@@ -22,6 +22,10 @@ export default function RegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
     if (authError) { setError(authError.message); setLoading(false); return }
 
+    // Sign in immediately so the session exists regardless of email confirmation setting
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) { setError(signInError.message); setLoading(false); return }
+
     if (authData.user) {
       await supabase.from('users').insert({
         auth_id: authData.user.id,
