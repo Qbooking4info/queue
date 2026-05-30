@@ -1,22 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import type { Database } from '@/types/database'
+
+// Service-role client — bypasses RLS, server-only, never exposed to browser
+function adminClient() {
+  return createAdminClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(req: NextRequest) {
+  // Verify the user is authenticated via their session cookie
   const supabase = await createClient()
-
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
+  const db = adminClient()
   const body = await req.json()
   const { name, type, description, address, city, state, phone, email, whatsapp,
     accepts_virtual, emergency_hours, specialtyIds, hours, planId } = body
 
   // Ensure public profile exists
-  let { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
+  let { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
   if (!profile) {
-    const { data: newProfile, error: pErr } = await supabase
+    const { data: newProfile, error: pErr } = await db
       .from('users')
       .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
       .select('id').single()
@@ -26,30 +37,27 @@ export async function POST(req: NextRequest) {
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
-  const { data: hospital, error: hErr } = await supabase.from('hospitals').insert({
+  const { data: hospital, error: hErr } = await db.from('hospitals').insert({
     name, slug, type: type ?? 'hospital',
     description: description || null,
     address, city, state,
-    phone: phone || null,
-    email: email || null,
-    whatsapp: whatsapp || null,
+    phone: phone || null, email: email || null, whatsapp: whatsapp || null,
     accepts_virtual: accepts_virtual ?? false,
     emergency_hours: emergency_hours ?? false,
   }).select('id').single()
-
   if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
 
-  await supabase.from('hospital_admins').insert({ hospital_id: hospital.id, user_id: profile.id, role: 'owner' })
+  await db.from('hospital_admins').insert({ hospital_id: hospital.id, user_id: profile.id, role: 'owner' })
 
   if (specialtyIds?.length > 0) {
-    await supabase.from('hospital_specialties').insert(
+    await db.from('hospital_specialties').insert(
       specialtyIds.map((sid: string) => ({ hospital_id: hospital.id, specialty_id: sid }))
     )
   }
 
   const openHours = (hours ?? []).filter((h: { closed: boolean }) => !h.closed)
   if (openHours.length > 0) {
-    await supabase.from('hospital_operating_hours').insert(
+    await db.from('hospital_operating_hours').insert(
       openHours.map((h: { day: number; open: string; close: string }) => ({
         hospital_id: hospital.id, day_of_week: h.day, open_time: h.open, close_time: h.close,
       }))
@@ -57,10 +65,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (planId) {
-    await supabase.from('hospital_subscriptions').insert({
-      hospital_id: hospital.id,
-      plan_id: planId,
-      status: 'trialing',
+    await db.from('hospital_subscriptions').insert({
+      hospital_id: hospital.id, plan_id: planId, status: 'trialing',
       trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     })
   }
