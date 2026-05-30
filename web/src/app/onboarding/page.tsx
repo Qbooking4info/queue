@@ -368,8 +368,17 @@ export default function OnboardingPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-      if (!profile) throw new Error('User profile not found')
+      let { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
+
+      // If profile missing (e.g. admin created via API), insert it now
+      if (!profile) {
+        const { data: newProfile, error: profileErr } = await supabase
+          .from('users')
+          .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
+          .select('id').single()
+        if (profileErr) throw new Error('Could not create user profile: ' + profileErr.message)
+        profile = newProfile
+      }
 
       const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
@@ -407,7 +416,12 @@ export default function OnboardingPage() {
 
       router.push('/dashboard?welcome=true')
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      const msg = e instanceof Error
+        ? e.message
+        : (e as { message?: string })?.message
+          ?? (e as { details?: string })?.details
+          ?? JSON.stringify(e)
+      setError(msg)
       setLoading(false)
     }
   }
