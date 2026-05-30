@@ -1,49 +1,39 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import type { Database } from '@/types/database'
-
-// Service-role client — bypasses RLS, server-only, never exposed to browser
-function adminClient() {
-  return createAdminClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
 
 export async function POST(req: NextRequest) {
-  // Verify the user is authenticated via their session cookie
+  // Verify session from cookie
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const db = adminClient()
+  // All DB writes use service role — bypasses RLS safely server-side
+  const db = createAdminClient()
   const body = await req.json()
   const { name, type, description, address, city, state, phone, email, whatsapp,
     accepts_virtual, emergency_hours, specialtyIds, hours, planId } = body
 
-  // Ensure public profile exists
+  // Ensure public profile row exists
   let { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
   if (!profile) {
-    const { data: newProfile, error: pErr } = await db
+    const { data: np, error: pErr } = await db
       .from('users')
       .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
       .select('id').single()
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 })
-    profile = newProfile
+    profile = np
   }
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
   const { data: hospital, error: hErr } = await db.from('hospitals').insert({
     name, slug, type: type ?? 'hospital',
-    description: description || null,
-    address, city, state,
+    description: description || null, address, city, state,
     phone: phone || null, email: email || null, whatsapp: whatsapp || null,
-    accepts_virtual: accepts_virtual ?? false,
-    emergency_hours: emergency_hours ?? false,
+    accepts_virtual: accepts_virtual ?? false, emergency_hours: emergency_hours ?? false,
   }).select('id').single()
   if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
 

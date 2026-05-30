@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
 
 const navItems = [
@@ -15,6 +16,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const headersList = await headers()
+  const pathname = headersList.get('x-invoke-path') ?? headersList.get('next-url') ?? '/dashboard'
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 bg-[#0D1610] border-r border-white/7 flex flex-col">
@@ -23,13 +27,22 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <div className="text-xs text-[#4A6058] tracking-widest uppercase mt-0.5">Hospital Portal</div>
         </div>
         <nav className="flex-1 p-3 flex flex-col gap-1">
-          {navItems.map(item => (
-            <Link key={item.href} href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#7A9089] hover:text-white hover:bg-white/5 transition-all">
-              <span className="text-base">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map(item => {
+            const isActive = item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href)
+            return (
+              <Link key={item.href} href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                  isActive
+                    ? 'text-green-400 bg-green-500/10'
+                    : 'text-[#7A9089] hover:text-white hover:bg-white/5'
+                }`}>
+                <span className="text-base">{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </nav>
         <div className="p-3 border-t border-white/7">
           <form action="/api/auth/signout" method="post">
