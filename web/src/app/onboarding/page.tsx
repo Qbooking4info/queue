@@ -365,54 +365,21 @@ export default function OnboardingPage() {
   async function handleSubmit() {
     setLoading(true); setError('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      let { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-
-      // If profile missing (e.g. admin created via API), insert it now
-      if (!profile) {
-        const { data: newProfile, error: profileErr } = await supabase
-          .from('users')
-          .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
-          .select('id').single()
-        if (profileErr) throw new Error('Could not create user profile: ' + profileErr.message)
-        profile = newProfile
-      }
-
-      const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
-
-      const { data: hospital, error: hErr } = await supabase.from('hospitals').insert({
-        name: data.name, slug, type: data.type, description: data.description || null,
-        address: data.address, city: data.city, state: data.state,
-        phone: data.phone, email: data.email || null, whatsapp: data.whatsapp || null,
-        accepts_virtual: data.accepts_virtual, emergency_hours: data.emergency_hours,
-      }).select('id').single()
-      if (hErr) throw hErr
-
-      await supabase.from('hospital_admins').insert({ hospital_id: hospital.id, user_id: profile.id, role: 'owner' })
-
-      if (data.specialtyIds.length > 0) {
-        await supabase.from('hospital_specialties').insert(
-          data.specialtyIds.map(sid => ({ hospital_id: hospital.id, specialty_id: sid }))
-        )
-      }
-
-      const openHours = data.hours.filter(h => !h.closed)
-      if (openHours.length > 0) {
-        await supabase.from('hospital_operating_hours').insert(
-          openHours.map(h => ({ hospital_id: hospital.id, day_of_week: h.day, open_time: h.open, close_time: h.close }))
-        )
-      }
-
-      const selectedPlan = plans.find(p => p.id === data.planId)
-      if (selectedPlan) {
-        await supabase.from('hospital_subscriptions').insert({
-          hospital_id: hospital.id, plan_id: data.planId,
-          status: 'trialing',
-          trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        })
-      }
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name, type: data.type, description: data.description,
+          address: data.address, city: data.city, state: data.state,
+          phone: data.phone, email: data.email, whatsapp: data.whatsapp,
+          accepts_virtual: data.accepts_virtual, emergency_hours: data.emergency_hours,
+          specialtyIds: data.specialtyIds,
+          hours: data.hours,
+          planId: data.planId,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Server error')
 
       router.push('/dashboard?welcome=true')
     } catch (e: unknown) {
