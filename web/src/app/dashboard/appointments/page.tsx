@@ -1,15 +1,14 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getHospitalContext } from '@/lib/getHospitalContext'
+import { StatusButton } from './StatusButton'
 
 const STATUS_COLOR: Record<string, string> = {
-  confirmed: 'text-green-400 bg-green-500/10 border-green-500/20',
-  pending:   'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  completed: 'text-gray-500 bg-white/5 border-white/10',
-  cancelled: 'text-red-400 bg-red-500/10 border-red-500/20',
-  no_show:   'text-red-400 bg-red-500/10 border-red-500/20',
-  checked_in:'text-blue-400 bg-blue-500/10 border-blue-500/20',
-  in_progress:'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  confirmed:   'text-green-400 bg-green-500/10 border-green-500/20',
+  pending:     'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  completed:   'text-gray-500 bg-white/5 border-white/10',
+  cancelled:   'text-red-400 bg-red-500/10 border-red-500/20',
+  no_show:     'text-red-400 bg-red-500/10 border-red-500/20',
+  checked_in:  'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  in_progress: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
 }
 
 export default async function AppointmentsPage({
@@ -17,22 +16,8 @@ export default async function AppointmentsPage({
 }: {
   searchParams: Promise<{ status?: string; date?: string }>
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const db = createAdminClient()
+  const { db, adminRecord } = await getHospitalContext()
   const params = await searchParams
-
-  const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) redirect('/onboarding')
-
-  const { data: adminRecord } = await db
-    .from('hospital_admins')
-    .select('hospital_id')
-    .eq('user_id', profile.id)
-    .single()
-  if (!adminRecord) redirect('/onboarding')
 
   let query = db
     .from('appointments')
@@ -64,7 +49,7 @@ export default async function AppointmentsPage({
                 ? 'border-green-500/50 bg-green-500/10 text-green-400'
                 : 'border-white/10 text-[#7A9089] hover:border-white/20'
             }`}>
-            {f === 'all' ? 'All' : f.replace('_', ' ')}
+            {f === 'all' ? 'All' : f.replace(/_/g, ' ')}
           </a>
         ))}
       </div>
@@ -76,24 +61,37 @@ export default async function AppointmentsPage({
             <div className="font-medium text-[#7A9089]">No appointments found</div>
           </div>
         ) : appointments.map(a => {
-          const doctor = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
-          const patient = Array.isArray(a.users) ? a.users[0] : a.users
+          const doctor  = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
+          const patient = Array.isArray(a.users)   ? a.users[0]   : a.users
           const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
           return (
-            <div key={a.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-lg shrink-0">
-                {a.type === 'virtual' ? '💻' : '🏥'}
+            <div key={a.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-lg shrink-0">
+                  {a.type === 'virtual' ? '💻' : '🏥'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <div className="font-semibold text-sm">{patient?.full_name ?? '—'}</div>
+                      <div className="text-xs text-[#7A9089]">{doctor?.title} {doctor?.full_name}</div>
+                      <div className="text-xs text-[#4A6058] mt-0.5">{a.appointment_date} · {a.start_time?.slice(0,5)} · <span className="capitalize">{a.type}</span></div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full border capitalize ${statusClass}`}>
+                        {a.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-xs font-mono text-[#4A6058]">{a.booking_ref}</span>
+                    </div>
+                  </div>
+                  {patient?.phone && (
+                    <div className="text-xs text-[#4A6058] mt-1">📞 {patient.phone}</div>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm">{patient?.full_name ?? '—'}</div>
-                <div className="text-xs text-[#7A9089]">{doctor?.title} {doctor?.full_name}</div>
-                <div className="text-xs text-[#4A6058] mt-0.5">{a.appointment_date} · {a.start_time?.slice(0,5)}</div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border capitalize ${statusClass}`}>
-                  {a.status.replace('_', ' ')}
-                </span>
-                <span className="text-xs font-mono text-[#4A6058]">{a.booking_ref}</span>
+              {/* Status action buttons */}
+              <div className="mt-3 flex justify-end">
+                <StatusButton appointmentId={a.id} currentStatus={a.status} />
               </div>
             </div>
           )

@@ -1,24 +1,8 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 
 export default async function DoctorsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const db = createAdminClient()
-
-  const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) redirect('/onboarding')
-
-  const { data: adminRecord } = await db
-    .from('hospital_admins')
-    .select('hospital_id')
-    .eq('user_id', profile.id)
-    .single()
-  if (!adminRecord) redirect('/onboarding')
+  const { db, adminRecord } = await getHospitalContext()
 
   const { data: doctors } = await db
     .from('doctors')
@@ -49,7 +33,7 @@ export default async function DoctorsPage() {
             return (
               <div key={d.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-lg font-bold text-green-400 shrink-0">
-                  {d.full_name.split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase()}
+                  {(d.full_name ?? '?').split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase()}
                 </div>
                 <div className="flex-1">
                   <div className="font-bold">{d.title} {d.full_name}</div>

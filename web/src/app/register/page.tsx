@@ -22,10 +22,8 @@ export default function RegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
     if (authError) { setError(authError.message); setLoading(false); return }
 
-    // Sign in immediately so the session exists regardless of email confirmation setting
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    if (signInError) { setError(signInError.message); setLoading(false); return }
-
+    // Insert profile row immediately using the auth user from signUp,
+    // before sign-in — ensures the row exists even if signIn fails.
     if (authData.user) {
       await supabase.from('users').insert({
         auth_id: authData.user.id,
@@ -33,6 +31,10 @@ export default function RegisterPage() {
         email,
       })
     }
+
+    // Sign in immediately so the session exists regardless of email confirmation setting
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) { setError(signInError.message); setLoading(false); return }
 
     router.push('/onboarding')
   }

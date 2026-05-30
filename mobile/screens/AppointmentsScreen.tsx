@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, RefreshControl, Alert, Linking } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { dark as t, spacing, font, radius } from '../lib/theme'
 
@@ -24,24 +24,27 @@ export function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false)
 
   const fetch = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-    const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-    if (!profile) return
+      const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
+      if (!profile) return
 
-    const query = supabase
-      .from('appointments')
-      .select('id,booking_ref,appointment_date,start_time,type,status,hospitals(name),doctors(full_name,title)')
-      .eq('patient_id', profile.id)
-      .order('appointment_date', { ascending: tab === 'upcoming' })
+      const upcomingStatuses  = ['pending','confirmed','checked_in','in_progress']
+      const completedStatuses = ['completed','cancelled','no_show']
 
-    if (tab === 'upcoming')   query.in('status', ['pending','confirmed','checked_in','in_progress'])
-    if (tab === 'completed')  query.in('status', ['completed','cancelled','no_show'])
-
-    const { data } = await query.limit(20)
-    setAppts((data as Appointment[]) ?? [])
-    setLoading(false); setRefreshing(false)
+      const { data } = await supabase
+        .from('appointments')
+        .select('id,booking_ref,appointment_date,start_time,type,status,hospitals(name),doctors(full_name,title)')
+        .eq('patient_id', profile.id)
+        .in('status', tab === 'upcoming' ? upcomingStatuses : completedStatuses)
+        .order('appointment_date', { ascending: tab === 'upcoming' })
+        .limit(20)
+      setAppts((data as Appointment[]) ?? [])
+    } finally {
+      setLoading(false); setRefreshing(false)
+    }
   }, [tab])
 
   useEffect(() => { setLoading(true); fetch() }, [fetch])
@@ -93,12 +96,18 @@ export function AppointmentsScreen() {
                 </View>
                 <View style={styles.cardFooter}>
                   {a.status === 'confirmed' && a.type === 'virtual' && (
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#5B9EFF22', borderColor: '#5B9EFF44' }]}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#5B9EFF22', borderColor: '#5B9EFF44' }]}
+                      onPress={() => Alert.alert('Join Call', 'Your video call link will be sent to your email and phone number 15 minutes before your appointment.')}>
                       <Text style={{ fontSize: font.sm, color: '#5B9EFF', fontWeight: '700' }}>Join Call</Text>
                     </TouchableOpacity>
                   )}
                   {(a.status === 'pending' || a.status === 'confirmed') && (
-                    <TouchableOpacity style={[styles.actionBtn, { borderColor: t.border }]}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { borderColor: t.border }]}
+                      onPress={() => Alert.alert('Reschedule', 'To reschedule, please contact the hospital directly.', [
+                        { text: 'OK' },
+                      ])}>
                       <Text style={{ fontSize: font.sm, color: t.textSub, fontWeight: '600' }}>Reschedule</Text>
                     </TouchableOpacity>
                   )}

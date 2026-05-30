@@ -27,9 +27,15 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
           </View>
           <Text style={styles.location}>{h.city}, {h.state}</Text>
           <View style={styles.meta}>
-            <Text style={styles.rating}>★ {h.avg_rating.toFixed(1)}</Text>
-            <Text style={styles.dot}>·</Text>
-            <Text style={styles.reviews}>({h.review_count})</Text>
+            {h.avg_rating ? (
+              <>
+                <Text style={styles.rating}>★ {h.avg_rating.toFixed(1)}</Text>
+                <Text style={styles.dot}>·</Text>
+                <Text style={styles.reviews}>({h.review_count})</Text>
+              </>
+            ) : (
+              <Text style={styles.reviews}>New</Text>
+            )}
             {h.accepts_virtual && <>
               <Text style={styles.dot}>·</Text>
               <Text style={styles.virtual}>Virtual</Text>

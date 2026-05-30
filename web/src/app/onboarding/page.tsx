@@ -164,7 +164,7 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
         })}
       </div>
       {data.specialtyIds.length > 0 && (
-        <p className="text-sm text-green-400">{data.specialtyIds.length} specialty{data.specialtyIds.length !== 1 ? 'ies' : 'y'} selected</p>
+        <p className="text-sm text-green-400">{data.specialtyIds.length} {data.specialtyIds.length !== 1 ? 'specialties' : 'specialty'} selected</p>
       )}
     </div>
   )

@@ -5,12 +5,12 @@ import { dark as t, spacing, font, radius } from '../lib/theme'
 import type { User } from '../types/database'
 
 const menuItems = [
-  { icon: '🩺', label: 'Medical History',            sub: 'View your past diagnoses and notes' },
-  { icon: '📄', label: 'Prescriptions & Lab Results', sub: 'Access your uploaded documents' },
-  { icon: '👨‍👩‍👧', label: 'Manage Dependents',          sub: 'Book appointments for family members' },
-  { icon: '🛡️', label: 'Insurance Details',            sub: 'Link your HMO or insurance card' },
-  { icon: '🔔', label: 'Notifications',                sub: 'Reminders, updates, and alerts' },
-  { icon: '🔐', label: 'Privacy & Security',           sub: 'Password, data, and account settings' },
+  { icon: '🩺', label: 'Medical History',            sub: 'View your past diagnoses and notes',     route: 'MedicalHistory' },
+  { icon: '📄', label: 'Prescriptions & Lab Results', sub: 'Access your uploaded documents',         route: 'Prescriptions' },
+  { icon: '👨‍👩‍👧', label: 'Manage Dependents',          sub: 'Book appointments for family members',   route: 'Dependents' },
+  { icon: '🛡️', label: 'Insurance Details',            sub: 'Link your HMO or insurance card',        route: 'Insurance' },
+  { icon: '🔔', label: 'Notifications',                sub: 'Reminders, updates, and alerts',         route: 'Notifications' },
+  { icon: '🔐', label: 'Privacy & Security',           sub: 'Password, data, and account settings',   route: 'PrivacySecurity' },
 ]
 
 const stats = [
@@ -49,6 +49,7 @@ export function ProfileScreen({ navigation }: { navigation: any }) {
 
   async function signOut() {
     await supabase.auth.signOut()
+    // App.tsx session listener unmounts MainNavigator and mounts AuthNavigator automatically
   }
 
   return (
@@ -75,7 +76,8 @@ export function ProfileScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.menu}>
           {menuItems.map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem} activeOpacity={0.7}>
+            <TouchableOpacity key={item.label} style={styles.menuItem} activeOpacity={0.7}
+              onPress={() => navigation.navigate(item.route)}>
               <Text style={{ fontSize: 20 }}>{item.icon}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuLabel}>{item.label}</Text>

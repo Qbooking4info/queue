@@ -37,7 +37,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Queue Hospital Portal</h1>
-          <p className="text-sm text-[#7A9089] mt-1">Sign in to manage your hospital</p>
+          <p className="text-sm text-[#7A9089] mt-1">Sign in as admin, specialist, or front desk</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -50,6 +50,9 @@ export default function LoginPage() {
         <p className="text-center text-sm text-[#7A9089] mt-6">
           New hospital?{' '}
           <Link href="/register" className="text-green-400 hover:text-green-300 font-medium">Register here</Link>
+        </p>
+        <p className="text-center text-xs text-[#4A6058] mt-3">
+          Staff members: use the same email and password from your patient app account
         </p>
       </div>
     </div>

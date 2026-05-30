@@ -1,42 +1,30 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const db = createAdminClient()
+  const { db, adminRecord } = await getHospitalContext()
   const params = await searchParams
 
-  const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) redirect('/onboarding')
+  if (adminRecord.role === 'specialist') redirect('/dashboard/specialist')
+  if (adminRecord.role === 'front_desk') redirect('/dashboard/frontdesk')
 
-  const { data: adminRecord } = await db
-    .from('hospital_admins')
-    .select('hospital_id, role, hospitals(name, city, state, is_verified, avg_rating, total_bookings)')
-    .eq('user_id', profile.id)
-    .single()
-
-  if (!adminRecord) redirect('/onboarding')
-
-  const hospital = adminRecord.hospitals as { name: string; city: string; state: string; is_verified: boolean; avg_rating: number; total_bookings: number } | null
+  const hid = adminRecord.hospital_id
 
   const [
+    { data: hospital },
     { count: confirmedCount },
     { count: doctorCount },
     { data: recentAppointments },
   ] = await Promise.all([
+    db.from('hospitals').select('name, city, state, is_verified, avg_rating, total_bookings').eq('id', hid).single(),
     db.from('appointments').select('*', { count: 'exact', head: true })
-      .eq('hospital_id', adminRecord.hospital_id)
-      .in('status', ['confirmed', 'checked_in', 'in_progress']),
+      .eq('hospital_id', hid).in('status', ['confirmed', 'checked_in', 'in_progress']),
     db.from('doctors').select('*', { count: 'exact', head: true })
-      .eq('hospital_id', adminRecord.hospital_id).eq('is_active', true),
+      .eq('hospital_id', hid).eq('is_active', true),
     db.from('appointments')
       .select('id, booking_ref, appointment_date, start_time, type, status, doctors(full_name, title)')
-      .eq('hospital_id', adminRecord.hospital_id)
+      .eq('hospital_id', hid)
       .gte('appointment_date', new Date().toISOString().split('T')[0])
       .in('status', ['pending', 'confirmed', 'checked_in'])
       .order('appointment_date', { ascending: true })
@@ -45,10 +33,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ])
 
   const stats = [
-    { label: 'Active Bookings',  value: confirmedCount ?? 0, icon: '📅', color: '#00E87A' },
-    { label: 'Active Doctors',   value: doctorCount ?? 0,    icon: '👨‍⚕️', color: '#5B9EFF' },
-    { label: 'Rating',           value: hospital?.avg_rating ? `${Number(hospital.avg_rating).toFixed(1)}★` : '—', icon: '⭐', color: '#FFB547' },
-    { label: 'Total Bookings',   value: hospital?.total_bookings ?? 0, icon: '📋', color: '#00E87A' },
+    { label: 'Active Bookings', value: confirmedCount ?? 0,   icon: '📅', color: '#00E87A' },
+    { label: 'Active Doctors',  value: doctorCount ?? 0,      icon: '👨‍⚕️', color: '#5B9EFF' },
+    { label: 'Rating',          value: hospital?.avg_rating ? `${Number(hospital.avg_rating).toFixed(1)}★` : '—', icon: '⭐', color: '#FFB547' },
+    { label: 'Total Bookings',  value: hospital?.total_bookings ?? 0, icon: '📋', color: '#00E87A' },
   ]
 
   return (
@@ -120,9 +108,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h2 className="font-bold mb-4">Quick Actions</h2>
           <div className="flex flex-col gap-2">
             {[
-              { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Add a Doctor',        sub: 'Register doctors and set availability' },
-              { href: '/dashboard/appointments', icon: '📅', label: 'View Appointments',   sub: 'Confirm, reschedule, or cancel bookings' },
-              { href: '/dashboard/settings',     icon: '⚙️',  label: 'Hospital Settings',  sub: 'Update profile, hours, and features' },
+              { href: '/dashboard/doctors/add', icon: '👨‍⚕️', label: 'Add a Doctor',      sub: 'Register doctors and set availability' },
+              { href: '/dashboard/appointments', icon: '📅', label: 'View Appointments', sub: 'Confirm, reschedule, or cancel bookings' },
+              { href: '/dashboard/settings',     icon: '⚙️',  label: 'Hospital Settings', sub: 'Update profile, hours, and features' },
             ].map(a => (
               <Link key={a.href} href={a.href}
                 className="flex items-center gap-3 p-3 rounded-xl border border-white/7 hover:border-green-500/20 hover:bg-green-500/5 transition-all group">

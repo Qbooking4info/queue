@@ -36,7 +36,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
             <Text style={styles.greeting}>Good morning 👋</Text>
             <Text style={styles.headline}>Find care near you</Text>
           </View>
-          <TouchableOpacity style={styles.notifBtn}>
+          <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
             <Text style={{ fontSize: 20 }}>🔔</Text>
             <View style={styles.notifDot} />
           </TouchableOpacity>
@@ -50,7 +50,8 @@ export function HomeScreen({ navigation }: { navigation: any }) {
         <Text style={styles.sectionLabel}>Specialties</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.xl }} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
           {specialties.map(s => (
-            <TouchableOpacity key={s.id} style={styles.specialtyChip}>
+            <TouchableOpacity key={s.id} style={styles.specialtyChip}
+              onPress={() => navigation.navigate('Search', { initialQuery: s.name })}>
               <Text style={{ fontSize: 22 }}>{s.icon}</Text>
               <Text style={styles.specialtyLabel}>{s.name}</Text>
             </TouchableOpacity>

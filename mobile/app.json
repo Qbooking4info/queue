@@ -16,10 +16,21 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.qbooking.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a46342ec-6f59-459a-8885-da9aab8d39e0"
+      },
+      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
   }
 }

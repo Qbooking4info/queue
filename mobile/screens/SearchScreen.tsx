@@ -13,8 +13,8 @@ interface Hospital {
 const FILTERS = ['All', 'Virtual', 'Open Now', 'Top Rated'] as const
 type Filter = typeof FILTERS[number]
 
-export function SearchScreen({ navigation }: { navigation: any }) {
-  const [query, setQuery]       = useState('')
+export function SearchScreen({ navigation, route }: { navigation: any; route: any }) {
+  const [query, setQuery]       = useState(route?.params?.initialQuery ?? '')
   const [filter, setFilter]     = useState<Filter>('All')
   const [hospitals, setHospitals] = useState<Hospital[]>([])
   const [loading, setLoading]   = useState(false)
@@ -23,15 +23,29 @@ export function SearchScreen({ navigation }: { navigation: any }) {
     setLoading(true)
     let q = supabase
       .from('hospitals')
-      .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon))')
+      .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
       .eq('is_active', true)
       .eq('is_verified', true)
 
-    if (query.trim()) q = q.ilike('name', `%${query}%`)
-    if (filter === 'Virtual')    q = q.eq('accepts_virtual', true)
-    if (filter === 'Top Rated')  q = q.gte('avg_rating', 4.5)
-    q.order('avg_rating', { ascending: false }).limit(20)
-      .then(({ data }) => { setHospitals((data as Hospital[]) ?? []); setLoading(false) })
+    if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
+    if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
+    if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
+
+    q.order('avg_rating', { ascending: false }).limit(20).then(({ data }) => {
+      let results = (data as (Hospital & { hospital_operating_hours: { day_of_week: number; open_time: string; close_time: string }[] })[]) ?? []
+      if (filter === 'Open Now') {
+        const now  = new Date()
+        const day  = now.getDay()
+        const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+        results = results.filter(h =>
+          h.hospital_operating_hours?.some(oh =>
+            oh.day_of_week === day && oh.open_time <= time && time <= oh.close_time
+          )
+        )
+      }
+      setHospitals(results)
+      setLoading(false)
+    })
   }, [query, filter])
 
   return (

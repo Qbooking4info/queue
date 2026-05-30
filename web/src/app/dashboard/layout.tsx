@@ -1,48 +1,39 @@
 import { redirect } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
-import { headers } from 'next/headers'
+import { NavLinks } from '@/components/dashboard/NavLinks'
 import type { ReactNode } from 'react'
 
-const navItems = [
-  { href: '/dashboard',              icon: '⊞', label: 'Overview'     },
-  { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
-  { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors'      },
-  { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings'     },
-]
+const ROLE_LABEL: Record<string, string> = {
+  admin:      'Admin',
+  specialist: 'Specialist',
+  front_desk: 'Front Desk',
+}
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const headersList = await headers()
-  const pathname = headersList.get('x-invoke-path') ?? headersList.get('next-url') ?? '/dashboard'
+  const db = createAdminClient()
+  const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
+  const { data: adminRecord } = profile
+    ? await db.from('hospital_admins').select('role').eq('user_id', profile.id).single()
+    : { data: null }
+
+  const role = adminRecord?.role ?? 'admin'
 
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 bg-[#0D1610] border-r border-white/7 flex flex-col">
         <div className="p-5 border-b border-white/7">
           <div className="text-xl font-bold tracking-tight">Queue</div>
-          <div className="text-xs text-[#4A6058] tracking-widest uppercase mt-0.5">Hospital Portal</div>
+          <div className="text-xs text-[#4A6058] tracking-widest uppercase mt-0.5">
+            {ROLE_LABEL[role] ?? 'Portal'}
+          </div>
         </div>
         <nav className="flex-1 p-3 flex flex-col gap-1">
-          {navItems.map(item => {
-            const isActive = item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
-            return (
-              <Link key={item.href} href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                  isActive
-                    ? 'text-green-400 bg-green-500/10'
-                    : 'text-[#7A9089] hover:text-white hover:bg-white/5'
-                }`}>
-                <span className="text-base">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
+          <NavLinks role={role} />
         </nav>
         <div className="p-3 border-t border-white/7">
           <form action="/api/auth/signout" method="post">
