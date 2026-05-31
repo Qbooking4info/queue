@@ -1,13 +1,18 @@
+import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { linkDoctorToUser, unlinkDoctorFromUser } from './actions'
 
 export default async function DoctorsPage() {
+  noStore()
   const { db, adminRecord } = await getHospitalContext()
 
   const isAdmin = adminRecord.role === 'admin' || adminRecord.role === 'owner'
 
-  const [{ data: doctors }, { data: allSpecialists }] = await Promise.all([
+  const [
+    { data: doctors, error: doctorsErr },
+    { data: allSpecialists },
+  ] = await Promise.all([
     db.from('doctors')
       .select('id, full_name, title, qualification, specialty_id, consultation_fee, virtual_fee, accepts_virtual, is_active, avg_rating, review_count, user_id, specialties(name), users(id, full_name, email)')
       .eq('hospital_id', adminRecord.hospital_id)
@@ -17,6 +22,8 @@ export default async function DoctorsPage() {
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('role', 'specialist'),
   ])
+
+  if (doctorsErr) console.error('[DoctorsPage] query error:', doctorsErr)
 
   // Specialist users already linked to a doctor
   const linkedUserIds = new Set(doctors?.map(d => d.user_id).filter(Boolean))
