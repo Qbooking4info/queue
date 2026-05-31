@@ -67,7 +67,7 @@ export async function setupFrontDeskLogin(
   // No front desk record — create one from scratch
   const { data: hospital } = await db.from('hospitals').select('slug').eq('id', adminRecord.hospital_id).single()
   const slugBase = (hospital?.slug ?? '').replace(/-[a-z0-9]{5,}$/, '') || 'hospital'
-  const fdEmail = `frontdesk.${slugBase}@queue.hospital`
+  const fdEmail = `frontdesk.${slugBase}@portal.queueapp.co`
 
   // Auth user might already exist (creation succeeded but hospital_admins insert failed before)
   let authId: string

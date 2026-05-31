@@ -56,7 +56,7 @@ export default async function StaffPage() {
         {staff?.map(member => {
           const user = Array.isArray(member.users) ? member.users[0] : member.users
           const isSelf = member.user_id === profile.id
-          const isSystemAccount = user?.email?.endsWith('@queue.hospital') ?? false
+          const isSystemAccount = user?.email?.endsWith('@portal.queueapp.co') ?? false
 
           return (
             <div key={member.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">

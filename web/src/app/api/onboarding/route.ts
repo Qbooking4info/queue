@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   // Auto-create a front desk login for this hospital
   const slugBase = slug.replace(/-[a-z0-9]{5,}$/, '')
-  const fdEmail = `frontdesk.${slugBase}@queue.hospital`
+  const fdEmail = `frontdesk.${slugBase}@portal.queueapp.co`
   const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   const fdPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
     .map((b: number) => charset[b % charset.length]).join('')

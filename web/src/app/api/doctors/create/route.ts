@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map((b: number) => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('')
-  const loginEmail = `dr.${nameSlug}.${suffix}@queue.hospital`
+  const loginEmail = `dr.${nameSlug}.${suffix}@portal.queueapp.co`
   const loginPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
     .map((b: number) => charset[b % charset.length]).join('')
 

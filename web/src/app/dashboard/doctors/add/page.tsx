@@ -58,6 +58,9 @@ export default function AddDoctorPage() {
     if (json.loginCreated) {
       setSuccess({ loginEmail: json.loginEmail, loginPassword: json.loginPassword })
       setLoading(false)
+    } else if (json.loginError) {
+      setError(`Doctor saved, but login could not be created: ${json.loginError}. Use the Staff page to set up their login manually.`)
+      setLoading(false)
     } else {
       router.push('/dashboard/doctors')
     }
