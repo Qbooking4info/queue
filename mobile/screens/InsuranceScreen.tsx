@@ -41,12 +41,19 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
     if (!insurance.member_id.trim()) { Alert.alert('Error', 'Please enter your Member ID.'); return }
     setSaving(true)
     const { error } = await supabase.from('user_insurance').upsert({
-      user_id: userId,
-      ...insurance,
+      user_id:      userId,
+      provider:     insurance.provider,
+      plan_name:    insurance.plan_name || null,
+      member_id:    insurance.member_id.trim(),
+      group_number: insurance.group_number || null,
+      updated_at:   new Date().toISOString(),
     }, { onConflict: 'user_id' })
     setSaving(false)
-    if (error) Alert.alert('Error', error.message)
-    else Alert.alert('Saved', 'Insurance details updated successfully.')
+    if (error) {
+      Alert.alert('Save Failed', error.message)
+    } else {
+      Alert.alert('Saved ✓', 'Your insurance details have been saved.')
+    }
   }
 
   return (
