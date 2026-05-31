@@ -52,7 +52,7 @@ export function HospitalProfileScreen({ route, navigation }: { route: any; navig
     const now  = new Date()
     const day  = now.getDay()
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-    return hours.some(h => h.day_of_week === day && h.open_time <= time && time <= h.close_time)
+    return hours.some(h => h.day_of_week === day && h.open_time.slice(0,5) <= time && time <= h.close_time.slice(0,5))
   }
 
   function handleBooking() {

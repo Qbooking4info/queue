@@ -38,7 +38,7 @@ export function SearchScreen({ navigation, route }: { navigation: any; route: an
         const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
         results = results.filter(h =>
           h.hospital_operating_hours?.some(oh =>
-            oh.day_of_week === day && oh.open_time <= time && time <= oh.close_time
+            oh.day_of_week === day && oh.open_time.slice(0,5) <= time && time <= oh.close_time.slice(0,5)
           )
         )
       }
