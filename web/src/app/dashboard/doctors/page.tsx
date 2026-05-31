@@ -14,7 +14,7 @@ export default async function DoctorsPage() {
     { data: allSpecialists },
   ] = await Promise.all([
     db.from('doctors')
-      .select('id, full_name, title, qualification, specialty_id, consultation_fee, virtual_fee, accepts_virtual, is_active, avg_rating, review_count, user_id, specialties(name), users(id, full_name, email)')
+      .select('id, full_name, title, qualification, specialty_id, consultation_fee, virtual_fee, accepts_virtual, is_active, avg_rating, review_count, user_id, specialties!doctors_specialty_id_fkey(name), users(id, full_name, email)')
       .eq('hospital_id', adminRecord.hospital_id)
       .order('full_name'),
     db.from('hospital_admins')
