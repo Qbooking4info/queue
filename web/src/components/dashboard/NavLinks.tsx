@@ -22,7 +22,7 @@ const NAV: Record<string, { href: string; icon: string; label: string }[]> = {
 
 export function NavLinks({ role }: { role: string }) {
   const pathname = usePathname()
-  const items = NAV[role] ?? NAV.admin
+  const items = NAV[role] ?? NAV.admin  // 'owner' falls back to admin nav
 
   return (
     <>

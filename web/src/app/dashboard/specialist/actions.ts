@@ -5,7 +5,7 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 
 export async function saveAppointmentNotes(formData: FormData) {
   const { db, profile, adminRecord } = await getHospitalContext()
-  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin') throw new Error('Unauthorized')
+  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') throw new Error('Unauthorized')
 
   const appointmentId = formData.get('appointment_id') as string
   const newStatus = formData.get('status') as string

@@ -13,6 +13,8 @@ export default function AddDoctorPage() {
   const [specialties, setSpecialties] = useState<Specialty[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState<{ loginEmail: string; loginPassword: string } | null>(null)
+  const [copied, setCopied] = useState<'email' | 'password' | null>(null)
 
   const [form, setForm] = useState({
     full_name: '',
@@ -40,31 +42,89 @@ export default function AddDoctorPage() {
     e.preventDefault()
     setLoading(true); setError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-
-    const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-    if (!profile) { router.push('/onboarding'); return }
-
-    const { data: adminRecord } = await supabase
-      .from('hospital_admins').select('hospital_id').eq('user_id', profile.id).single()
-    if (!adminRecord) { router.push('/onboarding'); return }
-
-    const { error: insertErr } = await supabase.from('doctors').insert({
-      hospital_id: adminRecord.hospital_id,
-      full_name: form.full_name.trim(),
-      title: form.title,
-      qualification: form.qualification.trim() || null,
-      specialty_id: form.specialty_id || null,
-      consultation_fee: form.consultation_fee ? Number(form.consultation_fee) : null,
-      virtual_fee: form.virtual_fee ? Number(form.virtual_fee) : null,
-      accepts_virtual: form.accepts_virtual,
-      bio: form.bio.trim() || null,
-      is_active: true,
+    const res = await fetch('/api/doctors/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
     })
+    const json = await res.json()
 
-    if (insertErr) { setError(insertErr.message); setLoading(false); return }
-    router.push('/dashboard/doctors')
+    if (!res.ok) {
+      setError(json.error ?? 'Failed to add doctor')
+      setLoading(false)
+      return
+    }
+
+    if (json.loginCreated) {
+      setSuccess({ loginEmail: json.loginEmail, loginPassword: json.loginPassword })
+      setLoading(false)
+    } else {
+      router.push('/dashboard/doctors')
+    }
+  }
+
+  async function copyText(text: string, field: 'email' | 'password') {
+    await navigator.clipboard.writeText(text)
+    setCopied(field)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  if (success) {
+    return (
+      <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
+        <div className="bg-[#111915] border border-white/7 rounded-2xl p-8">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
+              <span className="text-2xl">👨‍⚕️</span>
+            </div>
+            <h2 className="text-xl font-bold">Doctor Added</h2>
+            <p className="text-sm text-[#7A9089] mt-1">
+              Save these credentials and share them with the doctor.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 mb-6">
+            <div>
+              <div className="text-xs text-[#7A9089] mb-1">Login Email</div>
+              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
+                <span className="flex-1 text-sm font-mono text-white break-all">{success.loginEmail}</span>
+                <button onClick={() => copyText(success!.loginEmail, 'email')}
+                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
+                  {copied === 'email' ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#7A9089] mb-1">Password</div>
+              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
+                <span className="flex-1 text-sm font-mono text-white tracking-widest">{success.loginPassword}</span>
+                <button onClick={() => copyText(success!.loginPassword, 'password')}
+                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
+                  {copied === 'password' ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 mb-6">
+            <p className="text-xs text-amber-400 leading-relaxed">
+              <span className="font-semibold">Important:</span> This password will not be shown again. Copy it now and share it with the doctor securely.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Link href="/dashboard/doctors"
+              className="flex-1 text-center py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition-all">
+              Back to Doctors
+            </Link>
+            <button onClick={() => { setSuccess(null); setCopied(null); setForm({ full_name: '', title: 'Dr.', qualification: '', specialty_id: '', consultation_fee: '', virtual_fee: '', accepts_virtual: false, bio: '' }) }}
+              className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-[#7A9089] hover:text-white hover:border-white/20 transition-all">
+              Add Another
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

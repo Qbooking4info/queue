@@ -25,7 +25,6 @@ export function SearchScreen({ navigation, route }: { navigation: any; route: an
       .from('hospitals')
       .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
       .eq('is_active', true)
-      .eq('is_verified', true)
 
     if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
     if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)

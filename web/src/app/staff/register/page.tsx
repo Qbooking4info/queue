@@ -36,15 +36,28 @@ export default function StaffRegisterPage() {
     if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
     if (!authData.user) { setError('Account creation failed. Please try again.'); setLoading(false); return }
 
-    // Create users table record
-    await supabase.from('users').insert({
+    // If email confirmation is required, signUp returns a session-less user.
+    // Sign in first so we have a session for the RLS-protected insert.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+
+    if (signInErr) {
+      // Email confirmation is likely required — tell the user to confirm first.
+      setError('Please check your email and confirm your address, then sign in.')
+      setLoading(false)
+      return
+    }
+
+    // Create users table record (requires an active session for RLS)
+    const { error: profileErr } = await supabase.from('users').insert({
       auth_id:   authData.user.id,
       full_name: fullName.trim(),
       email:     email.trim().toLowerCase(),
     })
 
-    // Sign in immediately
-    await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+    if (profileErr) { setError(profileErr.message); setLoading(false); return }
 
     // Check if admin has already pre-assigned a role
     const { data: profile } = await supabase
@@ -55,13 +68,11 @@ export default function StaffRegisterPage() {
         .from('hospital_admins').select('role').eq('user_id', profile.id).single()
 
       if (adminRecord) {
-        // Role already assigned — go straight to dashboard
         router.push('/dashboard')
         return
       }
     }
 
-    // No role assigned yet — show waiting screen
     setDone(true)
     setLoading(false)
   }

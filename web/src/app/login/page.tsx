@@ -33,7 +33,7 @@ export default function LoginPage() {
     if (!email.trim()) { setResetError('Please enter your email address.'); return }
     setResetLoading(true); setResetError('')
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
     setResetLoading(false)
     if (error) { setResetError(error.message); return }
@@ -140,10 +140,6 @@ export default function LoginPage() {
         <p className="text-center text-sm text-[#7A9089] mt-6">
           New hospital?{' '}
           <Link href="/register" className="text-green-400 hover:text-green-300 font-medium">Register here</Link>
-        </p>
-        <p className="text-center text-xs text-[#4A6058] mt-3">
-          New staff member?{' '}
-          <Link href="/staff/register" className="text-green-400 hover:text-green-300">Create a staff account</Link>
         </p>
       </div>
     </div>

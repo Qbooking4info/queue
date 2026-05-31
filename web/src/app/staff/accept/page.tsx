@@ -8,42 +8,60 @@ export default function AcceptInvitePage() {
   const supabase = createClient()
 
   const [fullName, setFullName] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm]   = useState('')
   const [loading, setLoading]   = useState(false)
   const [checking, setChecking] = useState(true)
   const [error, setError]       = useState('')
   const [email, setEmail]       = useState('')
 
   useEffect(() => {
-    // Supabase sets the session from the URL hash on invite acceptance
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
-        // Session not ready yet — wait for hash to be processed
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, sess) => {
-          if (sess) {
-            subscription.unsubscribe()
-            setEmail(sess.user.email ?? '')
-            await checkExistingProfile(sess.user.id, sess.user.email ?? '')
-          }
-        })
-      } else {
+    async function init() {
+      // Session is already established by /auth/callback before landing here.
+      // Fall back to onAuthStateChange for implicit-flow invite links (hash tokens).
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session) {
         setEmail(session.user.email ?? '')
-        await checkExistingProfile(session.user.id, session.user.email ?? '')
+        await checkExistingProfile(session.user.id)
+        return
       }
-    })
+
+      // Implicit flow: wait for the client to process the URL hash token
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+        if (sess) {
+          subscription.unsubscribe()
+          setEmail(sess.user.email ?? '')
+          await checkExistingProfile(sess.user.id)
+        }
+      })
+
+      // No session and no hash token — link is invalid or expired
+      const timeout = setTimeout(() => {
+        setError('This invite link is invalid or has expired. Ask your admin to resend it.')
+        setChecking(false)
+      }, 5000)
+
+      return () => {
+        subscription.unsubscribe()
+        clearTimeout(timeout)
+      }
+    }
+
+    init()
   }, [])
 
-  async function checkExistingProfile(authId: string, userEmail: string) {
+  async function checkExistingProfile(authId: string) {
     const { data: profile } = await supabase
       .from('users').select('id, full_name').eq('auth_id', authId).single()
 
     if (profile?.full_name && profile.full_name !== 'Invited Staff') {
-      // Profile already complete — go to dashboard
       router.push('/dashboard')
       return
     }
 
-    if (profile) {
-      setFullName(profile.full_name === 'Invited Staff' ? '' : profile.full_name)
+    if (profile?.full_name === 'Invited Staff') {
+      setFullName('')
     }
 
     setChecking(false)
@@ -52,12 +70,13 @@ export default function AcceptInvitePage() {
   async function handleComplete(e: React.FormEvent) {
     e.preventDefault()
     if (!fullName.trim()) { setError('Please enter your name.'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (password !== confirm) { setError('Passwords do not match.'); return }
 
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Session expired. Please use the invite link again.'); setLoading(false); return }
 
-    // Upsert the users record with their real name
     const { error: upsertErr } = await supabase.from('users').upsert({
       auth_id:   user.id,
       full_name: fullName.trim(),
@@ -65,6 +84,9 @@ export default function AcceptInvitePage() {
     }, { onConflict: 'auth_id' })
 
     if (upsertErr) { setError(upsertErr.message); setLoading(false); return }
+
+    const { error: pwErr } = await supabase.auth.updateUser({ password })
+    if (pwErr) { setError(pwErr.message); setLoading(false); return }
 
     router.push('/dashboard')
   }
@@ -86,7 +108,7 @@ export default function AcceptInvitePage() {
           </div>
           <h1 className="text-2xl font-bold">Welcome to Queue</h1>
           <p className="text-sm text-[#7A9089] mt-1">
-            Complete your profile to access the portal
+            Set your name and password to access the portal
           </p>
           {email && <p className="text-xs text-[#4A6058] mt-1">{email}</p>}
         </div>
@@ -104,6 +126,24 @@ export default function AcceptInvitePage() {
               value={fullName} onChange={e => setFullName(e.target.value)}
               placeholder="Dr. Amaka Okafor"
               required autoFocus
+              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#7A9089] mb-1.5 block">Set Password *</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Min. 8 characters"
+              required
+              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[#7A9089] mb-1.5 block">Confirm Password *</label>
+            <input
+              type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
+              placeholder="Repeat password"
+              required
               className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
             />
           </div>

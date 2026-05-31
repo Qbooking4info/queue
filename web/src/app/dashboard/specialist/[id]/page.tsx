@@ -10,7 +10,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   const { id } = await params
   const { adminRecord } = await getHospitalContext()
 
-  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin') redirect('/dashboard')
+  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const db = createAdminClient()
   const { data: appt } = await db

@@ -18,16 +18,22 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const db = createAdminClient()
   const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
   const { data: adminRecord } = profile
-    ? await db.from('hospital_admins').select('role').eq('user_id', profile.id).single()
+    ? await db.from('hospital_admins').select('role, hospital_id').eq('user_id', profile.id).single()
     : { data: null }
 
   const role = adminRecord?.role ?? 'admin'
+
+  const { data: hospital } = adminRecord?.hospital_id
+    ? await db.from('hospitals').select('name').eq('id', adminRecord.hospital_id).single()
+    : { data: null }
 
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 bg-[#0D1610] border-r border-white/7 flex flex-col">
         <div className="p-5 border-b border-white/7">
-          <div className="text-xl font-bold tracking-tight">Queue</div>
+          <div className="text-xl font-bold tracking-tight truncate" title={hospital?.name ?? 'Queue'}>
+            {hospital?.name ?? 'Queue'}
+          </div>
           <div className="text-xs text-[#4A6058] tracking-widest uppercase mt-0.5">
             {ROLE_LABEL[role] ?? 'Portal'}
           </div>

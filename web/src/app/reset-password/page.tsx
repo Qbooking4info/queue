@@ -14,9 +14,14 @@ export default function ResetPasswordPage() {
   const [ready, setReady]         = useState(false)
 
   useEffect(() => {
-    // Supabase exchanges the token from the URL hash automatically
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    // After /auth/callback exchanges the code, the session exists immediately.
+    // Fall back to onAuthStateChange for implicit-flow reset links (hash tokens).
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) { setReady(true); return }
+
+      supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true)
+      })
     })
   }, [])
 

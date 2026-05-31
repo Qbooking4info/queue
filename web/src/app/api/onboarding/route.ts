@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const { error: adminErr } = await db
     .from('hospital_admins')
-    .insert({ hospital_id: hospital.id, user_id: profile.id, role: 'owner' })
+    .insert({ hospital_id: hospital.id, user_id: profile.id, role: 'admin' })
   if (adminErr) {
     // Roll back the hospital row so the user can retry cleanly
     await db.from('hospitals').delete().eq('id', hospital.id)
@@ -83,5 +84,43 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  return NextResponse.json({ success: true, hospitalId: hospital.id })
+  // Auto-create a front desk login for this hospital
+  const slugBase = slug.replace(/-[a-z0-9]{5,}$/, '')
+  const fdEmail = `frontdesk.${slugBase}@queue.hospital`
+  const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  const fdPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
+    .map((b: number) => charset[b % charset.length]).join('')
+
+  let frontdeskCredentials: { email: string; password: string } | null = null
+
+  const { data: fdAuth, error: fdAuthErr } = await db.auth.admin.createUser({
+    email: fdEmail,
+    password: fdPassword,
+    email_confirm: true,
+  })
+
+  if (!fdAuthErr && fdAuth.user) {
+    const { data: fdProfile } = await db.from('users').insert({
+      auth_id: fdAuth.user.id,
+      email: fdEmail,
+      full_name: 'Front Desk',
+    }).select('id').single()
+
+    if (fdProfile) {
+      const { error: fdAdminErr } = await db.from('hospital_admins').insert({
+        hospital_id: hospital.id,
+        user_id: fdProfile.id,
+        role: 'front_desk',
+      })
+      if (!fdAdminErr) {
+        frontdeskCredentials = { email: fdEmail, password: fdPassword }
+      }
+    }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/staff')
+  revalidatePath('/dashboard/settings')
+
+  return NextResponse.json({ success: true, hospitalId: hospital.id, frontdeskCredentials })
 }

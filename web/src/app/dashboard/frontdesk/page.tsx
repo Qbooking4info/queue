@@ -18,7 +18,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   const { db, adminRecord } = await getHospitalContext()
   const params = await searchParams
 
-  if (adminRecord.role !== 'front_desk' && adminRecord.role !== 'admin') redirect('/dashboard')
+  if (adminRecord.role !== 'front_desk' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const today = new Date().toISOString().split('T')[0]
   const selectedDate = params.date ?? today

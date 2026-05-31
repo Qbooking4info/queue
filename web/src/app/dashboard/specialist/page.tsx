@@ -15,15 +15,19 @@ const STATUS_COLOR: Record<string, string> = {
 export default async function SpecialistPage() {
   const { db, profile, adminRecord } = await getHospitalContext()
 
-  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin') redirect('/dashboard')
+  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
-  // Find the doctor record linked to this user
-  const { data: doctor } = await db
-    .from('doctors')
-    .select('id, full_name, title, specialties(name)')
-    .eq('hospital_id', adminRecord.hospital_id)
-    .eq('user_id', profile.id)
-    .single()
+  const [{ data: doctor }, { data: hospital }] = await Promise.all([
+    db.from('doctors')
+      .select('id, full_name, title, specialties(name)')
+      .eq('hospital_id', adminRecord.hospital_id)
+      .eq('user_id', profile.id)
+      .single(),
+    db.from('hospitals')
+      .select('name, city, state')
+      .eq('id', adminRecord.hospital_id)
+      .single(),
+  ])
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -63,6 +67,11 @@ export default async function SpecialistPage() {
           <p className="text-sm text-[#7A9089] mt-0.5">
             {specialty?.name ?? 'Specialist'} · {new Date(today + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+          {hospital && (
+            <p className="text-xs text-[#4A6058] mt-1">
+              🏥 {hospital.name}{hospital.city ? ` · ${hospital.city}` : ''}
+            </p>
+          )}
         </div>
         <div className="bg-[#111915] border border-white/7 rounded-2xl px-4 py-3 text-center">
           <div className="text-2xl font-bold text-green-400">{completedCount ?? 0}</div>

@@ -2,6 +2,8 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { removeStaff } from './actions'
+import CredentialsBadge from './CredentialsBadge'
+import FrontDeskSetup from './FrontDeskSetup'
 
 const ROLE_BADGE: Record<string, string> = {
   admin:      'text-green-400 bg-green-500/10 border-green-500/20',
@@ -18,13 +20,22 @@ const ROLE_LABEL: Record<string, string> = {
 export default async function StaffPage() {
   const { db, adminRecord, profile } = await getHospitalContext()
 
-  if (adminRecord.role !== 'admin') redirect('/dashboard')
+  if (adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const { data: staff } = await db
     .from('hospital_admins')
-    .select('id, role, user_id, users(full_name, email)')
+    .select('id, role, user_id, users(id, full_name, email)')
     .eq('hospital_id', adminRecord.hospital_id)
-    .order('role')
+    .order('role') as {
+      data: Array<{
+        id: string
+        role: string
+        user_id: string
+        users: { id: string; full_name: string; email: string } | { id: string; full_name: string; email: string }[] | null
+      }> | null
+    }
+
+  const hasFrontDesk = staff?.some(m => m.role === 'front_desk') ?? false
 
   return (
     <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
@@ -35,36 +46,45 @@ export default async function StaffPage() {
         </div>
         <Link href="/dashboard/staff/add"
           className="px-4 py-2 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-xl transition-all">
-          + Add Staff
+          + Add Admin
         </Link>
       </div>
+
+      {!hasFrontDesk && <FrontDeskSetup />}
 
       <div className="flex flex-col gap-2">
         {staff?.map(member => {
           const user = Array.isArray(member.users) ? member.users[0] : member.users
           const isSelf = member.user_id === profile.id
+          const isSystemAccount = user?.email?.endsWith('@queue.hospital') ?? false
+
           return (
-            <div key={member.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-sm font-bold text-[#7A9089] shrink-0">
-                {user?.full_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2) ?? '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm">
-                  {user?.full_name ?? '—'} {isSelf && <span className="text-xs text-[#4A6058]">(you)</span>}
+            <div key={member.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-sm font-bold text-[#7A9089] shrink-0">
+                  {user?.full_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2) ?? '?'}
                 </div>
-                <div className="text-xs text-[#4A6058] mt-0.5">{user?.email}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm">
+                    {user?.full_name ?? '—'} {isSelf && <span className="text-xs text-[#4A6058]">(you)</span>}
+                  </div>
+                  <div className="text-xs text-[#4A6058] mt-0.5">{user?.email}</div>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${ROLE_BADGE[member.role ?? ''] ?? 'text-gray-400 bg-white/5 border-white/10'}`}>
+                  {ROLE_LABEL[member.role ?? ''] ?? member.role}
+                </span>
+                {!isSelf && (
+                  <form action={removeStaff}>
+                    <input type="hidden" name="staff_id" value={member.id} />
+                    <button type="submit"
+                      className="text-xs text-red-400 hover:text-red-300 px-2.5 py-1 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all">
+                      Remove
+                    </button>
+                  </form>
+                )}
               </div>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${ROLE_BADGE[member.role ?? ''] ?? 'text-gray-400 bg-white/5 border-white/10'}`}>
-                {ROLE_LABEL[member.role ?? ''] ?? member.role}
-              </span>
-              {!isSelf && (
-                <form action={removeStaff}>
-                  <input type="hidden" name="staff_id" value={member.id} />
-                  <button type="submit"
-                    className="text-xs text-red-400 hover:text-red-300 px-2.5 py-1 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all">
-                    Remove
-                  </button>
-                </form>
+              {isSystemAccount && user?.id && (
+                <CredentialsBadge userId={user.id} email={user.email} />
               )}
             </div>
           )

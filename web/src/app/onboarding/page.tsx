@@ -332,6 +332,8 @@ export default function OnboardingPage() {
   const [plans, setPlans]         = useState<SubscriptionPlan[]>([])
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
+  const [fdCredentials, setFdCredentials] = useState<{ email: string; password: string } | null>(null)
+  const [copied, setCopied]       = useState<'email' | 'password' | null>(null)
   const [data, setData]           = useState<FormData>({
     name: '', type: 'hospital', description: '',
     address: '', city: '', state: '', phone: '', email: '', whatsapp: '',
@@ -381,7 +383,12 @@ export default function OnboardingPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Server error')
 
-      router.push('/dashboard?welcome=true')
+      if (json.frontdeskCredentials) {
+        setFdCredentials(json.frontdeskCredentials)
+        setLoading(false)
+      } else {
+        router.push('/dashboard?welcome=true')
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error
         ? e.message
@@ -401,6 +408,64 @@ export default function OnboardingPage() {
     <StepHours key="hours" data={data} onChange={update} />,
     <StepPlan key="plan" data={data} onChange={update} plans={plans} />,
   ]
+
+  async function copyText(text: string, field: 'email' | 'password') {
+    await navigator.clipboard.writeText(text)
+    setCopied(field)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  if (fdCredentials) {
+    return (
+      <div className="min-h-screen bg-[#060A07] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#111915] border border-white/7 rounded-2xl p-8">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 mb-4">
+              <span className="text-2xl">🖥️</span>
+            </div>
+            <h1 className="text-xl font-bold">Front Desk Login Created</h1>
+            <p className="text-sm text-[#7A9089] mt-1">
+              Save these credentials and share them with your front desk staff.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 mb-6">
+            <div>
+              <div className="text-xs text-[#7A9089] mb-1">Email</div>
+              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
+                <span className="flex-1 text-sm font-mono text-white break-all">{fdCredentials.email}</span>
+                <button onClick={() => copyText(fdCredentials!.email, 'email')}
+                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
+                  {copied === 'email' ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-[#7A9089] mb-1">Password</div>
+              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
+                <span className="flex-1 text-sm font-mono text-white tracking-widest">{fdCredentials.password}</span>
+                <button onClick={() => copyText(fdCredentials!.password, 'password')}
+                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
+                  {copied === 'password' ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 mb-6">
+            <p className="text-xs text-amber-400 leading-relaxed">
+              <span className="font-semibold">Important:</span> This password will not be shown again. Copy it now and store it securely. You can add more front desk staff with real email addresses from Staff management.
+            </p>
+          </div>
+
+          <button onClick={() => router.push('/dashboard?welcome=true')}
+            className="w-full py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition-all">
+            Go to Dashboard →
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#060A07] flex items-start justify-center p-4 py-12">
