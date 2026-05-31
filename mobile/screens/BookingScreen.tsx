@@ -83,8 +83,8 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
   const [dependents, setDependents]     = useState<Dependent[]>([])
   const [forDependent, setForDep]       = useState<Dependent | null>(null)  // null = self
 
-  // Step 4 — Date
-  const [selectedDate, setDate]         = useState<string>(getNextDays(1)[0])
+  // Step 4 — Date — start from tomorrow so closed-today doesn't confuse clients
+  const [selectedDate, setDate]         = useState<string>(getNextDays(14)[1])
   const days = getNextDays(14)
 
   // Step 5 — Time slot

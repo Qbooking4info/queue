@@ -97,7 +97,7 @@ export function HospitalProfileScreen({ route, navigation }: { route: any; navig
               )}
               <View style={[styles.statusBadge, { borderColor: openNow ? '#00E87A44' : '#FF5C5C44', backgroundColor: openNow ? '#00E87A11' : '#FF5C5C11' }]}>
                 <Text style={{ fontSize: 10, fontWeight: '700', color: openNow ? t.accent : '#FF5C5C' }}>
-                  {loading ? '…' : openNow ? 'Open Now' : 'Closed'}
+                  {loading ? '…' : openNow ? 'Open Now' : 'Closed Now'}
                 </Text>
               </View>
               {hospital.emergency_hours && (
