@@ -12,18 +12,22 @@ CREATE TABLE IF NOT EXISTS public.user_insurance (
 
 ALTER TABLE public.user_insurance ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own insurance" ON public.user_insurance;
 CREATE POLICY "Users can read own insurance"
   ON public.user_insurance FOR SELECT
   USING (user_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can insert own insurance" ON public.user_insurance;
 CREATE POLICY "Users can insert own insurance"
   ON public.user_insurance FOR INSERT
   WITH CHECK (user_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can update own insurance" ON public.user_insurance;
 CREATE POLICY "Users can update own insurance"
   ON public.user_insurance FOR UPDATE
   USING (user_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can delete own insurance" ON public.user_insurance;
 CREATE POLICY "Users can delete own insurance"
   ON public.user_insurance FOR DELETE
   USING (user_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
