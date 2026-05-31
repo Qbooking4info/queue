@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -13,6 +14,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default async function SpecialistPage() {
+  noStore()
   const { db, profile, adminRecord } = await getHospitalContext()
 
   if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')

@@ -18,6 +18,7 @@ export async function linkDoctorToUser(formData: FormData) {
     .eq('hospital_id', adminRecord.hospital_id)
 
   revalidatePath('/dashboard/doctors')
+  revalidatePath('/dashboard/specialist')
 }
 
 export async function unlinkDoctorFromUser(formData: FormData) {
@@ -34,4 +35,5 @@ export async function unlinkDoctorFromUser(formData: FormData) {
     .eq('hospital_id', adminRecord.hospital_id)
 
   revalidatePath('/dashboard/doctors')
+  revalidatePath('/dashboard/specialist')
 }
