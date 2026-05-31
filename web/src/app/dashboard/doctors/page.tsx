@@ -45,6 +45,10 @@ export default async function DoctorsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Link href={`/dashboard/doctors/${d.id}/schedule`}
+                    className="text-xs px-2.5 py-1 rounded-full border border-white/10 text-[#7A9089] hover:border-green-500/30 hover:text-green-400 transition-all">
+                    Schedule
+                  </Link>
                   <span className={`text-xs px-2.5 py-1 rounded-full border ${d.is_active ? 'text-green-400 bg-green-500/10 border-green-500/20' : 'text-gray-500 bg-white/5 border-white/10'}`}>
                     {d.is_active ? 'Active' : 'Inactive'}
                   </span>
