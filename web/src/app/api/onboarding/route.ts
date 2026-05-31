@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     description: description || null, address, city, state,
     phone: phone || null, email: email || null, whatsapp: whatsapp || null,
     accepts_virtual: accepts_virtual ?? false, emergency_hours: emergency_hours ?? false,
+    is_active: true,
   }).select('id').single()
   if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
 

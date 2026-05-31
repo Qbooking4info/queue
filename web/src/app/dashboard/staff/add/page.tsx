@@ -1,5 +1,5 @@
 'use client'
-import { useActionState, useState, useEffect } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { addStaff } from '../actions'
 
@@ -21,10 +21,25 @@ export default function AddStaffPage() {
         <span className="text-sm">Add Staff Member</span>
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">Add Staff Member</h1>
-      <p className="text-sm text-[#7A9089] mb-8">
-        The person must have an existing account on the Queue patient app. Their portal access uses the same login.
-      </p>
+      <h1 className="text-2xl font-bold mb-6">Add Staff Member</h1>
+
+      {/* How it works */}
+      <div className="grid grid-cols-2 gap-3 mb-8">
+        <div className="bg-[#111915] border border-white/7 rounded-2xl p-4">
+          <div className="text-lg mb-2">📧</div>
+          <div className="text-sm font-semibold mb-1">Invite by Email</div>
+          <div className="text-xs text-[#4A6058] leading-relaxed">
+            Staff gets an email with a setup link. They click it, set their name, and land straight on their dashboard.
+          </div>
+        </div>
+        <div className="bg-[#111915] border border-white/7 rounded-2xl p-4">
+          <div className="text-lg mb-2">👤</div>
+          <div className="text-sm font-semibold mb-1">Add Existing User</div>
+          <div className="text-xs text-[#4A6058] leading-relaxed">
+            Staff already registered at <span className="text-green-400">/staff/register</span>? Enter their email to grant access immediately.
+          </div>
+        </div>
+      </div>
 
       {state?.error && (
         <div className="mb-6 p-4 rounded-2xl border border-red-500/30 bg-red-500/8 text-sm text-red-400">
@@ -34,24 +49,20 @@ export default function AddStaffPage() {
 
       <form action={action} className="flex flex-col gap-6">
 
-        {/* Email */}
         <div>
           <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
             Email Address *
           </label>
           <input
-            name="email"
-            type="email"
-            required
-            placeholder="staff@example.com"
+            name="email" type="email" required
+            placeholder="doctor@hospital.com"
             className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
           />
           <p className="text-xs text-[#4A6058] mt-1.5">
-            Must match the email they used to register on the patient app
+            If they don't have an account yet, an invite email will be sent automatically.
           </p>
         </div>
 
-        {/* Role */}
         <div>
           <label className="text-xs text-[#7A9089] mb-3 block font-semibold uppercase tracking-wide">
             Role *
@@ -60,10 +71,7 @@ export default function AddStaffPage() {
             {ROLES.map(r => (
               <label key={r.value} className="cursor-pointer">
                 <input
-                  type="radio"
-                  name="role"
-                  value={r.value}
-                  required
+                  type="radio" name="role" value={r.value} required
                   onChange={() => setSelectedRole(r.value)}
                   className="sr-only peer"
                 />
@@ -79,34 +87,30 @@ export default function AddStaffPage() {
           </div>
         </div>
 
-        {/* Doctor link — only shown when Specialist selected */}
         {selectedRole === 'specialist' && (
           <div>
             <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
-              Doctor ID to Link (optional)
+              Link to Doctor Record (optional)
             </label>
             <input
               name="doctor_id"
-              placeholder="Paste doctor record ID to link their schedule"
+              placeholder="Doctor record ID — links their login to their appointment schedule"
               className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
             />
             <p className="text-xs text-[#4A6058] mt-1.5">
-              Links their login to a doctor record so they see their own appointments. Leave blank to set later.
+              Find the ID on the Doctors page. Leave blank to link later.
             </p>
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3 pt-2">
           <Link href="/dashboard/staff"
             className="flex-1 text-center py-2.5 rounded-xl border border-white/10 text-sm text-[#7A9089] hover:text-white hover:border-white/20 transition-all">
             Cancel
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
+          <button type="submit" disabled={pending}
             className="flex-1 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
-            {pending ? 'Adding…' : 'Add Staff Member'}
+            {pending ? 'Processing…' : 'Add Staff Member'}
           </button>
         </div>
       </form>

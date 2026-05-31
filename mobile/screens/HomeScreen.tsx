@@ -19,7 +19,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('hospitals').select(`id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon))`).eq('is_active', true).eq('is_verified', true).order('avg_rating', { ascending: false }).limit(10),
+      supabase.from('hospitals').select(`id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon))`).eq('is_active', true).order('avg_rating', { ascending: false }).limit(10),
       supabase.from('specialties').select('id,name,icon,slug').eq('is_active', true).order('sort_order').limit(8),
     ]).then(([{ data: h }, { data: s }]) => {
       setHospitals((h as Hospital[]) ?? [])
