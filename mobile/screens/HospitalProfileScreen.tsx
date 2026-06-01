@@ -44,6 +44,9 @@ export function HospitalProfileScreen({ route, navigation }: { route: any; navig
       setDoctors((d as Doctor[]) ?? [])
       setHours((h as Hour[]) ?? [])
       setSpecialties((s as Specialty[]) ?? [])
+    }).catch(() => {
+      // Network or DB error — show empty state rather than infinite loading
+    }).finally(() => {
       setLoading(false)
     })
   }, [hospital.id])

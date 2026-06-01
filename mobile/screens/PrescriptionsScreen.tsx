@@ -12,6 +12,7 @@ interface Doc {
 export function PrescriptionsScreen({ navigation }: { navigation: any }) {
   const [docs, setDocs] = useState<Doc[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -36,8 +37,11 @@ export function PrescriptionsScreen({ navigation }: { navigation: any }) {
           .order('created_at', { ascending: false })
 
         setDocs((data as Doc[]) ?? [])
-      } catch (_) {}
-      setLoading(false)
+      } catch {
+        setLoadError(true)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -71,6 +75,8 @@ export function PrescriptionsScreen({ navigation }: { navigation: any }) {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
           <Text style={styles.placeholder}>Loading…</Text>
+        ) : loadError ? (
+          <Text style={styles.placeholder}>Could not load documents. Check your connection and try again.</Text>
         ) : docs.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={{ fontSize: 44, marginBottom: 12 }}>📄</Text>

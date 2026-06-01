@@ -63,25 +63,29 @@ export async function POST(req: NextRequest) {
   }
 
   if (specialtyIds?.length > 0) {
-    await db.from('hospital_specialties').insert(
+    const { error: specErr } = await db.from('hospital_specialties').insert(
       specialtyIds.map((sid: string) => ({ hospital_id: hospital.id, specialty_id: sid }))
     )
+    if (specErr) console.error('[onboarding] specialties insert failed:', specErr.message)
   }
 
   const openHours = (hours ?? []).filter((h: { closed: boolean }) => !h.closed)
   if (openHours.length > 0) {
-    await db.from('hospital_operating_hours').insert(
+    const { error: hoursErr } = await db.from('hospital_operating_hours').insert(
       openHours.map((h: { day: number; open: string; close: string }) => ({
         hospital_id: hospital.id, day_of_week: h.day, open_time: h.open, close_time: h.close,
       }))
     )
+    if (hoursErr) console.error('[onboarding] operating hours insert failed:', hoursErr.message)
   }
 
+  const TRIAL_DAYS = 90
   if (planId) {
-    await db.from('hospital_subscriptions').insert({
+    const { error: subErr } = await db.from('hospital_subscriptions').insert({
       hospital_id: hospital.id, plan_id: planId, status: 'trialing',
-      trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     })
+    if (subErr) console.error('[onboarding] subscription insert failed:', subErr.message)
   }
 
   // Auto-create a front desk login for this hospital

@@ -272,7 +272,7 @@ function StepPlan({ data, onChange, plans }: { data: FormData; onChange: (d: Par
       </div>
       <div className="flex flex-col gap-3">
         {plans.map(plan => {
-          const features = plan.features as string[]
+          const features = Array.isArray(plan.features) ? plan.features as string[] : []
           const selected = data.planId === plan.id
           const isGrowth = plan.name === 'growth'
           return (
@@ -345,14 +345,15 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     supabase.from('specialties').select('*').eq('is_active', true).order('sort_order')
-      .then(({ data }) => setSpecialties(data ?? []))
+      .then(({ data: s }) => { if (s) setSpecialties(s) })
     supabase.from('subscription_plans').select('*').eq('is_active', true).order('sort_order')
-      .then(({ data: plans }) => {
-        setPlans(plans ?? [])
-        const growth = plans?.find(p => p.name === 'growth')
+      .then(({ data: ps }) => {
+        if (!ps) return
+        setPlans(ps)
+        const growth = ps.find(p => p.name === 'growth')
         if (growth) setData(d => ({ ...d, planId: growth.id }))
       })
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (partial: Partial<FormData>) => setData(d => ({ ...d, ...partial }))
 

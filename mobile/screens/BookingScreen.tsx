@@ -100,7 +100,9 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
     supabase.from('doctors')
       .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,specialties!doctors_specialty_id_fkey(name)')
       .eq('hospital_id', hospital.id).eq('is_active', true).order('full_name')
-      .then(({ data }) => setDoctors((data as Doctor[]) ?? []))
+      .then(({ data, error }) => {
+        if (!error) setDoctors((data as Doctor[]) ?? [])
+      })
   }, [hospital.id])
 
   // ── Load services & dependents when reaching step 3 ─────────────────────────
@@ -129,6 +131,7 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
 
   useEffect(() => {
     if (!selectedDoctor || !selectedDate || step !== 5) return
+    let cancelled = false
     setLoadingSlots(true)
     setSlot(null)
     supabase.from('time_slots')
@@ -140,11 +143,13 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
       .eq('is_virtual', selectedType === 'virtual')
       .order('start_time')
       .then(({ data }) => {
+        if (cancelled) return
         const available = (data as TimeSlot[]) ?? []
         setSlots(available.filter(s => s.max_capacity == null || (s.booked_count ?? 0) < s.max_capacity))
-        setLoadingSlots(false)
       })
-      .catch(() => setLoadingSlots(false))
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingSlots(false) })
+    return () => { cancelled = true }
   }, [selectedDoctor, selectedDate, selectedType, hospital.id, step])
 
   // ── Booking submission ────────────────────────────────────────────────────────

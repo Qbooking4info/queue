@@ -33,6 +33,22 @@ export async function POST(req: NextRequest) {
   if (!doctor_id || !working_days?.length || !start_time || !end_time || !slot_duration)
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
 
+  const timeRe = /^\d{2}:\d{2}$/
+  if (!timeRe.test(start_time) || !timeRe.test(end_time))
+    return NextResponse.json({ error: 'start_time and end_time must be HH:MM' }, { status: 400 })
+
+  const [sh, sm] = start_time.split(':').map(Number)
+  const [eh, em] = end_time.split(':').map(Number)
+  if (sh * 60 + sm >= eh * 60 + em)
+    return NextResponse.json({ error: 'start_time must be before end_time' }, { status: 400 })
+
+  if (!Number.isInteger(days_ahead) || days_ahead < 1 || days_ahead > 180)
+    return NextResponse.json({ error: 'days_ahead must be between 1 and 180' }, { status: 400 })
+
+  const VALID_DURATIONS = [10, 15, 20, 30, 45, 60]
+  if (!VALID_DURATIONS.includes(slot_duration))
+    return NextResponse.json({ error: `slot_duration must be one of ${VALID_DURATIONS.join(', ')}` }, { status: 400 })
+
   // Verify doctor belongs to this hospital
   const { data: doctor } = await db.from('doctors')
     .select('id, accepts_virtual')
@@ -46,11 +62,12 @@ export async function POST(req: NextRequest) {
 
   // Clear unbooked future slots if requested
   if (clear_existing) {
-    await db.from('time_slots')
+    const { error: deleteErr } = await db.from('time_slots')
       .delete()
       .eq('doctor_id', doctor_id)
       .gte('slot_date', today.toISOString().split('T')[0])
       .eq('booked_count', 0)
+    if (deleteErr) return NextResponse.json({ error: 'Failed to clear existing slots: ' + deleteErr.message }, { status: 500 })
   }
 
   // Build slots to insert
@@ -69,9 +86,6 @@ export async function POST(req: NextRequest) {
 
     const dateStr = date.toISOString().split('T')[0]
 
-    // Parse start/end into minutes-from-midnight
-    const [sh, sm] = start_time.split(':').map(Number)
-    const [eh, em] = end_time.split(':').map(Number)
     let cursor = sh * 60 + sm
     const endMins = eh * 60 + em
 
@@ -133,7 +147,7 @@ export async function GET(req: NextRequest) {
     .eq('doctor_id', doctor_id)
     .gte('slot_date', today)
     .order('slot_date').order('start_time')
-    .limit(200)
+    .limit(1000)
 
   return NextResponse.json({ slots: slots ?? [] })
 }

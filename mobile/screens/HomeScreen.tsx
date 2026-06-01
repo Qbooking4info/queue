@@ -24,6 +24,9 @@ export function HomeScreen({ navigation }: { navigation: any }) {
     ]).then(([{ data: h }, { data: s }]) => {
       setHospitals((h as Hospital[]) ?? [])
       setSpecialties((s as Specialty[]) ?? [])
+    }).catch(() => {
+      // Network or DB error — show empty state rather than infinite loading
+    }).finally(() => {
       setLoading(false)
     })
   }, [])

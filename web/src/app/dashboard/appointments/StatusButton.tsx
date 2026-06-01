@@ -12,8 +12,21 @@ const NEXT_ACTIONS: Record<string, { label: string; status: string; color: strin
 export function StatusButton({ appointmentId, currentStatus }: { appointmentId: string; currentStatus: string }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const TERMINAL: Record<string, { label: string; color: string }> = {
+    completed: { label: '✓ Completed', color: 'text-gray-500 border-white/10 bg-white/5' },
+    cancelled:  { label: '✕ Cancelled', color: 'text-red-400/60 border-red-500/10 bg-red-500/5' },
+    no_show:    { label: '✕ No Show',   color: 'text-red-400/60 border-red-500/10 bg-red-500/5' },
+  }
   const actions = NEXT_ACTIONS[currentStatus] ?? []
-  if (!actions.length) return null
+  if (!actions.length) {
+    const terminal = TERMINAL[currentStatus]
+    if (!terminal) return null
+    return (
+      <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${terminal.color}`}>
+        {terminal.label}
+      </span>
+    )
+  }
 
   function handleClick(status: string) {
     setError(null)

@@ -19,9 +19,9 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
     async function load() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setLoading(false); return }
+        if (!user) return
         const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-        if (!profile) { setLoading(false); return }
+        if (!profile) return
         setUserId(profile.id)
         const { data } = await supabase
           .from('user_insurance')
@@ -29,8 +29,12 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
           .eq('user_id', profile.id)
           .single()
         if (data) setInsurance(data as Insurance)
-      } catch (_) {}
-      setLoading(false)
+        // PGRST116 (no rows) is expected for new users — not an error
+      } catch {
+        // Network error — show empty form
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])

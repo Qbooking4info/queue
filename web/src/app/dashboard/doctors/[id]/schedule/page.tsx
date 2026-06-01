@@ -242,7 +242,7 @@ export default function DoctorSchedulePage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 max-h-[560px] overflow-y-auto pr-1">
-              {grouped.slice(0, 30).map(({ date, inPerson, virtual }) => {
+              {grouped.map(({ date, inPerson, virtual }) => {
                 const d = new Date(date + 'T00:00:00')
                 const label = d.toLocaleDateString('en-NG', { weekday: 'short', month: 'short', day: 'numeric' })
                 const bookedDay = [...inPerson, ...virtual].filter(s => s.booked_count > 0).length
@@ -276,9 +276,6 @@ export default function DoctorSchedulePage() {
                   </div>
                 )
               })}
-              {grouped.length > 30 && (
-                <p className="text-xs text-[#4A6058] text-center py-2">+{grouped.length - 30} more days</p>
-              )}
             </div>
           )}
         </div>

@@ -23,18 +23,21 @@ export function DependentsScreen({ navigation }: { navigation: any }) {
   async function load() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
+      if (!user) return
       const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-      if (!profile) { setLoading(false); return }
+      if (!profile) return
       setPatientId(profile.id)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('dependents')
         .select('id,full_name,relationship,date_of_birth')
         .eq('user_id', profile.id)
         .order('full_name')
-      setDependents((data as Dependent[]) ?? [])
-    } catch (_) {}
-    setLoading(false)
+      if (!error) setDependents((data as Dependent[]) ?? [])
+    } catch {
+      // Network error — leave list empty
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleAdd() {

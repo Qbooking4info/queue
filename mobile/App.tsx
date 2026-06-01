@@ -27,20 +27,28 @@ import { BookingScreen }          from './screens/BookingScreen'
 const Tab   = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
 
+const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__
+
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null }
   static getDerivedStateFromError(error: Error) { return { error } }
   render() {
     if (this.state.error) {
+      const err = this.state.error as Error
       return (
         <View style={{ flex: 1, backgroundColor: '#0a0a0a', padding: 24, justifyContent: 'center' }}>
-          <Text style={{ color: '#ff5c5c', fontSize: 18, fontWeight: '800', marginBottom: 12 }}>App Error</Text>
-          <ScrollView>
-            <Text style={{ color: '#fff', fontSize: 13, lineHeight: 20 }}>
-              {String((this.state.error as Error).message)}{'\n\n'}
-              {String((this.state.error as Error).stack)}
+          <Text style={{ color: '#ff5c5c', fontSize: 18, fontWeight: '800', marginBottom: 12 }}>Something went wrong</Text>
+          {IS_DEV ? (
+            <ScrollView>
+              <Text style={{ color: '#fff', fontSize: 13, lineHeight: 20 }}>
+                {err.message}{'\n\n'}{err.stack}
+              </Text>
+            </ScrollView>
+          ) : (
+            <Text style={{ color: '#7A9089', fontSize: 14, lineHeight: 22 }}>
+              An unexpected error occurred. Please restart the app. If the problem persists, contact support.
             </Text>
-          </ScrollView>
+          )}
         </View>
       )
     }
@@ -108,10 +116,11 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => { setSession(session) })
+      .catch(() => { /* session unavailable — stay logged out */ })
+      .finally(() => { setLoading(false) })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })

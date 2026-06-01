@@ -27,47 +27,51 @@ export function SearchScreen({ navigation, route }: { navigation: any; route: an
     setLoading(true)
 
     async function search() {
-      let hospitalIds: string[] | null = null
+      try {
+        let hospitalIds: string[] | null = null
 
-      // If filtering by specialty, first fetch hospital IDs that offer it
-      if (specialtyId) {
-        const { data: hs } = await supabase
-          .from('hospital_specialties')
-          .select('hospital_id')
-          .eq('specialty_id', specialtyId)
-        hospitalIds = (hs ?? []).map((r: { hospital_id: string }) => r.hospital_id)
-        if (hospitalIds.length === 0) {
-          setHospitals([])
-          setLoading(false)
-          return
+        // If filtering by specialty, first fetch hospital IDs that offer it
+        if (specialtyId) {
+          const { data: hs } = await supabase
+            .from('hospital_specialties')
+            .select('hospital_id')
+            .eq('specialty_id', specialtyId)
+          hospitalIds = (hs ?? []).map((r: { hospital_id: string }) => r.hospital_id)
+          if (hospitalIds.length === 0) {
+            setHospitals([])
+            return
+          }
         }
-      }
 
-      let q = supabase
-        .from('hospitals')
-        .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
-        .eq('is_active', true)
+        let q = supabase
+          .from('hospitals')
+          .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
+          .eq('is_active', true)
 
-      if (hospitalIds) q = q.in('id', hospitalIds)
-      if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
-      if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
-      if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
+        if (hospitalIds) q = q.in('id', hospitalIds)
+        if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
+        if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
+        if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
 
-      const { data } = await q.order('avg_rating', { ascending: false }).limit(30)
+        const { data } = await q.order('avg_rating', { ascending: false }).limit(30)
 
-      let results = (data as (Hospital & { hospital_operating_hours: { day_of_week: number; open_time: string; close_time: string }[] })[]) ?? []
-      if (filter === 'Open Now') {
-        const now  = new Date()
-        const day  = now.getDay()
-        const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-        results = results.filter(h =>
-          h.hospital_operating_hours?.some(oh =>
-            oh.day_of_week === day && oh.open_time.slice(0,5) <= time && time <= oh.close_time.slice(0,5)
+        let results = (data as (Hospital & { hospital_operating_hours: { day_of_week: number; open_time: string; close_time: string }[] })[]) ?? []
+        if (filter === 'Open Now') {
+          const now  = new Date()
+          const day  = now.getDay()
+          const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+          results = results.filter(h =>
+            h.hospital_operating_hours?.some(oh =>
+              oh.day_of_week === day && oh.open_time.slice(0,5) <= time && time <= oh.close_time.slice(0,5)
+            )
           )
-        )
+        }
+        setHospitals(results)
+      } catch {
+        // Network or DB error — leave current results in place
+      } finally {
+        setLoading(false)
       }
-      setHospitals(results)
-      setLoading(false)
     }
 
     search()

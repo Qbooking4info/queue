@@ -36,7 +36,10 @@ export default async function AppointmentsPage({
   if (params.status && params.status !== 'all') query = query.eq('status', params.status)
   if (safeDate) query = query.eq('appointment_date', safeDate)
 
-  const { data: appointments } = await query.range(offset, offset + PAGE_SIZE - 1)
+  // Fetch one extra to detect if a next page exists without a separate COUNT query
+  const { data: raw } = await query.range(offset, offset + PAGE_SIZE)
+  const appointments = raw?.slice(0, PAGE_SIZE) ?? []
+  const hasNextPage  = (raw?.length ?? 0) > PAGE_SIZE
 
   const filters = ['all','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
 
@@ -57,7 +60,7 @@ export default async function AppointmentsPage({
     return `/dashboard/appointments${s ? `?${s}` : ''}`
   }
 
-  const hasMore = (appointments?.length ?? 0) === PAGE_SIZE
+  const hasMore = hasNextPage
 
   return (
     <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
@@ -98,7 +101,7 @@ export default async function AppointmentsPage({
       </div>
 
       <div className="flex flex-col gap-2">
-        {!appointments?.length ? (
+        {!appointments.length ? (
           <div className="text-center py-20 text-[#4A6058]">
             <div className="text-4xl mb-3">📅</div>
             <div className="font-medium text-[#7A9089]">No appointments found</div>

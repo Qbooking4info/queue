@@ -22,19 +22,18 @@ export default function RegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
     if (authError) { setError(authError.message); setLoading(false); return }
 
-    // Insert profile row immediately using the auth user from signUp,
-    // before sign-in — ensures the row exists even if signIn fails.
+    // Sign in to get a session before inserting the profile (RLS requires auth.uid())
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) { setError(signInError.message); setLoading(false); return }
+
     if (authData.user) {
-      await supabase.from('users').insert({
+      const { error: profileErr } = await supabase.from('users').upsert({
         auth_id: authData.user.id,
         full_name: fullName,
         email,
-      })
+      }, { onConflict: 'auth_id' })
+      if (profileErr) { setError('Account created but profile setup failed: ' + profileErr.message); setLoading(false); return }
     }
-
-    // Sign in immediately so the session exists regardless of email confirmation setting
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    if (signInError) { setError(signInError.message); setLoading(false); return }
 
     router.push('/onboarding')
   }
