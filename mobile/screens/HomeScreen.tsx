@@ -33,7 +33,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning 👋</Text>
+            <Text style={styles.greeting}>{(() => { const h = new Date().getHours(); return h < 12 ? 'Good morning 👋' : h < 17 ? 'Good afternoon 👋' : 'Good evening 👋' })()}</Text>
             <Text style={styles.headline}>Find care near you</Text>
           </View>
           <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>

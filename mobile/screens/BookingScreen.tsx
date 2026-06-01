@@ -98,7 +98,7 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
 
   useEffect(() => {
     supabase.from('doctors')
-      .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,specialties(name)')
+      .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,specialties!doctors_specialty_id_fkey(name)')
       .eq('hospital_id', hospital.id).eq('is_active', true).order('full_name')
       .then(({ data }) => setDoctors((data as Doctor[]) ?? []))
   }, [hospital.id])
@@ -208,8 +208,8 @@ export function BookingScreen({ route, navigation }: { route: any; navigation: a
     Alert.alert(
       'Booking Confirmed! 🎉',
       `Appointment for ${patientName} with ${selectedDoctor.title} ${selectedDoctor.full_name} on ${formatDate(selectedDate)} at ${selectedSlot.start_time.slice(0, 5)} is pending confirmation.${fee != null ? `\n\nFee: ₦${fee.toLocaleString()}` : ''}`,
-      [{ text: 'View Bookings', onPress: () => navigation.navigate('Appointments') },
-       { text: 'Done', style: 'cancel' }]
+      [{ text: 'View Bookings', onPress: () => navigation.navigate('Main', { screen: 'Appointments' }) },
+       { text: 'Done', style: 'cancel', onPress: () => navigation.navigate('Main', { screen: 'Home' }) }]
     )
   }
 

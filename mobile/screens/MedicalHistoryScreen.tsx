@@ -24,7 +24,7 @@ export function MedicalHistoryScreen({ navigation }: { navigation: any }) {
       if (!profile) return
       const { data } = await supabase
         .from('appointments')
-        .select('id,booking_ref,appointment_date,status,type,diagnosis,doctor_notes,prescription_url,hospitals(name),doctors(full_name,title,specialties(name))')
+        .select('id,booking_ref,appointment_date,status,type,diagnosis,doctor_notes,prescription_url,hospitals(name),doctors(full_name,title,specialties!doctors_specialty_id_fkey(name))')
         .eq('patient_id', profile.id)
         .in('status', ['completed', 'no_show'])
         .order('appointment_date', { ascending: false })

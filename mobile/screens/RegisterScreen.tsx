@@ -23,13 +23,18 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
     })
     if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
 
-    // Insert profile row immediately — before sign-in, so it always exists
+    // Create profile row — upsert so re-attempts after a failed sign-up don't duplicate
     if (authData.user) {
-      await supabase.from('users').insert({
+      const { error: profileErr } = await supabase.from('users').upsert({
         auth_id: authData.user.id,
         full_name: fullName.trim(),
         email: email.trim(),
-      })
+      }, { onConflict: 'auth_id' })
+      if (profileErr) {
+        setError('Account created but profile setup failed: ' + profileErr.message)
+        setLoading(false)
+        return
+      }
     }
 
     const { error: signInErr } = await supabase.auth.signInWithPassword({

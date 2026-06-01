@@ -33,7 +33,7 @@ export function HospitalProfileScreen({ route, navigation }: { route: any; navig
   useEffect(() => {
     Promise.all([
       supabase.from('doctors')
-        .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,avg_rating,specialties(name)')
+        .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,avg_rating,specialties!doctors_specialty_id_fkey(name)')
         .eq('hospital_id', hospital.id).eq('is_active', true).order('full_name').limit(10),
       supabase.from('hospital_operating_hours')
         .select('day_of_week,open_time,close_time')

@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Ref
 import { supabase } from '../lib/supabase'
 import { dark as t, spacing, font, radius } from '../lib/theme'
 
-type Status = 'confirmed' | 'pending' | 'completed' | 'cancelled' | 'no_show'
+type Status = 'confirmed' | 'pending' | 'completed' | 'cancelled' | 'no_show' | 'checked_in' | 'in_progress'
 type TabFilter = 'upcoming' | 'completed'
 
 interface Appointment {
@@ -14,10 +14,12 @@ interface Appointment {
 }
 
 const STATUS_COLOR: Record<Status, string> = {
-  confirmed: '#00E87A', pending: '#FFB547', completed: '#4A6058', cancelled: '#FF5C5C', no_show: '#FF5C5C',
+  confirmed: '#00E87A', pending: '#FFB547', completed: '#4A6058',
+  cancelled: '#FF5C5C', no_show: '#FF5C5C',
+  checked_in: '#5B9EFF', in_progress: '#5B9EFF',
 }
 
-export function AppointmentsScreen() {
+export function AppointmentsScreen({ navigation }: { navigation: any }) {
   const [tab, setTab]               = useState<TabFilter>('upcoming')
   const [appointments, setAppts]    = useState<Appointment[]>([])
   const [loading, setLoading]       = useState(true)
@@ -86,7 +88,7 @@ export function AppointmentsScreen() {
                     <Text style={styles.hospitalName}>{hospital?.name}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[a.status] + '22', borderColor: STATUS_COLOR[a.status] + '44' }]}>
-                    <Text style={[styles.statusText, { color: STATUS_COLOR[a.status] }]}>{a.status}</Text>
+                    <Text style={[styles.statusText, { color: STATUS_COLOR[a.status] }]}>{a.status.replace(/_/g, ' ')}</Text>
                   </View>
                 </View>
                 <View style={styles.cardMeta}>
