@@ -11,13 +11,20 @@ const STATUS_COLOR: Record<string, string> = {
   in_progress: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
 }
 
+const PAGE_SIZE = 100
+
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; date?: string }>
+  searchParams: Promise<{ status?: string; date?: string; page?: string }>
 }) {
   const { db, adminRecord } = await getHospitalContext()
   const params = await searchParams
+
+  const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+  const safeDate = params.date && isValidDate(params.date) ? params.date : undefined
+  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const offset = (page - 1) * PAGE_SIZE
 
   let query = db
     .from('appointments')
@@ -27,23 +34,59 @@ export default async function AppointmentsPage({
     .order('start_time', { ascending: true })
 
   if (params.status && params.status !== 'all') query = query.eq('status', params.status)
-  if (params.date) query = query.eq('appointment_date', params.date)
+  if (safeDate) query = query.eq('appointment_date', safeDate)
 
-  const { data: appointments } = await query.limit(50)
+  const { data: appointments } = await query.range(offset, offset + PAGE_SIZE - 1)
 
   const filters = ['all','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
 
+  function filterHref(f: string) {
+    const qs = new URLSearchParams()
+    if (f !== 'all') qs.set('status', f)
+    if (safeDate) qs.set('date', safeDate)
+    const s = qs.toString()
+    return `/dashboard/appointments${s ? `?${s}` : ''}`
+  }
+
+  function pageHref(p: number) {
+    const qs = new URLSearchParams()
+    if (params.status && params.status !== 'all') qs.set('status', params.status)
+    if (safeDate) qs.set('date', safeDate)
+    if (p > 1) qs.set('page', String(p))
+    const s = qs.toString()
+    return `/dashboard/appointments${s ? `?${s}` : ''}`
+  }
+
+  const hasMore = (appointments?.length ?? 0) === PAGE_SIZE
+
   return (
     <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h1 className="text-2xl font-bold">Appointments</h1>
-        <span className="text-sm text-[#7A9089]">{appointments?.length ?? 0} shown</span>
+        {/* Date filter */}
+        <form method="get" className="flex items-center gap-2">
+          {params.status && params.status !== 'all' && (
+            <input type="hidden" name="status" value={params.status} />
+          )}
+          <input type="date" name="date" defaultValue={safeDate ?? ''}
+            className="bg-[#111915] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500/50" />
+          <button type="submit"
+            className="px-3 py-2 bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold rounded-xl hover:bg-green-500/20 transition-all">
+            Filter
+          </button>
+          {safeDate && (
+            <a href={filterHref(params.status ?? 'all')}
+              className="px-3 py-2 border border-white/10 text-[#7A9089] text-xs rounded-xl hover:border-white/20 transition-all">
+              Clear date
+            </a>
+          )}
+        </form>
       </div>
 
-      {/* Filters */}
+      {/* Status filters */}
       <div className="flex gap-2 flex-wrap mb-6">
         {filters.map(f => (
-          <a key={f} href={`/dashboard/appointments${f === 'all' ? '' : `?status=${f}`}`}
+          <a key={f} href={filterHref(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border capitalize transition-all ${
               (params.status ?? 'all') === f
                 ? 'border-green-500/50 bg-green-500/10 text-green-400'
@@ -97,6 +140,25 @@ export default async function AppointmentsPage({
           )
         })}
       </div>
+
+      {/* Pagination */}
+      {(page > 1 || hasMore) && (
+        <div className="flex items-center justify-center gap-3 mt-6">
+          {page > 1 && (
+            <a href={pageHref(page - 1)}
+              className="px-4 py-2 text-sm border border-white/10 rounded-xl text-[#7A9089] hover:border-white/20 transition-all">
+              ← Previous
+            </a>
+          )}
+          <span className="text-sm text-[#4A6058]">Page {page}</span>
+          {hasMore && (
+            <a href={pageHref(page + 1)}
+              className="px-4 py-2 text-sm border border-white/10 rounded-xl text-[#7A9089] hover:border-white/20 transition-all">
+              Next →
+            </a>
+          )}
+        </div>
+      )}
     </div>
   )
 }

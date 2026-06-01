@@ -41,8 +41,8 @@ export function NotificationsScreen({ navigation }: { navigation: any }) {
   }, [])
 
   async function markRead(id: string) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    if (!error) setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
   }
 
   function timeAgo(dateStr: string) {

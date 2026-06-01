@@ -378,6 +378,14 @@ export type Database = {
           { foreignKeyName: "time_slots_hospital_id_fkey"; columns: ["hospital_id"]; isOneToOne: false; referencedRelation: "hospitals"; referencedColumns: ["id"] },
         ]
       }
+      user_insurance: {
+        Row: { id: string; user_id: string; provider: string; plan_name: string | null; member_id: string; group_number: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; user_id: string; provider: string; plan_name?: string | null; member_id: string; group_number?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; user_id?: string; provider?: string; plan_name?: string | null; member_id?: string; group_number?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: [
+          { foreignKeyName: "user_insurance_user_id_fkey"; columns: ["user_id"]; isOneToOne: true; referencedRelation: "users"; referencedColumns: ["id"] },
+        ]
+      }
       users: {
         Row: { address: string | null; auth_id: string | null; avatar_url: string | null; blood_group: string | null; city: string | null; country: string | null; created_at: string | null; date_of_birth: string | null; email: string; full_name: string; gender: string | null; id: string; is_verified: boolean | null; phone: string | null; state: string | null; updated_at: string | null }
         Insert: { address?: string | null; auth_id?: string | null; avatar_url?: string | null; blood_group?: string | null; city?: string | null; country?: string | null; created_at?: string | null; date_of_birth?: string | null; email: string; full_name: string; gender?: string | null; id?: string; is_verified?: boolean | null; phone?: string | null; state?: string | null; updated_at?: string | null }
@@ -420,3 +428,4 @@ export type Payment            = Tables<'payments'>
 export type Review             = Tables<'reviews'>
 export type SubscriptionPlan   = Tables<'subscription_plans'>
 export type HospitalSubscription = Tables<'hospital_subscriptions'>
+export type UserInsurance        = Tables<'user_insurance'>

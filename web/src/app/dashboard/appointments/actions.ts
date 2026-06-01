@@ -40,5 +40,7 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
   if (!updated?.length) throw new Error('Appointment status changed by someone else. Please refresh.')
 
   revalidatePath('/dashboard/appointments')
+  revalidatePath('/dashboard/frontdesk')
+  revalidatePath('/dashboard/specialist')
   revalidatePath('/dashboard')
 }

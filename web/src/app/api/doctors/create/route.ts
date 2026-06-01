@@ -81,7 +81,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, doctorId: doctor.id, loginCreated: false, loginError: adminErr.message })
   }
 
-  await db.from('doctors').update({ user_id: newProfile.id }).eq('id', doctor.id)
+  const { error: linkErr } = await db.from('doctors').update({ user_id: newProfile.id }).eq('id', doctor.id)
+  if (linkErr) {
+    // Login account was created but doctor→user link failed; report as partial success
+    revalidatePath('/dashboard/doctors')
+    return NextResponse.json({ success: true, doctorId: doctor.id, loginCreated: false, loginError: linkErr.message })
+  }
 
   revalidatePath('/dashboard/doctors')
   return NextResponse.json({

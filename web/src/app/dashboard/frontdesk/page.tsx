@@ -21,7 +21,8 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   if (adminRecord.role !== 'front_desk' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const today = new Date().toISOString().split('T')[0]
-  const selectedDate = params.date ?? today
+  const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+  const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 
   const [{ data: appointments }, { count: pending }, { count: checkedIn }] = await Promise.all([
     db.from('appointments')

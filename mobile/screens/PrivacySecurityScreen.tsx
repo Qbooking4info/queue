@@ -113,7 +113,7 @@ export function PrivacySecurityScreen({ navigation }: { navigation: any }) {
           <Text style={styles.label}>Current Password</Text>
           <TextInput
             value={currentPassword}
-            onChangeText={t => { setCurrentPassword(t); setPwError(''); setPwSuccess(false) }}
+            onChangeText={val => { setCurrentPassword(val); setPwError(''); setPwSuccess(false) }}
             placeholder="Your current password"
             placeholderTextColor={t.textMuted}
             secureTextEntry
@@ -123,7 +123,7 @@ export function PrivacySecurityScreen({ navigation }: { navigation: any }) {
           <Text style={styles.label}>New Password</Text>
           <TextInput
             value={newPassword}
-            onChangeText={t => { setNewPassword(t); setPwError(''); setPwSuccess(false) }}
+            onChangeText={val => { setNewPassword(val); setPwError(''); setPwSuccess(false) }}
             placeholder="Min. 8 characters"
             placeholderTextColor={t.textMuted}
             secureTextEntry
@@ -133,7 +133,7 @@ export function PrivacySecurityScreen({ navigation }: { navigation: any }) {
           <Text style={styles.label}>Confirm New Password</Text>
           <TextInput
             value={confirmPassword}
-            onChangeText={t => { setConfirmPassword(t); setPwError(''); setPwSuccess(false) }}
+            onChangeText={val => { setConfirmPassword(val); setPwError(''); setPwSuccess(false) }}
             placeholder="Repeat new password"
             placeholderTextColor={t.textMuted}
             secureTextEntry

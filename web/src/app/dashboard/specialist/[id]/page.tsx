@@ -120,8 +120,8 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
                     name="status"
                     defaultValue={appt.status}
                     className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
-                    <option value="">— Keep current ({appt.status}) —</option>
-                    {STATUS_OPTS.map(s => (
+                    <option value="">— Keep current ({appt.status.replace(/_/g, ' ')}) —</option>
+                    {STATUS_OPTS.filter(s => s !== appt.status).map(s => (
                       <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
                     ))}
                   </select>

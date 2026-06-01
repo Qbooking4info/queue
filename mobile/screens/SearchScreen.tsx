@@ -14,23 +14,47 @@ const FILTERS = ['All', 'Virtual', 'Open Now', 'Top Rated'] as const
 type Filter = typeof FILTERS[number]
 
 export function SearchScreen({ navigation, route }: { navigation: any; route: any }) {
-  const [query, setQuery]       = useState(route?.params?.initialQuery ?? '')
-  const [filter, setFilter]     = useState<Filter>('All')
+  const [query, setQuery]         = useState(route?.params?.initialQuery ?? '')
+  const [filter, setFilter]       = useState<Filter>('All')
   const [hospitals, setHospitals] = useState<Hospital[]>([])
-  const [loading, setLoading]   = useState(false)
+  const [loading, setLoading]     = useState(false)
+
+  // Specialty filter passed from HomeScreen specialty chips
+  const specialtyId: string | undefined   = route?.params?.specialtyId
+  const specialtyName: string | undefined = route?.params?.specialtyName
 
   useEffect(() => {
     setLoading(true)
-    let q = supabase
-      .from('hospitals')
-      .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
-      .eq('is_active', true)
 
-    if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
-    if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
-    if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
+    async function search() {
+      let hospitalIds: string[] | null = null
 
-    q.order('avg_rating', { ascending: false }).limit(20).then(({ data }) => {
+      // If filtering by specialty, first fetch hospital IDs that offer it
+      if (specialtyId) {
+        const { data: hs } = await supabase
+          .from('hospital_specialties')
+          .select('hospital_id')
+          .eq('specialty_id', specialtyId)
+        hospitalIds = (hs ?? []).map((r: { hospital_id: string }) => r.hospital_id)
+        if (hospitalIds.length === 0) {
+          setHospitals([])
+          setLoading(false)
+          return
+        }
+      }
+
+      let q = supabase
+        .from('hospitals')
+        .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
+        .eq('is_active', true)
+
+      if (hospitalIds) q = q.in('id', hospitalIds)
+      if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
+      if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
+      if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
+
+      const { data } = await q.order('avg_rating', { ascending: false }).limit(30)
+
       let results = (data as (Hospital & { hospital_operating_hours: { day_of_week: number; open_time: string; close_time: string }[] })[]) ?? []
       if (filter === 'Open Now') {
         const now  = new Date()
@@ -44,13 +68,15 @@ export function SearchScreen({ navigation, route }: { navigation: any; route: an
       }
       setHospitals(results)
       setLoading(false)
-    })
-  }, [query, filter])
+    }
+
+    search()
+  }, [query, filter, specialtyId])
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Find Care</Text>
+        <Text style={styles.title}>{specialtyName ? `${specialtyName} Hospitals` : 'Find Care'}</Text>
         <View style={styles.searchRow}>
           <Text style={{ fontSize: 16, color: t.textMuted }}>🔍</Text>
           <TextInput

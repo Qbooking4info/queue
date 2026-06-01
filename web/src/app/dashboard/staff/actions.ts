@@ -136,7 +136,8 @@ export async function addStaff(
       userId = existingUser.id
     } else {
       // No account yet — send an invite email via Supabase Auth
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://web-roan-kappa-39.vercel.app'
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    if (!siteUrl) return { error: 'NEXT_PUBLIC_SITE_URL is not set — cannot send invite email.' }
       const { data: inviteData, error: inviteErr } = await db.auth.admin.inviteUserByEmail(email, {
         redirectTo: `${siteUrl}/auth/callback?next=/staff/accept`,
         data: { hospital_id: adminRecord.hospital_id, role },
@@ -188,11 +189,20 @@ export async function removeStaff(formData: FormData) {
   const db = createAdminClient()
 
   const { data: member } = await db
-    .from('hospital_admins').select('id, hospital_id')
+    .from('hospital_admins').select('id, hospital_id, user_id, role')
     .eq('id', staffId).single()
 
   if (!member || member.hospital_id !== adminRecord.hospital_id) return
 
+  // If removing a specialist, unlink them from any doctor record in this hospital
+  if (member.role === 'specialist') {
+    await db.from('doctors')
+      .update({ user_id: null })
+      .eq('hospital_id', member.hospital_id)
+      .eq('user_id', member.user_id)
+  }
+
   await db.from('hospital_admins').delete().eq('id', staffId)
   revalidatePath('/dashboard/staff')
+  revalidatePath('/dashboard/doctors')
 }

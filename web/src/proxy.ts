@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,7 +25,6 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isAuthRoute      = pathname.startsWith('/login') || pathname.startsWith('/register')
-  const isPublicRoute    = pathname === '/' || isAuthRoute
   const isDashboardRoute = pathname.startsWith('/dashboard')
   const isOnboarding     = pathname.startsWith('/onboarding')
 

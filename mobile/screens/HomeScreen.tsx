@@ -51,7 +51,7 @@ export function HomeScreen({ navigation }: { navigation: any }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.xl }} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.sm }}>
           {specialties.map(s => (
             <TouchableOpacity key={s.id} style={styles.specialtyChip}
-              onPress={() => navigation.navigate('Search', { initialQuery: s.name })}>
+              onPress={() => navigation.navigate('Search', { specialtyId: s.id, specialtyName: s.name })}>
               <Text style={{ fontSize: 22 }}>{s.icon}</Text>
               <Text style={styles.specialtyLabel}>{s.name}</Text>
             </TouchableOpacity>
