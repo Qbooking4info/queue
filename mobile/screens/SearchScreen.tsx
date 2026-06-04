@@ -1,96 +1,80 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import { useTheme } from '../contexts/ThemeContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
+import { hospitals } from '../data'
 
-interface Hospital {
-  id: string; name: string; type: string; city: string; state: string
-  avg_rating: number; review_count: number; accepts_virtual: boolean; is_verified: boolean
-  hospital_specialties: { specialties: { name: string; icon: string | null } | null }[]
-}
+const FILTERS = ['All', 'Virtual', 'Open Now', 'HMO Accepted', 'Emergency']
 
-const FILTERS = ['All', 'Virtual', 'Open Now', 'Top Rated'] as const
-type Filter = typeof FILTERS[number]
+interface Props { navigation: any }
 
-export function SearchScreen({ navigation }: { navigation: any }) {
-  const [query, setQuery]       = useState('')
-  const [filter, setFilter]     = useState<Filter>('All')
-  const [hospitals, setHospitals] = useState<Hospital[]>([])
-  const [loading, setLoading]   = useState(false)
+export function SearchScreen({ navigation }: Props) {
+  const { theme: t } = useTheme()
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState('All')
 
-  useEffect(() => {
-    setLoading(true)
-    let q = supabase
-      .from('hospitals')
-      .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon))')
-      .eq('is_active', true)
-      .eq('is_verified', true)
-
-    if (query.trim()) q = q.ilike('name', `%${query}%`)
-    if (filter === 'Virtual')    q = q.eq('accepts_virtual', true)
-    if (filter === 'Top Rated')  q = q.gte('avg_rating', 4.5)
-    q.order('avg_rating', { ascending: false }).limit(20)
-      .then(({ data }) => { setHospitals((data as Hospital[]) ?? []); setLoading(false) })
-  }, [query, filter])
+  const results = hospitals.filter(h =>
+    h.name.toLowerCase().includes(q.toLowerCase()) ||
+    h.specialty.toLowerCase().includes(q.toLowerCase()) ||
+    h.services.some(s => s.toLowerCase().includes(q.toLowerCase()))
+  )
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Find Care</Text>
-        <View style={styles.searchRow}>
-          <Text style={{ fontSize: 16, color: t.textMuted }}>🔍</Text>
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <View style={[styles.container, { backgroundColor: t.canvasBg }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
+
+        {/* Search input */}
+        <View style={[styles.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
+          <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
           <TextInput
-            value={query} onChangeText={setQuery}
-            placeholder="Hospital, doctor, or specialty…"
+            value={q} onChangeText={setQ}
+            placeholder="Hospital, doctor, specialty…"
             placeholderTextColor={t.textMuted}
-            style={styles.input}
+            style={[styles.input, { color: t.textPrimary }]}
           />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
+          {!!q && (
+            <TouchableOpacity onPress={() => setQ('')}>
               <Text style={{ color: t.textMuted, fontSize: 16 }}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            {FILTERS.map(f => (
-              <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[styles.filterChip, filter === f && styles.filterChipActive]}>
-                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+
+        {/* Filters */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll} contentContainerStyle={{ gap: 6, paddingHorizontal: 20 }}>
+          {FILTERS.map(f => (
+            <TouchableOpacity key={f} onPress={() => setFilter(f)}
+              style={[styles.filterPill, {
+                backgroundColor: filter === f ? t.accentBg : t.cardBg,
+                borderColor: filter === f ? t.accent : t.cardBorder,
+              }]}>
+              <Text style={[styles.filterText, { color: filter === f ? t.accent : t.textMuted }]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text style={[styles.resultCount, { color: t.textMuted }]}>{results.length} results · Lagos Island</Text>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 20 }}>
+          {results.map(h => (
+            <HospitalCard key={h.id} hospital={h} onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
+          ))}
+          <View style={{ height: 32 }} />
         </ScrollView>
       </View>
-
-      <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
-        <Text style={styles.count}>{hospitals.length} result{hospitals.length !== 1 ? 's' : ''}</Text>
-        {loading ? (
-          <Text style={styles.placeholder}>Searching…</Text>
-        ) : hospitals.length === 0 ? (
-          <Text style={styles.placeholder}>No hospitals found</Text>
-        ) : (
-          hospitals.map(h => (
-            <HospitalCard key={h.id} hospital={h} onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:            { flex: 1, backgroundColor: t.bg },
-  header:          { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: t.border },
-  title:           { fontSize: font.xl, fontWeight: '800', color: t.text, marginBottom: spacing.md, letterSpacing: -0.5 },
-  searchRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.borderMed, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 12 },
-  input:           { flex: 1, fontSize: font.base, color: t.text },
-  filterChip:      { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: t.border },
-  filterChipActive:{ borderColor: t.accent, backgroundColor: t.accentMuted },
-  filterText:      { fontSize: font.sm, color: t.textSub, fontWeight: '600' },
-  filterTextActive:{ color: t.accent },
-  results:         { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  count:           { fontSize: font.xs, color: t.textMuted, marginBottom: spacing.sm },
-  placeholder:     { color: t.textMuted, textAlign: 'center', paddingVertical: 40, fontSize: font.sm },
+  safe:        { flex: 1 },
+  container:   { flex: 1 },
+  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
+  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
+  input:       { flex: 1, fontSize: 13, fontFamily: undefined },
+  filterScroll:{ marginHorizontal: -20, marginBottom: 12 },
+  filterPill:  { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
+  filterText:  { fontSize: 11, fontWeight: '600' },
+  resultCount: { fontSize: 11, marginBottom: 10, paddingHorizontal: 20 },
 })

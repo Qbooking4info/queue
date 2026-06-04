@@ -1,79 +1,81 @@
 import 'react-native-url-polyfill/auto'
-import { useEffect, useState } from 'react'
-import { View, ActivityIndicator, Text } from 'react-native'
+import { useState } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from './lib/supabase'
-import { dark as t } from './lib/theme'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { Text, View } from 'react-native'
 
-import { HomeScreen }         from './screens/HomeScreen'
-import { SearchScreen }       from './screens/SearchScreen'
-import { AppointmentsScreen } from './screens/AppointmentsScreen'
-import { ProfileScreen }      from './screens/ProfileScreen'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { SplashScreen }            from './screens/SplashScreen'
+import { HomeScreen }              from './screens/HomeScreen'
+import { SearchScreen }            from './screens/SearchScreen'
+import { AppointmentsScreen }      from './screens/AppointmentsScreen'
+import { ProfileScreen }           from './screens/ProfileScreen'
+import { HospitalProfileScreen }   from './screens/HospitalProfileScreen'
+import { BookingFlowScreen }       from './screens/BookingFlowScreen'
+import { ConfirmationScreen }      from './screens/ConfirmationScreen'
 
 const Tab   = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
 
-function TabNavigator() {
+function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; color: string }) {
+  return <Text style={{ fontSize: 18, color }}>{icon}</Text>
+}
+
+function MainTabs() {
+  const { theme: t } = useTheme()
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: t.bgCard,
-          borderTopColor: t.border,
-          paddingTop: 4, paddingBottom: 20, height: 72,
-        },
-        tabBarActiveTintColor:   t.accent,
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarActiveTintColor: t.accent,
         tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle:        { fontSize: 10, fontWeight: '600', marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
-      <Tab.Screen name="Home"
-        component={HomeScreen}
-        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⊞</Text> }} />
-      <Tab.Screen name="Search"
-        component={SearchScreen}
-        options={{ tabBarLabel: 'Search', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⊕</Text> }} />
-      <Tab.Screen name="Appointments"
-        component={AppointmentsScreen}
-        options={{ tabBarLabel: 'Bookings', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>◆</Text> }} />
-      <Tab.Screen name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarLabel: 'Profile', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>●</Text> }} />
+      <Tab.Screen name="Home" component={HomeScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="⊞" {...p} />, tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Search" component={SearchScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="⊕" {...p} />, tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="◆" {...p} />, tabBarLabel: 'Bookings' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
 }
 
-function RootNavigator() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={TabNavigator} />
-    </Stack.Navigator>
-  )
-}
+function AppNavigator() {
+  const [splashDone, setSplashDone] = useState(false)
 
-export default function App() {
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(() => setLoading(false))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {})
-    return () => subscription.unsubscribe()
-  }, [])
-
-  if (loading) {
+  if (!splashDone) {
     return (
-      <View style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={t.accent} size="large" />
-      </View>
+      <SafeAreaProvider>
+        <SplashScreen onNext={() => setSplashDone(true)} />
+      </SafeAreaProvider>
     )
   }
 
   return (
-    <NavigationContainer>
-      <RootNavigator />
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="HospitalProfile" component={HospitalProfileScreen} />
+          <Stack.Screen name="BookingFlow" component={BookingFlowScreen} />
+          <Stack.Screen name="Confirmation" component={ConfirmationScreen}
+            options={{ animation: 'fade' }} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppNavigator />
+    </ThemeProvider>
   )
 }

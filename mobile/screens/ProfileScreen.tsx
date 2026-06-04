@@ -1,118 +1,123 @@
-import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
-import type { User } from '../types/database'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch } from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
+import { patientProfile as p } from '../data'
 
-const menuItems = [
-  { icon: '🩺', label: 'Medical History',            sub: 'View your past diagnoses and notes' },
-  { icon: '📄', label: 'Prescriptions & Lab Results', sub: 'Access your uploaded documents' },
-  { icon: '👨‍👩‍👧', label: 'Manage Dependents',          sub: 'Book appointments for family members' },
-  { icon: '🛡️', label: 'Insurance Details',            sub: 'Link your HMO or insurance card' },
-  { icon: '🔔', label: 'Notifications',                sub: 'Reminders, updates, and alerts' },
-  { icon: '🔐', label: 'Privacy & Security',           sub: 'Password, data, and account settings' },
-]
-
-const stats = [
-  { icon: '📋', label: 'Total Bookings',    key: 'bookings' },
-  { icon: '💻', label: 'Virtual Consults',  key: 'virtual'  },
-  { icon: '🏥', label: 'Hospitals Used',    key: 'hospitals' },
-  { icon: '⭐', label: 'Reviews Left',      key: 'reviews'  },
-]
-
-export function ProfileScreen({ navigation }: { navigation: any }) {
-  const [user, setUser]     = useState<User | null>(null)
-  const [counts, setCounts] = useState({ bookings: 0, virtual: 0, hospitals: 0, reviews: 0 })
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
-
-      const { data: profile } = await supabase.from('users').select('*').eq('auth_id', authUser.id).single()
-      if (!profile) return
-      setUser(profile as User)
-
-      const [{ count: bookings }, { count: virtual }, { data: apptHospitals }, { count: reviews }] = await Promise.all([
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('patient_id', profile.id),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('patient_id', profile.id).eq('type', 'virtual'),
-        supabase.from('appointments').select('hospital_id').eq('patient_id', profile.id),
-        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('patient_id', profile.id),
-      ])
-      const uniqueHospitals = new Set((apptHospitals ?? []).map((a: { hospital_id: string }) => a.hospital_id)).size
-      setCounts({ bookings: bookings ?? 0, virtual: virtual ?? 0, hospitals: uniqueHospitals, reviews: reviews ?? 0 })
-    }
-    load()
-  }, [])
-
-  const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
+export function ProfileScreen() {
+  const { theme: t, themeId, toggleTheme } = useTheme()
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.avatarSection}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
-          <Text style={styles.name}>{user?.full_name ?? 'Loading…'}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-          {user?.is_verified && (
-            <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ Verified Patient</Text></View>
-          )}
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 20 }}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>Profile</Text>
+
+        {/* Avatar & info */}
+        <View style={styles.profileCard}>
+          <View style={[styles.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+            <Text style={[styles.avatarText, { color: t.accent }]}>{p.initials}</Text>
+          </View>
+          <Text style={[styles.name, { color: t.textPrimary }]}>{p.name}</Text>
+          <Text style={[styles.email, { color: t.textMuted }]}>{p.email}</Text>
+          <View style={styles.badges}>
+            <View style={[styles.badge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+              <Text style={[styles.badgeText, { color: t.accent }]}>Verified Patient</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+              <Text style={[styles.badgeText, { color: t.textMuted }]}>Lagos Island</Text>
+            </View>
+          </View>
         </View>
 
+        {/* Theme toggle */}
+        <View style={[styles.themeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Text style={{ fontSize: 16 }}>{themeId === 'forest' ? '🌿' : '🏥'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Forest' : 'Clinical'} Theme</Text>
+            <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch theme</Text>
+          </View>
+          <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
+            trackColor={{ false: t.accentBg, true: t.accentBg }}
+            thumbColor={t.accent} />
+        </View>
+
+        {/* Stats */}
         <View style={styles.statsGrid}>
-          {stats.map(s => (
-            <View key={s.key} style={styles.statCard}>
-              <Text style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</Text>
-              <Text style={styles.statValue}>{counts[s.key as keyof typeof counts]}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
+          {[
+            { icon: '📅', label: 'Bookings',         value: p.totalBookings },
+            { icon: '💊', label: 'Prescriptions',    value: p.prescriptions },
+            { icon: '🏥', label: 'Hospitals used',   value: p.hospitalsUsed },
+            { icon: '💻', label: 'Virtual consults', value: p.virtualConsults },
+          ].map(s => (
+            <View key={s.label} style={[styles.statBox, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</Text>
+              <Text style={[styles.statValue, { color: t.textPrimary }]}>{s.value}</Text>
+              <Text style={[styles.statLabel, { color: t.textMuted }]}>{s.label}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.menu}>
-          {menuItems.map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem} activeOpacity={0.7}>
-              <Text style={{ fontSize: 20 }}>{item.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.menuSub}>{item.sub}</Text>
-              </View>
-              <Text style={{ color: t.textMuted, fontSize: 18 }}>›</Text>
-            </TouchableOpacity>
+        {/* Health profile */}
+        <View style={[styles.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Text style={[styles.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Health profile</Text>
+          {[
+            { label: 'Blood group', value: p.blood },
+            { label: 'Genotype',    value: p.genotype },
+            { label: 'Allergies',   value: p.allergies.join(', ') },
+            { label: 'Conditions',  value: p.conditions.join(', ') },
+            { label: 'HMO',         value: `${p.hmo} · ${p.hmoNo}` },
+          ].map(i => (
+            <View key={i.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
+              <Text style={[styles.infoLabel, { color: t.textMuted }]}>{i.label}</Text>
+              <Text style={[styles.infoValue, { color: t.textPrimary }]}>{i.value}</Text>
+            </View>
           ))}
         </View>
 
-        <TouchableOpacity onPress={signOut} style={styles.signOutBtn}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-        <View style={{ height: 40 }} />
+        {/* Menu */}
+        {[
+          { icon: '🩺', label: 'Medical history' },
+          { icon: '📋', label: 'Prescriptions & lab results' },
+          { icon: '👨‍👩‍👧', label: 'Manage dependents' },
+          { icon: '🔔', label: 'Notifications' },
+          { icon: '🔒', label: 'Privacy & security' },
+          { icon: '💬', label: 'Support & queries' },
+        ].map(item => (
+          <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 16 }}>{item.icon}</Text>
+            <Text style={[styles.menuLabel, { color: t.textPrimary }]}>{item.label}</Text>
+            <Text style={[styles.menuArrow, { color: t.textMuted }]}>›</Text>
+          </TouchableOpacity>
+        ))}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: t.bg },
-  scroll:       { flex: 1, paddingHorizontal: spacing.xl },
-  avatarSection:{ alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.xl },
-  avatar:       { width: 72, height: 72, borderRadius: 22, backgroundColor: t.accentMuted, borderWidth: 2, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  avatarText:   { fontSize: 22, fontWeight: '800', color: t.accent },
-  name:         { fontSize: font.lg, fontWeight: '800', color: t.text, letterSpacing: -0.4 },
-  email:        { fontSize: font.sm, color: t.textSub, marginTop: 3 },
-  verifiedBadge:{ marginTop: 8, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: t.accentBorder, backgroundColor: t.accentMuted },
-  verifiedText: { fontSize: 11, fontWeight: '700', color: t.accent },
-  statsGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl },
-  statCard:     { flex: 1, minWidth: '45%', backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.xl, padding: spacing.lg, alignItems: 'center' },
-  statValue:    { fontSize: font.xxl, fontWeight: '800', color: t.text },
-  statLabel:    { fontSize: 10, color: t.textSub, marginTop: 2, textAlign: 'center' },
-  menu:         { marginBottom: spacing.xl },
-  menuItem:     { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 13, marginBottom: spacing.sm },
-  menuLabel:    { fontSize: font.base, fontWeight: '600', color: t.text },
-  menuSub:      { fontSize: 11, color: t.textSub, marginTop: 1 },
-  signOutBtn:   { paddingVertical: 14, alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, borderColor: '#FF5C5C33', backgroundColor: 'rgba(255,92,92,0.06)' },
-  signOutText:  { fontSize: font.base, fontWeight: '700', color: '#FF5C5C' },
+  safe:        { flex: 1 },
+  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, paddingTop: 16, marginBottom: 16 },
+  profileCard: { alignItems: 'center', marginBottom: 16 },
+  avatar:      { width: 70, height: 70, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, marginBottom: 10 },
+  avatarText:  { fontSize: 22, fontWeight: '800' },
+  name:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  email:       { fontSize: 12, marginTop: 3 },
+  badges:      { flexDirection: 'row', gap: 6, marginTop: 8 },
+  badge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  badgeText:   { fontSize: 10, fontWeight: '700' },
+  themeRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1 },
+  themeLabel:  { fontSize: 14, fontWeight: '600' },
+  themeSub:    { fontSize: 11, marginTop: 1 },
+  statsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  statBox:     { width: '47.5%', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1 },
+  statValue:   { fontSize: 20, fontWeight: '800' },
+  statLabel:   { fontSize: 10, marginTop: 2, textAlign: 'center' },
+  section:     { borderRadius: 14, overflow: 'hidden', marginBottom: 14, borderWidth: 1 },
+  sectionTitle:{ padding: 10, paddingHorizontal: 14, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
+  infoRow:     { flexDirection: 'row', justifyContent: 'space-between', padding: 9, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
+  infoLabel:   { fontSize: 12, flexShrink: 0 },
+  infoValue:   { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
+  menuItem:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12, paddingHorizontal: 14, marginBottom: 7, borderWidth: 1 },
+  menuLabel:   { fontSize: 13, fontWeight: '500', flex: 1 },
+  menuArrow:   { fontSize: 18 },
 })
