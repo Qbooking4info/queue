@@ -1,86 +1,128 @@
-import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, Animated } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 
 interface Props { navigation: any; route: any }
 
 export function ConfirmationScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
-  const { hospital, doctor, slot, vtype, urgency } = route.params
-  const [show, setShow] = useState(false)
-  useEffect(() => { setTimeout(() => setShow(true), 100) }, [])
+  const { hospital, doctor, slot, vtype, urgency, bookingRef } = route.params
+
+  const scale   = useRef(new Animated.Value(0.3)).current
+  const opacity = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale,   { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }),
+      Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start()
+  }, [])
+
+  function goHome() {
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Home' } }] })
+  }
+  function goBookings() {
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Appointments' } }] })
+  }
+
+  const dateLabel = slot?.slot_date ?? new Date().toLocaleDateString('en-NG')
+  const timeLabel = slot?.start_time ?? '—'
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.splashBg }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Checkmark */}
-        <View style={[styles.checkCircle, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder,
-          opacity: show ? 1 : 0, transform: [{ scale: show ? 1 : 0.4 }] }]}>
-          <Text style={[styles.check, { color: t.accent }]}>✓</Text>
-        </View>
+    <SafeAreaView style={[st.safe, { backgroundColor: t.splashBg }]}>
+      <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
 
-        <Text style={[styles.headline, { opacity: show ? 1 : 0 }]}>Booking confirmed!</Text>
-        <Text style={[styles.sub, { color: 'rgba(255,255,255,0.5)', opacity: show ? 1 : 0 }]}>
-          Reminder sent to your phone and email
-        </Text>
+        {/* Animated checkmark */}
+        <Animated.View style={[st.checkWrap, { opacity, transform: [{ scale }] }]}>
+          <View style={[st.checkCircle, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+            <Text style={[st.checkIcon, { color: t.accent }]}>✓</Text>
+          </View>
+          <Text style={st.headline}>Booking confirmed!</Text>
+          <Text style={st.sub}>We'll send you a reminder before your appointment.</Text>
+        </Animated.View>
 
         {/* Booking card */}
-        <View style={[styles.card, { opacity: show ? 1 : 0 }]}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardHeaderLabel}>Booking ID</Text>
-            <Text style={[styles.bookingId, { color: t.accent }]}>QUE-00422</Text>
+        <Animated.View style={[st.card, { opacity }]}>
+          <View style={st.cardHeader}>
+            <View>
+              <Text style={st.cardHeaderLabel}>Booking ID</Text>
+              <Text style={[st.bookingId, { color: t.accent }]}>{bookingRef ?? 'QUE-XXXXX'}</Text>
+            </View>
+            <View style={[st.statusPill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <Text style={[st.statusText, { color: t.accent }]}>Pending</Text>
+            </View>
           </View>
+
           {[
-            { label: 'Doctor',   value: doctor.name },
-            { label: 'Hospital', value: hospital.name },
-            { label: 'Date',     value: 'Thu, 29 May 2025' },
-            { label: 'Time',     value: slot ?? '—' },
-            { label: 'Type',     value: vtype === 'virtual' ? 'Virtual consult' : 'In-person' },
-            { label: 'Urgency',  value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
+            { icon: '👨‍⚕️', label: 'Doctor',   value: doctor.name },
+            { icon: '🏥', label: 'Hospital', value: hospital.name },
+            { icon: '📅', label: 'Date',     value: dateLabel },
+            { icon: '⏰', label: 'Time',     value: timeLabel },
+            { icon: '💊', label: 'Type',     value: vtype === 'virtual' ? 'Virtual consultation' : 'In-person visit' },
+            { icon: '⚡', label: 'Urgency',  value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
           ].map(row => (
-            <View key={row.label} style={styles.cardRow}>
-              <Text style={styles.cardLabel}>{row.label}</Text>
-              <Text style={styles.cardValue} numberOfLines={2}>{row.value}</Text>
+            <View key={row.label} style={st.cardRow}>
+              <View style={st.cardRowLeft}>
+                <Text style={st.cardRowIcon}>{row.icon}</Text>
+                <Text style={st.cardLabel}>{row.label}</Text>
+              </View>
+              <Text style={st.cardValue} numberOfLines={2}>{row.value}</Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
+
+        {/* Info note */}
+        <Animated.View style={[st.noteBox, { opacity }]}>
+          <Text style={st.noteText}>
+            🔔 A confirmation notification has been added to your notifications. The hospital will confirm your slot shortly.
+          </Text>
+        </Animated.View>
 
         {/* Actions */}
-        <View style={[styles.actions, { opacity: show ? 1 : 0 }]}>
-          <TouchableOpacity style={styles.calBtn}>
-            <Text style={styles.calBtnText}>Add to calendar</Text>
+        <Animated.View style={[st.actions, { opacity }]}>
+          <TouchableOpacity onPress={goBookings}
+            style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+            <Text style={st.secondaryBtnText}>View bookings</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Appointments' })}
-            style={[styles.doneBtn, { backgroundColor: t.accent }]}>
-            <Text style={styles.doneBtnText}>Done</Text>
+          <TouchableOpacity onPress={goHome}
+            style={[st.primaryBtn, { backgroundColor: t.accent }]}>
+            <Text style={st.primaryBtnText}>Back to home</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
+
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  safe:           { flex: 1 },
-  content:        { alignItems: 'center', padding: 28, paddingTop: 48 },
-  checkCircle:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, marginBottom: 18 },
-  check:          { fontSize: 34 },
-  headline:       { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.8, textAlign: 'center' },
-  sub:            { fontSize: 13, marginTop: 6, textAlign: 'center' },
-  card:           { width: '100%', backgroundColor: 'rgba(255,255,255,0.06)',
-                    borderRadius: 18, padding: 18, marginTop: 24,
-                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  cardHeader:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  cardHeaderLabel:{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.7, textTransform: 'uppercase' },
-  bookingId:      { fontSize: 12, fontWeight: '700', fontFamily: undefined },
-  cardRow:        { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8,
-                    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', gap: 16 },
-  cardLabel:      { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
-  cardValue:      { fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: '500', textAlign: 'right', flex: 1 },
-  actions:        { flexDirection: 'row', gap: 9, marginTop: 18, width: '100%' },
-  calBtn:         { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center',
-                    backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  calBtnText:     { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
-  doneBtn:        { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center' },
-  doneBtnText:    { fontSize: 12, fontWeight: '700', color: '#fff' },
+const st = StyleSheet.create({
+  safe:            { flex: 1 },
+  content:         { alignItems: 'center', padding: 28, paddingTop: 40 },
+  // Animated header
+  checkWrap:       { alignItems: 'center', marginBottom: 28 },
+  checkCircle:     { width: 88, height: 88, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, marginBottom: 18 },
+  checkIcon:       { fontSize: 38 },
+  headline:        { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.8, textAlign: 'center' },
+  sub:             { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 6, textAlign: 'center' },
+  // Card
+  card:            { width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 12 },
+  cardHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  cardHeaderLabel: { fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 3 },
+  bookingId:       { fontSize: 14, fontWeight: '800' },
+  statusPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
+  statusText:      { fontSize: 11, fontWeight: '700' },
+  cardRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', gap: 12 },
+  cardRowLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardRowIcon:     { fontSize: 14 },
+  cardLabel:       { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
+  cardValue:       { fontSize: 12, color: 'rgba(255,255,255,0.88)', fontWeight: '600', textAlign: 'right', flex: 1 },
+  // Note
+  noteBox:         { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 13, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 20 },
+  noteText:        { fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 18, textAlign: 'center' },
+  // Buttons
+  actions:         { flexDirection: 'row', gap: 9, width: '100%' },
+  secondaryBtn:    { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
+  secondaryBtnText:{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
+  primaryBtn:      { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' },
+  primaryBtnText:  { fontSize: 13, fontWeight: '700', color: '#fff' },
 })

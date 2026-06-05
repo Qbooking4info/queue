@@ -1,41 +1,105 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Modal, Pressable, Dimensions,
+  StyleSheet, SafeAreaView, Modal, Pressable, Dimensions, ActivityIndicator,
 } from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
-import { hospitals, specialties } from '../data'
+import { specialties } from '../data'
+import { getHospitals, getNextAppointment } from '../lib/api'
+import { toDisplayHospital } from '../lib/adapters'
+import type { AppointmentWithRelations } from '../lib/api'
 import type { Theme } from '../contexts/ThemeContext'
+import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
-const SCREEN_H     = Dimensions.get('window').height
-const PREVIEW_COUNT = 10
+const SCREEN_H = Dimensions.get('window').height
+
 const SURGERY_LABELS = [
   'General Surgery', 'Plastic Surgery', 'Neurosurgery', 'Cardiothoracic',
   'Ortho Surgery', 'Laparoscopic', 'Paediatric Surgery', 'Vascular Surgery',
   'Maxillofacial', 'Endoscopic Surgery',
 ]
+const PREVIEW_COUNT = 10
 
-// ── Specialties grid (3-column) used inside the modal ─────────────────────
+function getGreeting(): { salutation: string; emoji: string } {
+  const hour = new Date().getHours()
+  if (hour < 12) return { salutation: 'Good morning',   emoji: '☀️' }
+  if (hour < 16) return { salutation: 'Good afternoon', emoji: '🌤️' }
+  return               { salutation: 'Good evening',   emoji: '🌇' }
+}
+
+const WELLNESS_TIPS = [
+  'Remember to stay hydrated today 💧',
+  'Your health is your wealth 🌿',
+  'A check-up a day keeps worries away 🩺',
+  'Taking care of yourself is a priority 💚',
+  'Small steps lead to great health 🏃',
+]
+
+function getDayMessage(): string {
+  const day = new Date().getDay()
+  const messages: Record<number, string> = {
+    0: 'Happy Sunday! Rest and recharge 🛌',
+    1: 'New week, fresh start 💪',
+    2: 'Keep the momentum going 🔥',
+    3: 'Midweek check-in — how are you feeling? 😊',
+    4: 'Almost there, stay strong 🌟',
+    5: 'Happy Friday! Wrap up and unwind 🎉',
+    6: 'Happy Saturday! Make it count 🌈',
+  }
+  return messages[day] ?? WELLNESS_TIPS[Math.floor(Math.random() * WELLNESS_TIPS.length)]
+}
+
+// Sort hospitals by proximity (rating as proxy — higher rating = more established/closer equivalent)
+function sortByProximity(list: DisplayHospital[]): DisplayHospital[] {
+  return [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+}
+
+// Filter hospitals that offer a given specialty
+function filterBySpecialty(list: DisplayHospital[], specialty: string): DisplayHospital[] {
+  const q = specialty.toLowerCase()
+  return list.filter(h =>
+    h.services.some(svc => svc.toLowerCase().includes(q) || q.includes(svc.toLowerCase()))
+  )
+}
+
 function SpecialtyGrid({
-  items, theme: t, onSelect,
-}: { items: typeof specialties; theme: Theme; onSelect: () => void }) {
+  items, theme: t, activeSpecialty, onSelect,
+}: {
+  items: typeof specialties
+  theme: Theme
+  activeSpecialty: string | null
+  onSelect: (label: string) => void
+}) {
   const rows: (typeof specialties)[] = []
   for (let i = 0; i < items.length; i += 3) rows.push(items.slice(i, i + 3))
   return (
     <>
       {rows.map((row, ri) => (
         <View key={ri} style={{ flexDirection: 'row', marginBottom: 8 }}>
-          {row.map(s => (
-            <TouchableOpacity key={s.label} onPress={onSelect}
-              style={{ flex: 1, margin: 4, borderRadius: 14, paddingVertical: 12,
-                paddingHorizontal: 4, alignItems: 'center', gap: 5, borderWidth: 1,
-                backgroundColor: t.inputBg, borderColor: t.cardBorder }}>
-              <Text style={{ fontSize: 22 }}>{s.icon}</Text>
-              <Text style={{ fontSize: 10, fontWeight: '500', textAlign: 'center', color: t.textSecondary }}
-                numberOfLines={2}>{s.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {row.map(sp => {
+            const active = activeSpecialty === sp.label
+            return (
+              <TouchableOpacity key={sp.label} onPress={() => onSelect(sp.label)}
+                style={{
+                  flex: 1, margin: 4, borderRadius: 14, paddingVertical: 12,
+                  paddingHorizontal: 4, alignItems: 'center', gap: 5, borderWidth: active ? 1.5 : 1,
+                  backgroundColor: active ? t.accentBg : t.inputBg,
+                  borderColor:     active ? t.accent   : t.cardBorder,
+                }}>
+                <Text style={{ fontSize: 22 }}>{sp.icon}</Text>
+                <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
+                  numberOfLines={2}>{sp.label}</Text>
+                {active && (
+                  <View style={{ position: 'absolute', top: 6, right: 6, width: 12, height: 12, borderRadius: 6, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#000', fontSize: 7, fontWeight: '900' }}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )
+          })}
           {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, i) => (
             <View key={`pad-${i}`} style={{ flex: 1, margin: 4 }} />
           ))}
@@ -45,20 +109,61 @@ function SpecialtyGrid({
   )
 }
 
-// ── Main screen ────────────────────────────────────────────────────────────
 interface Props { navigation: any }
 
 export function HomeScreen({ navigation }: Props) {
-  const { theme: t } = useTheme()
-  const [showAll, setShowAll] = useState(false)
-  const preview = specialties.slice(0, PREVIEW_COUNT)
-  const general = specialties.filter(s => !SURGERY_LABELS.includes(s.label))
-  const surgery = specialties.filter(s => SURGERY_LABELS.includes(s.label))
+  const { theme: t }              = useTheme()
+  const { user }                  = useAuth()
+  const [showAll, setShowAll]     = useState(false)
+  const [hospitals, setHospitals] = useState<DisplayHospital[]>([])
+  const [nextAppt, setNextAppt]   = useState<AppointmentWithRelations | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [activeSpecialty, setActiveSpecialty] = useState<string | null>(null)
+
+  const { salutation, emoji } = getGreeting()
+  const dayMessage            = getDayMessage()
+  const preview               = specialties.slice(0, PREVIEW_COUNT)
+  const general               = specialties.filter(s => !SURGERY_LABELS.includes(s.label))
+  const surgery               = specialties.filter(s =>  SURGERY_LABELS.includes(s.label))
+  const firstName             = user?.full_name?.split(' ')[0] ?? 'there'
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [raw, appt] = await Promise.all([
+      getHospitals(),
+      user ? getNextAppointment(user.id) : Promise.resolve(null),
+    ])
+    setHospitals(raw.map(toDisplayHospital))
+    setNextAppt(appt)
+    setLoading(false)
+  }, [user])
+
+  useFocusEffect(useCallback(() => { load() }, [load]))
+
+  // Derived: filtered + sorted hospitals
+  const displayedHospitals = useMemo(() => {
+    if (!activeSpecialty) return hospitals
+    const filtered = filterBySpecialty(hospitals, activeSpecialty)
+    return sortByProximity(filtered)
+  }, [hospitals, activeSpecialty])
+
+  function handleSpecialtyPress(label: string) {
+    setActiveSpecialty(prev => prev === label ? null : label)
+    setShowAll(false)
+  }
+
+  function clearFilter() {
+    setActiveSpecialty(null)
+  }
+
+  const activeIcon = activeSpecialty
+    ? (specialties.find(s => s.label === activeSpecialty)?.icon ?? '🔍')
+    : null
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
 
-      {/* ── All Specialties modal ── */}
+      {/* All Specialties modal */}
       <Modal visible={showAll} animationType="slide" transparent
         onRequestClose={() => setShowAll(false)}>
         <Pressable style={s.overlay} onPress={() => setShowAll(false)} />
@@ -71,57 +176,73 @@ export function HomeScreen({ navigation }: Props) {
               <Text style={{ color: t.textMuted, fontSize: 14, fontWeight: '700' }}>✕</Text>
             </TouchableOpacity>
           </View>
+          {activeSpecialty && (
+            <TouchableOpacity onPress={clearFilter}
+              style={[s.clearModalBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginHorizontal: 16, marginBottom: 8 }]}>
+              <Text style={[s.clearModalText, { color: t.accent }]}>✕  Clear filter: {activeSpecialty}</Text>
+            </TouchableOpacity>
+          )}
           <ScrollView showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 32 }}>
-            <SpecialtyGrid items={general} theme={t} onSelect={() => setShowAll(false)} />
-            {/* Surgery section */}
+            <SpecialtyGrid items={general} theme={t} activeSpecialty={activeSpecialty} onSelect={handleSpecialtyPress} />
             <View style={[s.dividerRow, { borderTopColor: t.cardBorder }]}>
               <View style={[s.dividerPill, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                 <Text style={[s.dividerText, { color: t.accent }]}>✂️  Surgery Sub-specialties</Text>
               </View>
             </View>
-            <SpecialtyGrid items={surgery} theme={t} onSelect={() => setShowAll(false)} />
+            <SpecialtyGrid items={surgery} theme={t} activeSpecialty={activeSpecialty} onSelect={handleSpecialtyPress} />
           </ScrollView>
         </View>
       </Modal>
 
-      {/* ── Main scroll ── */}
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
         <View style={s.header}>
-          <View>
-            <Text style={[s.greeting, { color: t.textMuted }]}>Good morning</Text>
-            <Text style={[s.headline, { color: t.textPrimary }]}>Adaeze 👋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.greeting, { color: t.textMuted }]}>{salutation} {emoji}</Text>
+            <Text style={[s.headline, { color: t.textPrimary }]}>{firstName} 👋</Text>
+            <Text style={[s.dayMsg, { color: t.textMuted }]} numberOfLines={1}>{dayMessage}</Text>
           </View>
-          <View style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')}
+            style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
             <Text style={{ fontSize: 18 }}>🔔</Text>
             <View style={[s.notifDot, { backgroundColor: t.accent }]} />
-          </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Appointment banner */}
-        <View style={[s.banner, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
-          <Text style={[s.bannerLabel, { color: t.accent }]}>NEXT APPOINTMENT</Text>
-          <View style={s.bannerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.bannerDoctor}>Dr. Amaka Osei</Text>
-              <Text style={[s.bannerSub, { color: 'rgba(255,255,255,0.5)' }]}>
-                Cardiology · Lagos Island General
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                {['Thu 29 May', '9:00 AM'].map(l => (
-                  <View key={l} style={[s.bannerChip, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                    <Text style={[s.bannerChipText, { color: t.accent }]}>{l}</Text>
-                  </View>
-                ))}
+        {/* Next appointment banner */}
+        {nextAppt ? (
+          <View style={[s.banner, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
+            <Text style={[s.bannerLabel, { color: t.accent }]}>NEXT APPOINTMENT</Text>
+            <View style={s.bannerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.bannerDoctor}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
+                <Text style={[s.bannerSub, { color: 'rgba(255,255,255,0.5)' }]}>
+                  {nextAppt.hospital?.name ?? ''}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                  {[nextAppt.appointment_date, nextAppt.start_time].map(l => (
+                    <View key={l} style={[s.bannerChip, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+                      <Text style={[s.bannerChipText, { color: t.accent }]}>{l}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
+              <TouchableOpacity style={[s.bannerBtn, { backgroundColor: t.accent }]}
+                onPress={() => navigation.navigate('AppointmentDetail', { appointment: nextAppt })}>
+                <Text style={s.bannerBtnText}>View</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[s.bannerBtn, { backgroundColor: t.accent }]}>
-              <Text style={s.bannerBtnText}>View</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        ) : !loading && (
+          <TouchableOpacity onPress={() => navigation.navigate('Search')}
+            style={[s.banner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={[s.bannerLabel, { color: t.accent }]}>BOOK YOUR FIRST APPOINTMENT</Text>
+            <Text style={[s.bannerDoctor, { color: t.textPrimary }]}>Find a hospital near you</Text>
+            <Text style={[s.bannerSub, { color: t.textMuted }]}>Search by specialty, hospital or doctor →</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Search */}
         <TouchableOpacity onPress={() => navigation.navigate('Search')}
@@ -139,23 +260,33 @@ export function HomeScreen({ navigation }: Props) {
               Emergency slots available · Premium fee applies
             </Text>
           </View>
-          <TouchableOpacity style={s.emergencyBtn}>
+          <TouchableOpacity style={s.emergencyBtn}
+            onPress={() => navigation.navigate('EmergencyBooking')}>
             <Text style={s.emergencyBtnText}>Book now</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Specialties — preview + More */}
+        {/* Specialties row */}
         <Text style={[s.sectionLabel, { color: t.textMuted }]}>Specialties</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={s.specialtyScroll}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-          {preview.map(sp => (
-            <TouchableOpacity key={sp.label}
-              style={[s.chip, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={{ fontSize: 20 }}>{sp.icon}</Text>
-              <Text style={[s.chipLabel, { color: t.textMuted }]}>{sp.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {preview.map(sp => {
+            const active = activeSpecialty === sp.label
+            return (
+              <TouchableOpacity key={sp.label} onPress={() => handleSpecialtyPress(sp.label)}
+                style={[s.chip, {
+                  backgroundColor: active ? t.accentBg  : t.cardBg,
+                  borderColor:     active ? t.accent    : t.cardBorder,
+                  borderWidth:     active ? 1.5 : 1,
+                }]}>
+                <Text style={{ fontSize: 20 }}>{sp.icon}</Text>
+                <Text style={[s.chipLabel, { color: active ? t.accent : t.textMuted, fontWeight: active ? '700' : '500' }]}>
+                  {sp.label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
           <TouchableOpacity onPress={() => setShowAll(true)}
             style={[s.chip, s.moreChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
             <Text style={{ fontSize: 18 }}>＋</Text>
@@ -163,17 +294,60 @@ export function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Nearby hospitals */}
+        {/* Active filter banner */}
+        {activeSpecialty && (
+          <View style={[s.filterBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+            <Text style={{ fontSize: 16 }}>{activeIcon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.filterBannerTitle, { color: t.accent }]}>
+                {displayedHospitals.length} hospital{displayedHospitals.length !== 1 ? 's' : ''} offering {activeSpecialty}
+              </Text>
+              <Text style={[s.filterBannerSub, { color: t.textSecondary }]}>
+                Sorted by proximity · Tap a chip again to clear
+              </Text>
+            </View>
+            <TouchableOpacity onPress={clearFilter}
+              style={[s.clearBtn, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <Text style={[s.clearBtnText, { color: t.accent }]}>✕ Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Hospital list */}
         <View style={s.sectionRow}>
-          <Text style={[s.sectionLabel, { color: t.textMuted }]}>Nearby hospitals</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Search')}>
-            <Text style={[s.seeAll, { color: t.accent }]}>See all →</Text>
-          </TouchableOpacity>
+          <Text style={[s.sectionLabel, { color: t.textMuted }]}>
+            {activeSpecialty ? `${activeSpecialty} hospitals` : 'Nearby hospitals'}
+          </Text>
+          {!activeSpecialty && (
+            <TouchableOpacity onPress={() => navigation.navigate('Search')}>
+              <Text style={[s.seeAll, { color: t.accent }]}>See all →</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {hospitals.slice(0, 3).map(h => (
-          <HospitalCard key={h.id} hospital={h}
-            onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
-        ))}
+
+        {loading ? (
+          <ActivityIndicator color={t.accent} style={{ marginVertical: 20 }} />
+        ) : displayedHospitals.length > 0 ? (
+          // Show top 3 when unfiltered, all results when filtered
+          (activeSpecialty ? displayedHospitals : displayedHospitals.slice(0, 3)).map(h => (
+            <HospitalCard key={h.id} hospital={h}
+              onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
+          ))
+        ) : activeSpecialty ? (
+          <View style={[s.emptyFilter, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
+            <Text style={[s.emptyFilterTitle, { color: t.textPrimary }]}>No hospitals found</Text>
+            <Text style={[s.emptyFilterSub, { color: t.textMuted }]}>
+              No hospitals near you currently offer {activeSpecialty}.
+            </Text>
+            <TouchableOpacity onPress={clearFilter}
+              style={[s.clearBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginTop: 10 }]}>
+              <Text style={[s.clearBtnText, { color: t.accent }]}>Clear filter</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={[s.emptyText, { color: t.textMuted }]}>No hospitals found nearby.</Text>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -182,50 +356,58 @@ export function HomeScreen({ navigation }: Props) {
 }
 
 const s = StyleSheet.create({
-  safe:           { flex: 1 },
-  scroll:         { flex: 1, paddingHorizontal: 20 },
-  // Header
-  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 16, marginBottom: 18 },
-  greeting:       { fontSize: 12, letterSpacing: 0.4 },
-  headline:       { fontSize: 22, fontWeight: '800', letterSpacing: -0.8, marginTop: 2 },
-  notifBtn:       { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  notifDot:       { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
-  // Banner
-  banner:         { borderRadius: 20, padding: 14, marginBottom: 18, borderWidth: 1 },
-  bannerLabel:    { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
-  bannerRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  bannerDoctor:   { fontSize: 15, fontWeight: '700', color: '#fff' },
-  bannerSub:      { fontSize: 11, marginTop: 2 },
-  bannerChip:     { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  bannerChipText: { fontSize: 10, fontWeight: '700' },
-  bannerBtn:      { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
-  bannerBtnText:  { fontSize: 12, fontWeight: '700', color: '#fff' },
-  // Search
-  searchBar:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 18, borderWidth: 1 },
-  searchPH:       { fontSize: 13 },
-  // Emergency
-  emergency:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#7B1A1A', borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(163,45,45,0.5)' },
-  emergencyTitle: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  emergencySub:   { fontSize: 11, marginTop: 1 },
-  emergencyBtn:   { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  emergencyBtnText:{ fontSize: 11, fontWeight: '700', color: '#A32D2D' },
-  // Sections
-  sectionLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 },
-  sectionRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 },
-  seeAll:         { fontSize: 12, fontWeight: '600' },
-  // Specialty row
-  specialtyScroll:{ marginHorizontal: -20, marginBottom: 4 },
-  chip:           { borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, alignItems: 'center', gap: 3 },
-  chipLabel:      { fontSize: 10, fontWeight: '500' },
-  moreChip:       { minWidth: 58 },
+  safe:              { flex: 1 },
+  scroll:            { flex: 1, paddingHorizontal: 20 },
+  header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 16, marginBottom: 18 },
+  greeting:          { fontSize: 12, letterSpacing: 0.4 },
+  headline:          { fontSize: 22, fontWeight: '800', letterSpacing: -0.8, marginTop: 2 },
+  dayMsg:            { fontSize: 11, marginTop: 3, opacity: 0.8 },
+  notifBtn:          { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  notifDot:          { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
+  banner:            { borderRadius: 20, padding: 14, marginBottom: 18, borderWidth: 1 },
+  bannerLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  bannerRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  bannerDoctor:      { fontSize: 15, fontWeight: '700', color: '#fff' },
+  bannerSub:         { fontSize: 11, marginTop: 2 },
+  bannerChip:        { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  bannerChipText:    { fontSize: 10, fontWeight: '700' },
+  bannerBtn:         { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
+  bannerBtnText:     { fontSize: 12, fontWeight: '700', color: '#fff' },
+  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 18, borderWidth: 1 },
+  searchPH:          { fontSize: 13 },
+  emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#7B1A1A', borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(163,45,45,0.5)' },
+  emergencyTitle:    { fontSize: 13, fontWeight: '700', color: '#fff' },
+  emergencySub:      { fontSize: 11, marginTop: 1 },
+  emergencyBtn:      { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  emergencyBtnText:  { fontSize: 11, fontWeight: '700', color: '#A32D2D' },
+  sectionLabel:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 },
+  sectionRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 10 },
+  seeAll:            { fontSize: 12, fontWeight: '600' },
+  specialtyScroll:   { marginHorizontal: -20, marginBottom: 4 },
+  chip:              { borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, alignItems: 'center', gap: 3 },
+  chipLabel:         { fontSize: 10 },
+  moreChip:          { minWidth: 58 },
+  // Active filter banner
+  filterBanner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 11, marginTop: 10, marginBottom: 4 },
+  filterBannerTitle: { fontSize: 12, fontWeight: '700' },
+  filterBannerSub:   { fontSize: 10, marginTop: 1 },
+  clearBtn:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
+  clearBtnText:      { fontSize: 11, fontWeight: '700' },
+  // Empty state
+  emptyText:         { fontSize: 13, textAlign: 'center', marginVertical: 20 },
+  emptyFilter:       { borderRadius: 18, borderWidth: 1, padding: 28, alignItems: 'center', marginVertical: 8 },
+  emptyFilterTitle:  { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  emptyFilterSub:    { fontSize: 12, textAlign: 'center', lineHeight: 18 },
   // Modal
-  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheet:          { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
-  handle:         { width: 40, height: 4, borderRadius: 99, alignSelf: 'center', marginBottom: 14 },
-  sheetHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
-  sheetTitle:     { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
-  closeBtn:       { width: 30, height: 30, borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
-  dividerRow:     { flexDirection: 'row', justifyContent: 'center', marginVertical: 14, borderTopWidth: 1, paddingTop: 14 },
-  dividerPill:    { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  dividerText:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  overlay:           { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet:             { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
+  handle:            { width: 40, height: 4, borderRadius: 99, alignSelf: 'center', marginBottom: 14 },
+  sheetHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
+  sheetTitle:        { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  closeBtn:          { width: 30, height: 30, borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
+  clearModalBtn:     { borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, alignItems: 'center' },
+  clearModalText:    { fontSize: 12, fontWeight: '700' },
+  dividerRow:        { flexDirection: 'row', justifyContent: 'center', marginVertical: 14, borderTopWidth: 1, paddingTop: 14 },
+  dividerPill:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
+  dividerText:       { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
 })

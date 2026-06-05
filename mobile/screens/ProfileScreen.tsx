@@ -1,9 +1,25 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch } from 'react-native'
+import { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Platform } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
-import { patientProfile as p } from '../data'
+import { useAuth }  from '../contexts/AuthContext'
 
-export function ProfileScreen() {
+interface Props { navigation?: any }
+
+export function ProfileScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
+  const { user, signOut }                  = useAuth()
+  const [signingOut, setSigningOut]        = useState(false)
+  const [confirmVisible, setConfirmVisible] = useState(false)
+
+  const initials = user?.full_name
+    ?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    await signOut()
+    setSigningOut(false)
+    setConfirmVisible(false)
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
@@ -13,17 +29,21 @@ export function ProfileScreen() {
         {/* Avatar & info */}
         <View style={styles.profileCard}>
           <View style={[styles.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[styles.avatarText, { color: t.accent }]}>{p.initials}</Text>
+            <Text style={[styles.avatarText, { color: t.accent }]}>{initials}</Text>
           </View>
-          <Text style={[styles.name, { color: t.textPrimary }]}>{p.name}</Text>
-          <Text style={[styles.email, { color: t.textMuted }]}>{p.email}</Text>
+          <Text style={[styles.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
+          <Text style={[styles.email, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Text style={[styles.badgeText, { color: t.accent }]}>Verified Patient</Text>
+              <Text style={[styles.badgeText, { color: t.accent }]}>
+                {user?.is_verified ? 'Verified Patient' : 'Unverified'}
+              </Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-              <Text style={[styles.badgeText, { color: t.textMuted }]}>Lagos Island</Text>
-            </View>
+            {!!user?.city && (
+              <View style={[styles.badge, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                <Text style={[styles.badgeText, { color: t.textMuted }]}>{user.city}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -39,54 +59,66 @@ export function ProfileScreen() {
             thumbColor={t.accent} />
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsGrid}>
-          {[
-            { icon: '📅', label: 'Bookings',         value: p.totalBookings },
-            { icon: '💊', label: 'Prescriptions',    value: p.prescriptions },
-            { icon: '🏥', label: 'Hospitals used',   value: p.hospitalsUsed },
-            { icon: '💻', label: 'Virtual consults', value: p.virtualConsults },
-          ].map(s => (
-            <View key={s.label} style={[styles.statBox, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</Text>
-              <Text style={[styles.statValue, { color: t.textPrimary }]}>{s.value}</Text>
-              <Text style={[styles.statLabel, { color: t.textMuted }]}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
-
         {/* Health profile */}
-        <View style={[styles.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[styles.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Health profile</Text>
-          {[
-            { label: 'Blood group', value: p.blood },
-            { label: 'Genotype',    value: p.genotype },
-            { label: 'Allergies',   value: p.allergies.join(', ') },
-            { label: 'Conditions',  value: p.conditions.join(', ') },
-            { label: 'HMO',         value: `${p.hmo} · ${p.hmoNo}` },
-          ].map(i => (
-            <View key={i.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
-              <Text style={[styles.infoLabel, { color: t.textMuted }]}>{i.label}</Text>
-              <Text style={[styles.infoValue, { color: t.textPrimary }]}>{i.value}</Text>
-            </View>
-          ))}
-        </View>
+        {(user?.blood_group || user?.date_of_birth) && (
+          <View style={[styles.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Health profile</Text>
+            {[
+              user?.blood_group   && { label: 'Blood group', value: user.blood_group },
+              user?.gender        && { label: 'Gender',      value: user.gender },
+              user?.date_of_birth && { label: 'Date of birth', value: user.date_of_birth },
+            ].filter(Boolean).map(i => i && (
+              <View key={i.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[styles.infoLabel, { color: t.textMuted }]}>{i.label}</Text>
+                <Text style={[styles.infoValue, { color: t.textPrimary }]}>{i.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Menu */}
         {[
-          { icon: '🩺', label: 'Medical history' },
-          { icon: '📋', label: 'Prescriptions & lab results' },
-          { icon: '👨‍👩‍👧', label: 'Manage dependents' },
-          { icon: '🔔', label: 'Notifications' },
-          { icon: '🔒', label: 'Privacy & security' },
-          { icon: '💬', label: 'Support & queries' },
+          { icon: '🩺', label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => navigation?.navigate('MedicalHistory') },
+          { icon: '📋', label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => navigation?.navigate('Prescriptions') },
+          { icon: '👨‍👩‍👧', label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => navigation?.navigate('Dependents') },
+          { icon: '🔔', label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => navigation?.navigate('Notifications') },
+          { icon: '🔒', label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => navigation?.navigate('PrivacySecurity') },
+          { icon: '💬', label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => navigation?.navigate('Support') },
         ].map(item => (
-          <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 16 }}>{item.icon}</Text>
-            <Text style={[styles.menuLabel, { color: t.textPrimary }]}>{item.label}</Text>
+          <TouchableOpacity key={item.label} onPress={item.onPress}
+            style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.menuLabel, { color: t.textPrimary }]}>{item.label}</Text>
+              <Text style={[styles.menuSub, { color: t.textMuted }]}>{item.sub}</Text>
+            </View>
             <Text style={[styles.menuArrow, { color: t.textMuted }]}>›</Text>
           </TouchableOpacity>
         ))}
+
+        {/* Sign out */}
+        {!confirmVisible ? (
+          <TouchableOpacity onPress={() => setConfirmVisible(true)}
+            style={[styles.signOutBtn, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.confirmBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
+            <Text style={styles.confirmText}>Sign out of your account?</Text>
+            <View style={styles.confirmRow}>
+              <TouchableOpacity onPress={() => setConfirmVisible(false)}
+                style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }]}>
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSignOut} disabled={signingOut}
+                style={[styles.confirmBtn, { backgroundColor: '#7B2020', borderColor: '#A32D2D', opacity: signingOut ? 0.6 : 1 }]}>
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                  {signingOut ? 'Signing out…' : 'Yes, sign out'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -108,16 +140,19 @@ const styles = StyleSheet.create({
   themeRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1 },
   themeLabel:  { fontSize: 14, fontWeight: '600' },
   themeSub:    { fontSize: 11, marginTop: 1 },
-  statsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  statBox:     { width: '47.5%', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1 },
-  statValue:   { fontSize: 20, fontWeight: '800' },
-  statLabel:   { fontSize: 10, marginTop: 2, textAlign: 'center' },
   section:     { borderRadius: 14, overflow: 'hidden', marginBottom: 14, borderWidth: 1 },
   sectionTitle:{ padding: 10, paddingHorizontal: 14, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
   infoRow:     { flexDirection: 'row', justifyContent: 'space-between', padding: 9, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
   infoLabel:   { fontSize: 12, flexShrink: 0 },
   infoValue:   { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
   menuItem:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12, paddingHorizontal: 14, marginBottom: 7, borderWidth: 1 },
-  menuLabel:   { fontSize: 13, fontWeight: '500', flex: 1 },
+  menuLabel:   { fontSize: 13, fontWeight: '600' },
+  menuSub:     { fontSize: 11, marginTop: 1 },
   menuArrow:   { fontSize: 18 },
+  signOutBtn:  { borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4, borderWidth: 1 },
+  signOutText: { color: '#F87171', fontSize: 14, fontWeight: '700' },
+  confirmBox:  { borderRadius: 14, padding: 16, marginTop: 8, marginBottom: 4, borderWidth: 1 },
+  confirmText: { color: '#F87171', fontSize: 14, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
+  confirmRow:  { flexDirection: 'row', gap: 8 },
+  confirmBtn:  { flex: 1, padding: 11, borderRadius: 10, alignItems: 'center', borderWidth: 1 },
 })

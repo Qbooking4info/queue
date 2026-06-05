@@ -3,9 +3,29 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { Avatar } from '../ui/Avatar'
 import { Stars } from '../ui/Stars'
 import { StatusBadge } from '../ui/StatusBadge'
-import type { Hospital } from '../../data'
 
-interface Props { hospital: Hospital; onPress: () => void }
+export interface DisplayHospital {
+  id:        string | number
+  name:      string
+  specialty: string
+  rating:    number
+  reviews:   number
+  wait:      string
+  distance:  string
+  tag:       string
+  tagType:   string
+  avatar:    string
+  avatarBg:  string
+  services:  string[]
+  virtual:   boolean
+  verified:  boolean
+  slots?:    string[]
+  doctors?:  any[]
+  hmo?:      string[]
+  emergencySlots?: number
+}
+
+interface Props { hospital: DisplayHospital; onPress: () => void }
 
 export function HospitalCard({ hospital: h, onPress }: Props) {
   const { theme: t } = useTheme()

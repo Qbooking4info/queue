@@ -4,15 +4,43 @@ import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
 import { Stars } from '../components/ui/Stars'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import type { Hospital, Doctor } from '../data'
+import type { DisplayHospital } from '../components/hospital/HospitalCard'
+
+interface BookingDoctor {
+  id?:              string
+  name:             string
+  spec:             string
+  fee:              string
+  avatar:           string
+  exp?:             string
+  rating?:          number
+  consultation_fee?: number
+  virtual_fee?:     number
+}
 
 interface Props { navigation: any; route: any }
 
 const TABS = ['doctors', 'services', 'hmo', 'info'] as const
 
+function toBookingDoctor(d: any): BookingDoctor {
+  const initials = (d.full_name ?? d.name ?? '??')
+    .split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+  return {
+    id:               d.id,
+    name:             d.full_name ?? d.name ?? 'Doctor',
+    spec:             d.specialty?.name ?? d.spec ?? 'Specialist',
+    fee:              d.consultation_fee ? `₦${Number(d.consultation_fee).toLocaleString()}` : (d.fee ?? '₦0'),
+    avatar:           initials,
+    exp:              d.years_experience ? `${d.years_experience} yrs` : (d.exp ?? ''),
+    rating:           d.avg_rating ?? d.rating ?? 0,
+    consultation_fee: d.consultation_fee,
+    virtual_fee:      d.virtual_fee,
+  }
+}
+
 export function HospitalProfileScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
-  const hospital: Hospital = route.params.hospital
+  const hospital: DisplayHospital = route.params.hospital
   const [tab, setTab] = useState<typeof TABS[number]>('doctors')
 
   return (
@@ -33,7 +61,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             <View style={{ flexDirection: 'row', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
               <StatusBadge type={hospital.tagType} />
               {hospital.virtual && <StatusBadge type="virtual" />}
-              {hospital.emergencySlots > 0 && (
+              {(hospital.emergencySlots ?? 0) > 0 && (
                 <View style={[styles.emergBadge]}>
                   <Text style={styles.emergBadgeText}>🚨 {hospital.emergencySlots} emergency</Text>
                 </View>
@@ -72,9 +100,13 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
       {/* Tab content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'doctors' && hospital.doctors.map(d => (
-          <DoctorRow key={d.name} doctor={d} onBook={() => navigation.navigate('BookingFlow', { hospital, doctor: d })} />
-        ))}
+        {tab === 'doctors' && (hospital.doctors ?? []).map((d, i) => {
+          const bd = toBookingDoctor(d)
+          return (
+            <DoctorRow key={bd.id ?? i} doctor={bd}
+              onBook={() => navigation.navigate('BookingFlow', { hospital, doctor: bd })} />
+          )
+        })}
 
         {tab === 'services' && (
           <View style={styles.chipGrid}>
@@ -86,7 +118,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {tab === 'hmo' && hospital.hmo.map(h => (
+        {tab === 'hmo' && (hospital.hmo ?? []).map(h => (
           <View key={h} style={[styles.hmoRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <Text style={{ fontSize: 14 }}>🏥</Text>
             <Text style={[styles.hmoName, { color: t.textPrimary }]}>{h}</Text>
@@ -97,11 +129,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         ))}
 
         {tab === 'info' && [
-          { label: 'Address',   value: '3 Marina Street, Lagos Island' },
-          { label: 'Phone',     value: '+234 802 000 0001' },
-          { label: 'Hours',     value: 'Mon–Fri 8:00 AM – 6:00 PM' },
-          { label: 'Emergency', value: '24/7 emergency line' },
-          { label: 'EMR',       value: 'OpenMRS · Instant record sync ✓' },
+          { label: 'Address',   value: (hospital as any).address ?? 'See directions' },
+          { label: 'Phone',     value: (hospital as any).phone   ?? 'Contact hospital' },
+          { label: 'City',      value: (hospital as any).city    ?? hospital.distance },
+          { label: 'Emergency', value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
         ].map(i => (
           <View key={i.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
             <Text style={[styles.infoLabel, { color: t.textMuted }]}>{i.label}</Text>
@@ -114,7 +145,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
       {/* Book CTA */}
       <View style={[styles.cta, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
         <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: t.accent }]}
-          onPress={() => navigation.navigate('BookingFlow', { hospital, doctor: hospital.doctors[0] })}>
+          onPress={() => {
+            const first = (hospital.doctors ?? [])[0]
+            if (first) navigation.navigate('BookingFlow', { hospital, doctor: toBookingDoctor(first) })
+          }}>
           <Text style={styles.ctaBtnText}>Book appointment</Text>
         </TouchableOpacity>
       </View>
@@ -122,7 +156,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
   )
 }
 
-function DoctorRow({ doctor: d, onBook }: { doctor: Doctor; onBook: () => void }) {
+function DoctorRow({ doctor: d, onBook }: { doctor: BookingDoctor; onBook: () => void }) {
   const { theme: t } = useTheme()
   return (
     <View style={[styles.doctorRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -133,7 +167,7 @@ function DoctorRow({ doctor: d, onBook }: { doctor: Doctor; onBook: () => void }
         <Text style={[styles.doctorName, { color: t.textPrimary }]}>{d.name}</Text>
         <Text style={[styles.doctorSpec, { color: t.textMuted }]}>{d.spec} · {d.exp}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <Stars rating={d.rating} />
+          <Stars rating={d.rating ?? 0} />
           <Text style={[styles.doctorFee, { color: t.accent, marginLeft: 'auto' }]}>{d.fee}</Text>
         </View>
       </View>

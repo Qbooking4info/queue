@@ -4,17 +4,30 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { Text, View } from 'react-native'
+import { Text, View, ActivityIndicator } from 'react-native'
 
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import { SplashScreen }            from './screens/SplashScreen'
-import { HomeScreen }              from './screens/HomeScreen'
-import { SearchScreen }            from './screens/SearchScreen'
-import { AppointmentsScreen }      from './screens/AppointmentsScreen'
-import { ProfileScreen }           from './screens/ProfileScreen'
-import { HospitalProfileScreen }   from './screens/HospitalProfileScreen'
-import { BookingFlowScreen }       from './screens/BookingFlowScreen'
-import { ConfirmationScreen }      from './screens/ConfirmationScreen'
+import { AuthProvider, useAuth }   from './contexts/AuthContext'
+
+import { SplashScreen }             from './screens/SplashScreen'
+import { LoginScreen }              from './screens/LoginScreen'
+import { RegisterScreen }           from './screens/RegisterScreen'
+import { HomeScreen }               from './screens/HomeScreen'
+import { SearchScreen }             from './screens/SearchScreen'
+import { AppointmentsScreen }       from './screens/AppointmentsScreen'
+import { ProfileScreen }            from './screens/ProfileScreen'
+import { HospitalProfileScreen }    from './screens/HospitalProfileScreen'
+import { BookingFlowScreen }        from './screens/BookingFlowScreen'
+import { ConfirmationScreen }       from './screens/ConfirmationScreen'
+import { NotificationsScreen }      from './screens/NotificationsScreen'
+import { AppointmentDetailScreen }  from './screens/AppointmentDetailScreen'
+import { EmergencyBookingScreen }      from './screens/EmergencyBookingScreen'
+import { EmergencyConfirmationScreen } from './screens/EmergencyConfirmationScreen'
+import { MedicalHistoryScreen }        from './screens/MedicalHistoryScreen'
+import { DependentsScreen }            from './screens/DependentsScreen'
+import { PrescriptionsScreen }         from './screens/PrescriptionsScreen'
+import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
+import { SupportScreen }               from './screens/SupportScreen'
 
 const Tab   = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
@@ -46,8 +59,39 @@ function MainTabs() {
   )
 }
 
+function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="MainTabs"          component={MainTabs} />
+      <Stack.Screen name="HospitalProfile"   component={HospitalProfileScreen} />
+      <Stack.Screen name="BookingFlow"       component={BookingFlowScreen} />
+      <Stack.Screen name="Confirmation"      component={ConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="Notifications"     component={NotificationsScreen} />
+      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+      <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
+      <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="MedicalHistory"    component={MedicalHistoryScreen} />
+      <Stack.Screen name="Dependents"        component={DependentsScreen} />
+      <Stack.Screen name="Prescriptions"     component={PrescriptionsScreen} />
+      <Stack.Screen name="PrivacySecurity"   component={PrivacySecurityScreen} />
+      <Stack.Screen name="Support"           component={SupportScreen} />
+    </Stack.Navigator>
+  )
+}
+
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="Login"    component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
+  )
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
+  const { session, loading }        = useAuth()
+  const { theme: t }                = useTheme()
 
   if (!splashDone) {
     return (
@@ -57,16 +101,20 @@ function AppNavigator() {
     )
   }
 
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.accent} size="large" />
+        </View>
+      </SafeAreaProvider>
+    )
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="HospitalProfile" component={HospitalProfileScreen} />
-          <Stack.Screen name="BookingFlow" component={BookingFlowScreen} />
-          <Stack.Screen name="Confirmation" component={ConfirmationScreen}
-            options={{ animation: 'fade' }} />
-        </Stack.Navigator>
+        {session ? <AppStack /> : <AuthStack />}
       </NavigationContainer>
     </SafeAreaProvider>
   )
@@ -75,7 +123,9 @@ function AppNavigator() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppNavigator />
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
     </ThemeProvider>
   )
 }
