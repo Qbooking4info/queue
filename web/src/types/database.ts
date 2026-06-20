@@ -188,7 +188,7 @@ export type Database = {
       doctors: {
         Row: {
           accepts_virtual: boolean | null; avatar_url: string | null; avg_rating: number | null
-          bio: string | null; consultation_fee: number | null; created_at: string | null
+          bio: string | null; clinic_id: string | null; consultation_fee: number | null; created_at: string | null
           full_name: string; hospital_id: string; id: string; is_active: boolean | null
           mdcn_number: string | null; qualification: string | null; review_count: number | null
           specialty_id: string | null; title: string | null; updated_at: string | null
@@ -196,7 +196,7 @@ export type Database = {
         }
         Insert: {
           accepts_virtual?: boolean | null; avatar_url?: string | null; avg_rating?: number | null
-          bio?: string | null; consultation_fee?: number | null; created_at?: string | null
+          bio?: string | null; clinic_id?: string | null; consultation_fee?: number | null; created_at?: string | null
           full_name: string; hospital_id: string; id?: string; is_active?: boolean | null
           mdcn_number?: string | null; qualification?: string | null; review_count?: number | null
           specialty_id?: string | null; title?: string | null; updated_at?: string | null
@@ -204,7 +204,7 @@ export type Database = {
         }
         Update: {
           accepts_virtual?: boolean | null; avatar_url?: string | null; avg_rating?: number | null
-          bio?: string | null; consultation_fee?: number | null; created_at?: string | null
+          bio?: string | null; clinic_id?: string | null; consultation_fee?: number | null; created_at?: string | null
           full_name?: string; hospital_id?: string; id?: string; is_active?: boolean | null
           mdcn_number?: string | null; qualification?: string | null; review_count?: number | null
           specialty_id?: string | null; title?: string | null; updated_at?: string | null
@@ -267,10 +267,46 @@ export type Database = {
           { foreignKeyName: "hospital_subscriptions_plan_id_fkey"; columns: ["plan_id"]; isOneToOne: false; referencedRelation: "subscription_plans"; referencedColumns: ["id"] },
         ]
       }
+      clinic_admins: {
+        Row: {
+          id: string; clinic_id: string; hospital_id: string; user_id: string
+          role: string | null; is_active: boolean | null; created_at: string | null
+        }
+        Insert: {
+          id?: string; clinic_id: string; hospital_id: string; user_id: string
+          role?: string | null; is_active?: boolean | null; created_at?: string | null
+        }
+        Update: {
+          id?: string; clinic_id?: string; hospital_id?: string; user_id?: string
+          role?: string | null; is_active?: boolean | null; created_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "clinic_admins_clinic_id_fkey"; columns: ["clinic_id"]; isOneToOne: false; referencedRelation: "hospital_clinics"; referencedColumns: ["id"] },
+          { foreignKeyName: "clinic_admins_hospital_id_fkey"; columns: ["hospital_id"]; isOneToOne: false; referencedRelation: "hospitals"; referencedColumns: ["id"] },
+          { foreignKeyName: "clinic_admins_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ]
+      }
+      hospital_clinics: {
+        Row: {
+          id: string; hospital_id: string; name: string; description: string | null
+          is_active: boolean | null; sort_order: number | null; created_at: string | null
+        }
+        Insert: {
+          id?: string; hospital_id: string; name: string; description?: string | null
+          is_active?: boolean | null; sort_order?: number | null; created_at?: string | null
+        }
+        Update: {
+          id?: string; hospital_id?: string; name?: string; description?: string | null
+          is_active?: boolean | null; sort_order?: number | null; created_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "hospital_clinics_hospital_id_fkey"; columns: ["hospital_id"]; isOneToOne: false; referencedRelation: "hospitals"; referencedColumns: ["id"] },
+        ]
+      }
       hospitals: {
         Row: {
           accepts_virtual: boolean | null; address: string; avg_rating: number | null
-          city: string; country: string | null; cover_url: string | null; created_at: string | null
+          city: string; clinic_model: string | null; country: string | null; cover_url: string | null; created_at: string | null
           description: string | null; email: string | null; emergency_hours: boolean | null
           emr_system: string | null; id: string; is_active: boolean | null; is_verified: boolean | null
           lat: number | null; lng: number | null; logo_url: string | null
@@ -281,7 +317,7 @@ export type Database = {
         }
         Insert: {
           accepts_virtual?: boolean | null; address: string; avg_rating?: number | null
-          city: string; country?: string | null; cover_url?: string | null; created_at?: string | null
+          city: string; clinic_model?: string | null; country?: string | null; cover_url?: string | null; created_at?: string | null
           description?: string | null; email?: string | null; emergency_hours?: boolean | null
           emr_system?: string | null; id?: string; is_active?: boolean | null; is_verified?: boolean | null
           lat?: number | null; lng?: number | null; logo_url?: string | null
@@ -292,7 +328,7 @@ export type Database = {
         }
         Update: {
           accepts_virtual?: boolean | null; address?: string; avg_rating?: number | null
-          city?: string; country?: string | null; cover_url?: string | null; created_at?: string | null
+          city?: string; clinic_model?: string | null; country?: string | null; cover_url?: string | null; created_at?: string | null
           description?: string | null; email?: string | null; emergency_hours?: boolean | null
           emr_system?: string | null; id?: string; is_active?: boolean | null; is_verified?: boolean | null
           lat?: number | null; lng?: number | null; logo_url?: string | null
@@ -420,3 +456,5 @@ export type Payment            = Tables<'payments'>
 export type Review             = Tables<'reviews'>
 export type SubscriptionPlan   = Tables<'subscription_plans'>
 export type HospitalSubscription = Tables<'hospital_subscriptions'>
+export type HospitalClinic      = Tables<'hospital_clinics'>
+export type ClinicAdmin         = Tables<'clinic_admins'>

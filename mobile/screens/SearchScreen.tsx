@@ -1,139 +1,113 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
+import type { DisplayHospital } from '../components/hospital/HospitalCard'
+import { getHospitals } from '../lib/api'
+import { toDisplayHospital } from '../lib/adapters'
 
-interface Hospital {
-  id: string; name: string; type: string; city: string; state: string
-  avg_rating: number; review_count: number; accepts_virtual: boolean; is_verified: boolean
-  hospital_specialties: { specialties: { name: string; icon: string | null } | null }[]
-}
+const FILTERS = ['All', 'Virtual', 'Open Now', 'HMO Accepted', 'Emergency']
 
-const FILTERS = ['All', 'Virtual', 'Open Now', 'Top Rated'] as const
-type Filter = typeof FILTERS[number]
+interface Props { navigation: any }
 
-export function SearchScreen({ navigation, route }: { navigation: any; route: any }) {
-  const [query, setQuery]         = useState(route?.params?.initialQuery ?? '')
-  const [filter, setFilter]       = useState<Filter>('All')
-  const [hospitals, setHospitals] = useState<Hospital[]>([])
-  const [loading, setLoading]     = useState(false)
+export function SearchScreen({ navigation }: Props) {
+  const { theme: t }         = useTheme()
+  const [q, setQ]            = useState('')
+  const [filter, setFilter]  = useState('All')
+  const [all, setAll]        = useState<DisplayHospital[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Specialty filter passed from HomeScreen specialty chips
-  const specialtyId: string | undefined   = route?.params?.specialtyId
-  const specialtyName: string | undefined = route?.params?.specialtyName
-
-  useEffect(() => {
+  const load = useCallback(async () => {
     setLoading(true)
+    const raw = await getHospitals()
+    setAll(raw.map(toDisplayHospital))
+    setLoading(false)
+  }, [])
 
-    async function search() {
-      try {
-        let hospitalIds: string[] | null = null
+  useEffect(() => { load() }, [load])
 
-        // If filtering by specialty, first fetch hospital IDs that offer it
-        if (specialtyId) {
-          const { data: hs } = await supabase
-            .from('hospital_specialties')
-            .select('hospital_id')
-            .eq('specialty_id', specialtyId)
-          hospitalIds = (hs ?? []).map((r: { hospital_id: string }) => r.hospital_id)
-          if (hospitalIds.length === 0) {
-            setHospitals([])
-            return
-          }
-        }
-
-        let q = supabase
-          .from('hospitals')
-          .select('id,name,type,city,state,avg_rating,review_count,accepts_virtual,is_verified,hospital_specialties(specialties(name,icon)),hospital_operating_hours(day_of_week,open_time,close_time)')
-          .eq('is_active', true)
-
-        if (hospitalIds) q = q.in('id', hospitalIds)
-        if (query.trim()) q = q.or(`name.ilike.%${query}%,city.ilike.%${query}%,type.ilike.%${query}%`)
-        if (filter === 'Virtual')   q = q.eq('accepts_virtual', true)
-        if (filter === 'Top Rated') q = q.gte('avg_rating', 4.5)
-
-        const { data } = await q.order('avg_rating', { ascending: false }).limit(30)
-
-        let results = (data as (Hospital & { hospital_operating_hours: { day_of_week: number; open_time: string; close_time: string }[] })[]) ?? []
-        if (filter === 'Open Now') {
-          const now  = new Date()
-          const day  = now.getDay()
-          const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-          results = results.filter(h =>
-            h.hospital_operating_hours?.some(oh =>
-              oh.day_of_week === day && oh.open_time.slice(0,5) <= time && time <= oh.close_time.slice(0,5)
-            )
-          )
-        }
-        setHospitals(results)
-      } catch {
-        // Network or DB error — leave current results in place
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    search()
-  }, [query, filter, specialtyId])
+  const results = all.filter(h => {
+    const matchesQuery = !q.trim() ||
+      h.name.toLowerCase().includes(q.toLowerCase()) ||
+      h.specialty.toLowerCase().includes(q.toLowerCase()) ||
+      h.services.some(s => s.toLowerCase().includes(q.toLowerCase()))
+    const matchesFilter =
+      filter === 'All'         ? true :
+      filter === 'Virtual'     ? h.virtual :
+      filter === 'Open Now'    ? h.tagType === 'open' :
+      filter === 'HMO Accepted'? (h.hmo ?? []).length > 0 :
+      filter === 'Emergency'   ? (h.emergencySlots ?? 0) > 0 : true
+    return matchesQuery && matchesFilter
+  })
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{specialtyName ? `${specialtyName} Hospitals` : 'Find Care'}</Text>
-        <View style={styles.searchRow}>
-          <Text style={{ fontSize: 16, color: t.textMuted }}>🔍</Text>
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <View style={[styles.container, { backgroundColor: t.canvasBg }]}>
+        <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
+
+        <View style={[styles.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
+          <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
           <TextInput
-            value={query} onChangeText={setQuery}
-            placeholder="Hospital, doctor, or specialty…"
+            value={q} onChangeText={setQ}
+            placeholder="Hospital, doctor, specialty…"
             placeholderTextColor={t.textMuted}
-            style={styles.input}
+            style={[styles.input, { color: t.textPrimary }]}
           />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
+          {!!q && (
+            <TouchableOpacity onPress={() => setQ('')}>
               <Text style={{ color: t.textMuted, fontSize: 16 }}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            {FILTERS.map(f => (
-              <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[styles.filterChip, filter === f && styles.filterChipActive]}>
-                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
 
-      <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
-        <Text style={styles.count}>{hospitals.length} result{hospitals.length !== 1 ? 's' : ''}</Text>
-        {loading ? (
-          <Text style={styles.placeholder}>Searching…</Text>
-        ) : hospitals.length === 0 ? (
-          <Text style={styles.placeholder}>No hospitals found</Text>
-        ) : (
-          hospitals.map(h => (
-            <HospitalCard key={h.id} hospital={h} onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
-          ))
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={{ gap: 6, paddingHorizontal: 20, alignItems: 'center' }}>
+          {FILTERS.map(f => (
+            <TouchableOpacity key={f} onPress={() => setFilter(f)}
+              style={[styles.filterPill, {
+                backgroundColor: filter === f ? t.accentBg : t.cardBg,
+                borderColor: filter === f ? t.accent : t.cardBorder,
+              }]}>
+              <Text style={[styles.filterText, { color: filter === f ? t.accent : t.textMuted }]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {!loading && (
+          <Text style={[styles.resultCount, { color: t.textMuted }]}>{results.length} results</Text>
         )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+
+        {loading ? (
+          <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 20 }}>
+            {results.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <Text style={[styles.emptyText, { color: t.textMuted }]}>No hospitals found.</Text>
+              </View>
+            )}
+            {results.map(h => (
+              <HospitalCard key={h.id} hospital={h}
+                onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
+            ))}
+            <View style={{ height: 32 }} />
+          </ScrollView>
+        )}
+      </View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:            { flex: 1, backgroundColor: t.bg },
-  header:          { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: t.border },
-  title:           { fontSize: font.xl, fontWeight: '800', color: t.text, marginBottom: spacing.md, letterSpacing: -0.5 },
-  searchRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.borderMed, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 12 },
-  input:           { flex: 1, fontSize: font.base, color: t.text },
-  filterChip:      { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: t.border },
-  filterChipActive:{ borderColor: t.accent, backgroundColor: t.accentMuted },
-  filterText:      { fontSize: font.sm, color: t.textSub, fontWeight: '600' },
-  filterTextActive:{ color: t.accent },
-  results:         { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  count:           { fontSize: font.xs, color: t.textMuted, marginBottom: spacing.sm },
-  placeholder:     { color: t.textMuted, textAlign: 'center', paddingVertical: 40, fontSize: font.sm },
+  safe:         { flex: 1 },
+  container:    { flex: 1 },
+  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
+  inputWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
+  input:        { flex: 1, fontSize: 13 },
+  filterScroll: { marginHorizontal: -20, marginBottom: 12, flexGrow: 0, height: 38 },
+  filterPill:   { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, alignSelf: 'center' },
+  filterText:   { fontSize: 11, fontWeight: '600' },
+  resultCount:  { fontSize: 11, marginBottom: 10, paddingHorizontal: 20 },
+  emptyText:    { fontSize: 13 },
 })

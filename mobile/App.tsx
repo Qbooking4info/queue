@@ -1,147 +1,131 @@
 import 'react-native-url-polyfill/auto'
-import { Component, useEffect, useState } from 'react'
-import { View, ActivityIndicator, Text, ScrollView } from 'react-native'
+import { useState } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from './lib/supabase'
-import { dark as t } from './lib/theme'
+import { Text, View, ActivityIndicator } from 'react-native'
 
-import { HomeScreen }             from './screens/HomeScreen'
-import { SearchScreen }           from './screens/SearchScreen'
-import { AppointmentsScreen }     from './screens/AppointmentsScreen'
-import { ProfileScreen }          from './screens/ProfileScreen'
-import { HospitalProfileScreen }  from './screens/HospitalProfileScreen'
-import { LoginScreen }            from './screens/LoginScreen'
-import { RegisterScreen }         from './screens/RegisterScreen'
-import { MedicalHistoryScreen }   from './screens/MedicalHistoryScreen'
-import { PrescriptionsScreen }    from './screens/PrescriptionsScreen'
-import { DependentsScreen }       from './screens/DependentsScreen'
-import { InsuranceScreen }        from './screens/InsuranceScreen'
-import { NotificationsScreen }    from './screens/NotificationsScreen'
-import { PrivacySecurityScreen }  from './screens/PrivacySecurityScreen'
-import { BookingScreen }          from './screens/BookingScreen'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { AuthProvider, useAuth }   from './contexts/AuthContext'
+
+import { SplashScreen }             from './screens/SplashScreen'
+import { LoginScreen }              from './screens/LoginScreen'
+import { RegisterScreen }           from './screens/RegisterScreen'
+import { HomeScreen }               from './screens/HomeScreen'
+import { SearchScreen }             from './screens/SearchScreen'
+import { AppointmentsScreen }       from './screens/AppointmentsScreen'
+import { ProfileScreen }            from './screens/ProfileScreen'
+import { HospitalProfileScreen }    from './screens/HospitalProfileScreen'
+import { BookingFlowScreen }        from './screens/BookingFlowScreen'
+import { ConfirmationScreen }       from './screens/ConfirmationScreen'
+import { NotificationsScreen }      from './screens/NotificationsScreen'
+import { AppointmentDetailScreen }  from './screens/AppointmentDetailScreen'
+import { EmergencyBookingScreen }      from './screens/EmergencyBookingScreen'
+import { EmergencyConfirmationScreen } from './screens/EmergencyConfirmationScreen'
+import { MedicalHistoryScreen }        from './screens/MedicalHistoryScreen'
+import { DependentsScreen }            from './screens/DependentsScreen'
+import { PrescriptionsScreen }         from './screens/PrescriptionsScreen'
+import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
+import { SupportScreen }               from './screens/SupportScreen'
 
 const Tab   = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
 
-const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__
-
-class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
-  state = { error: null }
-  static getDerivedStateFromError(error: Error) { return { error } }
-  render() {
-    if (this.state.error) {
-      const err = this.state.error as Error
-      return (
-        <View style={{ flex: 1, backgroundColor: '#0a0a0a', padding: 24, justifyContent: 'center' }}>
-          <Text style={{ color: '#ff5c5c', fontSize: 18, fontWeight: '800', marginBottom: 12 }}>Something went wrong</Text>
-          {IS_DEV ? (
-            <ScrollView>
-              <Text style={{ color: '#fff', fontSize: 13, lineHeight: 20 }}>
-                {err.message}{'\n\n'}{err.stack}
-              </Text>
-            </ScrollView>
-          ) : (
-            <Text style={{ color: '#7A9089', fontSize: 14, lineHeight: 22 }}>
-              An unexpected error occurred. Please restart the app. If the problem persists, contact support.
-            </Text>
-          )}
-        </View>
-      )
-    }
-    return this.props.children
-  }
+function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; color: string }) {
+  return <Text style={{ fontSize: 18, color }}>{icon}</Text>
 }
 
-function TabNavigator() {
+function MainTabs() {
+  const { theme: t } = useTheme()
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: t.bgCard,
-          borderTopColor: t.border,
-          paddingTop: 4, paddingBottom: 20, height: 72,
-        },
-        tabBarActiveTintColor:   t.accent,
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarActiveTintColor: t.accent,
         tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle:        { fontSize: 10, fontWeight: '600', marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
-      <Tab.Screen name="Home"
-        component={HomeScreen}
-        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⊞</Text> }} />
-      <Tab.Screen name="Search"
-        component={SearchScreen}
-        options={{ tabBarLabel: 'Search', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⊕</Text> }} />
-      <Tab.Screen name="Appointments"
-        component={AppointmentsScreen}
-        options={{ tabBarLabel: 'Bookings', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>◆</Text> }} />
-      <Tab.Screen name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarLabel: 'Profile', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>●</Text> }} />
+      <Tab.Screen name="Home" component={HomeScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="⊞" {...p} />, tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Search" component={SearchScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="⊕" {...p} />, tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="◆" {...p} />, tabBarLabel: 'Bookings' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
 }
 
-function MainNavigator() {
+function AppStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main"            component={TabNavigator} />
-      <Stack.Screen name="HospitalProfile" component={HospitalProfileScreen} />
-      <Stack.Screen name="MedicalHistory"  component={MedicalHistoryScreen} />
-      <Stack.Screen name="Prescriptions"   component={PrescriptionsScreen} />
-      <Stack.Screen name="Dependents"      component={DependentsScreen} />
-      <Stack.Screen name="Insurance"       component={InsuranceScreen} />
-      <Stack.Screen name="Notifications"   component={NotificationsScreen} />
-      <Stack.Screen name="PrivacySecurity" component={PrivacySecurityScreen} />
-      <Stack.Screen name="Booking"         component={BookingScreen} />
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="MainTabs"          component={MainTabs} />
+      <Stack.Screen name="HospitalProfile"   component={HospitalProfileScreen} />
+      <Stack.Screen name="BookingFlow"       component={BookingFlowScreen} />
+      <Stack.Screen name="Confirmation"      component={ConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="Notifications"     component={NotificationsScreen} />
+      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+      <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
+      <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="MedicalHistory"    component={MedicalHistoryScreen} />
+      <Stack.Screen name="Dependents"        component={DependentsScreen} />
+      <Stack.Screen name="Prescriptions"     component={PrescriptionsScreen} />
+      <Stack.Screen name="PrivacySecurity"   component={PrivacySecurityScreen} />
+      <Stack.Screen name="Support"           component={SupportScreen} />
     </Stack.Navigator>
   )
 }
 
-function AuthNavigator() {
+function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="Login"    component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
   )
 }
 
-export default function App() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+function AppNavigator() {
+  const [splashDone, setSplashDone] = useState(false)
+  const { session, loading }        = useAuth()
+  const { theme: t }                = useTheme()
 
-  useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => { setSession(session) })
-      .catch(() => { /* session unavailable — stay logged out */ })
-      .finally(() => { setLoading(false) })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+  if (!splashDone) {
+    return (
+      <SafeAreaProvider>
+        <SplashScreen onNext={() => setSplashDone(true)} />
+      </SafeAreaProvider>
+    )
+  }
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={t.accent} size="large" />
-      </View>
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.accent} size="large" />
+        </View>
+      </SafeAreaProvider>
     )
   }
 
   return (
-    <ErrorBoundary>
-      <SafeAreaProvider>
-        <NavigationContainer>
-          {session ? <MainNavigator /> : <AuthNavigator />}
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        {session ? <AppStack /> : <AuthStack />}
+      </NavigationContainer>
+    </SafeAreaProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

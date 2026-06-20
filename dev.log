@@ -1,0 +1,294 @@
+
+> web@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.182:3000
+- Environments: .env.local
+✓ Ready in 719ms
+
+Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+ GET / 307 in 3.4s (next.js: 80ms, proxy.ts: 3.1s, application-code: 178ms)
+ GET /login 200 in 123ms (next.js: 22ms, proxy.ts: 5ms, application-code: 96ms)
+ GET /dashboard 200 in 4.9s (next.js: 86ms, proxy.ts: 555ms, application-code: 4.2s)
+ GET /dashboard/settings 200 in 2.6s (next.js: 49ms, proxy.ts: 536ms, application-code: 2.0s)
+ GET /dashboard/staff 200 in 2.6s (next.js: 34ms, proxy.ts: 578ms, application-code: 1947ms)
+✓ Compiled in 1308ms
+⨯ ./src/app/dashboard/layout.tsx:4:1
+Merge conflict marker encountered.
+  [90m2 |[0m [36mimport[0m { createAdminClient } [36mfrom[0m [32m'@/lib/supabase/admin'[0m
+  [90m3 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m'@/lib/supabase/server'[0m
+[31m[1m>[0m [90m4 |[0m <<<<<<< [33mHEAD[0m
+  [90m  |[0m [31m[1m^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { [33mNavLinks[0m } [36mfrom[0m [32m'@/components/dashboard/NavLinks'[0m
+  [90m6 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m7 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:14:1
+Merge conflict marker encountered.
+  [90m12 |[0m }
+  [90m13 |[0m
+[31m[1m>[0m [90m14 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m15 |[0m [36mimport[0m { [33mDashboardShell[0m } [36mfrom[0m [32m'@/components/dashboard/Shell'[0m
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:18:1
+Merge conflict marker encountered.
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+[31m[1m>[0m [90m18 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m19 |[0m [36mexport[0m [36mdefault[0m [36masync[0m [36mfunction[0m [33mDashboardLayout[0m({ children }: { children: [33mReactNode[0m }) {
+  [90m20 |[0m   [36mconst[0m supabase = [36mawait[0m createClient()
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:23:1
+Merge conflict marker encountered.
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+  [90m22 |[0m   [36mif[0m (!user) redirect([32m'/login'[0m)
+[31m[1m>[0m [90m23 |[0m <<<<<<< [33mHEAD[0m
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m24 |[0m
+  [90m25 |[0m   [36mconst[0m db = createAdminClient()
+  [90m26 |[0m   [36mconst[0m { data: profile } = [36mawait[0m db.[36mfrom[0m([32m'users'[0m).select([32m'id'[0m).eq([32m'auth_id'[0m, user.id).sin...
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:62:1
+Merge conflict marker encountered.
+  [90m60 |[0m     </div>
+  [90m61 |[0m   )
+[31m[1m>[0m [90m62 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+  [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m65 |[0m }
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:64:1
+Merge conflict marker encountered.
+  [90m62 |[0m =======
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+[31m[1m>[0m [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m65 |[0m }
+  [90m66 |[0m
+
+Parsing ecmascript source code failed
+
+
+ GET /dashboard/staff 500 in 4.1s (next.js: 196ms, proxy.ts: 3.7s, application-code: 217ms)
+⨯ ./src/app/dashboard/layout.tsx:4:1
+Merge conflict marker encountered.
+  [90m2 |[0m [36mimport[0m { createAdminClient } [36mfrom[0m [32m'@/lib/supabase/admin'[0m
+  [90m3 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m'@/lib/supabase/server'[0m
+[31m[1m>[0m [90m4 |[0m <<<<<<< [33mHEAD[0m
+  [90m  |[0m [31m[1m^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { [33mNavLinks[0m } [36mfrom[0m [32m'@/components/dashboard/NavLinks'[0m
+  [90m6 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m7 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:14:1
+Merge conflict marker encountered.
+  [90m12 |[0m }
+  [90m13 |[0m
+[31m[1m>[0m [90m14 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m15 |[0m [36mimport[0m { [33mDashboardShell[0m } [36mfrom[0m [32m'@/components/dashboard/Shell'[0m
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:18:1
+Merge conflict marker encountered.
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+[31m[1m>[0m [90m18 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m19 |[0m [36mexport[0m [36mdefault[0m [36masync[0m [36mfunction[0m [33mDashboardLayout[0m({ children }: { children: [33mReactNode[0m }) {
+  [90m20 |[0m   [36mconst[0m supabase = [36mawait[0m createClient()
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:23:1
+Merge conflict marker encountered.
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+  [90m22 |[0m   [36mif[0m (!user) redirect([32m'/login'[0m)
+[31m[1m>[0m [90m23 |[0m <<<<<<< [33mHEAD[0m
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m24 |[0m
+  [90m25 |[0m   [36mconst[0m db = createAdminClient()
+  [90m26 |[0m   [36mconst[0m { data: profile } = [36mawait[0m db.[36mfrom[0m([32m'users'[0m).select([32m'id'[0m).eq([32m'auth_id'[0m, user.id).sin...
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:62:1
+Merge conflict marker encountered.
+  [90m60 |[0m     </div>
+  [90m61 |[0m   )
+[31m[1m>[0m [90m62 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+  [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m65 |[0m }
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:64:1
+Merge conflict marker encountered.
+  [90m62 |[0m =======
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+[31m[1m>[0m [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m65 |[0m }
+  [90m66 |[0m
+
+Parsing ecmascript source code failed
+
+
+ GET /dashboard/staff 500 in 1168ms (next.js: 31ms, proxy.ts: 1125ms, application-code: 12ms)
+⨯ ./src/app/dashboard/layout.tsx:4:1
+Merge conflict marker encountered.
+  [90m2 |[0m [36mimport[0m { createAdminClient } [36mfrom[0m [32m'@/lib/supabase/admin'[0m
+  [90m3 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m'@/lib/supabase/server'[0m
+[31m[1m>[0m [90m4 |[0m <<<<<<< [33mHEAD[0m
+  [90m  |[0m [31m[1m^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { [33mNavLinks[0m } [36mfrom[0m [32m'@/components/dashboard/NavLinks'[0m
+  [90m6 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m7 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:14:1
+Merge conflict marker encountered.
+  [90m12 |[0m }
+  [90m13 |[0m
+[31m[1m>[0m [90m14 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m15 |[0m [36mimport[0m { [33mDashboardShell[0m } [36mfrom[0m [32m'@/components/dashboard/Shell'[0m
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:18:1
+Merge conflict marker encountered.
+  [90m16 |[0m [36mimport[0m [36mtype[0m { [33mReactNode[0m } [36mfrom[0m [32m'react'[0m
+  [90m17 |[0m
+[31m[1m>[0m [90m18 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m19 |[0m [36mexport[0m [36mdefault[0m [36masync[0m [36mfunction[0m [33mDashboardLayout[0m({ children }: { children: [33mReactNode[0m }) {
+  [90m20 |[0m   [36mconst[0m supabase = [36mawait[0m createClient()
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:23:1
+Merge conflict marker encountered.
+  [90m21 |[0m   [36mconst[0m { data: { user } } = [36mawait[0m supabase.auth.getUser()
+  [90m22 |[0m   [36mif[0m (!user) redirect([32m'/login'[0m)
+[31m[1m>[0m [90m23 |[0m <<<<<<< [33mHEAD[0m
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m24 |[0m
+  [90m25 |[0m   [36mconst[0m db = createAdminClient()
+  [90m26 |[0m   [36mconst[0m { data: profile } = [36mawait[0m db.[36mfrom[0m([32m'users'[0m).select([32m'id'[0m).eq([32m'auth_id'[0m, user.id).sin...
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:62:1
+Merge conflict marker encountered.
+  [90m60 |[0m     </div>
+  [90m61 |[0m   )
+[31m[1m>[0m [90m62 |[0m =======
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+  [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m65 |[0m }
+
+Parsing ecmascript source code failed
+
+
+
+./src/app/dashboard/layout.tsx:64:1
+Merge conflict marker encountered.
+  [90m62 |[0m =======
+  [90m63 |[0m   [36mreturn[0m <[33mDashboardShell[0m>{children}</[33mDashboardShell[0m>
+[31m[1m>[0m [90m64 |[0m >>>>>>> [35m46[0mebdb97f5042b1056ecb121bad3f252717a80b7
+  [90m   |[0m [31m[1m^^^^^^^[0m
+  [90m65 |[0m }
+  [90m66 |[0m
+
+Parsing ecmascript source code failed
+
+
+ GET /dashboard/staff 500 in 1460ms (next.js: 6ms, proxy.ts: 1443ms, application-code: 10ms)
+[browser] Uncaught Error: ./src/app/login/page.tsx:180:4
+Expression expected
+  178 |             ))}
+  179 |           </div>
+> 180 | <<<<<<< HEAD
+      |    ^^
+  181 |           <h1 className="text-2xl font-bold tracking-tight">Queue Hospital Portal</h1>
+  182 |           <p className="text-sm text-[#7A9089] mt-1">Sign in as admin, specialist, or fro...
+  183 |         </div>
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (Error: ./src/app/login/page.tsx:180:4)
+    at <unknown> (Error: (./src/app/login/page.tsx:180:4)
+✓ Compiled in 969ms
+ GET /dashboard/staff 200 in 4.2s (next.js: 141ms, proxy.ts: 1341ms, application-code: 2.7s)

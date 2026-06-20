@@ -1,136 +1,101 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, SafeAreaView, KeyboardAvoidingView,
+  Platform, ScrollView, ActivityIndicator,
+} from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
 
-export function RegisterScreen({ navigation }: { navigation: any }) {
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+interface Props { navigation: any }
+
+export function RegisterScreen({ navigation }: Props) {
+  const { theme: t }              = useTheme()
+  const { signUp }                = useAuth()
+  const [fullName, setFullName]   = useState('')
+  const [phone,    setPhone]      = useState('')
+  const [email,    setEmail]      = useState('')
+  const [pass,     setPass]       = useState('')
+  const [confirm,  setConfirm]    = useState('')
+  const [error,    setError]      = useState('')
+  const [busy,     setBusy]       = useState(false)
 
   async function handleRegister() {
-    if (!fullName.trim())  { setError('Please enter your full name.'); return }
-    if (!email.trim())     { setError('Please enter your email address.'); return }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
-    setLoading(true); setError('')
-
-    const { data: authData, error: signUpErr } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: { data: { full_name: fullName.trim() } },
-    })
-    if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
-
-    // Create profile row — upsert so re-attempts after a failed sign-up don't duplicate
-    if (authData.user) {
-      const { error: profileErr } = await supabase.from('users').upsert({
-        auth_id: authData.user.id,
-        full_name: fullName.trim(),
-        email: email.trim(),
-      }, { onConflict: 'auth_id' })
-      if (profileErr) {
-        setError('Account created but profile setup failed: ' + profileErr.message)
-        setLoading(false)
-        return
-      }
-    }
-
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
-    if (signInErr) { setError(signInErr.message); setLoading(false); return }
-    // on success: App.tsx session listener switches to main navigator automatically
+    if (!fullName.trim()) { setError('Enter your full name.'); return }
+    if (!phone.trim())    { setError('Enter your phone number.'); return }
+    if (!email.trim())    { setError('Enter your email address.'); return }
+    if (pass.length < 6)  { setError('Password must be at least 6 characters.'); return }
+    if (pass !== confirm) { setError('Passwords do not match.'); return }
+    setBusy(true); setError('')
+    const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim())
+    setBusy(false)
+    if (err) setError(err)
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Back */}
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={{ color: t.accent, fontSize: 16 }}>← Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+            <Text style={[s.backText, { color: t.accent }]}>← Back</Text>
           </TouchableOpacity>
 
-          {/* Logo */}
-          <View style={styles.logoWrap}>
-            <View style={styles.logoIcon}>
-              <Text style={{ fontSize: 32 }}>🏥</Text>
-            </View>
-            <Text style={styles.logoText}>Queue</Text>
-          </View>
+          <Text style={[s.title,  { color: t.textPrimary }]}>Create account</Text>
+          <Text style={[s.sub,    { color: t.textMuted   }]}>Join Queue to book appointments easily</Text>
 
-          {/* Card */}
-          <View style={styles.card}>
-            <Text style={styles.title}>Create account</Text>
-            <Text style={styles.subtitle}>Book appointments at top hospitals near you</Text>
+          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
 
-            <View style={styles.fields}>
-              <View style={styles.field}>
-                <Text style={styles.label}>Full name</Text>
+            {[
+              { label: 'Full name',        value: fullName, onChange: setFullName, placeholder: 'Adaeze Okonkwo',     keyboardType: 'default',       autoCapitalize: 'words',  secure: false },
+              { label: 'Phone number',     value: phone,    onChange: setPhone,    placeholder: '+234 812 345 6789',  keyboardType: 'phone-pad',     autoCapitalize: 'none',   secure: false },
+              { label: 'Email address',    value: email,    onChange: setEmail,    placeholder: 'you@email.com',      keyboardType: 'email-address', autoCapitalize: 'none',   secure: false },
+              { label: 'Password',         value: pass,     onChange: setPass,     placeholder: '••••••••',           keyboardType: 'default',       autoCapitalize: 'none',   secure: true  },
+              { label: 'Confirm password', value: confirm,  onChange: setConfirm,  placeholder: '••••••••',           keyboardType: 'default',       autoCapitalize: 'none',   secure: true  },
+            ].map(f => (
+              <View key={f.label} style={s.fieldWrap}>
+                <Text style={[s.label, { color: t.textMuted }]}>{f.label}</Text>
                 <TextInput
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder="Amaka Okafor"
+                  value={f.value}
+                  onChangeText={f.onChange}
+                  placeholder={f.placeholder}
                   placeholderTextColor={t.textMuted}
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  style={styles.input}
+                  keyboardType={f.keyboardType as any}
+                  autoCapitalize={f.autoCapitalize as any}
+                  autoCorrect={false}
+                  secureTextEntry={f.secure}
+                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
                 />
               </View>
+            ))}
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Email address</Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  placeholderTextColor={t.textMuted}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
-                  style={styles.input}
-                />
+            {!!error && (
+              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
+                <Text style={s.errText}>{error}</Text>
               </View>
-
-              <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Min. 8 characters"
-                  placeholderTextColor={t.textMuted}
-                  secureTextEntry
-                  autoComplete="new-password"
-                  style={styles.input}
-                />
-              </View>
-            </View>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            )}
 
             <TouchableOpacity
-              onPress={handleRegister}
-              disabled={loading}
-              style={[styles.btn, loading && styles.btnDisabled]}>
-              <Text style={styles.btnText}>{loading ? 'Creating account…' : 'Create Account'}</Text>
+              style={[s.btn, { backgroundColor: t.accent }, busy && { opacity: 0.6 }]}
+              onPress={handleRegister} disabled={busy}>
+              {busy
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnText}>Create account</Text>}
             </TouchableOpacity>
 
-            <Text style={styles.terms}>
-              By creating an account you agree to our Terms of Service and Privacy Policy.
-            </Text>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
+          <View style={s.footer}>
+            <Text style={[s.footerText, { color: t.textMuted }]}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.footerLink}>Sign in</Text>
+              <Text style={[s.footerLink, { color: t.accent }]}>Sign in</Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={[s.terms, { color: t.textMuted }]}>
+            By creating an account you agree to our Terms of Service and Privacy Policy.
+          </Text>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -138,26 +103,23 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: t.bg },
-  scroll:      { flexGrow: 1, paddingHorizontal: spacing.xl, paddingVertical: 24 },
-  backBtn:     { marginBottom: 16 },
-  logoWrap:    { alignItems: 'center', marginBottom: 28 },
-  logoIcon:    { width: 64, height: 64, borderRadius: 20, backgroundColor: t.accentMuted, borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  logoText:    { fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.5 },
-  card:        { backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.xl, padding: spacing.xl },
-  title:       { fontSize: font.xl, fontWeight: '800', color: t.text, letterSpacing: -0.4, marginBottom: 4 },
-  subtitle:    { fontSize: font.sm, color: t.textSub, marginBottom: 24 },
-  fields:      { gap: 14, marginBottom: 16 },
-  field:       { gap: 6 },
-  label:       { fontSize: font.xs, fontWeight: '600', color: t.textSub },
-  input:       { backgroundColor: t.bg, borderWidth: 1, borderColor: t.borderMed, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 13, fontSize: font.base, color: t.text },
-  error:       { fontSize: font.xs, color: '#FF5C5C', backgroundColor: 'rgba(255,92,92,0.08)', borderWidth: 1, borderColor: 'rgba(255,92,92,0.2)', borderRadius: radius.md, padding: 10, marginBottom: 12 },
-  btn:         { backgroundColor: t.accent, borderRadius: radius.lg, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.6 },
-  btnText:     { fontSize: font.base, fontWeight: '800', color: '#060A07' },
-  terms:       { fontSize: 10, color: t.textMuted, textAlign: 'center', marginTop: 14, lineHeight: 15 },
-  footer:      { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
-  footerText:  { fontSize: font.sm, color: t.textSub },
-  footerLink:  { fontSize: font.sm, color: t.accent, fontWeight: '700' },
+const s = StyleSheet.create({
+  safe:      { flex: 1 },
+  scroll:    { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24 },
+  backBtn:   { marginBottom: 20 },
+  backText:  { fontSize: 14, fontWeight: '600' },
+  title:     { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
+  sub:       { fontSize: 13, marginTop: 4, marginBottom: 24 },
+  card:      { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14, marginBottom: 20 },
+  fieldWrap: { gap: 6 },
+  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
+  errText:   { color: '#F87171', fontSize: 12 },
+  btn:       { borderRadius: 14, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
+  btnText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  footerText:{ fontSize: 13 },
+  footerLink:{ fontSize: 13, fontWeight: '700' },
+  terms:     { fontSize: 11, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
 })

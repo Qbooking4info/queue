@@ -1,130 +1,112 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
-  const db = createAdminClient()
-  const body = await req.json()
-  const { name, type, description, address, city, state, phone, email, whatsapp,
-    accepts_virtual, emergency_hours, specialtyIds, hours, planId } = body
-
-  // Validate required fields server-side
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return NextResponse.json({ error: 'Hospital name is required' }, { status: 400 })
-  }
-  if (!address || !city || !state) {
-    return NextResponse.json({ error: 'Address, city, and state are required' }, { status: 400 })
-  }
-
-  // Validate planId references a real plan
-  if (planId) {
-    const { data: plan } = await db.from('subscription_plans').select('id').eq('id', planId).single()
-    if (!plan) {
-      return NextResponse.json({ error: 'Invalid plan selected' }, { status: 400 })
+  try {
+    // Verify session from cookie
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-  }
 
-  // Ensure public profile row exists
-  let { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) {
-    const { data: np, error: pErr } = await db
-      .from('users')
-      .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
-      .select('id').single()
-    if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 })
-    profile = np
-  }
+    // All DB writes use service role — bypasses RLS safely server-side
+    const db = createAdminClient()
+    const body = await req.json()
+    const {
+      name, type, description,
+      registrationNumber, mdcnNumber,
+      address, city, state, phone, email, whatsapp,
+      clinicModel, clinics,
+      accepts_virtual, emergency_hours,
+      specialtyIds, hours, planId,
+    } = body
 
-  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
+    // Ensure public profile row exists
+    let { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
+    if (!profile) {
+      const { data: np, error: pErr } = await db
+        .from('users')
+        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
+        .select('id').single()
+      if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 })
+      profile = np
+    }
 
-  const { data: hospital, error: hErr } = await db.from('hospitals').insert({
-    name: name.trim(), slug, type: type ?? 'hospital',
-    description: description || null, address, city, state,
-    phone: phone || null, email: email || null, whatsapp: whatsapp || null,
-    accepts_virtual: accepts_virtual ?? false, emergency_hours: emergency_hours ?? false,
-    is_active: true,
-  }).select('id').single()
-  if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
-  const { error: adminErr } = await db
-    .from('hospital_admins')
-    .insert({ hospital_id: hospital.id, user_id: profile.id, role: 'admin' })
-  if (adminErr) {
-    // Roll back the hospital row so the user can retry cleanly
-    await db.from('hospitals').delete().eq('id', hospital.id)
-    return NextResponse.json({ error: 'Failed to link admin account. Please try again.' }, { status: 500 })
-  }
-
-  if (specialtyIds?.length > 0) {
-    const { error: specErr } = await db.from('hospital_specialties').insert(
-      specialtyIds.map((sid: string) => ({ hospital_id: hospital.id, specialty_id: sid }))
-    )
-    if (specErr) console.error('[onboarding] specialties insert failed:', specErr.message)
-  }
-
-  const openHours = (hours ?? []).filter((h: { closed: boolean }) => !h.closed)
-  if (openHours.length > 0) {
-    const { error: hoursErr } = await db.from('hospital_operating_hours').insert(
-      openHours.map((h: { day: number; open: string; close: string }) => ({
-        hospital_id: hospital.id, day_of_week: h.day, open_time: h.open, close_time: h.close,
-      }))
-    )
-    if (hoursErr) console.error('[onboarding] operating hours insert failed:', hoursErr.message)
-  }
-
-  const TRIAL_DAYS = 90
-  if (planId) {
-    const { error: subErr } = await db.from('hospital_subscriptions').insert({
-      hospital_id: hospital.id, plan_id: planId, status: 'trialing',
-      trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    })
-    if (subErr) console.error('[onboarding] subscription insert failed:', subErr.message)
-  }
-
-  // Auto-create a front desk login for this hospital
-  const slugBase = slug.replace(/-[a-z0-9]{5,}$/, '')
-  const fdEmail = `frontdesk.${slugBase}@portal.queueapp.co`
-  const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  const fdPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
-    .map((b: number) => charset[b % charset.length]).join('')
-
-  let frontdeskCredentials: { email: string; password: string } | null = null
-
-  const { data: fdAuth, error: fdAuthErr } = await db.auth.admin.createUser({
-    email: fdEmail,
-    password: fdPassword,
-    email_confirm: true,
-  })
-
-  if (!fdAuthErr && fdAuth.user) {
-    const { data: fdProfile } = await db.from('users').insert({
-      auth_id: fdAuth.user.id,
-      email: fdEmail,
-      full_name: 'Front Desk',
+    const { data: hospital, error: hErr } = await db.from('hospitals').insert({
+      name, slug, type: type ?? 'hospital',
+      description: description || null,
+      address, city, state,
+      phone: phone || null, email: email || null, whatsapp: whatsapp || null,
+      accepts_virtual: accepts_virtual ?? false,
+      emergency_hours: emergency_hours ?? false,
+      registration_number: registrationNumber || null,
+      mdcn_accreditation: mdcnNumber || null,
+      clinic_model: clinicModel ?? 'single',
+      is_verified: false,
     }).select('id').single()
+    if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
 
-    if (fdProfile) {
-      const { error: fdAdminErr } = await db.from('hospital_admins').insert({
-        hospital_id: hospital.id,
-        user_id: fdProfile.id,
-        role: 'front_desk',
+    // Link admin as owner
+    await db.from('hospital_admins').insert({
+      hospital_id: hospital.id,
+      user_id: profile.id,
+      role: 'owner',
+    })
+
+    // Save specialties
+    if (specialtyIds?.length > 0) {
+      await db.from('hospital_specialties').insert(
+        specialtyIds.map((sid: string) => ({ hospital_id: hospital.id, specialty_id: sid }))
+      )
+    }
+
+    // Save operating hours
+    const openHours = (hours ?? []).filter((h: { closed: boolean }) => !h.closed)
+    if (openHours.length > 0) {
+      await db.from('hospital_operating_hours').insert(
+        openHours.map((h: { day: number; open: string; close: string }) => ({
+          hospital_id: hospital.id, day_of_week: h.day, open_time: h.open, close_time: h.close,
+        }))
+      )
+    }
+
+    // Save subscription
+    if (planId) {
+      await db.from('hospital_subscriptions').insert({
+        hospital_id: hospital.id, plan_id: planId, status: 'trialing',
+        trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       })
-      if (!fdAdminErr) {
-        frontdeskCredentials = { email: fdEmail, password: fdPassword }
+    }
+
+    // Save clinics (multi-clinic model) — requires hospital_clinics table
+    if (clinicModel === 'multi' && Array.isArray(clinics) && clinics.length > 0) {
+      const validClinics = (clinics as { id: string; name: string; description: string }[])
+        .filter(c => c.name?.trim())
+      if (validClinics.length > 0) {
+        // Use raw SQL via RPC in case the table was just created
+        const { error: clinicErr } = await db.from('hospital_clinics').insert(
+          validClinics.map((c, i) => ({
+            hospital_id: hospital.id,
+            name: c.name.trim(),
+            description: c.description?.trim() || null,
+            sort_order: i,
+            is_active: true,
+          }))
+        )
+        // Non-fatal: table may not exist yet — log but don't fail onboarding
+        if (clinicErr) {
+          console.warn('hospital_clinics insert failed (run migration?):', clinicErr.message)
+        }
       }
     }
+
+    return NextResponse.json({ success: true, hospitalId: hospital.id })
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/staff')
-  revalidatePath('/dashboard/settings')
-
-  return NextResponse.json({ success: true, hospitalId: hospital.id, frontdeskCredentials })
 }

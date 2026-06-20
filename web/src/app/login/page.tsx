@@ -1,147 +1,195 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const supabase = createClient()
+function LoginContent() {
+  const router         = useRouter()
+  const searchParams   = useSearchParams()
+  const justRegistered = searchParams.get('registered') === 'true'
 
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
-
-  const [forgotMode, setForgotMode]     = useState(false)
-  const [resetSent, setResetSent]       = useState(false)
-  const [resetLoading, setResetLoading] = useState(false)
-  const [resetError, setResetError]     = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [emailFocus, setEmailFocus] = useState(false)
+  const [passFocus,  setPassFocus]  = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true); setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    setError('')
+    setLoading(true)
+    const supabase = createClient()
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+    if (authErr) { setError(authErr.message); setLoading(false); return }
     router.push('/dashboard')
   }
 
-  async function handleForgot(e: React.FormEvent) {
-    e.preventDefault()
-    if (!email.trim()) { setResetError('Please enter your email address.'); return }
-    setResetLoading(true); setResetError('')
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    })
-    setResetLoading(false)
-    if (error) { setResetError(error.message); return }
-    setResetSent(true)
-  }
+  const inputStyle = (focused: boolean) => ({
+    width: '100%', background: '#FFFFFF', border: `1.5px solid ${focused ? '#1A7FC1' : '#DDE8F5'}`,
+    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#0C2A4A',
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
+    transition: 'border-color .15s',
+  })
 
-  // ── Forgot password sent ──────────────────────────────────────
-  if (resetSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#060A07]">
-        <div className="w-full max-w-sm text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-6">
-            <span className="text-2xl">📧</span>
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      {/* Left panel — branding */}
+      <div style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+        flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
+        position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
+          borderRadius: '50%', background: 'rgba(0,232,122,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -40, right: -40, width: 240, height: 240,
+          borderRadius: '50%', background: 'rgba(0,232,122,0.03)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(0,232,122,0.1)',
+              border: '1px solid rgba(0,232,122,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
+                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2.5"/>
+                <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
+                <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="30" cy="30" r="8" fill="#061208" stroke="#00E87A" strokeWidth="2.5"/>
+                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.03em' }}>Queue</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '.08em', textTransform: 'uppercase' }}>Hospital Portal</div>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold mb-3">Check your email</h1>
-          <p className="text-sm text-[#7A9089] mb-6 leading-relaxed">
-            We sent a password reset link to <span className="text-white font-medium">{email}</span>.
-            Click the link in the email to set a new password.
-          </p>
-          <button onClick={() => { setForgotMode(false); setResetSent(false) }}
-            className="text-sm text-green-400 hover:text-green-300">
-            ← Back to sign in
-          </button>
+
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.04em', lineHeight: 1.2, marginBottom: 16 }}>
+            Your clinic,<br />under control.
+          </div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7 }}>
+            Manage appointments, doctors, and patient queues — all from one dashboard.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 48 }}>
+            {[
+              { icon: '📅', text: 'Real-time queue management' },
+              { icon: '👨‍⚕️', text: 'Doctor schedule & availability' },
+              { icon: '📊', text: 'Analytics & revenue insights' },
+              { icon: '🔔', text: 'Instant booking notifications' },
+            ].map(f => (
+              <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,232,122,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  {f.icon}
+                </div>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{f.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+          © {new Date().getFullYear()} Queue Health Technologies
         </div>
       </div>
-    )
-  }
 
-  // ── Forgot password form ──────────────────────────────────────
-  if (forgotMode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#060A07]">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-              <span className="text-2xl">🔑</span>
+      {/* Right panel — form */}
+      <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', padding: '40px 24px' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+
+          {/* Registration success banner */}
+          {justRegistered && (
+            <div style={{ marginBottom: 24, padding: '14px 16px', background: '#E6F9EF',
+              border: '1px solid rgba(0,160,80,0.3)', borderRadius: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0A7A40', marginBottom: 3 }}>
+                ✓ Hospital registered successfully!
+              </div>
+              <div style={{ fontSize: 12, color: '#1A6040', lineHeight: 1.6 }}>
+                Your hospital is pending verification. Sign in below to access your dashboard while we review your details.
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Reset Password</h1>
-            <p className="text-sm text-[#7A9089] mt-1">Enter your email and we'll send a reset link</p>
-          </div>
-
-          {resetError && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
-              {resetError}
-            </p>
           )}
 
-          <form onSubmit={handleForgot} className="flex flex-col gap-4">
-            <Input
-              label="Email address" type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@hospital.com" required
-            />
-            <Button type="submit" size="lg" loading={resetLoading} className="mt-2 w-full">
-              Send Reset Link
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-[#7A9089] mt-6">
-            Remember your password?{' '}
-            <button onClick={() => setForgotMode(false)} className="text-green-400 hover:text-green-300 font-medium">
-              Sign in
-            </button>
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Login form ────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#060A07]">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-            <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-              <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2"/>
-              <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="30" cy="30" r="8" fill="#0A0F0D" stroke="#00E87A" strokeWidth="2"/>
-              <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Queue Hospital Portal</h1>
-          <p className="text-sm text-[#7A9089] mt-1">Sign in as admin, specialist, or front desk</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@hospital.com" required />
-          <div>
-            <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-            <div className="flex justify-end mt-1.5">
-              <button type="button" onClick={() => { setForgotMode(true); setResetError('') }}
-                className="text-xs text-[#4A6058] hover:text-green-400 transition-colors">
-                Forgot password?
-              </button>
+          <div style={{ marginBottom: 36 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#0C2A4A', letterSpacing: '-.04em', marginBottom: 6 }}>
+              Sign in to your hospital
+            </div>
+            <div style={{ fontSize: 13, color: '#6A8FAA' }}>
+              Enter your admin credentials to access the dashboard.
             </div>
           </div>
-          {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
-          <Button type="submit" size="lg" loading={loading} className="mt-2 w-full">Sign In</Button>
-        </form>
 
-        <p className="text-center text-sm text-[#7A9089] mt-6">
-          New hospital?{' '}
-          <Link href="/register" className="text-green-400 hover:text-green-300 font-medium">Register here</Link>
-        </p>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+                marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                Email address
+              </label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="admin@yourhospital.ng" required
+                onFocus={() => setEmailFocus(true)} onBlur={() => setEmailFocus(false)}
+                style={inputStyle(emailFocus)} />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+                marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input type={showPass ? 'text' : 'password'} value={password}
+                  onChange={e => setPassword(e.target.value)} placeholder="••••••••" required
+                  onFocus={() => setPassFocus(true)} onBlur={() => setPassFocus(false)}
+                  style={{ ...inputStyle(passFocus), paddingRight: 44 }} />
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#6A8FAA' }}>
+                  {showPass ? '🙈' : '👁'}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#E03E3E' }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading}
+              style={{ width: '100%', background: '#1A7FC1', color: '#FFFFFF', border: 'none',
+                borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
+                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+                fontFamily: 'inherit', marginTop: 4, transition: 'opacity .15s' }}>
+              {loading ? 'Signing in…' : 'Sign in to dashboard →'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: '#6A8FAA' }}>
+            New hospital?{' '}
+            <Link href="/register" style={{ color: '#1A7FC1', fontWeight: 600 }}>Register here</Link>
+          </div>
+
+          <div style={{ marginTop: 20, padding: '14px 16px', background: '#E6F1FB',
+            border: '1px solid rgba(26,127,193,0.25)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#1A7FC1', marginBottom: 4 }}>DEMO CREDENTIALS</div>
+            <div style={{ fontSize: 12, color: '#2A5070' }}>
+              Email: <strong>demo@queueapp.ng</strong><br />
+              Password: <strong>Queue@2025!</strong>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

@@ -1,186 +1,242 @@
-import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, SafeAreaView, Alert } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import { useState, useCallback } from 'react'
+import {
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, SafeAreaView, ActivityIndicator, Modal, Pressable,
+} from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
+import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
+import { getDependents, addDependent, updateDependent, deleteDependent } from '../lib/api'
 
-interface Dependent {
-  id: string; full_name: string; relationship: string; date_of_birth: string | null
-}
+interface Props { navigation: any }
 
-export function DependentsScreen({ navigation }: { navigation: any }) {
+const RELATIONSHIPS: { label: string; value: string }[] = [
+  { label: 'Spouse',  value: 'spouse'  },
+  { label: 'Child',   value: 'child'   },
+  { label: 'Parent',  value: 'parent'  },
+  { label: 'Sibling', value: 'sibling' },
+  { label: 'Other',   value: 'other'   },
+]
+const GENDERS       = ['Female', 'Male', 'Other']
+
+interface Dependent { id: string; full_name: string; relationship: string | null; date_of_birth: string | null; gender: string | null }
+
+const EMPTY_FORM = { full_name: '', relationship: '', date_of_birth: '', gender: '' }
+
+export function DependentsScreen({ navigation }: Props) {
+  const { theme: t }    = useTheme()
+  const { user }        = useAuth()
   const [dependents, setDependents] = useState<Dependent[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [adding, setAdding]         = useState(false)
-  const [name, setName]             = useState('')
-  const [relationship, setRelationship] = useState('')
-  const [saving, setSaving]         = useState(false)
-  const [patientId, setPatientId]   = useState<string | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [modalOpen,  setModalOpen]  = useState(false)
+  const [editing,    setEditing]    = useState<Dependent | null>(null)
+  const [form,       setForm]       = useState(EMPTY_FORM)
+  const [saving,     setSaving]     = useState(false)
+  const [deleting,   setDeleting]   = useState<string | null>(null)
+  const [error,      setError]      = useState('')
 
-  useEffect(() => {
-    load()
-  }, [])
+  const load = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    setDependents(await getDependents(user.id))
+    setLoading(false)
+  }, [user])
 
-  async function load() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('users').select('id').eq('auth_id', user.id).single()
-      if (!profile) return
-      setPatientId(profile.id)
-      const { data, error } = await supabase
-        .from('dependents')
-        .select('id,full_name,relationship,date_of_birth')
-        .eq('user_id', profile.id)
-        .order('full_name')
-      if (!error) setDependents((data as Dependent[]) ?? [])
-    } catch {
-      // Network error — leave list empty
-    } finally {
-      setLoading(false)
-    }
+  useFocusEffect(useCallback(() => { load() }, [load]))
+
+  function openAdd() {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setError('')
+    setModalOpen(true)
   }
 
-  async function handleAdd() {
-    if (!patientId) { Alert.alert('Error', 'Still loading. Please wait.'); return }
-    if (!name.trim()) { Alert.alert('Error', 'Please enter the full name.'); return }
-    if (!relationship.trim()) { Alert.alert('Error', 'Please enter the relationship.'); return }
+  function openEdit(d: Dependent) {
+    setEditing(d)
+    setForm({ full_name: d.full_name, relationship: d.relationship ?? '', date_of_birth: d.date_of_birth ?? '', gender: d.gender ?? '' })
+    setError('')
+    setModalOpen(true)
+  }
+
+  async function handleSave() {
+    if (!form.full_name.trim()) { setError('Name is required.'); return }
+    if (!form.relationship)     { setError('Please select a relationship.'); return }
+    if (!user) return
     setSaving(true)
-    const { error } = await supabase.from('dependents').insert({
-      user_id: patientId,
-      full_name: name.trim(),
-      relationship: relationship.trim(),
-    })
-    setSaving(false)
-    if (error) {
-      Alert.alert('Error', error.message)
+    setError('')
+    if (editing) {
+      await updateDependent(editing.id, { full_name: form.full_name.trim(), relationship: form.relationship, date_of_birth: form.date_of_birth || undefined, gender: form.gender || undefined })
     } else {
-      setName(''); setRelationship(''); setAdding(false)
-      load()
+      await addDependent(user.id, { full_name: form.full_name.trim(), relationship: form.relationship, date_of_birth: form.date_of_birth || undefined, gender: form.gender || undefined })
     }
+    setSaving(false)
+    setModalOpen(false)
+    load()
   }
 
-  async function handleRemove(id: string, depName: string) {
-    Alert.alert('Remove Dependent', `Remove ${depName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        const { error } = await supabase.from('dependents').delete().eq('id', id)
-        if (error) Alert.alert('Error', error.message)
-        else load()
-      }},
-    ])
+  async function handleDelete(id: string) {
+    setDeleting(id)
+    await deleteDependent(id)
+    setDeleting(null)
+    load()
   }
 
-  const RELATIONSHIPS = ['Spouse', 'Child', 'Parent', 'Sibling', 'Other']
+  const RELATION_ICONS: Record<string, string> = { spouse: '💑', child: '👶', parent: '👨‍👩‍👦', sibling: '🤝', other: '👤', Spouse: '💑', Child: '👶', Parent: '👨‍👩‍👦', Sibling: '🤝', Other: '👤' }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={{ color: t.accent, fontSize: 16 }}>←</Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Manage Dependents</Text>
-        {!adding && (
-          <TouchableOpacity onPress={() => setAdding(true)} style={styles.addBtn}>
-            <Text style={{ color: t.accent, fontSize: 20, lineHeight: 24 }}>+</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={[s.title, { color: t.textPrimary }]}>Dependents</Text>
+        <TouchableOpacity onPress={openAdd}
+          style={[s.addBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+          <Text style={[s.addBtnText, { color: t.accent }]}>+ Add</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {adding && (
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>Add Dependent</Text>
-            <Text style={styles.label}>Full Name</Text>
+      {/* Add / Edit Modal */}
+      <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => setModalOpen(false)}>
+        <Pressable style={s.overlay} onPress={() => setModalOpen(false)} />
+        <View style={[s.sheet, { backgroundColor: t.cardBg }]}>
+          <View style={[s.sheetHandle, { backgroundColor: t.inputBorder }]} />
+          <Text style={[s.sheetTitle, { color: t.textPrimary }]}>{editing ? 'Edit dependent' : 'Add dependent'}</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={[s.fieldLabel, { color: t.textMuted }]}>Full name *</Text>
             <TextInput
-              value={name} onChangeText={setName}
-              placeholder="e.g. Amaka Okafor"
-              placeholderTextColor={t.textMuted}
-              style={styles.input}
+              value={form.full_name} onChangeText={v => setForm(f => ({ ...f, full_name: v }))}
+              placeholder="e.g. Emeka Okonkwo" placeholderTextColor={t.textMuted}
+              style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
             />
-            <Text style={styles.label}>Relationship</Text>
-            <View style={styles.chips}>
+
+            <Text style={[s.fieldLabel, { color: t.textMuted }]}>Relationship *</Text>
+            <View style={s.pillRow}>
               {RELATIONSHIPS.map(r => (
-                <TouchableOpacity key={r} onPress={() => setRelationship(r)}
-                  style={[styles.chip, relationship === r && styles.chipActive]}>
-                  <Text style={[styles.chipText, relationship === r && styles.chipTextActive]}>{r}</Text>
+                <TouchableOpacity key={r.value} onPress={() => setForm(f => ({ ...f, relationship: r.value }))}
+                  style={[s.pill, { borderColor: form.relationship === r.value ? t.accent : t.cardBorder, backgroundColor: form.relationship === r.value ? t.accentBg : t.inputBg }]}>
+                  <Text style={[s.pillText, { color: form.relationship === r.value ? t.accent : t.textMuted, fontWeight: form.relationship === r.value ? '700' : '400' }]}>
+                    {RELATION_ICONS[r.label] ?? '👤'} {r.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <View style={styles.formActions}>
-              <TouchableOpacity onPress={() => setAdding(false)} style={styles.cancelBtn}>
-                <Text style={{ color: t.textSub, fontSize: font.base, fontWeight: '600' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleAdd} disabled={saving} style={styles.saveBtn}>
-                <Text style={{ color: '#060A07', fontSize: font.base, fontWeight: '800' }}>
-                  {saving ? 'Saving…' : 'Add Dependent'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
-        {loading ? (
-          <Text style={styles.placeholder}>Loading…</Text>
-        ) : dependents.length === 0 && !adding ? (
-          <View style={styles.emptyState}>
-            <Text style={{ fontSize: 44, marginBottom: 12 }}>👨‍👩‍👧</Text>
-            <Text style={styles.emptyTitle}>No dependents added</Text>
-            <Text style={styles.emptyBody}>Add family members so you can book appointments on their behalf</Text>
-            <TouchableOpacity onPress={() => setAdding(true)} style={styles.emptyBtn}>
-              <Text style={styles.emptyBtnText}>Add Dependent</Text>
+            <Text style={[s.fieldLabel, { color: t.textMuted }]}>Date of birth</Text>
+            <TextInput
+              value={form.date_of_birth} onChangeText={v => setForm(f => ({ ...f, date_of_birth: v }))}
+              placeholder="YYYY-MM-DD" placeholderTextColor={t.textMuted}
+              style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
+            />
+
+            <Text style={[s.fieldLabel, { color: t.textMuted }]}>Gender</Text>
+            <View style={s.pillRow}>
+              {GENDERS.map(g => (
+                <TouchableOpacity key={g} onPress={() => setForm(f => ({ ...f, gender: g.toLowerCase() }))}
+                  style={[s.pill, { borderColor: form.gender === g.toLowerCase() ? t.accent : t.cardBorder, backgroundColor: form.gender === g.toLowerCase() ? t.accentBg : t.inputBg }]}>
+                  <Text style={[s.pillText, { color: form.gender === g.toLowerCase() ? t.accent : t.textMuted, fontWeight: form.gender === g.toLowerCase() ? '700' : '400' }]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {!!error && <Text style={s.errorText}>{error}</Text>}
+
+            <TouchableOpacity onPress={handleSave} disabled={saving}
+              style={[s.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
+              <Text style={s.saveBtnText}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Add dependent'}</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          dependents.map(dep => (
-            <View key={dep.id} style={styles.card}>
-              <View style={styles.avatar}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: t.accent }}>
-                  {dep.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.depName}>{dep.full_name}</Text>
-                <Text style={styles.depRel}>{dep.relationship}</Text>
-              </View>
-              <TouchableOpacity onPress={() => handleRemove(dep.id, dep.full_name)}>
-                <Text style={{ color: '#FF5C5C', fontSize: font.sm, fontWeight: '600' }}>Remove</Text>
+
+            {editing && (
+              <TouchableOpacity onPress={() => { setModalOpen(false); handleDelete(editing.id) }}
+                style={[s.deleteBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.07)' }]}>
+                <Text style={s.deleteBtnText}>Remove dependent</Text>
+              </TouchableOpacity>
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* List */}
+      {loading ? (
+        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {dependents.length === 0 ? (
+            <View style={[s.emptyCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={{ fontSize: 40, marginBottom: 12 }}>👨‍👩‍👧</Text>
+              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No dependents yet</Text>
+              <Text style={[s.emptySub, { color: t.textMuted }]}>
+                Add family members so you can book appointments on their behalf.
+              </Text>
+              <TouchableOpacity onPress={openAdd}
+                style={[s.emptyAddBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                <Text style={[s.emptyAddBtnText, { color: t.accent }]}>+ Add first dependent</Text>
               </TouchableOpacity>
             </View>
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          ) : (
+            <>
+              <Text style={[s.countText, { color: t.textMuted }]}>{dependents.length} dependent{dependents.length !== 1 ? 's' : ''}</Text>
+              {dependents.map(d => (
+                <TouchableOpacity key={d.id} onPress={() => openEdit(d)} activeOpacity={0.75}
+                  style={[s.depCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                  <View style={[s.depAvatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+                    <Text style={{ fontSize: 22 }}>{RELATION_ICONS[d.relationship ?? ''] ?? '👤'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.depName, { color: t.textPrimary }]}>{d.full_name}</Text>
+                    <Text style={[s.depMeta, { color: t.textMuted }]}>
+                      {d.relationship ?? 'Dependent'}
+                      {d.date_of_birth ? ` · ${d.date_of_birth}` : ''}
+                      {d.gender ? ` · ${d.gender}` : ''}
+                    </Text>
+                  </View>
+                  {deleting === d.id
+                    ? <ActivityIndicator color={t.accent} size="small" />
+                    : <Text style={[s.editArrow, { color: t.textMuted }]}>›</Text>
+                  }
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: t.bg },
-  header:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: t.border },
-  backBtn:       { width: 36, height: 36, borderRadius: 10, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },
-  title:         { fontSize: font.lg, fontWeight: '800', color: t.text, letterSpacing: -0.4, flex: 1 },
-  addBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: t.accentMuted, borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  scroll:        { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  form:          { backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.xl, padding: spacing.xl, marginBottom: spacing.lg },
-  formTitle:     { fontSize: font.md, fontWeight: '800', color: t.text, marginBottom: spacing.lg },
-  label:         { fontSize: font.xs, fontWeight: '600', color: t.textSub, marginBottom: 6 },
-  input:         { backgroundColor: t.bg, borderWidth: 1, borderColor: t.borderMed, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 13, fontSize: font.base, color: t.text, marginBottom: spacing.md },
-  chips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
-  chip:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: t.border },
-  chipActive:    { borderColor: t.accent, backgroundColor: t.accentMuted },
-  chipText:      { fontSize: font.sm, color: t.textSub, fontWeight: '600' },
-  chipTextActive:{ color: t.accent },
-  formActions:   { flexDirection: 'row', gap: spacing.sm },
-  cancelBtn:     { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, borderColor: t.border },
-  saveBtn:       { flex: 2, paddingVertical: 13, alignItems: 'center', borderRadius: radius.lg, backgroundColor: t.accent },
-  placeholder:   { color: t.textMuted, textAlign: 'center', paddingVertical: 40, fontSize: font.sm },
-  emptyState:    { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle:    { fontSize: font.lg, fontWeight: '700', color: t.text, marginBottom: 6 },
-  emptyBody:     { fontSize: font.sm, color: t.textSub, textAlign: 'center', maxWidth: 260, lineHeight: 20, marginBottom: 24 },
-  emptyBtn:      { backgroundColor: t.accent, paddingHorizontal: spacing.xl, paddingVertical: 13, borderRadius: radius.lg },
-  emptyBtnText:  { color: '#060A07', fontWeight: '800', fontSize: font.base },
-  card:          { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.sm },
-  avatar:        { width: 44, height: 44, borderRadius: 14, backgroundColor: t.accentMuted, borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  depName:       { fontSize: font.base, fontWeight: '700', color: t.text },
-  depRel:        { fontSize: font.sm, color: t.textSub, marginTop: 2 },
+const s = StyleSheet.create({
+  safe:           { flex: 1 },
+  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  back:           { fontSize: 22 },
+  title:          { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  addBtn:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
+  addBtnText:     { fontSize: 12, fontWeight: '700' },
+  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet:          { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '85%' },
+  sheetHandle:    { width: 40, height: 4, borderRadius: 99, alignSelf: 'center', marginBottom: 16 },
+  sheetTitle:     { fontSize: 18, fontWeight: '800', letterSpacing: -0.5, marginBottom: 16 },
+  fieldLabel:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  pillRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  pill:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
+  pillText:       { fontSize: 12 },
+  errorText:      { color: '#F87171', fontSize: 12, marginTop: 8 },
+  saveBtn:        { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 18 },
+  saveBtnText:    { color: '#fff', fontSize: 14, fontWeight: '700' },
+  deleteBtn:      { borderRadius: 14, padding: 13, alignItems: 'center', marginTop: 8, borderWidth: 1 },
+  deleteBtnText:  { color: '#FF5C5C', fontSize: 13, fontWeight: '600' },
+  emptyCard:      { borderRadius: 20, borderWidth: 1, padding: 36, alignItems: 'center' },
+  emptyTitle:     { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  emptySub:       { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  emptyAddBtn:    { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99, borderWidth: 1 },
+  emptyAddBtnText:{ fontSize: 13, fontWeight: '700' },
+  countText:      { fontSize: 11, marginBottom: 12 },
+  depCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 14, marginBottom: 8, borderWidth: 1 },
+  depAvatar:      { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  depName:        { fontSize: 14, fontWeight: '700' },
+  depMeta:        { fontSize: 11, marginTop: 2, textTransform: 'capitalize' },
+  editArrow:      { fontSize: 22 },
 })

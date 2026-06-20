@@ -1,254 +1,249 @@
-import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert, Linking } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
+import { Avatar } from '../components/ui/Avatar'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
-interface Hospital {
-  id: string; name: string; type: string; city: string; state: string
-  avg_rating: number | null; review_count: number; accepts_virtual: boolean
-  is_verified: boolean; description: string | null; phone: string | null
-  whatsapp: string | null; email: string | null; emergency_hours: boolean
-  address: string | null
-}
+interface Props { navigation: any; route: any }
 
-interface Doctor {
-  id: string; full_name: string; title: string; qualification: string | null
-  consultation_fee: number | null; virtual_fee: number | null
-  accepts_virtual: boolean; avg_rating: number | null
-  specialties: { name: string } | null
-}
+const TABS = ['services', 'hmo', 'info'] as const
 
-interface Hour { day_of_week: number; open_time: string; close_time: string }
-interface Specialty { specialties: { name: string; icon: string | null } | null }
+export function HospitalProfileScreen({ navigation, route }: Props) {
+  const { theme: t } = useTheme()
+  const hospital: DisplayHospital & {
+    clinic_model?: string | null
+    daily_booking_limit?: number | null
+    approval_mode?: string | null
+    requires_referral?: boolean | null
+    opd_fee?: number | null
+  } = route.params.hospital
+  const [tab, setTab] = useState<typeof TABS[number]>('services')
 
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const isMultiClinic = hospital.clinic_model === 'multi'
 
-export function HospitalProfileScreen({ route, navigation }: { route: any; navigation: any }) {
-  const hospital: Hospital = route.params.hospital
-  const [doctors, setDoctors]     = useState<Doctor[]>([])
-  const [hours, setHours]         = useState<Hour[]>([])
-  const [specialties, setSpecialties] = useState<Specialty[]>([])
-  const [loading, setLoading]     = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      supabase.from('doctors')
-        .select('id,full_name,title,qualification,consultation_fee,virtual_fee,accepts_virtual,avg_rating,specialties!doctors_specialty_id_fkey(name)')
-        .eq('hospital_id', hospital.id).eq('is_active', true).order('full_name').limit(10),
-      supabase.from('hospital_operating_hours')
-        .select('day_of_week,open_time,close_time')
-        .eq('hospital_id', hospital.id).order('day_of_week'),
-      supabase.from('hospital_specialties')
-        .select('specialties(name,icon)').eq('hospital_id', hospital.id),
-    ]).then(([{ data: d }, { data: h }, { data: s }]) => {
-      setDoctors((d as Doctor[]) ?? [])
-      setHours((h as Hour[]) ?? [])
-      setSpecialties((s as Specialty[]) ?? [])
-    }).catch(() => {
-      // Network or DB error — show empty state rather than infinite loading
-    }).finally(() => {
-      setLoading(false)
-    })
-  }, [hospital.id])
-
-  function isOpenNow() {
-    const now  = new Date()
-    const day  = now.getDay()
-    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-    return hours.some(h => h.day_of_week === day && h.open_time.slice(0,5) <= time && time <= h.close_time.slice(0,5))
+  function bookInPerson() {
+    navigation.navigate('BookingFlow', { hospital, bookingType: 'physical' })
   }
 
-  function handleBooking() {
-    navigation.navigate('Booking', { hospital })
+  function bookVirtual() {
+    navigation.navigate('BookingFlow', { hospital, bookingType: 'virtual' })
   }
-
-  function handleCall() {
-    if (hospital.phone) Linking.openURL(`tel:${hospital.phone}`)
-  }
-
-  const specialtyNames = specialties.slice(0, 6).map(s => s.specialties?.name).filter(Boolean)
-  const openNow = !loading && isOpenNow()
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={{ color: t.accent, fontSize: 16 }}>←</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {hospital.name.split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()}
-            </Text>
-          </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      {/* Hero */}
+      <View style={[styles.hero, { backgroundColor: t.canvasBg }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={[styles.backArrow, { color: t.textMuted }]}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.heroRow}>
+          <Avatar initials={hospital.avatar} bg={hospital.avatarBg} size={58} />
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.name} numberOfLines={2}>{hospital.name}</Text>
-              {hospital.is_verified && <Text style={{ color: t.accent, fontSize: 14 }}>✓</Text>}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={[styles.hospitalName, { color: t.textPrimary }]}>{hospital.name}</Text>
+              {hospital.verified && <Text style={{ fontSize: 13, color: t.accent }}>✓</Text>}
             </View>
-            <Text style={styles.type}>{hospital.type.replace(/_/g, ' ')} · {hospital.city}, {hospital.state}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-              {hospital.avg_rating ? (
-                <Text style={styles.rating}>★ {hospital.avg_rating.toFixed(1)} ({hospital.review_count})</Text>
-              ) : (
-                <Text style={styles.ratingNew}>New</Text>
+            <Text style={[styles.hospitalSpecialty, { color: t.textMuted }]}>{hospital.specialty}</Text>
+            <View style={{ flexDirection: 'row', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+              <StatusBadge type={hospital.tagType} />
+              {hospital.virtual && <StatusBadge type="virtual" />}
+              {isMultiClinic && (
+                <View style={[styles.multiChip, { backgroundColor: 'rgba(180,156,240,0.12)', borderColor: 'rgba(180,156,240,0.3)' }]}>
+                  <Text style={[styles.multiChipText, { color: '#B49CF0' }]}>🏢 Multi-clinic</Text>
+                </View>
               )}
-              <View style={[styles.statusBadge, { borderColor: openNow ? '#00E87A44' : '#FF5C5C44', backgroundColor: openNow ? '#00E87A11' : '#FF5C5C11' }]}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: openNow ? t.accent : '#FF5C5C' }}>
-                  {loading ? '…' : openNow ? 'Open Now' : 'Closed Now'}
-                </Text>
-              </View>
-              {hospital.emergency_hours && (
-                <View style={[styles.statusBadge, { borderColor: '#FF5C5C44', backgroundColor: '#FF5C5C11' }]}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#FF5C5C' }}>24/7</Text>
+              {(hospital.emergencySlots ?? 0) > 0 && (
+                <View style={styles.emergBadge}>
+                  <Text style={styles.emergBadgeText}>🚨 {hospital.emergencySlots} emergency</Text>
                 </View>
               )}
             </View>
           </View>
         </View>
 
-        {/* Specialties */}
-        {specialtyNames.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.tags}>
-              {specialtyNames.map(s => (
-                <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
-              ))}
+        {/* Stats */}
+        <View style={styles.statsGrid}>
+          {[
+            { label: 'Rating',   value: `${hospital.rating} ★` },
+            { label: 'Reviews',  value: String(hospital.reviews) },
+            { label: 'Wait',     value: hospital.wait },
+            { label: 'Distance', value: hospital.distance },
+          ].map(s => (
+            <View key={s.label} style={[styles.statBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+              <Text style={[styles.statValue, { color: t.textPrimary }]}>{s.value}</Text>
+              <Text style={[styles.statLabel, { color: t.textMuted }]}>{s.label}</Text>
             </View>
-          </View>
-        )}
-
-        {/* Description */}
-        {hospital.description && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.body}>{hospital.description}</Text>
-          </View>
-        )}
-
-        {/* Doctors */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Doctors</Text>
-          {loading ? (
-            <Text style={styles.muted}>Loading…</Text>
-          ) : doctors.length === 0 ? (
-            <Text style={styles.muted}>No doctors listed yet</Text>
-          ) : doctors.map(d => (
-            <TouchableOpacity key={d.id} style={styles.doctorCard} activeOpacity={0.75}
-              onPress={() => navigation.navigate('Booking', { hospital, doctor: d })}>
-              <View style={styles.doctorAvatar}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: t.accent }}>
-                  {(d.full_name ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.doctorName}>{d.title} {d.full_name}</Text>
-                <Text style={styles.doctorSub}>
-                  {d.specialties?.name ?? 'General'}{d.qualification ? ` · ${d.qualification}` : ''}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-                  {d.consultation_fee ? (
-                    <Text style={styles.fee}>₦{d.consultation_fee.toLocaleString()} consult</Text>
-                  ) : null}
-                  {d.accepts_virtual && d.virtual_fee ? (
-                    <Text style={[styles.fee, { color: '#5B9EFF' }]}>₦{d.virtual_fee.toLocaleString()} virtual</Text>
-                  ) : null}
-                </View>
-              </View>
-            </TouchableOpacity>
           ))}
         </View>
 
-        {/* Operating Hours */}
-        {!loading && hours.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Operating Hours</Text>
-            {DAYS.map((day, i) => {
-              const h = hours.find(oh => oh.day_of_week === i)
-              return (
-                <View key={day} style={styles.hourRow}>
-                  <Text style={[styles.day, !h && { color: t.textMuted }]}>{day}</Text>
-                  <Text style={[styles.hourText, !h && { color: t.textMuted }]}>
-                    {h ? `${h.open_time.slice(0,5)} – ${h.close_time.slice(0,5)}` : 'Closed'}
-                  </Text>
-                </View>
-              )
-            })}
+        {/* Multi-clinic OPD note */}
+        {isMultiClinic && (
+          <View style={[styles.opdNote, { backgroundColor: 'rgba(85,167,235,0.08)', borderColor: 'rgba(85,167,235,0.2)' }]}>
+            <Text style={[styles.opdNoteIcon]}>💡</Text>
+            <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
+              Not sure which department to book?{' '}
+              <Text style={{ fontWeight: '700' }}>Book an OPD (General) visit</Text> — the doctor
+              will assess and refer you to the right sub-clinic.
+            </Text>
           </View>
         )}
 
-        {/* Contact */}
-        {(hospital.phone || hospital.address) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact</Text>
-            {hospital.address && <Text style={styles.body}>{hospital.address}, {hospital.city}, {hospital.state}</Text>}
-            {hospital.phone && (
-              <TouchableOpacity onPress={handleCall} style={{ marginTop: 8 }}>
-                <Text style={{ color: t.accent, fontSize: font.sm, fontWeight: '600' }}>📞 {hospital.phone}</Text>
+        {/* Approval mode notice */}
+        {hospital.approval_mode === 'manual' && (
+          <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
+            <Text style={styles.opdNoteIcon}>📋</Text>
+            <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
+              This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
+              requests. You may be asked to describe your symptoms or upload a referral letter.
+              Rejected bookings receive a full refund.
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Tabs */}
+      <View style={[styles.tabBar, { borderBottomColor: t.cardBorder }]}>
+        {TABS.map(tb => (
+          <TouchableOpacity key={tb} onPress={() => setTab(tb)} style={styles.tabItem}>
+            <Text style={[styles.tabText, {
+              color: tab === tb ? t.accent : t.textMuted,
+              fontWeight: tab === tb ? '700' : '400',
+            }]}>
+              {tb.charAt(0).toUpperCase() + tb.slice(1)}
+            </Text>
+            <View style={[styles.tabUnderline, { backgroundColor: tab === tb ? t.accent : 'transparent' }]} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Tab content */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {tab === 'services' && (
+          <View style={styles.chipGrid}>
+            {hospital.services.map((s, idx) => (
+              <TouchableOpacity key={idx}
+                onPress={() => bookInPerson()}
+                style={[styles.serviceChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                <Text style={[styles.serviceText, { color: t.accent }]}>{s}</Text>
+                <Text style={[styles.serviceBookText, { color: t.accent }]}>→</Text>
               </TouchableOpacity>
-            )}
+            ))}
+            <View style={[styles.serviceNote, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+              <Text style={[styles.serviceNoteText, { color: t.textMuted }]}>
+                Tap a service to begin an in-person booking. Your request will be routed to the appropriate department.
+              </Text>
+            </View>
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        {tab === 'hmo' && (hospital.hmo ?? []).map(h => (
+          <View key={h} style={[styles.hmoRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 14 }}>🏥</Text>
+            <Text style={[styles.hmoName, { color: t.textPrimary }]}>{h}</Text>
+            <View style={[styles.acceptedBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+              <Text style={[styles.acceptedText, { color: t.accent }]}>Accepted</Text>
+            </View>
+          </View>
+        ))}
+
+        {tab === 'info' && [
+          { label: 'Address',      value: (hospital as any).address ?? 'See directions' },
+          { label: 'Phone',        value: (hospital as any).phone   ?? 'Contact hospital' },
+          { label: 'City',         value: (hospital as any).city    ?? hospital.distance },
+          { label: 'Daily Limit',  value: hospital.daily_booking_limit ? `${hospital.daily_booking_limit} bookings/day` : 'No limit' },
+          { label: 'OPD Fee',      value: hospital.opd_fee ? `₦${hospital.opd_fee.toLocaleString()}` : 'Free' },
+          { label: 'Approval',     value: hospital.approval_mode === 'manual' ? 'Manual review required' : 'Instant confirmation' },
+          { label: 'Emergency',    value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
+        ].map(item => (
+          <View key={item.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
+            <Text style={[styles.infoLabel, { color: t.textMuted }]}>{item.label}</Text>
+            <Text style={[styles.infoValue, { color: t.textPrimary }]}>{item.value}</Text>
+          </View>
+        ))}
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Book CTA */}
-      <View style={styles.cta}>
-        {hospital.phone && (
-          <TouchableOpacity onPress={handleCall} style={styles.callBtn}>
-            <Text style={{ color: t.accent, fontSize: font.sm, fontWeight: '700' }}>📞 Call</Text>
+      {/* Booking CTAs */}
+      <View style={[styles.cta, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
+        <View style={styles.ctaRow}>
+          {/* In-person to hospital (OPD) */}
+          <TouchableOpacity style={[styles.ctaBtnSecondary, { borderColor: t.accent, backgroundColor: t.accentBg }]}
+            onPress={bookInPerson}>
+            <Text style={[styles.ctaBtnSecondaryText, { color: t.accent }]}>🏥 In-Person Visit</Text>
+            {hospital.opd_fee ? (
+              <Text style={[styles.ctaBtnFee, { color: t.accent }]}>₦{hospital.opd_fee.toLocaleString()}</Text>
+            ) : (
+              <Text style={[styles.ctaBtnFee, { color: t.accent }]}>Free OPD</Text>
+            )}
           </TouchableOpacity>
-        )}
-        {hospital.whatsapp && (
-          <TouchableOpacity
-            onPress={() => Linking.openURL(`https://wa.me/${hospital.whatsapp?.replace(/\D/g,'')}`)}
-            style={styles.callBtn}>
-            <Text style={{ color: '#25D366', fontSize: font.sm, fontWeight: '700' }}>💬 WhatsApp</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity onPress={handleBooking} style={styles.bookBtn}>
-          <Text style={styles.bookText}>Book Appointment</Text>
-        </TouchableOpacity>
+
+          {/* Virtual — only if hospital accepts virtual */}
+          {hospital.virtual ? (
+            <TouchableOpacity
+              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
+              onPress={bookVirtual}>
+              <Text style={styles.ctaBtnPrimaryText}>💻 Book Virtual</Text>
+              <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)' }]}>Choose a doctor →</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
+              onPress={bookInPerson}>
+              <Text style={styles.ctaBtnPrimaryText}>Book Appointment</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: t.bg },
-  header:       { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  backBtn:      { width: 36, height: 36, borderRadius: 10, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },
-  hero:         { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, alignItems: 'flex-start' },
-  avatar:       { width: 56, height: 56, borderRadius: 16, backgroundColor: '#1A3A28', borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center', shrink: 0 } as any,
-  avatarText:   { color: t.accent, fontSize: font.sm, fontWeight: '800', letterSpacing: -0.5 },
-  name:         { fontSize: font.lg, fontWeight: '800', color: t.text, letterSpacing: -0.3, flex: 1 },
-  type:         { fontSize: font.xs, color: t.textSub, marginTop: 2, textTransform: 'capitalize' },
-  rating:       { fontSize: font.xs, color: '#FFB547', fontWeight: '700' },
-  ratingNew:    { fontSize: font.xs, color: t.textMuted, fontWeight: '600' },
-  statusBadge:  { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  section:      { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
-  sectionTitle: { fontSize: font.xs, fontWeight: '700', color: t.textSub, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: spacing.md },
-  tags:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:          { backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
-  tagText:      { fontSize: 11, color: t.textSub, fontWeight: '600' },
-  body:         { fontSize: font.sm, color: t.textSub, lineHeight: 22 },
-  muted:        { fontSize: font.sm, color: t.textMuted },
-  doctorCard:   { flexDirection: 'row', gap: spacing.md, backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm },
-  doctorAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#1A3A28', borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  doctorName:   { fontSize: font.sm, fontWeight: '700', color: t.text },
-  doctorSub:    { fontSize: 11, color: t.textSub, marginTop: 1 },
-  fee:          { fontSize: 10, color: t.accent, fontWeight: '600' },
-  hourRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: t.border },
-  day:          { fontSize: font.sm, color: t.textSub, fontWeight: '600', width: 40 },
-  hourText:     { fontSize: font.sm, color: t.text },
-  cta:          { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: spacing.sm, padding: spacing.xl, paddingBottom: 32, backgroundColor: t.bg, borderTopWidth: 1, borderTopColor: t.border },
-  callBtn:      { paddingHorizontal: spacing.lg, paddingVertical: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: t.accentBorder, backgroundColor: t.accentMuted },
-  bookBtn:      { flex: 1, backgroundColor: t.accent, borderRadius: radius.lg, paddingVertical: 14, alignItems: 'center' },
-  bookText:     { fontSize: font.base, fontWeight: '800', color: '#060A07' },
+  safe:                { flex: 1 },
+  hero:                { paddingHorizontal: 20, paddingBottom: 14 },
+  backBtn:             { paddingBottom: 12, paddingTop: 4 },
+  backArrow:           { fontSize: 22 },
+  heroRow:             { flexDirection: 'row', gap: 14, alignItems: 'flex-start', marginBottom: 14 },
+  hospitalName:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  hospitalSpecialty:   { fontSize: 12, marginTop: 2 },
+  multiChip:           { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  multiChipText:       { fontSize: 10, fontWeight: '700' },
+  emergBadge:          { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99,
+                         backgroundColor: '#FCEBEB', borderWidth: 1, borderColor: 'rgba(163,45,45,0.3)' },
+  emergBadgeText:      { fontSize: 10, fontWeight: '700', color: '#791F1F', textTransform: 'uppercase' },
+  opdNote:             { flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+                         borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 10 },
+  opdNoteIcon:         { fontSize: 14 },
+  opdNoteText:         { flex: 1, fontSize: 12, lineHeight: 18 },
+  statsGrid:           { flexDirection: 'row', gap: 8 },
+  statBox:             { flex: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 8, borderWidth: 1 },
+  statValue:           { fontSize: 12, fontWeight: '700' },
+  statLabel:           { fontSize: 9, marginTop: 2 },
+  tabBar:              { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
+  tabItem:             { flex: 1, alignItems: 'center', paddingVertical: 11 },
+  tabText:             { fontSize: 12 },
+  tabUnderline:        { height: 2, width: '80%', borderRadius: 99, marginTop: 4 },
+  content:             { flex: 1, paddingHorizontal: 20, paddingTop: 14 },
+  chipGrid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  serviceChip:         { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1,
+                         flexDirection: 'row', alignItems: 'center', gap: 6 },
+  serviceText:         { fontSize: 12, fontWeight: '600' },
+  serviceBookText:     { fontSize: 12, fontWeight: '700' },
+  serviceNote:         { width: '100%', borderRadius: 12, padding: 12, borderWidth: 1, marginTop: 8 },
+  serviceNoteText:     { fontSize: 12, lineHeight: 18 },
+  hmoRow:              { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 8, borderWidth: 1 },
+  hmoName:             { flex: 1, fontSize: 13, fontWeight: '600' },
+  acceptedBadge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  acceptedText:        { fontSize: 10, fontWeight: '700' },
+  infoRow:             { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, gap: 16 },
+  infoLabel:           { fontSize: 12, flexShrink: 0 },
+  infoValue:           { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
+  cta:                 { padding: 16, paddingBottom: 20, borderTopWidth: 1 },
+  ctaRow:              { flexDirection: 'row', gap: 10 },
+  ctaBtnSecondary:     { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center', borderWidth: 1.5 },
+  ctaBtnSecondaryText: { fontSize: 13, fontWeight: '700' },
+  ctaBtnPrimary:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' },
+  ctaBtnPrimaryText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
+  ctaBtnFee:           { fontSize: 10, marginTop: 2 },
 })

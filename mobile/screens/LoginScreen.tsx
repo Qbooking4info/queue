@@ -1,85 +1,97 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { dark as t, spacing, font, radius } from '../lib/theme'
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, SafeAreaView, KeyboardAvoidingView,
+  Platform, ScrollView, ActivityIndicator,
+} from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
 
-export function LoginScreen({ navigation }: { navigation: any }) {
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+interface Props { navigation: any }
+
+export function LoginScreen({ navigation }: Props) {
+  const { theme: t }        = useTheme()
+  const { signIn }          = useAuth()
+  const [email, setEmail]   = useState('')
+  const [pass,  setPass]    = useState('')
+  const [error, setError]   = useState('')
+  const [busy,  setBusy]    = useState(false)
 
   async function handleLogin() {
-    if (!email.trim() || !password) { setError('Please enter your email and password.'); return }
-    setLoading(true); setError('')
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    if (err) { setError(err.message); setLoading(false) }
-    // on success: App.tsx session listener switches to main navigator automatically
+    if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
+    setBusy(true); setError('')
+    const err = await signIn(email.trim().toLowerCase(), pass)
+    setBusy(false)
+    if (err) setError(err)
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Logo */}
-          <View style={styles.logoWrap}>
-            <View style={styles.logoIcon}>
-              <Text style={{ fontSize: 32 }}>🏥</Text>
+          <View style={s.logoWrap}>
+            <View style={[s.logoBox, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <Text style={[s.logoText, { color: t.accent }]}>Q</Text>
             </View>
-            <Text style={styles.logoText}>Queue</Text>
-            <Text style={styles.logoSub}>Healthcare, simplified</Text>
+            <Text style={[s.appName, { color: t.textPrimary }]}>Queue</Text>
+            <Text style={[s.tagline, { color: t.textMuted }]}>Your health, on your schedule</Text>
           </View>
 
           {/* Card */}
-          <View style={styles.card}>
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Sign in to your patient account</Text>
+          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={[s.cardTitle, { color: t.textPrimary }]}>Welcome back</Text>
+            <Text style={[s.cardSub,   { color: t.textMuted  }]}>Sign in to your account</Text>
 
-            <View style={styles.fields}>
-              <View style={styles.field}>
-                <Text style={styles.label}>Email address</Text>
+            <View style={s.fields}>
+              <View style={s.fieldWrap}>
+                <Text style={[s.label, { color: t.textMuted }]}>Email address</Text>
                 <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
+                  value={email} onChangeText={setEmail}
+                  placeholder="you@email.com"
                   placeholderTextColor={t.textMuted}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
-                  style={styles.input}
+                  keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
+                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
                 />
               </View>
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
+              <View style={s.fieldWrap}>
+                <Text style={[s.label, { color: t.textMuted }]}>Password</Text>
                 <TextInput
-                  value={password}
-                  onChangeText={setPassword}
+                  value={pass} onChangeText={setPass}
                   placeholder="••••••••"
                   placeholderTextColor={t.textMuted}
                   secureTextEntry
-                  autoComplete="password"
-                  style={styles.input}
+                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
                 />
               </View>
             </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {!!error && (
+              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
+                <Text style={s.errText}>{error}</Text>
+              </View>
+            )}
 
             <TouchableOpacity
-              onPress={handleLogin}
-              disabled={loading}
-              style={[styles.btn, loading && styles.btnDisabled]}>
-              <Text style={styles.btnText}>{loading ? 'Signing in…' : 'Sign In'}</Text>
+              style={[s.btn, { backgroundColor: t.accent }, busy && { opacity: 0.6 }]}
+              onPress={handleLogin} disabled={busy}>
+              {busy
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnText}>Sign in</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.forgotRow}>
+              <Text style={[s.forgotText, { color: t.accent }]}>Forgot password?</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+          {/* Register link */}
+          <View style={s.footer}>
+            <Text style={[s.footerText, { color: t.textMuted }]}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.footerLink}>Create account</Text>
+              <Text style={[s.footerLink, { color: t.accent }]}>Create account</Text>
             </TouchableOpacity>
           </View>
 
@@ -89,25 +101,28 @@ export function LoginScreen({ navigation }: { navigation: any }) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: t.bg },
-  scroll:      { flexGrow: 1, paddingHorizontal: spacing.xl, justifyContent: 'center', paddingVertical: 40 },
-  logoWrap:    { alignItems: 'center', marginBottom: 36 },
-  logoIcon:    { width: 72, height: 72, borderRadius: 22, backgroundColor: t.accentMuted, borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  logoText:    { fontSize: 28, fontWeight: '800', color: t.text, letterSpacing: -0.5 },
-  logoSub:     { fontSize: font.sm, color: t.textSub, marginTop: 2 },
-  card:        { backgroundColor: t.bgCard, borderWidth: 1, borderColor: t.border, borderRadius: radius.xl, padding: spacing.xl },
-  title:       { fontSize: font.xl, fontWeight: '800', color: t.text, letterSpacing: -0.4, marginBottom: 4 },
-  subtitle:    { fontSize: font.sm, color: t.textSub, marginBottom: 24 },
-  fields:      { gap: 14, marginBottom: 16 },
-  field:       { gap: 6 },
-  label:       { fontSize: font.xs, fontWeight: '600', color: t.textSub },
-  input:       { backgroundColor: t.bg, borderWidth: 1, borderColor: t.borderMed, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: 13, fontSize: font.base, color: t.text },
-  error:       { fontSize: font.xs, color: '#FF5C5C', backgroundColor: 'rgba(255,92,92,0.08)', borderWidth: 1, borderColor: 'rgba(255,92,92,0.2)', borderRadius: radius.md, padding: 10, marginBottom: 12 },
-  btn:         { backgroundColor: t.accent, borderRadius: radius.lg, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  btnDisabled: { opacity: 0.6 },
-  btnText:     { fontSize: font.base, fontWeight: '800', color: '#060A07' },
-  footer:      { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
-  footerText:  { fontSize: font.sm, color: t.textSub },
-  footerLink:  { fontSize: font.sm, color: t.accent, fontWeight: '700' },
+const s = StyleSheet.create({
+  safe:       { flex: 1 },
+  scroll:     { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
+  logoWrap:   { alignItems: 'center', marginBottom: 32 },
+  logoBox:    { width: 64, height: 64, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  logoText:   { fontSize: 28, fontWeight: '900' },
+  appName:    { fontSize: 26, fontWeight: '900', letterSpacing: -1 },
+  tagline:    { fontSize: 13, marginTop: 4 },
+  card:       { borderRadius: 20, borderWidth: 1, padding: 24, marginBottom: 20 },
+  cardTitle:  { fontSize: 20, fontWeight: '800', letterSpacing: -0.6 },
+  cardSub:    { fontSize: 13, marginTop: 4, marginBottom: 20 },
+  fields:     { gap: 14 },
+  fieldWrap:  { gap: 6 },
+  label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input:      { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  errBox:     { borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 14 },
+  errText:    { color: '#F87171', fontSize: 12 },
+  btn:        { borderRadius: 14, paddingVertical: 13, alignItems: 'center', marginTop: 20 },
+  btnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
+  forgotRow:  { alignItems: 'center', marginTop: 14 },
+  forgotText: { fontSize: 13, fontWeight: '500' },
+  footer:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  footerText: { fontSize: 13 },
+  footerLink: { fontSize: 13, fontWeight: '700' },
 })
