@@ -1,137 +1,216 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { useAdmin } from '@/contexts/AdminContext'
+import { StatCard } from '@/components/dashboard/StatCard'
+import { Badge } from '@/components/dashboard/Badge'
+import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
+import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
+import { getAppointments, getRangeStats } from '@/lib/admin-api'
+import type { AdminAppointment } from '@/lib/admin-api'
 import Link from 'next/link'
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+const DOC_COLORS: Record<string, string> = {}
+const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
+function docColor(name: string) {
+  if (!DOC_COLORS[name]) DOC_COLORS[name] = PALETTE[Object.keys(DOC_COLORS).length % PALETTE.length]
+  return DOC_COLORS[name]
+}
 
-  const db = createAdminClient()
-  const params = await searchParams
+const docStatuses = ['Available', 'With Patient', 'On Break']
 
-  const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) redirect('/onboarding')
+export default function OverviewPage() {
+  const { theme: C } = useTheme()
+  const { hospital, stats, doctors, loading: ctxLoading } = useAdmin()
 
-  const { data: adminRecord } = await db
-    .from('hospital_admins')
-    .select('hospital_id, role, hospitals(name, city, state, is_verified, avg_rating, total_bookings)')
-    .eq('user_id', profile.id)
-    .single()
+  const [range, setRange]       = useState<DateRangeKey>('today')
+  const [bounds, setBounds]     = useState<DateBounds>(getDateBounds('today'))
+  const [appts, setAppts]       = useState<AdminAppointment[]>([])
+  const [rangeStats, setRangeStats] = useState({ total: 0, completed: 0, cancelled: 0, pending: 0 })
+  const [loading, setLoading]   = useState(true)
 
-  if (!adminRecord) redirect('/onboarding')
+  const load = useCallback(async () => {
+    if (!hospital?.id) return
+    setLoading(true)
+    const [a, s] = await Promise.all([
+      getAppointments(hospital.id, bounds.from, bounds.to),
+      getRangeStats(hospital.id, bounds.from, bounds.to),
+    ])
+    setAppts(a)
+    setRangeStats(s)
+    setLoading(false)
+  }, [hospital?.id, bounds])
 
-  const hospital = adminRecord.hospitals as { name: string; city: string; state: string; is_verified: boolean; avg_rating: number; total_bookings: number } | null
+  useEffect(() => { load() }, [load])
 
-  const [
-    { count: confirmedCount },
-    { count: doctorCount },
-    { data: recentAppointments },
-  ] = await Promise.all([
-    db.from('appointments').select('*', { count: 'exact', head: true })
-      .eq('hospital_id', adminRecord.hospital_id)
-      .in('status', ['confirmed', 'checked_in', 'in_progress']),
-    db.from('doctors').select('*', { count: 'exact', head: true })
-      .eq('hospital_id', adminRecord.hospital_id).eq('is_active', true),
-    db.from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, doctors(full_name, title)')
-      .eq('hospital_id', adminRecord.hospital_id)
-      .gte('appointment_date', new Date().toISOString().split('T')[0])
-      .in('status', ['pending', 'confirmed', 'checked_in'])
-      .order('appointment_date', { ascending: true })
-      .order('start_time', { ascending: true })
-      .limit(5),
-  ])
+  function handleRangeChange(key: DateRangeKey, b: DateBounds) {
+    setRange(key)
+    setBounds(b)
+  }
 
-  const stats = [
-    { label: 'Active Bookings',  value: confirmedCount ?? 0, icon: '📅', color: '#00E87A' },
-    { label: 'Active Doctors',   value: doctorCount ?? 0,    icon: '👨‍⚕️', color: '#5B9EFF' },
-    { label: 'Rating',           value: hospital?.avg_rating ? `${Number(hospital.avg_rating).toFixed(1)}★` : '—', icon: '⭐', color: '#FFB547' },
-    { label: 'Total Bookings',   value: hospital?.total_bookings ?? 0, icon: '📋', color: '#00E87A' },
-  ]
+  const today = new Date()
+  const timeStr = today.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
-      {params.welcome === 'true' && (
-        <div className="mb-6 p-4 rounded-2xl border border-green-500/30 bg-green-500/8">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎉</span>
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
+          Good {today.getHours() < 12 ? 'morning' : today.getHours() < 17 ? 'afternoon' : 'evening'}, {hospital?.name ?? 'Dashboard'} 👋
+        </div>
+        <div style={{ fontSize: 14, color: C.textSub, marginTop: 4 }} suppressHydrationWarning>
+          {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {timeStr}
+        </div>
+      </div>
+
+      {/* Date filter bar */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+        padding: '12px 16px', marginBottom: 20 }}>
+        <DateFilter value={range} onChange={handleRangeChange} label="Showing" />
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+        <StatCard icon="📅" label="Total Appointments"
+          value={loading ? '…' : rangeStats.total}
+          sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
+          colorKey="accent" />
+        <StatCard icon="✔" label="Completed"
+          value={loading ? '…' : rangeStats.completed}
+          sub={rangeStats.total > 0 ? `${Math.round(rangeStats.completed / rangeStats.total * 100)}% completion rate` : 'No appointments'}
+          colorKey="blue" />
+        <StatCard icon="👨‍⚕️" label="Active Doctors"
+          value={ctxLoading ? '…' : stats.activeDoctors}
+          sub="On duty today" colorKey="purple" />
+        <StatCard icon="⭐" label="Avg Rating"
+          value={ctxLoading ? '…' : stats.avgRating.toFixed(1)}
+          sub={`Based on ${stats.reviewCount} reviews`} colorKey="amber" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        {/* Appointments list */}
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div className="font-bold text-green-400">Welcome to Queue!</div>
-              <div className="text-sm text-[#7A9089]">Your hospital profile is under review. We&apos;ll verify it within 24 hours.</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{hospital?.name ?? 'Dashboard'}</h1>
-          <p className="text-sm text-[#7A9089] mt-0.5 capitalize">{hospital?.city}, {hospital?.state} · {adminRecord.role}</p>
-        </div>
-        {!hospital?.is_verified && (
-          <span className="text-xs bg-amber-500/10 border border-amber-500/25 text-amber-400 px-3 py-1.5 rounded-full font-medium">
-            Pending Verification
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        {stats.map(s => (
-          <div key={s.label} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
-            <div className="text-2xl mb-2">{s.icon}</div>
-            <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
-            <div className="text-xs text-[#7A9089] mt-1">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-[#111915] border border-white/7 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold">Upcoming Appointments</h2>
-            <Link href="/dashboard/appointments" className="text-xs text-green-400 hover:text-green-300">View all →</Link>
-          </div>
-          {recentAppointments?.length ? (
-            <div className="flex flex-col gap-2">
-              {recentAppointments.map(a => {
-                const doctor = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
-                return (
-                  <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
-                    <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-sm shrink-0">
-                      {a.type === 'virtual' ? '💻' : '🏥'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{doctor?.title} {doctor?.full_name}</div>
-                      <div className="text-xs text-[#7A9089]">{a.appointment_date} · {a.start_time?.slice(0, 5)}</div>
-                    </div>
-                    <span className="text-xs font-mono text-[#4A6058] shrink-0">{a.booking_ref}</span>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-[#4A6058] text-center py-6">No upcoming appointments</p>
-          )}
-        </div>
-
-        <div className="bg-[#111915] border border-white/7 rounded-2xl p-5">
-          <h2 className="font-bold mb-4">Quick Actions</h2>
-          <div className="flex flex-col gap-2">
-            {[
-              { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Add a Doctor',        sub: 'Register doctors and set availability' },
-              { href: '/dashboard/appointments', icon: '📅', label: 'View Appointments',   sub: 'Confirm, reschedule, or cancel bookings' },
-              { href: '/dashboard/settings',     icon: '⚙️',  label: 'Hospital Settings',  sub: 'Update profile, hours, and features' },
-            ].map(a => (
-              <Link key={a.href} href={a.href}
-                className="flex items-center gap-3 p-3 rounded-xl border border-white/7 hover:border-green-500/20 hover:bg-green-500/5 transition-all group">
-                <span className="text-xl">{a.icon}</span>
-                <div className="flex-1">
-                  <div className="text-sm font-medium group-hover:text-green-400 transition-colors">{a.label}</div>
-                  <div className="text-xs text-[#7A9089]">{a.sub}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Appointments</div>
+              {!loading && (
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>
+                  {appts.length} record{appts.length !== 1 ? 's' : ''} · all clinics
                 </div>
-                <span className="text-[#4A6058] group-hover:text-green-400 transition-colors">›</span>
+              )}
+            </div>
+            <Link href="/dashboard/appointments"
+              style={{ fontSize: 12, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
+              View all →
+            </Link>
+          </div>
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+            {loading ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+            ) : appts.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+                No appointments for this period
+              </div>
+            ) : appts.slice(0, 10).map((a, i) => (
+              <div key={a.id} style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: i % 2 === 1 ? C.rowAlt : C.card }}>
+                <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 56 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted }}>{a.start_time}</div>
+                  {range !== 'today' && (
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>
+                      {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </div>
+                  )}
+                </div>
+                <div style={{ width: 32, height: 32, borderRadius: 8,
+                  background: docColor(a.doctor_name), display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#a0e8c0', flexShrink: 0 }}>
+                  {a.doctor_name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.patient_name}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textSub }}>
+                    {a.specialty_name ?? 'General'} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                  </div>
+                </div>
+                <Badge status={a.status} />
+              </div>
+            ))}
+            {appts.length > 10 && (
+              <div style={{ padding: '12px 20px', textAlign: 'center' }}>
+                <Link href="/dashboard/appointments" style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+                  +{appts.length - 10} more — View all →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Doctors on duty */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
+              fontSize: 14, fontWeight: 700, color: C.text }}>
+              Doctors On Duty
+            </div>
+            {ctxLoading ? (
+              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>Loading…</div>
+            ) : doctors.length === 0 ? (
+              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>No doctors yet</div>
+            ) : doctors.slice(0, 4).map((d, i) => {
+              const status = docStatuses[i % docStatuses.length]
+              return (
+                <div key={d.id} style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: d.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, color: '#a0e8c0', flexShrink: 0 }}>
+                    {d.avatar}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.full_name}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                    background: status === 'Available' ? C.accentLight : status === 'With Patient' ? C.amberLight : C.border,
+                    color: status === 'Available' ? C.accent : status === 'With Patient' ? C.amber : C.textMuted,
+                    border: `1px solid ${status === 'Available' ? C.accentBorder : 'transparent'}` }}>
+                    {status}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Quick actions */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
+              fontSize: 14, fontWeight: 700, color: C.text }}>
+              Quick Actions
+            </div>
+            {[
+              { href: '/dashboard/doctors',  icon: '👨‍⚕️', label: 'Add a Doctor',      sub: 'Register doctors & set availability' },
+              { href: '/dashboard/services', icon: '🏥', label: 'Manage Services',    sub: 'Enable specialties & set pricing'  },
+              { href: '/dashboard/settings', icon: '⚙️',  label: 'Hospital Settings', sub: 'Update profile and preferences'    },
+            ].map(item => (
+              <Link key={item.href} href={item.href}
+                style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{item.label}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted }}>{item.sub}</div>
+                </div>
+                <span style={{ color: C.textMuted, fontSize: 14 }}>›</span>
               </Link>
             ))}
           </div>

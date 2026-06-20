@@ -23,6 +23,13 @@ export interface DisplayHospital {
   doctors?:  any[]
   hmo?:      string[]
   emergencySlots?: number
+  // Booking policy fields
+  hospitalType?:       string | null
+  clinic_model?:       string | null
+  approval_mode?:      string | null
+  opd_fee?:            number | null
+  daily_booking_limit?: number | null
+  requires_referral?:  boolean | null
 }
 
 interface Props { hospital: DisplayHospital; onPress: () => void }

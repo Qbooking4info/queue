@@ -52,5 +52,12 @@ export function toDisplayHospital(
     hmo:       [],
     emergencySlots: h.emergency_hours ? 2 : 0,
     slots:     [],
+    // Booking policy fields — forwarded from hospital record
+    hospitalType:        (h as any).type             ?? null,
+    clinic_model:        (h as any).clinic_model     ?? null,
+    approval_mode:       (h as any).approval_mode    ?? null,
+    opd_fee:             (h as any).opd_fee          ?? null,
+    daily_booking_limit: (h as any).daily_booking_limit ?? null,
+    requires_referral:   (h as any).requires_referral   ?? null,
   }
 }

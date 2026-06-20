@@ -251,6 +251,34 @@ export function HomeScreen({ navigation }: Props) {
           <Text style={[s.searchPH, { color: t.textMuted }]}>Search hospitals, doctors, specialties…</Text>
         </TouchableOpacity>
 
+        {/* Book Appointment quick-start */}
+        <View style={s.bookRow}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('BookingFlow', {})}
+            style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <View style={[s.bookIcon, { backgroundColor: t.accentBg }]}>
+              <Text style={{ fontSize: 20 }}>🏥</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Physical Visit</Text>
+              <Text style={[s.bookCardSub, { color: t.textMuted }]}>Doctor assigned on arrival</Text>
+            </View>
+            <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('BookingFlow', { bookingType: 'virtual' })}
+            style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <View style={[s.bookIcon, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
+              <Text style={{ fontSize: 20 }}>💻</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Virtual Call</Text>
+              <Text style={[s.bookCardSub, { color: t.textMuted }]}>Choose a preferred doctor</Text>
+            </View>
+            <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Emergency CTA */}
         <View style={s.emergency}>
           <Text style={{ fontSize: 22 }}>🚨</Text>
@@ -373,7 +401,12 @@ const s = StyleSheet.create({
   bannerChipText:    { fontSize: 10, fontWeight: '700' },
   bannerBtn:         { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
   bannerBtnText:     { fontSize: 12, fontWeight: '700', color: '#fff' },
-  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 18, borderWidth: 1 },
+  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 14, borderWidth: 1 },
+  bookRow:           { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  bookCard:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 12, borderWidth: 1 },
+  bookIcon:          { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  bookCardLabel:     { fontSize: 12, fontWeight: '700' },
+  bookCardSub:       { fontSize: 10, marginTop: 1 },
   searchPH:          { fontSize: 13 },
   emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#7B1A1A', borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(163,45,45,0.5)' },
   emergencyTitle:    { fontSize: 13, fontWeight: '700', color: '#fff' },

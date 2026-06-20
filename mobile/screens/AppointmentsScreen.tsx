@@ -1,19 +1,41 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native'
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl,
+} from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getPatientAppointments } from '../lib/api'
 import type { AppointmentWithRelations } from '../lib/api'
 
-const FILTERS = ['upcoming', 'completed', 'cancelled'] as const
+const FILTERS = ['upcoming', 'pending review', 'completed', 'cancelled'] as const
+
+function statusColors(status: string, approvalStatus: string, t: any) {
+  if (approvalStatus === 'pending_approval')
+    return { bg: 'rgba(239,159,39,0.12)', color: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
+  if (status === 'confirmed')   return { bg: t.accentBg,            color: t.accent,    border: t.accentBorder }
+  if (status === 'pending')     return { bg: 'rgba(26,127,193,0.1)', color: '#1A7FC1',   border: 'rgba(26,127,193,0.3)' }
+  if (status === 'checked_in')  return { bg: '#E8F4FE',              color: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' }
+  if (status === 'in_progress') return { bg: '#FEF0E6',              color: '#7A3A00',   border: 'rgba(122,58,0,0.3)' }
+  if (status === 'completed')   return { bg: t.inputBg,              color: t.textMuted, border: t.cardBorder }
+  return { bg: '#FCEBEB', color: '#791F1F', border: 'rgba(163,45,45,0.3)' }
+}
+
+function statusLabel(status: string, approvalStatus: string) {
+  if (approvalStatus === 'pending_approval') return 'Awaiting Review'
+  if (status === 'in_progress') return 'In progress'
+  if (status === 'checked_in')  return 'Checked in'
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
 
 export function AppointmentsScreen({ navigation }: { navigation?: any }) {
-  const { theme: t }           = useTheme()
-  const { user }               = useAuth()
-  const [filter, setFilter]    = useState<typeof FILTERS[number]>('upcoming')
-  const [appts, setAppts]      = useState<AppointmentWithRelations[]>([])
-  const [loading, setLoading]  = useState(true)
+  const { theme: t } = useTheme()
+  const { user }     = useAuth()
+
+  const [filter,     setFilter]     = useState<typeof FILTERS[number]>('upcoming')
+  const [appts,      setAppts]      = useState<AppointmentWithRelations[]>([])
+  const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async (silent = false) => {
@@ -27,120 +49,177 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  const filtered = appts.filter(a =>
-    filter === 'upcoming'
-      ? ['confirmed', 'pending', 'checked_in', 'in_progress'].includes(a.status)
-      : a.status === filter
-  )
+  const filtered = appts.filter(a => {
+    const approvalStatus = (a as any).approval_status ?? 'auto_approved'
+    if (filter === 'pending review') return approvalStatus === 'pending_approval'
+    if (filter === 'upcoming')
+      return ['confirmed', 'pending', 'checked_in', 'in_progress'].includes(a.status)
+        && approvalStatus !== 'pending_approval'
+    if (filter === 'completed') return a.status === 'completed'
+    if (filter === 'cancelled') return a.status === 'cancelled' || approvalStatus === 'rejected'
+    return true
+  })
 
-  const statusStyle = (status: string) => {
-    if (status === 'confirmed')   return { bg: t.accentBg,  color: t.accent }
-    if (status === 'pending')     return { bg: '#FEF8E7',   color: '#633806' }
-    if (status === 'completed')   return { bg: t.inputBg,   color: t.textMuted }
-    if (status === 'checked_in')  return { bg: '#E8F4FE',   color: '#1A5A8C' }
-    if (status === 'in_progress') return { bg: '#FEF0E6',   color: '#7A3A00' }
-    return { bg: '#FCEBEB', color: '#791F1F' }
-  }
-
-  const doctorInitials = (name: string) =>
-    name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() ?? '??'
+  const pendingCount = appts.filter(a => (a as any).approval_status === 'pending_approval').length
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.title, { color: t.textPrimary }]}>My bookings</Text>
 
-        <View style={styles.filters}>
-          {FILTERS.map(f => (
-            <TouchableOpacity key={f} onPress={() => setFilter(f)}
-              style={[styles.filterPill, {
-                backgroundColor: filter === f ? t.accentBg : t.cardBg,
-                borderColor: filter === f ? t.accent : t.cardBorder,
-              }]}>
-              <Text style={[styles.filterText, { color: filter === f ? t.accent : t.textMuted }]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+        {/* Title */}
+        <View style={[s.titleRow, { borderBottomColor: t.cardBorder }]}>
+          <Text style={[s.title, { color: t.textPrimary }]}>My Bookings</Text>
+          {pendingCount > 0 && (
+            <View style={[s.pendingBadge, { backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF9F27' }}>
+                {pendingCount} awaiting review
               </Text>
-            </TouchableOpacity>
-          ))}
+            </View>
+          )}
         </View>
+
+        {/* Filter row */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.filterScroll}
+          contentContainerStyle={s.filterContent}>
+          {FILTERS.map((f, i) => {
+            const active = filter === f
+            const isLast = i === FILTERS.length - 1
+            return (
+              <TouchableOpacity
+                key={f}
+                onPress={() => setFilter(f)}
+                style={[
+                  s.filterPill,
+                  isLast ? s.filterPillLast : undefined,
+                  {
+                    backgroundColor: active ? t.accentBg : t.cardBg,
+                    borderColor:     active ? t.accent   : t.cardBorder,
+                  },
+                ]}>
+                <Text style={[s.filterText, { color: active ? t.accent : t.textMuted }]}>
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </Text>
+                {f === 'pending review' && pendingCount > 0 && (
+                  <View style={s.filterDot} />
+                )}
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
 
         {loading ? (
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : (
           <ScrollView
+            style={s.list}
             showsVerticalScrollIndicator={false}
-            style={{ paddingHorizontal: 20 }}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true) }} tintColor={t.accent} />
+              <RefreshControl
+                refreshing={refreshing}
+                tintColor={t.accent}
+                onRefresh={() => { setRefreshing(true); load(true) }}
+              />
             }>
+
             {filtered.length === 0 && (
-              <View style={styles.empty}>
-                <Text style={{ fontSize: 32, marginBottom: 10 }}>📅</Text>
-                <Text style={[styles.emptyText, { color: t.textMuted }]}>No {filter} appointments</Text>
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>📅</Text>
+                <Text style={[s.emptyText, { color: t.textMuted }]}>
+                  No {filter} appointments
+                </Text>
                 {filter === 'upcoming' && (
-                  <TouchableOpacity onPress={() => navigation?.navigate('Search')}
-                    style={[styles.bookBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                    <Text style={[styles.bookBtnText, { color: t.accent }]}>Book an appointment →</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation?.navigate('BookingFlow', {})}
+                    style={[s.bookNowBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                    <Text style={[s.bookNowText, { color: t.accent }]}>Book an appointment →</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
 
             {filtered.map(a => {
-              const ss      = statusStyle(a.status)
-              const doctor  = a.doctor
-              const hospital = a.hospital
+              const approvalStatus = (a as any).approval_status ?? 'auto_approved'
+              const bookingMode    = (a as any).booking_mode ?? 'doctor'
+              const bookingRef     = (a as any).booking_ref ?? a.id
+              const sc             = statusColors(a.status, approvalStatus, t)
+              const isVirtual      = a.type === 'virtual'
+              const isPending      = approvalStatus === 'pending_approval'
+              const clinicObj      = (a as any).clinic ?? null
+              const clinicLabel    = clinicObj && !clinicObj.is_opd ? clinicObj.name : null
+              const doctorName     = a.doctor?.full_name
+                ?? (bookingMode === 'hospital' ? null : 'Doctor')
+
               return (
-                <TouchableOpacity key={a.id} activeOpacity={0.75}
+                <TouchableOpacity
+                  key={a.id}
+                  activeOpacity={0.75}
                   onPress={() => navigation?.navigate('AppointmentDetail', { appointment: a })}
-                  style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <View style={styles.cardTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.cardDoctor, { color: t.textPrimary }]}>
-                        {doctor?.full_name ?? 'Doctor'}
-                      </Text>
-                      <Text style={[styles.cardSpec, { color: t.textMuted }]}>
-                        {hospital?.name ?? ''}
-                      </Text>
+                  style={[
+                    s.card,
+                    {
+                      backgroundColor: t.cardBg,
+                      borderColor: isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
+                    },
+                  ]}>
+
+                  {/* Ref row — booking ID + status badge */}
+                  <View style={[s.refRow, { borderBottomColor: t.cardBorder }]}>
+                    <View style={s.refLeft}>
+                      <Text style={s.refIcon}>{isVirtual ? '💻' : '🏥'}</Text>
+                      <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: ss.bg }]}>
-                      <Text style={[styles.statusText, { color: ss.color }]}>{a.status.replace('_', ' ')}</Text>
+                    <View style={[s.statusPill, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                      <Text style={[s.statusText, { color: sc.color }]}>
+                        {statusLabel(a.status, approvalStatus)}
+                      </Text>
                     </View>
                   </View>
 
-                  <View style={styles.cardChips}>
-                    {[a.appointment_date, a.start_time, a.type].map(tag => (
-                      <View key={tag} style={[styles.chip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                        <Text style={[styles.chipText, { color: t.textMuted }]}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={[styles.cardBottom, { borderTopColor: t.cardBorder }]}>
-                    <Text style={[styles.bookingId, { color: t.textMuted }]}>{a.booking_ref}</Text>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {['confirmed', 'pending'].includes(a.status) && a.type === 'virtual' && (
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                          <Text style={[styles.actionBtnText, { color: t.accent }]}>Join call</Text>
-                        </TouchableOpacity>
-                      )}
-                      {['confirmed', 'pending'].includes(a.status) && (
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                          <Text style={[styles.actionBtnText, { color: t.textMuted }]}>Reschedule</Text>
-                        </TouchableOpacity>
-                      )}
-                      {a.status === 'completed' && (
-                        <TouchableOpacity
-                          onPress={() => navigation?.navigate('HospitalProfile', { hospital: { id: a.hospital_id } })}
-                          style={[styles.actionBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                          <Text style={[styles.actionBtnText, { color: t.accent }]}>Book again</Text>
-                        </TouchableOpacity>
-                      )}
+                  {/* Body — hospital + doctor | date + time */}
+                  <View style={s.cardBody}>
+                    <View style={s.cardBodyLeft}>
+                      <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>
+                        {a.hospital?.name ?? '—'}
+                      </Text>
+                      <Text style={[s.doctorLine, { color: t.textMuted }]} numberOfLines={1}>
+                        {clinicLabel
+                          ? clinicLabel
+                          : doctorName ?? (isVirtual ? 'Doctor to be assigned' : 'OPD / General Outpatient')}
+                      </Text>
+                    </View>
+                    <View style={s.cardBodyRight}>
+                      <Text style={[s.dateText, { color: t.textPrimary }]}>{a.appointment_date}</Text>
+                      <Text style={[s.timeText,  { color: t.textMuted   }]}>{a.start_time}</Text>
                     </View>
                   </View>
+
+                  {/* Pending approval banner */}
+                  {isPending && (
+                    <View style={[s.approvalBanner, { backgroundColor: 'rgba(239,159,39,0.06)', borderTopColor: 'rgba(239,159,39,0.2)' }]}>
+                      <Text style={{ fontSize: 11, color: '#EF9F27' }}>
+                        ⏳ Awaiting hospital review — you'll be notified once approved.
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Footer — check-in pass prompt */}
+                  {!isPending && ['confirmed', 'pending', 'checked_in'].includes(a.status) && (
+                    <View style={[s.cardFooter, { borderTopColor: t.cardBorder }]}>
+                      <Text style={[s.footerHint, { color: t.textMuted }]}>Tap to view check-in pass</Text>
+                      {isVirtual && (
+                        <View style={[s.virtualTag, { backgroundColor: 'rgba(55,138,221,0.1)', borderColor: 'rgba(55,138,221,0.25)' }]}>
+                          <Text style={s.virtualTagText}>Virtual</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </TouchableOpacity>
               )
             })}
+
             <View style={{ height: 32 }} />
           </ScrollView>
         )}
@@ -149,27 +228,44 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   )
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe:          { flex: 1 },
-  title:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
-  filters:       { flexDirection: 'row', gap: 6, marginBottom: 14, paddingHorizontal: 20 },
-  filterPill:    { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
-  filterText:    { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  empty:         { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyText:     { fontSize: 13 },
-  bookBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, borderWidth: 1, marginTop: 4 },
-  bookBtnText:   { fontSize: 12, fontWeight: '700' },
-  card:          { borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1 },
-  cardTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  cardDoctor:    { fontSize: 14, fontWeight: '700' },
-  cardSpec:      { fontSize: 11, marginTop: 2 },
-  statusBadge:   { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
-  statusText:    { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
-  cardChips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 },
-  chip:          { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  chipText:      { fontSize: 10, fontWeight: '600', textTransform: 'capitalize' },
-  cardBottom:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, paddingTop: 10 },
-  bookingId:     { fontSize: 11 },
-  actionBtn:     { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 9, borderWidth: 1 },
-  actionBtnText: { fontSize: 11, fontWeight: '700' },
+  titleRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  title:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.8 },
+  pendingBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  // Filter row
+  filterScroll:  { flexGrow: 0 },
+  filterContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
+  filterPill:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8 },
+  filterPillLast:{ marginRight: 0 },
+  filterText:    { fontSize: 12, fontWeight: '600' },
+  filterDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF9F27', marginLeft: 5 },
+  // List
+  list:          { paddingHorizontal: 20 },
+  // Empty state
+  empty:         { alignItems: 'center', paddingVertical: 56 },
+  emptyIcon:     { fontSize: 32, marginBottom: 10 },
+  emptyText:     { fontSize: 13, marginBottom: 12 },
+  bookNowBtn:    { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
+  bookNowText:   { fontSize: 13, fontWeight: '700' },
+  // Card
+  card:          { borderRadius: 16, marginBottom: 10, borderWidth: 1, overflow: 'hidden' },
+  refRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
+  refLeft:       { flexDirection: 'row', alignItems: 'center' },
+  refIcon:       { fontSize: 14, marginRight: 7 },
+  refText:       { fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  statusPill:    { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
+  statusText:    { fontSize: 10, fontWeight: '700' },
+  cardBody:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12 },
+  cardBodyLeft:  { flex: 1, paddingRight: 10 },
+  cardBodyRight: { alignItems: 'flex-end' },
+  hospitalName:  { fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  doctorLine:    { fontSize: 11 },
+  dateText:      { fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  timeText:      { fontSize: 11 },
+  approvalBanner:{ paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 1 },
+  cardFooter:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1 },
+  footerHint:    { fontSize: 10 },
+  virtualTag:    { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  virtualTagText:{ fontSize: 9, color: '#85B7EB', fontWeight: '700' },
 })

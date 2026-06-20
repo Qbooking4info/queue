@@ -14,8 +14,14 @@ export async function POST(req: NextRequest) {
     // All DB writes use service role — bypasses RLS safely server-side
     const db = createAdminClient()
     const body = await req.json()
-    const { name, type, description, address, city, state, phone, email, whatsapp,
-      accepts_virtual, emergency_hours, specialtyIds, hours, planId } = body
+    const {
+      name, type, description,
+      registrationNumber, mdcnNumber,
+      address, city, state, phone, email, whatsapp,
+      clinicModel, clinics,
+      accepts_virtual, emergency_hours,
+      specialtyIds, hours, planId,
+    } = body
 
     // Ensure public profile row exists
     let { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
@@ -32,20 +38,33 @@ export async function POST(req: NextRequest) {
 
     const { data: hospital, error: hErr } = await db.from('hospitals').insert({
       name, slug, type: type ?? 'hospital',
-      description: description || null, address, city, state,
+      description: description || null,
+      address, city, state,
       phone: phone || null, email: email || null, whatsapp: whatsapp || null,
-      accepts_virtual: accepts_virtual ?? false, emergency_hours: emergency_hours ?? false,
+      accepts_virtual: accepts_virtual ?? false,
+      emergency_hours: emergency_hours ?? false,
+      registration_number: registrationNumber || null,
+      mdcn_accreditation: mdcnNumber || null,
+      clinic_model: clinicModel ?? 'single',
+      is_verified: false,
     }).select('id').single()
     if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
 
-    await db.from('hospital_admins').insert({ hospital_id: hospital.id, user_id: profile.id, role: 'owner' })
+    // Link admin as owner
+    await db.from('hospital_admins').insert({
+      hospital_id: hospital.id,
+      user_id: profile.id,
+      role: 'owner',
+    })
 
+    // Save specialties
     if (specialtyIds?.length > 0) {
       await db.from('hospital_specialties').insert(
         specialtyIds.map((sid: string) => ({ hospital_id: hospital.id, specialty_id: sid }))
       )
     }
 
+    // Save operating hours
     const openHours = (hours ?? []).filter((h: { closed: boolean }) => !h.closed)
     if (openHours.length > 0) {
       await db.from('hospital_operating_hours').insert(
@@ -55,11 +74,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Save subscription
     if (planId) {
       await db.from('hospital_subscriptions').insert({
         hospital_id: hospital.id, plan_id: planId, status: 'trialing',
         trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       })
+    }
+
+    // Save clinics (multi-clinic model) — requires hospital_clinics table
+    if (clinicModel === 'multi' && Array.isArray(clinics) && clinics.length > 0) {
+      const validClinics = (clinics as { id: string; name: string; description: string }[])
+        .filter(c => c.name?.trim())
+      if (validClinics.length > 0) {
+        // Use raw SQL via RPC in case the table was just created
+        const { error: clinicErr } = await db.from('hospital_clinics').insert(
+          validClinics.map((c, i) => ({
+            hospital_id: hospital.id,
+            name: c.name.trim(),
+            description: c.description?.trim() || null,
+            sort_order: i,
+            is_active: true,
+          }))
+        )
+        // Non-fatal: table may not exist yet — log but don't fail onboarding
+        if (clinicErr) {
+          console.warn('hospital_clinics insert failed (run migration?):', clinicErr.message)
+        }
+      }
     }
 
     return NextResponse.json({ success: true, hospitalId: hospital.id })

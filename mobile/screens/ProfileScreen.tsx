@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Platform } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Clipboard } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 
@@ -8,8 +8,18 @@ interface Props { navigation?: any }
 export function ProfileScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
   const { user, signOut }                  = useAuth()
-  const [signingOut, setSigningOut]        = useState(false)
+  const [signingOut, setSigningOut]         = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
+  const [idCopied, setIdCopied]             = useState(false)
+
+  const patientId = (user as any)?.patient_id ?? null
+
+  function copyPatientId() {
+    if (!patientId) return
+    Clipboard.setString(patientId)
+    setIdCopied(true)
+    setTimeout(() => setIdCopied(false), 2000)
+  }
 
   const initials = user?.full_name
     ?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
@@ -33,6 +43,19 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
           <Text style={[styles.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
           <Text style={[styles.email, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
+
+          {/* Patient ID — copyable */}
+          {patientId && (
+            <TouchableOpacity onPress={copyPatientId} activeOpacity={0.7}
+              style={[styles.patientIdRow, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <Text style={[styles.patientIdLabel, { color: t.accent }]}>Patient ID</Text>
+              <Text style={[styles.patientIdValue, { color: t.accent }]}>{patientId}</Text>
+              <Text style={[styles.patientIdCopy, { color: idCopied ? t.accent : t.textMuted }]}>
+                {idCopied ? '✓ Copied' : '⎘'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
               <Text style={[styles.badgeText, { color: t.accent }]}>
@@ -134,7 +157,11 @@ const styles = StyleSheet.create({
   avatarText:  { fontSize: 22, fontWeight: '800' },
   name:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
   email:       { fontSize: 12, marginTop: 3 },
-  badges:      { flexDirection: 'row', gap: 6, marginTop: 8 },
+  patientIdRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
+  patientIdLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, opacity: 0.6 },
+  patientIdValue: { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+  patientIdCopy:  { fontSize: 10, fontWeight: '600', marginLeft: 4 },
+  badges:         { flexDirection: 'row', gap: 6, marginTop: 8 },
   badge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   badgeText:   { fontSize: 10, fontWeight: '700' },
   themeRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1 },

@@ -2,46 +2,33 @@ import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
-import { Stars } from '../components/ui/Stars'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
-interface BookingDoctor {
-  id?:              string
-  name:             string
-  spec:             string
-  fee:              string
-  avatar:           string
-  exp?:             string
-  rating?:          number
-  consultation_fee?: number
-  virtual_fee?:     number
-}
-
 interface Props { navigation: any; route: any }
 
-const TABS = ['doctors', 'services', 'hmo', 'info'] as const
-
-function toBookingDoctor(d: any): BookingDoctor {
-  const initials = (d.full_name ?? d.name ?? '??')
-    .split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-  return {
-    id:               d.id,
-    name:             d.full_name ?? d.name ?? 'Doctor',
-    spec:             d.specialty?.name ?? d.spec ?? 'Specialist',
-    fee:              d.consultation_fee ? `₦${Number(d.consultation_fee).toLocaleString()}` : (d.fee ?? '₦0'),
-    avatar:           initials,
-    exp:              d.years_experience ? `${d.years_experience} yrs` : (d.exp ?? ''),
-    rating:           d.avg_rating ?? d.rating ?? 0,
-    consultation_fee: d.consultation_fee,
-    virtual_fee:      d.virtual_fee,
-  }
-}
+const TABS = ['services', 'hmo', 'info'] as const
 
 export function HospitalProfileScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
-  const hospital: DisplayHospital = route.params.hospital
-  const [tab, setTab] = useState<typeof TABS[number]>('doctors')
+  const hospital: DisplayHospital & {
+    clinic_model?: string | null
+    daily_booking_limit?: number | null
+    approval_mode?: string | null
+    requires_referral?: boolean | null
+    opd_fee?: number | null
+  } = route.params.hospital
+  const [tab, setTab] = useState<typeof TABS[number]>('services')
+
+  const isMultiClinic = hospital.clinic_model === 'multi'
+
+  function bookInPerson() {
+    navigation.navigate('BookingFlow', { hospital, bookingType: 'physical' })
+  }
+
+  function bookVirtual() {
+    navigation.navigate('BookingFlow', { hospital, bookingType: 'virtual' })
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
@@ -61,8 +48,13 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             <View style={{ flexDirection: 'row', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
               <StatusBadge type={hospital.tagType} />
               {hospital.virtual && <StatusBadge type="virtual" />}
+              {isMultiClinic && (
+                <View style={[styles.multiChip, { backgroundColor: 'rgba(180,156,240,0.12)', borderColor: 'rgba(180,156,240,0.3)' }]}>
+                  <Text style={[styles.multiChipText, { color: '#B49CF0' }]}>🏢 Multi-clinic</Text>
+                </View>
+              )}
               {(hospital.emergencySlots ?? 0) > 0 && (
-                <View style={[styles.emergBadge]}>
+                <View style={styles.emergBadge}>
                   <Text style={styles.emergBadgeText}>🚨 {hospital.emergencySlots} emergency</Text>
                 </View>
               )}
@@ -84,13 +76,40 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             </View>
           ))}
         </View>
+
+        {/* Multi-clinic OPD note */}
+        {isMultiClinic && (
+          <View style={[styles.opdNote, { backgroundColor: 'rgba(85,167,235,0.08)', borderColor: 'rgba(85,167,235,0.2)' }]}>
+            <Text style={[styles.opdNoteIcon]}>💡</Text>
+            <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
+              Not sure which department to book?{' '}
+              <Text style={{ fontWeight: '700' }}>Book an OPD (General) visit</Text> — the doctor
+              will assess and refer you to the right sub-clinic.
+            </Text>
+          </View>
+        )}
+
+        {/* Approval mode notice */}
+        {hospital.approval_mode === 'manual' && (
+          <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
+            <Text style={styles.opdNoteIcon}>📋</Text>
+            <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
+              This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
+              requests. You may be asked to describe your symptoms or upload a referral letter.
+              Rejected bookings receive a full refund.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: t.cardBorder }]}>
         {TABS.map(tb => (
           <TouchableOpacity key={tb} onPress={() => setTab(tb)} style={styles.tabItem}>
-            <Text style={[styles.tabText, { color: tab === tb ? t.accent : t.textMuted, fontWeight: tab === tb ? '700' : '400' }]}>
+            <Text style={[styles.tabText, {
+              color: tab === tb ? t.accent : t.textMuted,
+              fontWeight: tab === tb ? '700' : '400',
+            }]}>
               {tb.charAt(0).toUpperCase() + tb.slice(1)}
             </Text>
             <View style={[styles.tabUnderline, { backgroundColor: tab === tb ? t.accent : 'transparent' }]} />
@@ -100,21 +119,21 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
       {/* Tab content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'doctors' && (hospital.doctors ?? []).map((d, i) => {
-          const bd = toBookingDoctor(d)
-          return (
-            <DoctorRow key={bd.id ?? i} doctor={bd}
-              onBook={() => navigation.navigate('BookingFlow', { hospital, doctor: bd })} />
-          )
-        })}
-
         {tab === 'services' && (
           <View style={styles.chipGrid}>
-            {hospital.services.map(s => (
-              <View key={s} style={[styles.serviceChip, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[styles.serviceText, { color: t.textPrimary }]}>{s}</Text>
-              </View>
+            {hospital.services.map((s, idx) => (
+              <TouchableOpacity key={idx}
+                onPress={() => bookInPerson()}
+                style={[styles.serviceChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                <Text style={[styles.serviceText, { color: t.accent }]}>{s}</Text>
+                <Text style={[styles.serviceBookText, { color: t.accent }]}>→</Text>
+              </TouchableOpacity>
             ))}
+            <View style={[styles.serviceNote, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+              <Text style={[styles.serviceNoteText, { color: t.textMuted }]}>
+                Tap a service to begin an in-person booking. Your request will be routed to the appropriate department.
+              </Text>
+            </View>
           </View>
         )}
 
@@ -129,95 +148,102 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         ))}
 
         {tab === 'info' && [
-          { label: 'Address',   value: (hospital as any).address ?? 'See directions' },
-          { label: 'Phone',     value: (hospital as any).phone   ?? 'Contact hospital' },
-          { label: 'City',      value: (hospital as any).city    ?? hospital.distance },
-          { label: 'Emergency', value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
-        ].map(i => (
-          <View key={i.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
-            <Text style={[styles.infoLabel, { color: t.textMuted }]}>{i.label}</Text>
-            <Text style={[styles.infoValue, { color: t.textPrimary }]}>{i.value}</Text>
+          { label: 'Address',      value: (hospital as any).address ?? 'See directions' },
+          { label: 'Phone',        value: (hospital as any).phone   ?? 'Contact hospital' },
+          { label: 'City',         value: (hospital as any).city    ?? hospital.distance },
+          { label: 'Daily Limit',  value: hospital.daily_booking_limit ? `${hospital.daily_booking_limit} bookings/day` : 'No limit' },
+          { label: 'OPD Fee',      value: hospital.opd_fee ? `₦${hospital.opd_fee.toLocaleString()}` : 'Free' },
+          { label: 'Approval',     value: hospital.approval_mode === 'manual' ? 'Manual review required' : 'Instant confirmation' },
+          { label: 'Emergency',    value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
+        ].map(item => (
+          <View key={item.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
+            <Text style={[styles.infoLabel, { color: t.textMuted }]}>{item.label}</Text>
+            <Text style={[styles.infoValue, { color: t.textPrimary }]}>{item.value}</Text>
           </View>
         ))}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Book CTA */}
+      {/* Booking CTAs */}
       <View style={[styles.cta, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-        <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: t.accent }]}
-          onPress={() => {
-            const first = (hospital.doctors ?? [])[0]
-            if (first) navigation.navigate('BookingFlow', { hospital, doctor: toBookingDoctor(first) })
-          }}>
-          <Text style={styles.ctaBtnText}>Book appointment</Text>
-        </TouchableOpacity>
+        <View style={styles.ctaRow}>
+          {/* In-person to hospital (OPD) */}
+          <TouchableOpacity style={[styles.ctaBtnSecondary, { borderColor: t.accent, backgroundColor: t.accentBg }]}
+            onPress={bookInPerson}>
+            <Text style={[styles.ctaBtnSecondaryText, { color: t.accent }]}>🏥 In-Person Visit</Text>
+            {hospital.opd_fee ? (
+              <Text style={[styles.ctaBtnFee, { color: t.accent }]}>₦{hospital.opd_fee.toLocaleString()}</Text>
+            ) : (
+              <Text style={[styles.ctaBtnFee, { color: t.accent }]}>Free OPD</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Virtual — only if hospital accepts virtual */}
+          {hospital.virtual ? (
+            <TouchableOpacity
+              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
+              onPress={bookVirtual}>
+              <Text style={styles.ctaBtnPrimaryText}>💻 Book Virtual</Text>
+              <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)' }]}>Choose a doctor →</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
+              onPress={bookInPerson}>
+              <Text style={styles.ctaBtnPrimaryText}>Book Appointment</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   )
 }
 
-function DoctorRow({ doctor: d, onBook }: { doctor: BookingDoctor; onBook: () => void }) {
-  const { theme: t } = useTheme()
-  return (
-    <View style={[styles.doctorRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      <View style={[styles.doctorAvatar, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-        <Text style={[styles.doctorAvatarText, { color: t.textMuted }]}>{d.avatar}</Text>
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.doctorName, { color: t.textPrimary }]}>{d.name}</Text>
-        <Text style={[styles.doctorSpec, { color: t.textMuted }]}>{d.spec} · {d.exp}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <Stars rating={d.rating ?? 0} />
-          <Text style={[styles.doctorFee, { color: t.accent, marginLeft: 'auto' }]}>{d.fee}</Text>
-        </View>
-      </View>
-      <TouchableOpacity onPress={onBook}
-        style={[styles.bookBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-        <Text style={[styles.bookBtnText, { color: t.accent }]}>Book</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
-  safe:            { flex: 1 },
-  hero:            { paddingHorizontal: 20, paddingBottom: 14 },
-  backBtn:         { paddingBottom: 12, paddingTop: 4 },
-  backArrow:       { fontSize: 22 },
-  heroRow:         { flexDirection: 'row', gap: 14, alignItems: 'flex-start', marginBottom: 14 },
-  hospitalName:    { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  hospitalSpecialty:{ fontSize: 12, marginTop: 2 },
-  emergBadge:      { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99,
-                     backgroundColor: '#FCEBEB', borderWidth: 1, borderColor: 'rgba(163,45,45,0.3)' },
-  emergBadgeText:  { fontSize: 10, fontWeight: '700', color: '#791F1F', textTransform: 'uppercase' },
-  statsGrid:       { flexDirection: 'row', gap: 8 },
-  statBox:         { flex: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 8, borderWidth: 1 },
-  statValue:       { fontSize: 12, fontWeight: '700' },
-  statLabel:       { fontSize: 9, marginTop: 2 },
-  tabBar:          { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
-  tabItem:         { flex: 1, alignItems: 'center', paddingVertical: 11 },
-  tabText:         { fontSize: 12 },
-  tabUnderline:    { height: 2, width: '80%', borderRadius: 99, marginTop: 4 },
-  content:         { flex: 1, paddingHorizontal: 20, paddingTop: 14 },
-  doctorRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 13, marginBottom: 9, borderWidth: 1 },
-  doctorAvatar:    { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
-  doctorAvatarText:{ fontSize: 12, fontWeight: '700' },
-  doctorName:      { fontSize: 13, fontWeight: '700' },
-  doctorSpec:      { fontSize: 11, marginTop: 1 },
-  doctorFee:       { fontSize: 12, fontWeight: '700' },
-  bookBtn:         { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1 },
-  bookBtnText:     { fontSize: 11, fontWeight: '700' },
-  chipGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  serviceChip:     { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1 },
-  serviceText:     { fontSize: 12, fontWeight: '500' },
-  hmoRow:          { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 8, borderWidth: 1 },
-  hmoName:         { flex: 1, fontSize: 13, fontWeight: '600' },
-  acceptedBadge:   { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  acceptedText:    { fontSize: 10, fontWeight: '700' },
-  infoRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, gap: 16 },
-  infoLabel:       { fontSize: 12, flexShrink: 0 },
-  infoValue:       { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
-  cta:             { padding: 16, paddingBottom: 20, borderTopWidth: 1 },
-  ctaBtn:          { borderRadius: 16, padding: 15, alignItems: 'center' },
-  ctaBtnText:      { fontSize: 15, fontWeight: '700', color: '#fff' },
+  safe:                { flex: 1 },
+  hero:                { paddingHorizontal: 20, paddingBottom: 14 },
+  backBtn:             { paddingBottom: 12, paddingTop: 4 },
+  backArrow:           { fontSize: 22 },
+  heroRow:             { flexDirection: 'row', gap: 14, alignItems: 'flex-start', marginBottom: 14 },
+  hospitalName:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  hospitalSpecialty:   { fontSize: 12, marginTop: 2 },
+  multiChip:           { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  multiChipText:       { fontSize: 10, fontWeight: '700' },
+  emergBadge:          { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99,
+                         backgroundColor: '#FCEBEB', borderWidth: 1, borderColor: 'rgba(163,45,45,0.3)' },
+  emergBadgeText:      { fontSize: 10, fontWeight: '700', color: '#791F1F', textTransform: 'uppercase' },
+  opdNote:             { flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+                         borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 10 },
+  opdNoteIcon:         { fontSize: 14 },
+  opdNoteText:         { flex: 1, fontSize: 12, lineHeight: 18 },
+  statsGrid:           { flexDirection: 'row', gap: 8 },
+  statBox:             { flex: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 8, borderWidth: 1 },
+  statValue:           { fontSize: 12, fontWeight: '700' },
+  statLabel:           { fontSize: 9, marginTop: 2 },
+  tabBar:              { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
+  tabItem:             { flex: 1, alignItems: 'center', paddingVertical: 11 },
+  tabText:             { fontSize: 12 },
+  tabUnderline:        { height: 2, width: '80%', borderRadius: 99, marginTop: 4 },
+  content:             { flex: 1, paddingHorizontal: 20, paddingTop: 14 },
+  chipGrid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  serviceChip:         { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1,
+                         flexDirection: 'row', alignItems: 'center', gap: 6 },
+  serviceText:         { fontSize: 12, fontWeight: '600' },
+  serviceBookText:     { fontSize: 12, fontWeight: '700' },
+  serviceNote:         { width: '100%', borderRadius: 12, padding: 12, borderWidth: 1, marginTop: 8 },
+  serviceNoteText:     { fontSize: 12, lineHeight: 18 },
+  hmoRow:              { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 8, borderWidth: 1 },
+  hmoName:             { flex: 1, fontSize: 13, fontWeight: '600' },
+  acceptedBadge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  acceptedText:        { fontSize: 10, fontWeight: '700' },
+  infoRow:             { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, gap: 16 },
+  infoLabel:           { fontSize: 12, flexShrink: 0 },
+  infoValue:           { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
+  cta:                 { padding: 16, paddingBottom: 20, borderTopWidth: 1 },
+  ctaRow:              { flexDirection: 'row', gap: 10 },
+  ctaBtnSecondary:     { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center', borderWidth: 1.5 },
+  ctaBtnSecondaryText: { fontSize: 13, fontWeight: '700' },
+  ctaBtnPrimary:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' },
+  ctaBtnPrimaryText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
+  ctaBtnFee:           { fontSize: 10, marginTop: 2 },
 })
