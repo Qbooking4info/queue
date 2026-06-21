@@ -48,6 +48,7 @@ export type Clinic = {
   is_active:           boolean
   sort_order:          number | null
   daily_booking_limit: number | null
+  service_tags:        string[]
 }
 
 export async function getClinicsForHospital(hospitalId: string): Promise<Clinic[]> {

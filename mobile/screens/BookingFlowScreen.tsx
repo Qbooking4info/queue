@@ -559,6 +559,23 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                             {clinic.description && (
                               <Text style={[s.urgSub, { color: t.textMuted, marginTop: 3 }]}>{clinic.description}</Text>
                             )}
+                            {clinic.service_tags?.length > 0 && (
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+                                {clinic.service_tags.slice(0, 4).map(tag => (
+                                  <View key={tag} style={[s.miniTag, {
+                                    backgroundColor: active ? t.accentBgMid : t.inputBg,
+                                    borderColor: active ? t.accentBorder : t.cardBorder,
+                                  }]}>
+                                    <Text style={{ fontSize: 9, color: active ? t.accent : t.textMuted }}>{tag}</Text>
+                                  </View>
+                                ))}
+                                {clinic.service_tags.length > 4 && (
+                                  <Text style={{ fontSize: 9, color: t.textMuted, alignSelf: 'center' }}>
+                                    +{clinic.service_tags.length - 4}
+                                  </Text>
+                                )}
+                              </View>
+                            )}
                           </View>
                           <View style={[s.radio, {
                             borderColor:     active ? t.accent : t.cardBorder,

@@ -110,6 +110,7 @@ export interface ClinicWithAdmin {
   is_active: boolean | null
   sort_order: number | null
   created_at: string | null
+  service_tags: string[]
   subAdmin: { id: string; full_name: string; email: string } | null
   doctorCount: number
 }
@@ -382,6 +383,7 @@ export interface ClinicDetail {
   hospital_id: string
   created_at: string | null
   sort_order: number | null
+  service_tags: string[]
 }
 
 export interface ClinicStaffMember {
@@ -550,7 +552,7 @@ export async function createClinicDoctor(
   return data as { id: string }
 }
 
-export async function updateClinic(clinicId: string, updates: { name?: string; description?: string | null; is_active?: boolean }): Promise<{ error: { message: string } | null }> {
+export async function updateClinic(clinicId: string, updates: { name?: string; description?: string | null; is_active?: boolean; service_tags?: string[] }): Promise<{ error: { message: string } | null }> {
   const { error } = await adminDb.from('hospital_clinics').update(updates).eq('id', clinicId)
   return { error }
 }

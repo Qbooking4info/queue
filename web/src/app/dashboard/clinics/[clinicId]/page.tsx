@@ -16,6 +16,7 @@ import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment,
 } from '@/lib/admin-api'
 import { adminDb } from '@/lib/supabase/admin-client'
+import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -51,12 +52,13 @@ type Tab = 'overview' | 'doctors' | 'staff' | 'appointments' | 'analytics'
 
 function EditClinicModal({
   clinic, col, onClose, onSave,
-}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined) => void }) {
+}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined, serviceTags: string[]) => void }) {
   const { theme: C } = useTheme()
-  const [name, setName]   = useState(clinic.name)
-  const [desc, setDesc]   = useState(clinic.description ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [name,        setName]        = useState(clinic.name)
+  const [desc,        setDesc]        = useState(clinic.description ?? '')
+  const [serviceTags, setServiceTags] = useState<string[]>(clinic.service_tags ?? [])
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
 
   async function handleSave() {
     if (!name.trim()) return
@@ -64,10 +66,11 @@ function EditClinicModal({
     const { error: err } = await updateClinic(clinic.id, {
       name: name.trim(),
       description: desc.trim() || null,
+      service_tags: serviceTags,
     })
     setSaving(false)
     if (err) { setError(err.message ?? 'Failed to save'); return }
-    onSave(name.trim(), desc.trim() || undefined)
+    onSave(name.trim(), desc.trim() || undefined, serviceTags)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -121,6 +124,17 @@ function EditClinicModal({
               placeholder="e.g. Handles cardiac patients and ECG services"
               rows={3}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+              marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+              Services Offered
+            </label>
+            <ServiceTagPicker selected={serviceTags} onChange={setServiceTags} />
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+              Helps patients find this clinic when searching by service type.
+            </div>
           </div>
 
           {error && (
@@ -919,6 +933,37 @@ export default function ClinicDetailPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Services offered */}
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Services Offered</div>
+                  <button onClick={() => setShowEdit(true)}
+                    style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                    Edit
+                  </button>
+                </div>
+                <div style={{ padding: '12px 16px' }}>
+                  {(clinic?.service_tags ?? []).length === 0 ? (
+                    <div style={{ fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
+                      No services configured — click Edit to add.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(clinic?.service_tags ?? []).map(tag => (
+                        <span key={tag} style={{
+                          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
+                          background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`,
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1371,8 +1416,8 @@ export default function ClinicDetailPage() {
           clinic={clinic}
           col={col}
           onClose={() => setShowEdit(false)}
-          onSave={(name, description) => {
-            setClinic(prev => prev ? { ...prev, name, description: description ?? null } : prev)
+          onSave={(name, description, serviceTags) => {
+            setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags } : prev)
             setShowEdit(false)
           }}
         />

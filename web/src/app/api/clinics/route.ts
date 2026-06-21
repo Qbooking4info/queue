@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const db = createAdminClient()
-  const { hospitalId, clinicName, subAdminName, subAdminEmail, tempPassword } = await req.json()
+  const { hospitalId, clinicName, subAdminName, subAdminEmail, tempPassword, serviceTags } = await req.json()
 
   if (!hospitalId || !clinicName?.trim()) {
     return NextResponse.json({ error: 'hospitalId and clinicName are required' }, { status: 400 })
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   // Create the clinic
   const { data: clinic, error: clinicErr } = await db
     .from('hospital_clinics')
-    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0 })
+    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0, service_tags: serviceTags ?? [] })
     .select('id')
     .single()
   if (clinicErr) return NextResponse.json({ error: clinicErr.message }, { status: 400 })
