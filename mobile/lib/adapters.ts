@@ -1,5 +1,5 @@
-import type { Hospital, Doctor } from '../types/database'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
+import type { HospitalWithDoctors } from './api'
 
 const AVATAR_BG = ['#1A4A32','#1A2A4A','#3A1A0E','#2A1A40','#1A3A1A','#2A2A1A']
 
@@ -13,21 +13,38 @@ function initials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()
 }
 
-export function toDisplayHospital(
-  h: Hospital & { doctors?: (Doctor & { specialty?: { name: string; icon: string } | null })[] }
-): DisplayHospital {
-  // Collect unique specialty names from doctors
-  const services = h.doctors
-    ? [...new Set(
-        h.doctors
-          .map(d => d.specialty?.name)
-          .filter((n): n is string => !!n)
-      )].slice(0, 6)
-    : []
+export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
+  // 1. Registered specialties via hospital_specialties table (the explicit list)
+  const registeredSpecialties: string[] = [
+    ...new Set(
+      (h.hospital_specialties ?? [])
+        .map(hs => hs.specialty?.name)
+        .filter((n): n is string => !!n)
+    ),
+  ]
+
+  // 2. Doctor-derived specialties as fallback / supplement
+  const doctorSpecialties: string[] = [
+    ...new Set(
+      (h.doctors ?? [])
+        .map(d => (d as any).specialty?.name)
+        .filter((n): n is string => !!n)
+    ),
+  ]
+
+  // 3. Merge: registered first, then any doctor specialties not already listed
+  const mergedSpecialties = [
+    ...registeredSpecialties,
+    ...doctorSpecialties.filter(s => !registeredSpecialties.includes(s)),
+  ]
+
+  // The "services" chips used for booking routing and specialty filtering
+  // always use specialty names so filterBySpecialty in HomeScreen keeps working
+  const services = mergedSpecialties.length > 0 ? mergedSpecialties : ['General Practice']
 
   // Derive a readable specialty summary for the subtitle
-  const specialtyLine = services.length > 0
-    ? services.slice(0, 2).join(' · ')
+  const specialtyLine = mergedSpecialties.length > 0
+    ? mergedSpecialties.slice(0, 2).join(' · ')
     : (h.type === 'clinic' ? 'Specialist Clinic' : 'Multi-Specialty')
 
   let tag = 'Open Now'; let tagType = 'open'
