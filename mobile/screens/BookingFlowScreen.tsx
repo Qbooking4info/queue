@@ -6,13 +6,12 @@ import {
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import {
-  getHospitals, getDailyBookingCount, getAvailableSlots,
+  getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
-import type { TimeSlot } from '../types/database'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 import type { Clinic } from '../lib/api'
 
@@ -112,9 +111,6 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [selectedDate, setSelectedDate] = useState(DATES[0].iso)
   const [opdSlot,      setOpdSlot]      = useState<typeof OPD_SLOTS[0] | null>(null)
   const [preferredDoc, setPreferredDoc] = useState<any | null>(null)
-  const [virtualSlots, setVirtualSlots] = useState<TimeSlot[]>([])
-  const [loadingSlots, setLoadingSlots] = useState(false)
-  const [virtualSlot,  setVirtualSlot]  = useState<TimeSlot | null>(null)
   const [dateFullMap,  setDateFullMap]  = useState<Record<string, boolean>>({})
   const [checkingLim,  setCheckingLim]  = useState(false)
 
@@ -151,7 +147,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setLoadingHosp(true)
     const raw    = await getHospitals(q || undefined)
     const mapped = raw.map(toDisplayHospital)
-    setHospitalList(bookingType === 'virtual' ? mapped.filter(h => h.virtual) : mapped)
+    setHospitalList(mapped)
     setLoadingHosp(false)
   }
 
@@ -169,9 +165,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     }
   }, [selectedDate])
 
-  // Daily limit check when entering schedule (physical)
+  // Daily limit check when entering schedule
   useEffect(() => {
-    if (step !== STEP_SCHEDULE || bookingType !== 'physical' || !hospital) return
+    if (step !== STEP_SCHEDULE || !hospital) return
     setCheckingLim(true)
     Promise.all(
       DATES.map(d =>
@@ -197,16 +193,6 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       .finally(() => setLoadingClinics(false))
   }, [step, hospital?.id])
 
-  // Virtual slots when doctor or date changes
-  useEffect(() => {
-    if (step !== STEP_SCHEDULE || bookingType !== 'virtual' || !preferredDoc?.id) return
-    setVirtualSlot(null)
-    setLoadingSlots(true)
-    getAvailableSlots(preferredDoc.id, selectedDate, true)
-      .then(s => setVirtualSlots(s))
-      .finally(() => setLoadingSlots(false))
-  }, [preferredDoc?.id, selectedDate, step])
-
   // ── Navigation ────────────────────────────────────────────────────────────
 
   function goBack() {
@@ -221,8 +207,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     if (step === STEP_HOSPITAL) return !!hospital
     if (step === STEP_DETAILS)  return reason.trim().length >= 3 && !(hospital?.clinic_model === 'multi' && !selectedClinic)
     if (step === STEP_SCHEDULE) {
-      if (bookingType === 'physical') return !!opdSlot && !dateFullMap[selectedDate]
-      return !preferredDoc || !!virtualSlot
+      return !!opdSlot && !dateFullMap[selectedDate]
     }
     return true
   }
@@ -240,12 +225,14 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       ? 'manual'
       : (hospital.approval_mode ?? 'auto')
 
+    const arrivalTime = opdSlot?.time ?? '09:00'
+
     if (bookingType === 'physical' || !preferredDoc) {
       result = await createHospitalAppointment({
         patientId:          user.id,
         hospitalId:         String(hospital.id),
         date:               selectedDate,
-        startTime:          bookingType === 'physical' ? (opdSlot?.time ?? '09:00') : '09:00',
+        startTime:          arrivalTime,
         reason,
         urgency,
         type:               bookingType === 'virtual' ? 'virtual' : 'in-person',
@@ -254,13 +241,14 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         symptomDescription: referralNote || undefined,
       })
     } else {
+      // Virtual with preferred doctor — queue-based, no DB slot needed
       result = await createAppointment({
         patientId:    user.id,
         doctorId:     preferredDoc.id,
         hospitalId:   String(hospital.id),
-        slotId:       virtualSlot?.id ?? null,
-        date:         virtualSlot?.slot_date ?? selectedDate,
-        startTime:    virtualSlot?.start_time ?? '09:00',
+        slotId:       null,
+        date:         selectedDate,
+        startTime:    arrivalTime,
         type:         'virtual',
         reason,
         urgency,
@@ -416,7 +404,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   <TouchableOpacity key={h.id}
                     onPress={() => {
                       setHospital(h)
-                      setPreferredDoc(null); setVirtualSlot(null)
+                      setPreferredDoc(null)
                       setSelectedClinic(null); setReferralNote('')
                       setStep(STEP_DETAILS)
                     }}
@@ -683,17 +671,24 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               {/* ── Virtual ────────────────────────────────────────── */}
               {bookingType === 'virtual' && (
                 <>
-                  <Text style={[s.label, { color: t.textMuted }]}>Preferred doctor (optional)</Text>
+                  {/* How it works banner */}
+                  <View style={[s.infoBox, { backgroundColor: 'rgba(55,138,221,0.08)', borderColor: 'rgba(55,138,221,0.22)', marginBottom: 18 }]}>
+                    <Text style={[s.infoText, { color: '#85B7EB', lineHeight: 18 }]}>
+                      💻 <Text style={{ fontWeight: '700' }}>Virtual queue — how it works:</Text>{'\n'}
+                      Join the queue for your chosen date and window. When it's your turn, the doctor will call you directly. You don't need to be at the hospital.
+                    </Text>
+                  </View>
 
-                  {virtualDoctors.length > 0 ? (
+                  {/* Preferred doctor (optional) */}
+                  {virtualDoctors.length > 0 && (
                     <>
+                      <Text style={[s.label, { color: t.textMuted }]}>Preferred doctor (optional)</Text>
                       <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
                         Pick a doctor you'd like to consult, or skip — the hospital will assign one.
                       </Text>
 
-                      {/* No preference */}
                       <TouchableOpacity
-                        onPress={() => { setPreferredDoc(null); setVirtualSlot(null) }}
+                        onPress={() => setPreferredDoc(null)}
                         style={[s.docRow, {
                           borderColor:     !preferredDoc ? t.accent : t.cardBorder,
                           backgroundColor: !preferredDoc ? t.accentBg : t.cardBg,
@@ -720,16 +715,14 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                         const fee = d.virtual_fee ?? d.consultation_fee ?? 0
                         return (
                           <TouchableOpacity key={d.id}
-                            onPress={() => { setPreferredDoc(active ? null : d); setVirtualSlot(null) }}
+                            onPress={() => setPreferredDoc(active ? null : d)}
                             style={[s.docRow, {
                               borderColor:     active ? t.accent : t.cardBorder,
                               backgroundColor: active ? t.accentBg : t.cardBg,
                             }]}>
                             <Avatar initials={initials} bg="#1A2A4A" size={40} />
                             <View style={{ flex: 1 }}>
-                              <Text style={[s.docName, { color: active ? t.accent : t.textPrimary }]}>
-                                {d.full_name}
-                              </Text>
+                              <Text style={[s.docName, { color: active ? t.accent : t.textPrimary }]}>{d.full_name}</Text>
                               <Text style={[s.docSpec, { color: t.textMuted }]}>
                                 {d.specialty?.name ?? 'Specialist'} · ₦{Number(fee).toLocaleString()}
                               </Text>
@@ -744,76 +737,70 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                         )
                       })}
                     </>
-                  ) : (
-                    <View style={[s.infoBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder, marginBottom: 14 }]}>
-                      <Text style={[s.infoText, { color: t.textMuted }]}>
-                        💻 No specific virtual doctors listed. The hospital will assign an available doctor for your consultation.
-                      </Text>
-                    </View>
                   )}
 
                   {/* Date */}
-                  <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred date</Text>
+                  <Text style={[s.label, { color: t.textMuted, marginTop: 16 }]}>Choose a date</Text>
+                  {checkingLim && (
+                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
+                  )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 8 }}>
+                    style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
                     {DATES.map(d => {
                       const active = selectedDate === d.iso
+                      const full   = !!dateFullMap[d.iso]
                       return (
-                        <TouchableOpacity key={d.iso} onPress={() => setSelectedDate(d.iso)}
+                        <TouchableOpacity key={d.iso} onPress={() => !full && setSelectedDate(d.iso)}
+                          disabled={full}
                           style={[s.dateChip, {
-                            borderColor:     active ? t.accent : t.cardBorder,
-                            backgroundColor: active ? t.accentBg : t.cardBg,
+                            borderColor:     full ? t.cardBorder : active ? t.accent : t.cardBorder,
+                            backgroundColor: full ? t.inputBg   : active ? t.accentBg : t.cardBg,
+                            opacity: full ? 0.45 : 1,
                           }]}>
-                          <Text style={[s.dateLabel, { color: active ? t.accent : t.textPrimary }]}>
+                          <Text style={[s.dateLabel, { color: full ? t.textMuted : active ? t.accent : t.textPrimary }]}>
                             {d.label}
                           </Text>
+                          {full && <Text style={{ fontSize: 9, color: t.textMuted }}>Full</Text>}
                         </TouchableOpacity>
                       )
                     })}
                   </ScrollView>
-
-                  {/* Slots — only when doctor selected */}
-                  {preferredDoc && (
-                    <>
-                      <Text style={[s.label, { color: t.textMuted }]}>Available time slots</Text>
-                      {loadingSlots ? (
-                        <ActivityIndicator color={t.accent} style={{ marginVertical: 16 }} />
-                      ) : virtualSlots.length > 0 ? (
-                        <View style={s.slotGrid}>
-                          {virtualSlots.map(sl => {
-                            const active = virtualSlot?.id === sl.id
-                            return (
-                              <TouchableOpacity key={sl.id} onPress={() => setVirtualSlot(active ? null : sl)}
-                                style={[s.slotBtn, {
-                                  borderColor:     active ? t.accent : t.cardBorder,
-                                  backgroundColor: active ? t.accentBg : t.cardBg,
-                                }]}>
-                                <Text style={[s.slotText, {
-                                  color: active ? t.accent : t.textSecondary,
-                                  fontWeight: active ? '700' : '400',
-                                }]}>{sl.start_time}</Text>
-                              </TouchableOpacity>
-                            )
-                          })}
-                        </View>
-                      ) : (
-                        <View style={[s.emptyBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                          <Text style={{ fontSize: 13, color: t.textMuted, textAlign: 'center' }}>
-                            No virtual slots for {DATES.find(d => d.iso === selectedDate)?.label ?? selectedDate}.
-                            Try another date.
-                          </Text>
-                        </View>
-                      )}
-                    </>
-                  )}
-
-                  {!preferredDoc && (
-                    <View style={[s.infoBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                      <Text style={[s.infoText, { color: t.textMuted }]}>
-                        The hospital will contact you to confirm your appointment time after reviewing your booking.
-                      </Text>
+                  {dateFullMap[selectedDate] && (
+                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ This date is fully booked. Please pick another day.</Text>
                     </View>
                   )}
+
+                  {/* Arrival window */}
+                  <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred call window</Text>
+                  {opdSlots.length === 0 && (
+                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ No available windows for today. Please choose another date.</Text>
+                    </View>
+                  )}
+                  <View style={s.slotGrid}>
+                    {opdSlots.map(sl => {
+                      const active = opdSlot?.id === sl.id
+                      return (
+                        <TouchableOpacity key={sl.id} onPress={() => setOpdSlot(active ? null : sl)}
+                          style={[s.slotBtn, {
+                            borderColor:     active ? t.accent : t.cardBorder,
+                            backgroundColor: active ? t.accentBg : t.cardBg,
+                          }]}>
+                          <Text style={[s.slotText, {
+                            color: active ? t.accent : t.textSecondary,
+                            fontWeight: active ? '700' : '400',
+                          }]}>{sl.label}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+
+                  <View style={[s.infoBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder, marginTop: 10 }]}>
+                    <Text style={[s.infoText, { color: t.textMuted }]}>
+                      📞 The doctor will call you during your selected window when it's your turn. Make sure your phone is on.
+                    </Text>
+                  </View>
                 </>
               )}
             </View>
