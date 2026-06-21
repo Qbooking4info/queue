@@ -466,6 +466,27 @@ export async function getUnassignedDoctors(hospitalId: string): Promise<AdminDoc
   }))
 }
 
+export async function createDoctor(hospitalId: string, payload: {
+  full_name:        string
+  title?:           string
+  specialty_id?:    string
+  consultation_fee?: number
+  virtual_fee?:     number
+  years_experience?: number
+  accepts_virtual:  boolean
+  bio?:             string
+  phone?:           string
+  email?:           string
+}): Promise<{ id: string } | { error: string }> {
+  const { data, error } = await adminDb
+    .from('doctors')
+    .insert({ hospital_id: hospitalId, is_active: true, ...payload } as any)
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  return { id: data.id }
+}
+
 export async function assignDoctorToClinic(doctorId: string, clinicId: string): Promise<void> {
   await adminDb.from('doctors').update({ clinic_id: clinicId }).eq('id', doctorId)
 }
