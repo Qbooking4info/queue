@@ -8,6 +8,7 @@ import { Text, View, ActivityIndicator } from 'react-native'
 
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { AuthProvider, useAuth }   from './contexts/AuthContext'
+import { usePushNotifications }    from './hooks/usePushNotifications'
 
 import { SplashScreen }             from './screens/SplashScreen'
 import { LoginScreen }              from './screens/LoginScreen'
@@ -90,8 +91,9 @@ function AuthStack() {
 
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading }        = useAuth()
+  const { session, loading, user }  = useAuth()
   const { theme: t }                = useTheme()
+  usePushNotifications(user?.id)
 
   if (!splashDone) {
     return (

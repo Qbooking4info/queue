@@ -327,6 +327,12 @@ export async function markAllNotificationsRead(userId: string) {
   await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId)
 }
 
+// ── Push token ───────────────────────────────────────────────────────────────
+
+export async function savePushToken(userId: string, token: string): Promise<void> {
+  await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+}
+
 // ── User profile ─────────────────────────────────────────────────────────────
 
 export async function updateUserProfile(

@@ -659,16 +659,89 @@ export async function markNoShow(appointmentId: string): Promise<void> {
   } as any).eq('id', appointmentId)
 }
 
+async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
+    })
+  } catch { /* best-effort */ }
+}
+
+async function notifyPatient(
+  appointmentId: string,
+  type: 'confirmed' | 'cancelled',
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+) {
+  try {
+    const { data: appt } = await adminDb
+      .from('appointments')
+      .select('patient_id, booking_ref')
+      .eq('id', appointmentId)
+      .single()
+    if (!appt?.patient_id) return
+
+    const { data: patient } = await adminDb
+      .from('users')
+      .select('push_token')
+      .eq('id', appt.patient_id)
+      .single()
+
+    // In-app notification
+    await adminDb.from('notifications').insert({
+      user_id:  appt.patient_id,
+      type,
+      title,
+      body,
+      data:     { appointment_id: appointmentId, booking_ref: appt.booking_ref, ...data },
+      is_read:  false,
+      sent_via: ['in_app'],
+    } as any)
+
+    // Device push notification
+    const pushToken = (patient as any)?.push_token
+    if (pushToken) await sendExpoPush(pushToken, title, body, { appointment_id: appointmentId })
+  } catch { /* best-effort — never block the approval action */ }
+}
+
 export async function approveAppointment(appointmentId: string, note?: string): Promise<void> {
+  const { data: appt } = await adminDb
+    .from('appointments')
+    .select('booking_ref, appointment_date, hospital:hospitals!appointments_hospital_id_fkey(name), clinic:hospital_clinics!appointments_clinic_id_fkey(name)')
+    .eq('id', appointmentId)
+    .single()
+
   await adminDb.from('appointments').update({
     approval_status: 'auto_approved',
     status: 'confirmed',
     approval_note: note ?? null,
     updated_at: new Date().toISOString(),
   } as any).eq('id', appointmentId)
+
+  const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'
+  const clinicName   = (appt as any)?.clinic?.name
+  const ref          = (appt as any)?.booking_ref ?? appointmentId
+  const dateStr      = (appt as any)?.appointment_date
+    ? new Date((appt as any).appointment_date + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
+    : ''
+
+  const notifBody = clinicName
+    ? `Your booking (${ref}) at ${hospitalName} — ${clinicName} on ${dateStr} has been confirmed.`
+    : `Your booking (${ref}) at ${hospitalName} on ${dateStr} has been confirmed.`
+
+  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved ✅', notifBody)
 }
 
 export async function rejectAppointment(appointmentId: string, note: string): Promise<void> {
+  const { data: appt } = await adminDb
+    .from('appointments')
+    .select('booking_ref, hospital:hospitals!appointments_hospital_id_fkey(name)')
+    .eq('id', appointmentId)
+    .single()
+
   await adminDb.from('appointments').update({
     approval_status: 'rejected',
     status: 'cancelled',
@@ -678,6 +751,15 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
     refund_pct: 100,
     updated_at: new Date().toISOString(),
   } as any).eq('id', appointmentId)
+
+  const ref          = (appt as any)?.booking_ref ?? appointmentId
+  const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'
+
+  await notifyPatient(
+    appointmentId, 'cancelled',
+    'Booking Not Approved ❌',
+    `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. A full refund has been issued.`,
+  )
 }
 
 export async function getDailyBookingCount(
