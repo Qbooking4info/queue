@@ -1,11 +1,14 @@
 'use client'
+import { useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import Link from 'next/link'
 
 export default function DoctorsPage() {
   const { theme: C } = useTheme()
-  const { doctors, stats, loading, hospital } = useAdmin()
+  const { doctors, stats, loading, hospital, reload } = useAdmin()
+
+  useEffect(() => { reload() }, [])
 
   return (
     <div>

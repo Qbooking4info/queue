@@ -7,9 +7,9 @@ import { getAllSpecialties, createDoctor } from '@/lib/admin-api'
 import type { SpecialtyRow } from '@/lib/admin-api'
 
 export default function AddDoctorPage() {
-  const { theme: C } = useTheme()
-  const { hospital }  = useAdmin()
-  const router        = useRouter()
+  const { theme: C }       = useTheme()
+  const { hospital, reload } = useAdmin()
+  const router               = useRouter()
 
   const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
   const [saving, setSaving]           = useState(false)
@@ -56,6 +56,7 @@ export default function AddDoctorPage() {
 
     setSaving(false)
     if ('error' in result) { setError(result.error); return }
+    await reload()
     router.push('/dashboard/doctors')
   }
 
