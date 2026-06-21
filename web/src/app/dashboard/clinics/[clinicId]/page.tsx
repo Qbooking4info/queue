@@ -11,6 +11,7 @@ import {
   getClinicRangeStats, getUnassignedDoctors, assignDoctorToClinic,
   removeDoctorFromClinic, createClinicDoctor, updateAppointmentStatus,
   toggleClinicActive, deleteClinic, updateClinic,
+  approveAppointment, rejectAppointment,
 } from '@/lib/admin-api'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment,
@@ -601,14 +602,17 @@ export default function ClinicDetailPage() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState<Tab>('overview')
 
-  const [range,  setRange]  = useState<DateRangeKey>('today')
-  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('today'))
+  const [range,  setRange]  = useState<DateRangeKey>('this_week')
+  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('this_week'))
 
-  const [showAssign,    setShowAssign]    = useState(false)
-  const [showAddStaff,  setShowAddStaff]  = useState(false)
-  const [showEdit,      setShowEdit]      = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
+  const [showAssign,      setShowAssign]      = useState(false)
+  const [showAddStaff,    setShowAddStaff]    = useState(false)
+  const [showEdit,        setShowEdit]        = useState(false)
+  const [confirmDelete,   setConfirmDelete]   = useState(false)
+  const [deleting,        setDeleting]        = useState(false)
+  const [rejectClinicAppt, setRejectClinicAppt] = useState<AdminAppointment | null>(null)
+  const [rejectNote,       setRejectNote]       = useState('')
+  const [rejectSaving,     setRejectSaving]     = useState(false)
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -1202,12 +1206,27 @@ export default function ClinicDetailPage() {
             <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} label="Period" />
           </div>
 
+          {/* Pending approvals banner */}
+          {(() => {
+            const pending = appts.filter(a => a.approval_status === 'pending_approval')
+            return pending.length > 0 ? (
+              <div style={{ background: 'rgba(239,159,39,0.08)', border: '1px solid rgba(239,159,39,0.25)',
+                borderRadius: 12, padding: '10px 16px', marginBottom: 14,
+                display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⏳</span>
+                <span style={{ fontSize: 13, color: '#EF9F27', fontWeight: 700 }}>
+                  {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting your review
+                </span>
+              </div>
+            ) : null
+          })()}
+
           {/* Table */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: C.bgAlt }}>
-                  {['Date','Time','Patient','Doctor','Type','Status','Actions'].map(h => (
+                  {['Date','ID','Patient','Reason / Note','Doctor','Status','Actions'].map(h => (
                     <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11,
                       fontWeight: 700, color: C.textMuted, letterSpacing: '.06em',
                       textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`,
@@ -1222,66 +1241,166 @@ export default function ClinicDetailPage() {
                   </td></tr>
                 ) : appts.length === 0 ? (
                   <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
-                    {doctors.length === 0
-                      ? 'Add doctors to this clinic first to see appointments.'
-                      : 'No appointments for this period.'}
+                    No appointments for this period.
                   </td></tr>
-                ) : appts.map((a, i) => (
-                  <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
-                    background: i % 2 === 0 ? C.card : C.rowAlt }}>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
-                      {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
-                      <div style={{ fontSize: 11, color: C.textSub }}>
-                        {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
-                      </div>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{a.doctor_name}</div>
-                      <div style={{ fontSize: 11, color: C.textSub }}>{a.specialty_name ?? 'General'}</div>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 600,
-                        background: a.type === 'virtual' ? C.blueLight : C.accentLight,
-                        color: a.type === 'virtual' ? C.blue : C.accent }}>
-                        {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}><Badge status={a.status} /></td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {a.status !== 'cancelled' && a.status !== 'completed' && (
-                          <button onClick={async () => {
-                            await updateAppointmentStatus(a.id, 'checked_in')
-                            setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
-                          }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
-                              border: `1px solid ${col.bg.replace('0.14','0.3')}`,
-                              background: col.bg, color: col.text, cursor: 'pointer', fontWeight: 600 }}>
-                            Check In
-                          </button>
+                ) : appts.map((a, i) => {
+                  const needsApproval = a.approval_status === 'pending_approval'
+                  return (
+                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
+                      background: needsApproval
+                        ? 'rgba(239,159,39,0.04)'
+                        : i % 2 === 0 ? C.card : C.rowAlt,
+                      outline: needsApproval ? '1px solid rgba(239,159,39,0.15)' : 'none' }}>
+                      <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
+                        <div>{new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted }}>{a.start_time}</div>
+                      </td>
+                      <td style={{ padding: '11px 14px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
+                        {a.booking_ref}
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
+                        <div style={{ fontSize: 11, color: C.textSub }}>
+                          {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
+                        </div>
+                      </td>
+                      <td style={{ padding: '11px 14px', maxWidth: 200 }}>
+                        <div style={{ fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.reason ?? '—'}
+                        </div>
+                        {a.symptom_description && (
+                          <div style={{ fontSize: 11, color: '#EF9F27', marginTop: 2,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={a.symptom_description}>
+                            📋 {a.symptom_description}
+                          </div>
                         )}
-                        {(a.status === 'checked_in' || a.status === 'in_progress') && (
-                          <button onClick={async () => {
-                            await updateAppointmentStatus(a.id, 'completed')
-                            setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'completed' } : x))
-                          }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
-                              border: `1px solid ${C.border}`, background: C.card,
-                              color: C.textSub, cursor: 'pointer', fontWeight: 600 }}>
-                            Complete
-                          </button>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+                          {a.assigned_doctor_name ?? a.doctor_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textSub }}>{a.specialty_name ?? 'General'}</div>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <Badge status={a.status} />
+                        {needsApproval && (
+                          <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
+                            color: '#EF9F27', background: 'rgba(239,159,39,0.1)',
+                            borderRadius: 6, padding: '2px 6px', display: 'inline-block' }}>
+                            AWAITING REVIEW
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {/* Approve */}
+                          {needsApproval && (
+                            <button onClick={async () => {
+                              await approveAppointment(a.id)
+                              setAppts(prev => prev.map(x => x.id === a.id
+                                ? { ...x, approval_status: 'auto_approved', status: 'confirmed' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
+                                border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
+                                color: '#00E87A', fontWeight: 700 }}>
+                              Approve
+                            </button>
+                          )}
+                          {/* Reject */}
+                          {needsApproval && (
+                            <button onClick={() => { setRejectClinicAppt(a); setRejectNote('') }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
+                                border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)',
+                                color: '#f07070', fontWeight: 700 }}>
+                              Reject
+                            </button>
+                          )}
+                          {/* Check In */}
+                          {!needsApproval && !['cancelled','completed','no_show'].includes(a.status) && (
+                            <button onClick={async () => {
+                              await updateAppointmentStatus(a.id, 'checked_in')
+                              setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
+                                border: `1px solid ${col.bg.replace('0.14','0.3')}`,
+                                background: col.bg, color: col.text, cursor: 'pointer', fontWeight: 600 }}>
+                              Check In
+                            </button>
+                          )}
+                          {/* Complete */}
+                          {['checked_in','in_progress'].includes(a.status) && (
+                            <button onClick={async () => {
+                              await updateAppointmentStatus(a.id, 'completed')
+                              setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'completed' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
+                                border: `1px solid ${C.border}`, background: C.card,
+                                color: C.textSub, cursor: 'pointer', fontWeight: 600 }}>
+                              Complete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Reject modal for clinic sub-admin */}
+          {rejectClinicAppt && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              onClick={e => { if (e.target === e.currentTarget) setRejectClinicAppt(null) }}>
+              <div style={{ width: '100%', maxWidth: 420, background: C.card,
+                border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
+                boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
+                  Reject Booking
+                </div>
+                <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
+                  Patient <strong style={{ color: C.text }}>{rejectClinicAppt.patient_name}</strong> will be notified with a full refund.
+                </div>
+                <textarea
+                  value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                  placeholder="Reason for rejection (required)…" rows={3}
+                  style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                    borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
+                    outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' as const }} />
+                <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                  <button onClick={() => setRejectClinicAppt(null)}
+                    style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+                      background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                      color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!rejectNote.trim()) return
+                      setRejectSaving(true)
+                      await rejectAppointment(rejectClinicAppt.id, rejectNote.trim())
+                      setAppts(prev => prev.map(x => x.id === rejectClinicAppt.id
+                        ? { ...x, approval_status: 'rejected', status: 'cancelled' } : x))
+                      setRejectSaving(false)
+                      setRejectClinicAppt(null)
+                    }}
+                    disabled={rejectSaving || !rejectNote.trim()}
+                    style={{ flex: 1, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
+                      background: rejectNote.trim() ? 'rgba(220,60,60,0.15)' : C.bgAlt,
+                      border: rejectNote.trim() ? '1px solid rgba(220,60,60,0.3)' : `1px solid ${C.border}`,
+                      color: rejectNote.trim() ? '#f07070' : C.textMuted,
+                      fontSize: 13, fontWeight: 700,
+                      cursor: !rejectNote.trim() || rejectSaving ? 'not-allowed' : 'pointer',
+                      opacity: rejectSaving ? 0.7 : 1 }}>
+                    {rejectSaving ? 'Rejecting…' : 'Reject & Refund'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

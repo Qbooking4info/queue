@@ -15,7 +15,7 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_FILTERS = ['all','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
+const STATUS_FILTERS = ['all','pending_review','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
 
 const DOC_COLORS: Record<string, string> = {}
 const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
@@ -24,7 +24,10 @@ function docColor(name: string) {
   return DOC_COLORS[name]
 }
 function filterLabel(f: string) {
-  const m: Record<string, string> = { checked_in: 'Checked In', in_progress: 'In Progress', no_show: 'No-Show' }
+  const m: Record<string, string> = {
+    pending_review: 'Pending Review', checked_in: 'Checked In',
+    in_progress: 'In Progress', no_show: 'No-Show',
+  }
   return m[f] ?? f.charAt(0).toUpperCase() + f.slice(1)
 }
 function urgencyColor(u?: string) {
@@ -412,8 +415,8 @@ export default function AppointmentsPage() {
   const { theme: C } = useTheme()
   const { hospital } = useAdmin()
 
-  const [range,   setRange]   = useState<DateRangeKey>('today')
-  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('today'))
+  const [range,   setRange]   = useState<DateRangeKey>('this_week')
+  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('this_week'))
   const [appts,   setAppts]   = useState<AdminAppointment[]>([])
   const [doctors, setDoctors] = useState<AdminDoctor[]>([])
   const [loading, setLoading] = useState(true)
@@ -446,7 +449,7 @@ export default function AppointmentsPage() {
   async function handleApprove(appt: AdminAppointment) {
     await approveAppointment(appt.id)
     setAppts(prev => prev.map(a => a.id === appt.id
-      ? { ...a, approval_status: 'approved', status: 'confirmed' } : a))
+      ? { ...a, approval_status: 'auto_approved', status: 'confirmed' } : a))
   }
 
   async function handleNoShow(appt: AdminAppointment) {
@@ -457,11 +460,16 @@ export default function AppointmentsPage() {
   }
 
   const filtered = appts.filter(a => {
-    const mf = filter === 'all' || a.status === filter
+    const mf = filter === 'all'
+      ? true
+      : filter === 'pending_review'
+        ? a.approval_status === 'pending_approval'
+        : a.status === filter
     const ms = !search.trim() ||
       a.patient_name.toLowerCase().includes(search.toLowerCase()) ||
       a.doctor_name.toLowerCase().includes(search.toLowerCase()) ||
-      a.booking_ref.toLowerCase().includes(search.toLowerCase())
+      a.booking_ref.toLowerCase().includes(search.toLowerCase()) ||
+      (a.clinic_name ?? '').toLowerCase().includes(search.toLowerCase())
     return mf && ms
   })
 
@@ -536,7 +544,7 @@ export default function AppointmentsPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bgAlt }}>
-              {['Date','Time','ID','Patient','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
+              {['Date','Time','ID','Patient','Clinic','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700,
                   color: C.textMuted, letterSpacing: '.06em', textTransform: 'uppercase',
                   borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
@@ -545,11 +553,11 @@ export default function AppointmentsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
                 Loading appointments…
               </td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
                 No appointments match your filters.
               </td></tr>
             ) : filtered.map((a, i) => {
@@ -575,6 +583,17 @@ export default function AppointmentsPage() {
                       {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
                       {a.walkin_patient_phone ? ` · ${a.walkin_patient_phone}` : ''}
                     </div>
+                  </td>
+                  <td style={{ padding: '11px 14px' }}>
+                    {a.clinic_name ? (
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+                        background: 'rgba(180,156,240,0.12)', color: '#B49CF0',
+                        border: '1px solid rgba(180,156,240,0.25)', whiteSpace: 'nowrap' }}>
+                        {a.clinic_name}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: C.textMuted }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: '11px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
