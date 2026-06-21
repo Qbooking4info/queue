@@ -830,9 +830,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       ? (preferredDoc?.full_name ?? 'No preference — hospital assigns')
                       : 'Assigned on arrival at clinic' },
                   { label: 'Date',     value: DATES.find(d => d.iso === selectedDate)?.label ?? selectedDate },
-                  { label: 'Time',     value: bookingType === 'physical'
-                      ? (opdSlot?.label ?? '—')
-                      : (virtualSlot?.start_time ?? (preferredDoc ? '—' : 'To be confirmed by hospital')) },
+                  { label: 'Time',     value: opdSlot?.label ?? '—' },
                   { label: 'Reason',   value: reason },
                   { label: 'Priority', value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
                 ].map(row => (
