@@ -467,16 +467,16 @@ export async function getUnassignedDoctors(hospitalId: string): Promise<AdminDoc
 }
 
 export async function createDoctor(hospitalId: string, payload: {
-  full_name:        string
-  title?:           string
-  specialty_id?:    string
+  full_name:         string
+  title?:            string
+  specialty_id?:     string
   consultation_fee?: number
-  virtual_fee?:     number
+  virtual_fee?:      number
   years_experience?: number
-  accepts_virtual:  boolean
-  bio?:             string
-  phone?:           string
-  email?:           string
+  accepts_virtual:   boolean
+  bio?:              string
+  qualification?:    string
+  mdcn_number?:      string
 }): Promise<{ id: string } | { error: string }> {
   const { data, error } = await adminDb
     .from('doctors')

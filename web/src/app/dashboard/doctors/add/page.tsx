@@ -24,8 +24,8 @@ export default function AddDoctorPage() {
     years_experience: '',
     accepts_virtual:  false,
     bio:              '',
-    phone:            '',
-    email:            '',
+    qualification:    '',
+    mdcn_number:      '',
   })
 
   useEffect(() => {
@@ -45,13 +45,13 @@ export default function AddDoctorPage() {
       full_name:        form.full_name.trim(),
       title:            form.title.trim() || undefined,
       specialty_id:     form.specialty_id || undefined,
-      consultation_fee: form.consultation_fee ? Number(form.consultation_fee) : undefined,
-      virtual_fee:      form.virtual_fee     ? Number(form.virtual_fee)      : undefined,
-      years_experience: form.years_experience ? Number(form.years_experience) : undefined,
+      consultation_fee: form.consultation_fee  ? Number(form.consultation_fee)  : undefined,
+      virtual_fee:      form.virtual_fee       ? Number(form.virtual_fee)       : undefined,
+      years_experience: form.years_experience  ? Number(form.years_experience)  : undefined,
       accepts_virtual:  form.accepts_virtual,
-      bio:              form.bio.trim()   || undefined,
-      phone:            form.phone.trim() || undefined,
-      email:            form.email.trim() || undefined,
+      bio:              form.bio.trim()           || undefined,
+      qualification:    form.qualification.trim() || undefined,
+      mdcn_number:      form.mdcn_number.trim()   || undefined,
     })
 
     setSaving(false)
@@ -162,15 +162,17 @@ export default function AddDoctorPage() {
         </div>
 
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 16 }}>Contact (optional)</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 16 }}>Credentials (optional)</div>
           <div style={row}>
             <div>
-              <label style={label}>Phone</label>
-              <input value={form.phone} onChange={set('phone')} placeholder="+234 800 000 0000" style={input} />
+              <label style={label}>Qualifications</label>
+              <input value={form.qualification} onChange={set('qualification')}
+                placeholder="e.g. MBBS, FWACP" style={input} />
             </div>
             <div>
-              <label style={label}>Email</label>
-              <input type="email" value={form.email} onChange={set('email')} placeholder="doctor@example.com" style={input} />
+              <label style={label}>MDCN Number</label>
+              <input value={form.mdcn_number} onChange={set('mdcn_number')}
+                placeholder="Medical licence number" style={input} />
             </div>
           </div>
         </div>
