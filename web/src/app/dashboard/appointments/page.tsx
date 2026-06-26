@@ -42,11 +42,13 @@ function WalkInModal({
   hospitalId, doctors, onClose, onDone,
 }: { hospitalId: string; doctors: AdminDoctor[]; onClose: () => void; onDone: () => void }) {
   const { theme: C } = useTheme()
+  const [clinics,       setClinics]       = useState<{ id: string; name: string; is_opd: boolean }[]>([])
   const [patientNumber, setPatientNumber] = useState('')
   const [foundPatient,  setFoundPatient]  = useState<{ id: string; full_name: string; phone: string | null; patient_number: string } | null>(null)
   const [searching,     setSearching]     = useState(false)
   const [name,          setName]          = useState('')
   const [phone,         setPhone]         = useState('')
+  const [clinicId,      setClinicId]      = useState('')
   const [doctorId,      setDoctorId]      = useState('')
   const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
   const [time,          setTime]          = useState('09:00')
@@ -54,6 +56,13 @@ function WalkInModal({
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
   const [done,          setDone]          = useState('')
+
+  useEffect(() => {
+    fetch(`/api/clinics?hospitalId=${hospitalId}`)
+      .then(r => r.json())
+      .then(data => setClinics(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [hospitalId])
 
   async function searchByPatientNumber() {
     const q = patientNumber.trim().toUpperCase()
@@ -98,6 +107,7 @@ function WalkInModal({
         patientName:   name.trim(),
         patientPhone:  phone.trim()         || undefined,
         patientNumber: patientNumber.trim() || undefined,
+        clinicId:      clinicId             || undefined,
         doctorId:      doctorId             || undefined,
         date, startTime: time, reason: reason.trim(),
       }),
@@ -222,6 +232,18 @@ function WalkInModal({
                   placeholder="08012345678" style={inputStyle}
                   disabled={!!foundPatient} />
               </div>
+
+              {clinics.length > 0 && (
+                <div>
+                  <label style={lbl}>Clinic / Department</label>
+                  <select value={clinicId} onChange={e => setClinicId(e.target.value)} style={inputStyle}>
+                    <option value="">— General / Main Hospital —</option>
+                    {clinics.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
