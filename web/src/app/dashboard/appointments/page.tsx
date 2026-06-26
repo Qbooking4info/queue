@@ -42,15 +42,50 @@ function WalkInModal({
   hospitalId, doctors, onClose, onDone,
 }: { hospitalId: string; doctors: AdminDoctor[]; onClose: () => void; onDone: () => void }) {
   const { theme: C } = useTheme()
-  const [name,    setName]    = useState('')
-  const [phone,   setPhone]   = useState('')
-  const [doctorId, setDoctorId] = useState('')
-  const [date,    setDate]    = useState(new Date().toISOString().split('T')[0])
-  const [time,    setTime]    = useState('09:00')
-  const [reason,  setReason]  = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-  const [done,    setDone]    = useState('')
+  const [patientNumber, setPatientNumber] = useState('')
+  const [foundPatient,  setFoundPatient]  = useState<{ id: string; full_name: string; phone: string | null; patient_number: string } | null>(null)
+  const [searching,     setSearching]     = useState(false)
+  const [name,          setName]          = useState('')
+  const [phone,         setPhone]         = useState('')
+  const [doctorId,      setDoctorId]      = useState('')
+  const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
+  const [time,          setTime]          = useState('09:00')
+  const [reason,        setReason]        = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState('')
+  const [done,          setDone]          = useState('')
+
+  async function searchByPatientNumber() {
+    const q = patientNumber.trim().toUpperCase()
+    if (!q) return
+    setSearching(true); setFoundPatient(null); setError('')
+    const res = await fetch(`/api/appointments/walkin?patientNumber=${encodeURIComponent(q)}`)
+    const json = await res.json()
+    setSearching(false)
+    if (json.found) {
+      setFoundPatient(json.patient)
+      setName(json.patient.full_name)
+      setPhone(json.patient.phone ?? '')
+    } else {
+      setError(`No registered patient found with number ${q}`)
+    }
+  }
+
+  async function searchByPhone() {
+    const q = phone.trim()
+    if (!q || foundPatient) return
+    const res = await fetch(`/api/appointments/walkin?phone=${encodeURIComponent(q)}`)
+    const json = await res.json()
+    if (json.found) {
+      setFoundPatient(json.patient)
+      setName(json.patient.full_name)
+      setPatientNumber(json.patient.patient_number ?? '')
+    }
+  }
+
+  function clearPatient() {
+    setFoundPatient(null); setPatientNumber(''); setName(''); setPhone('')
+  }
 
   async function handleCreate() {
     if (!name.trim()) return
@@ -59,9 +94,11 @@ function WalkInModal({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        hospitalId, patientName: name.trim(),
-        patientPhone: phone.trim() || undefined,
-        doctorId: doctorId || undefined,
+        hospitalId,
+        patientName:   name.trim(),
+        patientPhone:  phone.trim()         || undefined,
+        patientNumber: patientNumber.trim() || undefined,
+        doctorId:      doctorId             || undefined,
         date, startTime: time, reason: reason.trim(),
       }),
     })
@@ -77,6 +114,10 @@ function WalkInModal({
     borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
   }
+  const lbl: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em',
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
@@ -85,14 +126,15 @@ function WalkInModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ width: '100%', maxWidth: 480, background: C.card,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          position: 'sticky', top: 0, background: C.card, zIndex: 1 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Walk-in Booking</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
-              Book an appointment for a patient who has presented at the facility
+              Book an appointment for a patient at the front desk
             </div>
           </div>
           <button onClick={onClose}
@@ -119,33 +161,80 @@ function WalkInModal({
             </div>
           ) : (
             <>
+              {/* Patient number lookup */}
+              <div style={{ background: C.bgAlt, borderRadius: 12, padding: 14, border: `1px solid ${C.border}` }}>
+                <label style={lbl}>Patient Number (QB-XXXXXX)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={patientNumber}
+                    onChange={e => { setPatientNumber(e.target.value.toUpperCase()); setFoundPatient(null) }}
+                    onKeyDown={e => e.key === 'Enter' && searchByPatientNumber()}
+                    placeholder="QB-001234"
+                    style={{ ...inputStyle, flex: 1 }}
+                    disabled={!!foundPatient}
+                  />
+                  {foundPatient ? (
+                    <button onClick={clearPatient}
+                      style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${C.border}`,
+                        background: C.bgAlt, color: C.textMuted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      Clear
+                    </button>
+                  ) : (
+                    <button onClick={searchByPatientNumber} disabled={!patientNumber.trim() || searching}
+                      style={{ padding: '10px 16px', borderRadius: 10, border: 'none',
+                        background: patientNumber.trim() ? C.accent : C.bgAlt,
+                        color: patientNumber.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      {searching ? '…' : 'Look up'}
+                    </button>
+                  )}
+                </div>
+                {foundPatient && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: C.accentLight ?? 'rgba(0,200,100,0.08)',
+                    borderRadius: 8, border: `1px solid ${C.accentBorder}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 16 }}>✅</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{foundPatient.full_name}</div>
+                      <div style={{ fontSize: 11, color: C.textSub }}>
+                        {foundPatient.patient_number} · {foundPatient.phone ?? 'No phone'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!foundPatient && (
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>
+                    App patients have a QB number on their profile. Leave blank for first-time or unregistered patients.
+                  </div>
+                )}
+              </div>
+
+              {/* Manual patient details */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Patient Name *</label>
+                <label style={lbl}>Patient Name *</label>
                 <input value={name} onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Chukwuemeka Obi" style={inputStyle} />
+                  placeholder="e.g. Chukwuemeka Obi" style={inputStyle}
+                  disabled={!!foundPatient} />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Phone (optional)</label>
+                <label style={lbl}>Phone (optional)</label>
                 <input value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="08012345678" style={inputStyle} />
+                  onBlur={searchByPhone}
+                  placeholder="08012345678" style={inputStyle}
+                  disabled={!!foundPatient} />
               </div>
+
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Date *</label>
+                  <label style={lbl}>Date *</label>
                   <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Time *</label>
+                  <label style={lbl}>Time *</label>
                   <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inputStyle} />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Assign Doctor (optional)</label>
+                <label style={lbl}>Assign Doctor (optional)</label>
                 <select value={doctorId} onChange={e => setDoctorId(e.target.value)} style={inputStyle}>
                   <option value="">— Assign later —</option>
                   {doctors.filter(d => d.is_active).map(d => (
@@ -156,8 +245,7 @@ function WalkInModal({
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Reason / Chief Complaint</label>
+                <label style={lbl}>Reason / Chief Complaint</label>
                 <input value={reason} onChange={e => setReason(e.target.value)}
                   placeholder="e.g. Fever and headache" style={inputStyle} />
               </div>

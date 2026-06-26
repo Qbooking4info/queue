@@ -12,11 +12,11 @@ export function ProfileScreen({ navigation }: Props) {
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [idCopied, setIdCopied]             = useState(false)
 
-  const patientId = (user as any)?.patient_id ?? null
+  const patientNumber = (user as any)?.patient_number ?? null
 
   function copyPatientId() {
-    if (!patientId) return
-    Clipboard.setString(patientId)
+    if (!patientNumber) return
+    Clipboard.setString(patientNumber)
     setIdCopied(true)
     setTimeout(() => setIdCopied(false), 2000)
   }
@@ -44,12 +44,12 @@ export function ProfileScreen({ navigation }: Props) {
           <Text style={[styles.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
           <Text style={[styles.email, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
 
-          {/* Patient ID — copyable */}
-          {patientId && (
+          {/* Patient Number — copyable */}
+          {patientNumber && (
             <TouchableOpacity onPress={copyPatientId} activeOpacity={0.7}
               style={[styles.patientIdRow, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Text style={[styles.patientIdLabel, { color: t.accent }]}>Patient ID</Text>
-              <Text style={[styles.patientIdValue, { color: t.accent }]}>{patientId}</Text>
+              <Text style={[styles.patientIdLabel, { color: t.accent }]}>Patient No.</Text>
+              <Text style={[styles.patientIdValue, { color: t.accent }]}>{patientNumber}</Text>
               <Text style={[styles.patientIdCopy, { color: idCopied ? t.accent : t.textMuted }]}>
                 {idCopied ? '✓ Copied' : '⎘'}
               </Text>

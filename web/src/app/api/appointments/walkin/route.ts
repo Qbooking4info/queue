@@ -1,53 +1,79 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
+// GET — look up a registered patient by patient_number or phone
+export async function GET(req: NextRequest) {
+  const db     = createAdminClient()
+  const { searchParams } = new URL(req.url)
+  const patientNumber = searchParams.get('patientNumber')?.trim().toUpperCase()
+  const phone         = searchParams.get('phone')?.trim()
+
+  if (!patientNumber && !phone) {
+    return NextResponse.json({ error: 'patientNumber or phone required' }, { status: 400 })
+  }
+
+  let query = db.from('users').select('id, full_name, phone, patient_number, email')
+
+  if (patientNumber) {
+    query = query.eq('patient_number', patientNumber)
+  } else {
+    query = query.eq('phone', phone!)
+  }
+
+  const { data } = await query.limit(1).single()
+  if (!data) return NextResponse.json({ found: false })
+
+  return NextResponse.json({
+    found: true,
+    patient: {
+      id:             data.id,
+      full_name:      data.full_name,
+      phone:          data.phone,
+      patient_number: data.patient_number,
+      email:          data.email,
+    },
+  })
+}
+
 // POST — front desk creates a walk-in appointment
-// Body: { hospitalId, patientName, patientPhone?, doctorId?, clinicId?, date, startTime, reason, staffId? }
+// Body: { hospitalId, patientName, patientPhone?, patientNumber?, doctorId?, clinicId?, date, startTime, reason, staffId? }
 export async function POST(req: NextRequest) {
   const db = createAdminClient()
   try {
     const body = await req.json()
     const {
-      hospitalId, patientName, patientPhone, doctorId, clinicId,
-      date, startTime, reason, staffId,
+      hospitalId, patientName, patientPhone, patientNumber,
+      doctorId, clinicId, date, startTime, reason, staffId,
     } = body
 
     if (!hospitalId || !patientName || !date || !startTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Look up or create a patient user record by phone number
+    // Try to link to a registered patient — look up by patient_number first, then phone
     let patientUserId: string | null = null
 
-    if (patientPhone) {
-      // Try to find existing user by phone
-      const { data: existing } = await db
+    if (patientNumber?.trim()) {
+      const { data } = await db
         .from('users')
         .select('id')
-        .eq('phone', patientPhone)
+        .eq('patient_number', patientNumber.trim().toUpperCase())
         .limit(1)
         .single()
-
-      if (existing) {
-        patientUserId = existing.id
-      } else {
-        // Create a minimal user record for the walk-in patient
-        const { data: authUser } = await db.auth.admin.createUser({
-          phone: patientPhone,
-          phone_confirm: true,
-          user_metadata: { full_name: patientName },
-        })
-        if (authUser?.user) {
-          const { data: newUser } = await db
-            .from('users')
-            .insert({ auth_id: authUser.user.id, full_name: patientName, phone: patientPhone })
-            .select('id')
-            .single()
-          patientUserId = newUser?.id ?? null
-        }
-      }
+      if (data) patientUserId = data.id
     }
 
+    if (!patientUserId && patientPhone?.trim()) {
+      const { data } = await db
+        .from('users')
+        .select('id')
+        .eq('phone', patientPhone.trim())
+        .limit(1)
+        .single()
+      if (data) patientUserId = data.id
+    }
+
+    // patient_id is now nullable — walk-in patients without an app account are fine
     const bookingRef = `WLK-${Date.now().toString().slice(-6)}`
 
     const { data, error } = await db
@@ -55,18 +81,18 @@ export async function POST(req: NextRequest) {
       .insert({
         hospital_id:          hospitalId,
         patient_id:           patientUserId,
-        doctor_id:            doctorId ?? null,
-        clinic_id:            clinicId ?? null,
+        doctor_id:            doctorId   ?? null,
+        clinic_id:            clinicId   ?? null,
         appointment_date:     date,
         start_time:           startTime,
         type:                 'in-person',
-        reason:               reason ?? null,
+        reason:               reason     ?? null,
         status:               'confirmed',
         booking_mode:         'walkin',
         approval_status:      'auto_approved',
         urgency:              'routine',
         booking_ref:          bookingRef,
-        booked_by_staff_id:   staffId ?? null,
+        booked_by_staff_id:   staffId    ?? null,
         walkin_patient_name:  patientName,
         walkin_patient_phone: patientPhone ?? null,
         refund_pct:           0,
@@ -75,7 +101,11 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ id: data.id, bookingRef: data.booking_ref })
+    return NextResponse.json({
+      id:         data.id,
+      bookingRef: data.booking_ref,
+      linked:     !!patientUserId,
+    })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
