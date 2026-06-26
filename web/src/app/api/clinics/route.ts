@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   // Create the clinic
   const { data: clinic, error: clinicErr } = await db
     .from('hospital_clinics')
-    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0, service_tags: serviceTags ?? [] })
+    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0, service_tags: serviceTags ?? [] } as any)
     .select('id')
     .single()
   if (clinicErr) return NextResponse.json({ error: clinicErr.message }, { status: 400 })

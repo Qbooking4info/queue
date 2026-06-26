@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'patientNumber or phone required' }, { status: 400 })
   }
 
-  let query = db.from('users').select('id, full_name, phone, patient_number, email')
+  let query = (db.from('users') as any).select('id, full_name, phone, patient_number, email')
 
   if (patientNumber) {
     query = query.eq('patient_number', patientNumber)
@@ -54,8 +54,7 @@ export async function POST(req: NextRequest) {
     let patientUserId: string | null = null
 
     if (patientNumber?.trim()) {
-      const { data } = await db
-        .from('users')
+      const { data } = await (db.from('users') as any)
         .select('id')
         .eq('patient_number', patientNumber.trim().toUpperCase())
         .limit(1)
@@ -96,7 +95,7 @@ export async function POST(req: NextRequest) {
         walkin_patient_name:  patientName,
         walkin_patient_phone: patientPhone ?? null,
         refund_pct:           0,
-      })
+      } as any)
       .select('id, booking_ref')
       .single()
 
