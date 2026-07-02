@@ -22,6 +22,8 @@ function LoginContent() {
     setError('')
     setLoading(true)
     const supabase = createClient()
+    // Clear any existing session first so old account data doesn't bleed through
+    await supabase.auth.signOut()
     const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
     if (authErr) { setError(authErr.message); setLoading(false); return }
     router.push('/dashboard')
