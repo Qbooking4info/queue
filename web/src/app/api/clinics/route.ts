@@ -1,11 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { getServerUser } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getClinicsForHospital } from '@/lib/admin-api'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getServerUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const hospitalId = new URL(req.url).searchParams.get('hospitalId')
@@ -16,8 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getServerUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const db = createAdminClient()

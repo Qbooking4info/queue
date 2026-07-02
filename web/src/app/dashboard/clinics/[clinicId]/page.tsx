@@ -668,7 +668,7 @@ export default function ClinicDetailPage() {
   }
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
-  const deskOfficers = staff.filter(s => s.role === 'desk_officer')
+  const deskOfficers = staff.filter(s => s.role === 'desk_officer' || s.role === 'front_desk')
   const todayAppts   = appts.filter(a => a.appointment_date === new Date().toISOString().split('T')[0])
 
   // analytics — specialty breakdown from aAppts

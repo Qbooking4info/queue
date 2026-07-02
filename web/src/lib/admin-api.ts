@@ -43,6 +43,7 @@ export interface AdminDoctor {
   years_experience: number | null
   avatar: string
   color: string
+  clinic_id: string | null
 }
 
 export interface AdminHospital {
@@ -86,21 +87,91 @@ function calcAge(dob: string | null): number | null {
   return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
 }
 
-export async function getHospitalIdForUser(authId: string): Promise<string | null> {
-  const { data: profile } = await adminDb
-    .from('users')
-    .select('id')
-    .eq('auth_id', authId)
-    .single()
-  if (!profile) return null
+export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk'
 
-  const { data: adminRow } = await adminDb
-    .from('hospital_admins')
-    .select('hospital_id')
-    .eq('user_id', profile.id)
+export interface UserRoleInfo {
+  role: UserRole
+  hospitalId?: string   // undefined for super_admin
+  clinicId?: string
+  doctorId?: string
+  displayName?: string
+}
+
+export async function getUserRole(authId: string): Promise<UserRoleInfo | null> {
+  // Try users table lookup
+  // Select via any to avoid type errors until is_super_admin migration runs
+  const { data: profileRaw } = await (adminDb as any)
+    .from('users')
+    .select('id, full_name, is_super_admin')
+    .eq('auth_id', authId)
+    .single() as { data: { id: string; full_name: string | null; is_super_admin: boolean } | null; error: unknown }
+  const profile = profileRaw
+
+  if (profile) {
+    // Super admin
+    if (profile.is_super_admin) {
+      return { role: 'super_admin', displayName: profile.full_name ?? undefined }
+    }
+
+    // Hospital admin
+    const { data: adminRow } = await adminDb
+      .from('hospital_admins')
+      .select('hospital_id')
+      .eq('user_id', profile.id)
+      .limit(1)
+      .single()
+    if (adminRow) return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+
+    // Clinic staff (clinic_admin / front_desk share the clinic_admins table, differentiated by role column)
+    const { data: clinicRow } = await adminDb
+      .from('clinic_admins')
+      .select('hospital_id, clinic_id, role')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+    if (clinicRow) {
+      const r = ((clinicRow as any).role ?? 'clinic_admin') as string
+      const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
+      return {
+        role: isFrontDesk ? 'front_desk' : 'clinic_admin',
+        hospitalId: clinicRow.hospital_id,
+        clinicId: (clinicRow.clinic_id as string | undefined) ?? undefined,
+        displayName: profile.full_name ?? undefined,
+      }
+    }
+  }
+
+  // Doctor (auth_user_id stored directly on doctors row)
+  const { data: doctorRow } = await (adminDb.from('doctors') as any)
+    .select('id, hospital_id, full_name')
+    .eq('auth_user_id', authId)
+    .single()
+  if (doctorRow) return { role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id, displayName: doctorRow.full_name }
+
+  // Fallback: maybe clinic_admins uses auth_user_id directly (no users row)
+  const { data: caRow } = await (adminDb.from('clinic_admins') as any)
+    .select('hospital_id, clinic_id, role')
+    .eq('auth_user_id', authId)
+    .eq('is_active', true)
     .limit(1)
     .single()
-  return adminRow?.hospital_id ?? null
+  if (caRow) {
+    const r = (caRow.role ?? 'clinic_admin') as string
+    const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
+    return {
+      role: isFrontDesk ? 'front_desk' : 'clinic_admin',
+      hospitalId: caRow.hospital_id,
+      clinicId: caRow.clinic_id ?? undefined,
+    }
+  }
+
+  return null
+}
+
+export async function getHospitalIdForUser(authId: string): Promise<string | null> {
+  const info = await getUserRole(authId)
+  return info?.hospitalId ?? null
 }
 
 export interface ClinicWithAdmin {
@@ -157,7 +228,6 @@ export async function getClinicsForHospital(hospitalId: string): Promise<ClinicW
   }) as ClinicWithAdmin[]
 }
 
-// Fallback for demo/test accounts with no hospital_admins record
 export async function getFirstHospitalId(): Promise<string | null> {
   const { data } = await adminDb
     .from('hospitals')
@@ -166,6 +236,68 @@ export async function getFirstHospitalId(): Promise<string | null> {
     .limit(1)
     .single()
   return data?.id ?? null
+}
+
+export async function getAllHospitals(): Promise<AdminHospital[]> {
+  const { data } = await adminDb
+    .from('hospitals')
+    .select('*')
+    .order('name')
+  return (data as AdminHospital[]) ?? []
+}
+
+export async function getDoctorTodayAppointments(doctorId: string): Promise<AdminAppointment[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const { data } = await adminDb
+    .from('appointments')
+    .select(`
+      id, booking_ref, appointment_date, start_time, status, type, reason,
+      patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
+      doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name))
+    `)
+    .eq('doctor_id', doctorId)
+    .eq('appointment_date', today)
+    .order('start_time')
+  if (!data) return []
+  return (data as any[]).map(a => ({
+    id: a.id, booking_ref: a.booking_ref,
+    appointment_date: a.appointment_date,
+    start_time: (a.start_time ?? '').slice(0, 5),
+    status: a.status, type: a.type, reason: a.reason,
+    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_age: calcAge(a.patient?.date_of_birth ?? null),
+    patient_gender: a.patient?.gender ?? null,
+    doctor_name: a.doctor?.full_name ?? 'Unknown',
+    doctor_id: a.doctor?.id ?? '',
+    specialty_name: a.doctor?.specialty?.name ?? null,
+  }))
+}
+
+export async function getClinicStats(hospitalId: string, clinicId: string) {
+  const today = new Date().toISOString().split('T')[0]
+  const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
+  const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
+  const orFilter = doctorIds.length > 0
+    ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+    : `clinic_id.eq.${clinicId}`
+
+  const base = () => adminDb.from('appointments').select('id', { count: 'exact', head: true })
+    .eq('hospital_id', hospitalId).eq('appointment_date', today).or(orFilter)
+
+  const [apptRes, completedRes, doctorRes] = await Promise.all([
+    base().neq('status', 'cancelled'),
+    base().eq('status', 'completed'),
+    adminDb.from('doctors').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId).eq('is_active', true),
+  ])
+
+  return {
+    todayTotal: apptRes.count ?? 0,
+    todayCompleted: completedRes.count ?? 0,
+    activeDoctors: doctorRes.count ?? 0,
+    avgRating: 0,
+    totalBookings: 0,
+    reviewCount: 0,
+  }
 }
 
 export async function getHospital(hospitalId: string): Promise<AdminHospital | null> {
@@ -250,19 +382,29 @@ export async function getRangeStats(hospitalId: string, from: string, to: string
   return { total, completed, cancelled, pending: total - completed - cancelled }
 }
 
-export async function getTodayAppointments(hospitalId: string): Promise<AdminAppointment[]> {
+export async function getTodayAppointments(hospitalId: string, clinicId?: string): Promise<AdminAppointment[]> {
   const today = new Date().toISOString().split('T')[0]
-  const { data, error } = await adminDb
+
+  let query = adminDb
     .from('appointments')
     .select(`
-      id, booking_ref, appointment_date, start_time, status, type, reason,
+      id, booking_ref, appointment_date, start_time, status, type, reason, clinic_id,
       patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name))
     `)
     .eq('hospital_id', hospitalId)
     .eq('appointment_date', today)
-    .order('start_time')
 
+  if (clinicId) {
+    const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
+    const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
+    const orFilter = doctorIds.length > 0
+      ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+      : `clinic_id.eq.${clinicId}`
+    query = (query as any).or(orFilter)
+  }
+
+  const { data, error } = await (query as any).order('start_time')
   if (error || !data) return []
 
   return (data as any[]).map(a => ({
@@ -273,6 +415,7 @@ export async function getTodayAppointments(hospitalId: string): Promise<AdminApp
     status: a.status,
     type: a.type,
     reason: a.reason,
+    clinic_id: a.clinic_id ?? null,
     patient_name: a.patient?.full_name ?? 'Unknown',
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
@@ -324,17 +467,18 @@ export async function getWeekAppointments(hospitalId: string): Promise<Record<st
   return schedule
 }
 
-export async function getDoctors(hospitalId: string): Promise<AdminDoctor[]> {
-  const { data, error } = await adminDb
+export async function getDoctors(hospitalId: string, clinicId?: string): Promise<AdminDoctor[]> {
+  let q = adminDb
     .from('doctors')
     .select(`
       id, full_name, title, avg_rating, review_count, is_active,
-      accepts_virtual, consultation_fee, years_experience,
+      accepts_virtual, consultation_fee, years_experience, clinic_id,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('hospital_id', hospitalId)
     .eq('is_active', true)
-    .order('avg_rating', { ascending: false })
+  if (clinicId) q = (q as any).eq('clinic_id', clinicId)
+  const { data, error } = await (q as any).order('avg_rating', { ascending: false })
 
   if (error || !data) return []
 
@@ -351,6 +495,7 @@ export async function getDoctors(hospitalId: string): Promise<AdminDoctor[]> {
     years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name),
     color: nameToColor(d.full_name),
+    clinic_id: d.clinic_id ?? null,
   }))
 }
 
@@ -426,7 +571,7 @@ export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]>
     .from('doctors')
     .select(`
       id, full_name, title, avg_rating, review_count, is_active,
-      accepts_virtual, consultation_fee, years_experience,
+      accepts_virtual, consultation_fee, years_experience, clinic_id,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('clinic_id', clinicId)
@@ -440,6 +585,7 @@ export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]>
     is_active: d.is_active, accepts_virtual: d.accepts_virtual,
     consultation_fee: d.consultation_fee, years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name), color: nameToColor(d.full_name),
+    clinic_id: d.clinic_id ?? null,
   }))
 }
 
@@ -694,14 +840,17 @@ export interface HospitalService {
   virtual_price: number | null
   duration_mins: number | null
   is_active:    boolean
+  clinic_id:    string | null
 }
 
-export async function getHospitalServices(hospitalId: string): Promise<HospitalService[]> {
-  const { data } = await adminDb
+export async function getHospitalServices(hospitalId: string, clinicId?: string): Promise<HospitalService[]> {
+  let q = adminDb
     .from('services')
-    .select('id, name, description, specialty_id, base_price, virtual_price, duration_mins, is_active, specialty:specialties!services_specialty_id_fkey(name)')
+    .select('id, name, description, specialty_id, base_price, virtual_price, duration_mins, is_active, clinic_id, specialty:specialties!services_specialty_id_fkey(name)')
     .eq('hospital_id', hospitalId)
-    .order('name')
+  // Clinic-scoped users see only their clinic's services (+ hospital-wide ones with no clinic)
+  if (clinicId) q = (q as any).or(`clinic_id.eq.${clinicId},clinic_id.is.null`)
+  const { data } = await (q as any).order('name')
   return ((data as any[]) ?? []).map(s => ({
     id:           s.id,
     name:         s.name,
@@ -712,15 +861,18 @@ export async function getHospitalServices(hospitalId: string): Promise<HospitalS
     virtual_price: s.virtual_price ?? null,
     duration_mins: s.duration_mins ?? null,
     is_active:    s.is_active ?? true,
+    clinic_id:    s.clinic_id ?? null,
   }))
 }
 
 export async function createService(
   hospitalId: string,
-  data: { name: string; description?: string; specialty_id?: string; base_price?: number; virtual_price?: number; duration_mins?: number }
+  data: { name: string; description?: string; specialty_id?: string; base_price?: number; virtual_price?: number; duration_mins?: number },
+  clinicId?: string
 ): Promise<{ error?: string }> {
   const { error } = await adminDb.from('services').insert({
     hospital_id:   hospitalId,
+    clinic_id:     clinicId ?? null,
     name:          data.name,
     description:   data.description ?? null,
     specialty_id:  data.specialty_id ?? null,
@@ -936,4 +1088,31 @@ export async function updateHospitalSettings(hospitalId: string, settings: {
 }): Promise<{ error: string | null }> {
   const { error } = await adminDb.from('hospitals').update(settings as any).eq('id', hospitalId)
   return { error: error?.message ?? null }
+}
+
+// ── Doctor self-service ───────────────────────────────────────────────────────
+
+export type DoctorAvailabilityStatus = 'on_duty' | 'on_break' | 'off_duty'
+
+export async function getDoctorProfile(doctorId: string): Promise<{
+  avg_rating: number
+  review_count: number
+  total_bookings: number
+  availability_status: DoctorAvailabilityStatus
+} | null> {
+  const { data } = await (adminDb.from('doctors') as any)
+    .select('avg_rating, review_count, total_bookings, availability_status')
+    .eq('id', doctorId)
+    .single()
+  if (!data) return null
+  return {
+    avg_rating:          data.avg_rating ?? 0,
+    review_count:        data.review_count ?? 0,
+    total_bookings:      data.total_bookings ?? 0,
+    availability_status: (data.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
+  }
+}
+
+export async function setDoctorAvailability(doctorId: string, status: DoctorAvailabilityStatus): Promise<void> {
+  await (adminDb.from('doctors') as any).update({ availability_status: status }).eq('id', doctorId)
 }

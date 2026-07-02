@@ -7,7 +7,8 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
 import {
-  getAppointments, updateAppointmentStatus,
+  getAppointments, getClinicAppointments,
+  updateAppointmentStatus,
   assignDoctorToAppointment, markNoShow,
   approveAppointment, rejectAppointment,
   getDoctors as getDoctorsForHospital,
@@ -50,6 +51,11 @@ function WalkInModal({
   const [phone,         setPhone]         = useState('')
   const [clinicId,      setClinicId]      = useState('')
   const [doctorId,      setDoctorId]      = useState('')
+
+  // Doctors filtered to the selected clinic; if no clinic chosen, show all
+  const availableDoctors = clinicId
+    ? doctors.filter(d => d.is_active && d.clinic_id === clinicId)
+    : doctors.filter(d => d.is_active)
   const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
   const [time,          setTime]          = useState('09:00')
   const [reason,        setReason]        = useState('')
@@ -236,7 +242,7 @@ function WalkInModal({
               {clinics.length > 0 && (
                 <div>
                   <label style={lbl}>Clinic / Department</label>
-                  <select value={clinicId} onChange={e => setClinicId(e.target.value)} style={inputStyle}>
+                  <select value={clinicId} onChange={e => { setClinicId(e.target.value); setDoctorId('') }} style={inputStyle}>
                     <option value="">— General / Main Hospital —</option>
                     {clinics.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -256,10 +262,18 @@ function WalkInModal({
                 </div>
               </div>
               <div>
-                <label style={lbl}>Assign Doctor (optional)</label>
-                <select value={doctorId} onChange={e => setDoctorId(e.target.value)} style={inputStyle}>
+                <label style={lbl}>
+                  Assign Doctor (optional)
+                  {clinicId && availableDoctors.length === 0 && (
+                    <span style={{ color: '#f07070', fontWeight: 400, marginLeft: 6, textTransform: 'none' }}>
+                      — no doctors in this clinic
+                    </span>
+                  )}
+                </label>
+                <select value={doctorId} onChange={e => setDoctorId(e.target.value)} style={inputStyle}
+                  disabled={clinicId !== '' && availableDoctors.length === 0}>
                   <option value="">— Assign later —</option>
-                  {doctors.filter(d => d.is_active).map(d => (
+                  {availableDoctors.map(d => (
                     <option key={d.id} value={d.id}>
                       {d.title ? `${d.title} ` : ''}{d.full_name}{d.specialty_name ? ` · ${d.specialty_name}` : ''}
                     </option>
@@ -311,6 +325,11 @@ function AssignDoctorModal({
   const [selected, setSelected] = useState('')
   const [saving,   setSaving]   = useState(false)
 
+  // Only show doctors from the appointment's clinic (if one is assigned)
+  const eligibleDoctors = appointment.clinic_id
+    ? doctors.filter(d => d.is_active && d.clinic_id === appointment.clinic_id)
+    : doctors.filter(d => d.is_active)
+
   async function handleAssign() {
     if (!selected) return
     setSaving(true)
@@ -338,8 +357,18 @@ function AssignDoctorModal({
             ✕
           </button>
         </div>
+        {appointment.clinic_id && (
+          <div style={{ padding: '8px 22px', background: C.bgAlt, borderBottom: `1px solid ${C.border}`,
+            fontSize: 11, color: C.textMuted }}>
+            Showing doctors registered to this appointment's clinic only
+          </div>
+        )}
         <div style={{ padding: '16px 22px', maxHeight: '55vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {doctors.filter(d => d.is_active).map(d => (
+          {eligibleDoctors.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: C.textMuted, fontSize: 13 }}>
+              No doctors registered to this clinic yet
+            </div>
+          ) : eligibleDoctors.map(d => (
             <button key={d.id} onClick={() => setSelected(d.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                 padding: '11px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
@@ -523,7 +552,7 @@ function DetailPanel({
 
 export default function AppointmentsPage() {
   const { theme: C } = useTheme()
-  const { hospital } = useAdmin()
+  const { hospital, role, clinicId: userClinicId } = useAdmin()
 
   const [range,   setRange]   = useState<DateRangeKey>('this_week')
   const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('this_week'))
@@ -538,16 +567,20 @@ export default function AppointmentsPage() {
   const [rejectAppt,  setRejectAppt]  = useState<AdminAppointment | null>(null)
   const [detailAppt,  setDetailAppt]  = useState<AdminAppointment | null>(null)
 
+  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
+
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
     const [a, d] = await Promise.all([
-      getAppointments(hospital.id, bounds.from, bounds.to),
-      getDoctorsForHospital(hospital.id),
+      isScopedToClinic
+        ? getClinicAppointments(hospital.id, userClinicId!, bounds.from, bounds.to)
+        : getAppointments(hospital.id, bounds.from, bounds.to),
+      getDoctorsForHospital(hospital.id, isScopedToClinic ? userClinicId! : undefined),
     ])
     setAppts(a); setDoctors(d)
     setLoading(false)
-  }, [hospital?.id, bounds])
+  }, [hospital?.id, bounds, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
 

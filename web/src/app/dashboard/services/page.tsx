@@ -18,9 +18,10 @@ function fmtPrice(n: number | null) {
 // ── Add / Edit Service Modal ──────────────────────────────────────────────────
 
 function ServiceModal({
-  hospitalId, allSpecialties, editing, onSave, onClose, C,
+  hospitalId, clinicId, allSpecialties, editing, onSave, onClose, C,
 }: {
   hospitalId: string
+  clinicId?: string | null
   allSpecialties: SpecialtyRow[]
   editing?: HospitalService | null
   onSave: () => void
@@ -49,7 +50,7 @@ function ServiceModal({
     }
     const res = editing
       ? await updateService(editing.id, payload)
-      : await createService(hospitalId, payload)
+      : await createService(hospitalId, payload, clinicId ?? undefined)
     setSaving(false)
     if (res.error) { setError(res.error); return }
     onSave()
@@ -252,8 +253,10 @@ function AddSpecialtyModal({
 type Tab = 'services' | 'specialties'
 
 export default function ServicesPage() {
-  const { theme: C }     = useTheme()
-  const { hospital }     = useAdmin()
+  const { theme: C }                        = useTheme()
+  const { hospital, role, clinicId: userClinicId } = useAdmin()
+
+  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
 
   const [tab,             setTab]             = useState<Tab>('services')
   const [services,        setServices]        = useState<HospitalService[]>([])
@@ -270,16 +273,25 @@ export default function ServicesPage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const [svc, spec, all] = await Promise.all([
-      getHospitalServices(hospital.id),
-      getRegisteredSpecialties(hospital.id),
-      getAllSpecialties(),
-    ])
-    setServices(svc)
-    setSpecialties(spec)
-    setAllSpecialties(all)
+    if (isScopedToClinic) {
+      const [svc, all] = await Promise.all([
+        getHospitalServices(hospital.id, userClinicId!),
+        getAllSpecialties(),
+      ])
+      setServices(svc)
+      setAllSpecialties(all)
+    } else {
+      const [svc, spec, all] = await Promise.all([
+        getHospitalServices(hospital.id),
+        getRegisteredSpecialties(hospital.id),
+        getAllSpecialties(),
+      ])
+      setServices(svc)
+      setSpecialties(spec)
+      setAllSpecialties(all)
+    }
     setLoading(false)
-  }, [hospital?.id])
+  }, [hospital?.id, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
 
@@ -309,10 +321,10 @@ export default function ServicesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
-            Services & Specialties
+            {isScopedToClinic ? 'Clinic Services' : 'Services & Specialties'}
           </div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            Manage what your hospital offers on Queue
+            {isScopedToClinic ? 'Manage services for your clinic' : 'Manage what your hospital offers on Queue'}
           </div>
         </div>
         <button
@@ -323,25 +335,27 @@ export default function ServicesPage() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
-        {(['services', 'specialties'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ padding: '8px 20px', borderRadius: 99, fontSize: 13, fontWeight: 700,
-              cursor: 'pointer', border: '1px solid', fontFamily: 'inherit',
-              background: tab === t ? C.accentLight : C.bgAlt,
-              color:      tab === t ? C.accent : C.textSub,
-              borderColor: tab === t ? C.accentBorder : C.border }}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-            <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600,
-              background: tab === t ? C.accentBorder : C.border,
-              color: tab === t ? C.accent : C.textMuted,
-              borderRadius: 99, padding: '1px 7px' }}>
-              {t === 'services' ? services.length : specialties.length}
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* Tabs — hide Specialties for clinic-scoped users */}
+      {!isScopedToClinic && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+          {(['services', 'specialties'] as Tab[]).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              style={{ padding: '8px 20px', borderRadius: 99, fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', border: '1px solid', fontFamily: 'inherit',
+                background: tab === t ? C.accentLight : C.bgAlt,
+                color:      tab === t ? C.accent : C.textSub,
+                borderColor: tab === t ? C.accentBorder : C.border }}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+              <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600,
+                background: tab === t ? C.accentBorder : C.border,
+                color: tab === t ? C.accent : C.textMuted,
+                borderRadius: 99, padding: '1px 7px' }}>
+                {t === 'services' ? services.length : specialties.length}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: C.textMuted, fontSize: 13 }}>
@@ -362,7 +376,9 @@ export default function ServicesPage() {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-              {services.map(s => (
+              {services.map(s => {
+                const canEdit = true
+                return (
                 <div key={s.id} style={{ background: C.card,
                   border: `1px solid ${s.is_active ? C.accentBorder : C.border}`,
                   borderRadius: 16, padding: 18, transition: 'border-color .2s',
@@ -378,15 +394,17 @@ export default function ServicesPage() {
                         </div>
                       )}
                     </div>
-                    {/* Active toggle */}
-                    <div onClick={() => handleToggleService(s)}
-                      style={{ width: 38, height: 21, borderRadius: 99,
-                        background: s.is_active ? C.accent : C.borderMed,
-                        position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}>
-                      <div style={{ position: 'absolute', top: 3, left: s.is_active ? 19 : 3,
-                        width: 15, height: 15, borderRadius: '50%', background: '#fff',
-                        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
-                    </div>
+                    {/* Active toggle — only if user can edit */}
+                    {canEdit && (
+                      <div onClick={() => handleToggleService(s)}
+                        style={{ width: 38, height: 21, borderRadius: 99,
+                          background: s.is_active ? C.accent : C.borderMed,
+                          position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}>
+                        <div style={{ position: 'absolute', top: 3, left: s.is_active ? 19 : 3,
+                          width: 15, height: 15, borderRadius: '50%', background: '#fff',
+                          transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                      </div>
+                    )}
                   </div>
 
                   {s.description && (
@@ -402,40 +420,47 @@ export default function ServicesPage() {
                     {s.base_price != null && (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px',
                         borderRadius: 99, background: C.accentLight, color: C.accent }}>
-                        🏥 {fmtPrice(s.base_price)}
+                        {fmtPrice(s.base_price)}
                       </span>
                     )}
                     {s.virtual_price != null && (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px',
                         borderRadius: 99, background: 'rgba(91,158,255,0.12)', color: '#5B9EFF' }}>
-                        💻 {fmtPrice(s.virtual_price)}
+                        {fmtPrice(s.virtual_price)}
                       </span>
                     )}
                     {s.duration_mins != null && (
                       <span style={{ fontSize: 11, padding: '3px 9px',
                         borderRadius: 99, background: C.bgAlt, color: C.textSub }}>
-                        ⏱ {s.duration_mins} min
+                        {s.duration_mins} min
                       </span>
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setEditService(s)}
-                      style={{ flex: 1, padding: '7px', borderRadius: 8,
-                        border: `1px solid ${C.border}`, background: C.card,
-                        color: C.textSub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Edit
-                    </button>
-                    <button onClick={() => setDeleteConfirm(s)}
-                      style={{ padding: '7px 12px', borderRadius: 8,
-                        border: '1px solid rgba(220,60,60,0.25)', background: 'rgba(220,60,60,0.06)',
-                        color: '#f07070', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Delete
-                    </button>
-                  </div>
+                  {/* Actions — locked for hospital-wide services viewed by clinic_admin */}
+                  {canEdit ? (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setEditService(s)}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8,
+                          border: `1px solid ${C.border}`, background: C.card,
+                          color: C.textSub, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Edit
+                      </button>
+                      <button onClick={() => setDeleteConfirm(s)}
+                        style={{ padding: '7px 12px', borderRadius: 8,
+                          border: '1px solid rgba(220,60,60,0.25)', background: 'rgba(220,60,60,0.06)',
+                          color: '#f07070', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: C.textMuted, fontStyle: 'italic' }}>
+                      Managed by hospital admin
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
+
             </div>
           )}
         </div>
@@ -494,6 +519,7 @@ export default function ServicesPage() {
       {(showAddService || editService) && hospital && (
         <ServiceModal
           hospitalId={hospital.id}
+          clinicId={isScopedToClinic ? userClinicId : null}
           allSpecialties={allSpecialties}
           editing={editService}
           C={C}

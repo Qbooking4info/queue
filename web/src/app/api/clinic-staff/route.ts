@@ -5,7 +5,9 @@ export async function POST(req: NextRequest) {
   const db = createAdminClient()
   try {
     const body = await req.json()
-    const { clinicId, hospitalId, staffName, staffEmail, tempPassword, role = 'desk_officer' } = body
+    const { clinicId, hospitalId, staffName, staffEmail, tempPassword, role: rawRole = 'front_desk' } = body
+    // Normalize legacy 'desk_officer' value to 'front_desk'
+    const role = rawRole === 'desk_officer' ? 'front_desk' : rawRole
 
     if (!clinicId || !hospitalId || !staffName || !staffEmail || !tempPassword) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
