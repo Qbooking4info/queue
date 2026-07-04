@@ -7,7 +7,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
 import {
-  getAppointments, getClinicAppointments,
+  getAppointments, getClinicAppointments, getDoctorAppointments,
   updateAppointmentStatus,
   assignDoctorToAppointment, markNoShow,
   approveAppointment, rejectAppointment,
@@ -552,7 +552,10 @@ function DetailPanel({
 
 export default function AppointmentsPage() {
   const { theme: C } = useTheme()
-  const { hospital, role, clinicId: userClinicId } = useAdmin()
+  const { hospital, role, clinicId: userClinicId, doctorId: userDoctorId } = useAdmin()
+
+  const isDoctor         = role === 'doctor'
+  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
 
   const [range,   setRange]   = useState<DateRangeKey>('this_week')
   const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('this_week'))
@@ -567,20 +570,23 @@ export default function AppointmentsPage() {
   const [rejectAppt,  setRejectAppt]  = useState<AdminAppointment | null>(null)
   const [detailAppt,  setDetailAppt]  = useState<AdminAppointment | null>(null)
 
-  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
-
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const [a, d] = await Promise.all([
-      isScopedToClinic
-        ? getClinicAppointments(hospital.id, userClinicId!, bounds.from, bounds.to)
-        : getAppointments(hospital.id, bounds.from, bounds.to),
-      getDoctorsForHospital(hospital.id, isScopedToClinic ? userClinicId! : undefined),
-    ])
-    setAppts(a); setDoctors(d)
+    if (isDoctor && userDoctorId) {
+      const a = await getDoctorAppointments(userDoctorId, bounds.from, bounds.to)
+      setAppts(a); setDoctors([])
+    } else {
+      const [a, d] = await Promise.all([
+        isScopedToClinic
+          ? getClinicAppointments(hospital.id, userClinicId!, bounds.from, bounds.to)
+          : getAppointments(hospital.id, bounds.from, bounds.to),
+        getDoctorsForHospital(hospital.id, isScopedToClinic ? userClinicId! : undefined),
+      ])
+      setAppts(a); setDoctors(d)
+    }
     setLoading(false)
-  }, [hospital?.id, bounds, isScopedToClinic, userClinicId])
+  }, [hospital?.id, bounds, isDoctor, userDoctorId, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
 
@@ -625,8 +631,9 @@ export default function AppointmentsPage() {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Appointments</div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            {appts.length} record{appts.length !== 1 ? 's' : ''} · all clinics
-            {pendingApproval > 0 && (
+            {appts.length} record{appts.length !== 1 ? 's' : ''}
+            {!isDoctor && ' · all clinics'}
+            {!isDoctor && pendingApproval > 0 && (
               <span style={{ marginLeft: 10, background: 'rgba(239,159,39,0.15)',
                 border: '1px solid rgba(239,159,39,0.3)', color: '#EF9F27',
                 fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
@@ -636,11 +643,13 @@ export default function AppointmentsPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowWalkIn(true)}
-            style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
-              borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            + Walk-in Booking
-          </button>
+          {!isDoctor && (
+            <button onClick={() => setShowWalkIn(true)}
+              style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              + Walk-in Booking
+            </button>
+          )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
@@ -791,8 +800,8 @@ export default function AppointmentsPage() {
                           border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted, fontWeight: 600 }}>
                         Detail
                       </button>
-                      {/* Approve / Reject */}
-                      {needsApproval && (
+                      {/* Approve / Reject — admins and front desk only */}
+                      {!isDoctor && needsApproval && (
                         <>
                           <button onClick={() => handleApprove(a)}
                             style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
@@ -808,8 +817,8 @@ export default function AppointmentsPage() {
                           </button>
                         </>
                       )}
-                      {/* Assign Doctor */}
-                      {needsAssign && (
+                      {/* Assign Doctor — admins only */}
+                      {!isDoctor && needsAssign && (
                         <button onClick={() => setAssignAppt(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
                             border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)',

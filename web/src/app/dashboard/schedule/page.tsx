@@ -22,7 +22,7 @@ function docPal(name: string) {
 
 export default function SchedulePage() {
   const { theme: C } = useTheme()
-  const { hospital } = useAdmin()
+  const { hospital, role, doctorId } = useAdmin()
   const [schedule, setSchedule] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(true)
   const isDark = C.id === 'forest'
@@ -35,9 +35,10 @@ export default function SchedulePage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    setSchedule(await getWeekAppointments(hospital.id))
+    const scopedDoctorId = role === 'doctor' && doctorId ? doctorId : undefined
+    setSchedule(await getWeekAppointments(hospital.id, scopedDoctorId))
     setLoading(false)
-  }, [hospital?.id])
+  }, [hospital?.id, role, doctorId])
 
   useEffect(() => { load() }, [load])
 

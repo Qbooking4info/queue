@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -35,7 +36,12 @@ function computeTypeBreakdown(appts: AdminAppointment[]) {
 
 export default function AnalyticsPage() {
   const { theme: C } = useTheme()
-  const { hospital, stats } = useAdmin()
+  const { hospital, stats, role } = useAdmin()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (role === 'doctor' || role === 'front_desk') router.replace('/dashboard')
+  }, [role])
 
   const [range, setRange]       = useState<DateRangeKey>('this_month')
   const [bounds, setBounds]     = useState<DateBounds>(getDateBounds('this_month'))

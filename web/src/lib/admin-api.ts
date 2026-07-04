@@ -274,6 +274,39 @@ export async function getDoctorTodayAppointments(doctorId: string): Promise<Admi
   }))
 }
 
+export async function getDoctorAppointments(doctorId: string, from: string, to: string): Promise<AdminAppointment[]> {
+  const { data } = await adminDb
+    .from('appointments')
+    .select(`
+      id, booking_ref, appointment_date, start_time, status, type, reason,
+      approval_status, clinic_id,
+      patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
+      doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
+      clinic:hospital_clinics!appointments_clinic_id_fkey(name)
+    `)
+    .eq('doctor_id', doctorId)
+    .gte('appointment_date', from)
+    .lte('appointment_date', to)
+    .order('appointment_date', { ascending: false })
+    .order('start_time')
+  if (!data) return []
+  return (data as any[]).map(a => ({
+    id: a.id, booking_ref: a.booking_ref,
+    appointment_date: a.appointment_date,
+    start_time: (a.start_time ?? '').slice(0, 5),
+    status: a.status, type: a.type, reason: a.reason,
+    approval_status: a.approval_status ?? null,
+    clinic_id: a.clinic_id ?? null,
+    clinic_name: a.clinic?.name ?? null,
+    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_age: calcAge(a.patient?.date_of_birth ?? null),
+    patient_gender: a.patient?.gender ?? null,
+    doctor_name: a.doctor?.full_name ?? 'Unknown',
+    doctor_id: a.doctor?.id ?? '',
+    specialty_name: a.doctor?.specialty?.name ?? null,
+  }))
+}
+
 export async function getClinicStats(hospitalId: string, clinicId: string) {
   const today = new Date().toISOString().split('T')[0]
   const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
@@ -426,7 +459,7 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
   }))
 }
 
-export async function getWeekAppointments(hospitalId: string): Promise<Record<string, any[]>> {
+export async function getWeekAppointments(hospitalId: string, doctorId?: string): Promise<Record<string, any[]>> {
   const today = new Date()
   const day = today.getDay()
   const monday = new Date(today)
@@ -434,7 +467,7 @@ export async function getWeekAppointments(hospitalId: string): Promise<Record<st
   const friday = new Date(monday)
   friday.setDate(monday.getDate() + 4)
 
-  const { data } = await adminDb
+  let q = adminDb
     .from('appointments')
     .select(`
       appointment_date, start_time, type, status,
@@ -446,6 +479,8 @@ export async function getWeekAppointments(hospitalId: string): Promise<Record<st
     .lte('appointment_date', friday.toISOString().split('T')[0])
     .neq('status', 'cancelled')
     .order('start_time')
+  if (doctorId) q = (q as any).eq('doctor_id', doctorId)
+  const { data } = await q
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   const schedule: Record<string, any[]> = Object.fromEntries(days.map(d => [d, []]))
