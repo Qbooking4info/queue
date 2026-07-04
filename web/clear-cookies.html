@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><title>Clear Localhost Cookies</title></head>
+<body>
+<h2>Clearing Supabase auth cookies for localhost:3000...</h2>
+<div id="status">Working...</div>
+<script>
+// This runs from the file:// origin but can't clear http://localhost cookies
+// directly — instead, it opens localhost and injects the clear script.
+const status = document.getElementById('status');
+
+// Open localhost and inject a cookie-clearing script
+const w = window.open('http://localhost:3000', '_blank');
+let attempts = 0;
+
+const check = setInterval(() => {
+  attempts++;
+  try {
+    if (w && !w.closed) {
+      w.document.cookie.split(';').forEach(c => {
+        const key = c.split('=')[0].trim();
+        if (key) {
+          w.document.cookie = key + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+        }
+      });
+      status.textContent = 'Cookies cleared! Close this window and try logging in at localhost:3000';
+      clearInterval(check);
+    }
+  } catch (e) {
+    if (attempts > 3) {
+      clearInterval(check);
+      // Fallback: open the clear-session API route
+      status.innerHTML = 'Could not auto-clear. <a href="http://localhost:3000/api/clear-session">Click here to clear session</a>';
+    }
+  }
+}, 800);
+</script>
+</body>
+</html>
