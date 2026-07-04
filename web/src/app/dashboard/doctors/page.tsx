@@ -1,30 +1,49 @@
 'use client'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import Link from 'next/link'
+import type { DoctorAvailabilityStatus } from '@/lib/admin-api'
+
+const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
+  on_duty:  { label: 'On Duty',   dot: '#22c55e', bg: 'rgba(34,197,94,0.12)',  text: '#16a34a' },
+  on_break: { label: 'On Break',  dot: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: '#d97706' },
+  off_duty: { label: 'Off Duty',  dot: '#94a3b8', bg: 'rgba(148,163,184,0.12)',text: '#64748b' },
+}
 
 export default function DoctorsPage() {
   const { theme: C } = useTheme()
-  const { doctors, stats, loading, hospital, reload } = useAdmin()
+  const { doctors, stats, loading, reload, role } = useAdmin()
+  const router = useRouter()
 
-  useEffect(() => { reload() }, [])
+  const isFrontDesk = role === 'front_desk'
+
+  useEffect(() => {
+    // Doctors (role=doctor) shouldn't access the full doctors list
+    if (role === 'doctor') { router.replace('/dashboard'); return }
+    reload()
+  }, [role])
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Doctors & Staff</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
+            {isFrontDesk ? 'Doctor Availability' : 'Doctors & Staff'}
+          </div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
             {stats.activeDoctors} practitioner{stats.activeDoctors !== 1 ? 's' : ''} registered
           </div>
         </div>
-        <Link href="/dashboard/doctors/add"
-          style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-            border: 'none', borderRadius: 10, padding: '10px 18px',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
-          + Invite Doctor
-        </Link>
+        {!isFrontDesk && (
+          <Link href="/dashboard/doctors/add"
+            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+              border: 'none', borderRadius: 10, padding: '10px 18px',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
+            + Invite Doctor
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -38,9 +57,8 @@ export default function DoctorsPage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
-          {doctors.map((d, i) => {
-            const statuses = ['Available', 'With Patient', 'On Break']
-            const status = statuses[i % statuses.length]
+          {doctors.map(d => {
+            const avail = AVAIL[d.availability_status] ?? AVAIL.on_duty
             return (
               <div key={d.id} style={{ background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 16, padding: 20, transition: 'background .3s' }}>
@@ -58,10 +76,13 @@ export default function DoctorsPage() {
                         </div>
                         <div style={{ fontSize: 12, color: C.textSub }}>{d.specialty_name ?? 'General Practice'}</div>
                       </div>
+                      {/* Real availability badge */}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
-                        background: status === 'Available' ? C.accentLight : status === 'With Patient' ? C.amberLight : C.border,
-                        color: status === 'Available' ? C.accent : status === 'With Patient' ? C.amber : C.textMuted }}>
-                        {status}
+                        background: avail.bg, color: avail.text,
+                        display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: avail.dot,
+                          display: 'inline-block', flexShrink: 0 }} />
+                        {avail.label}
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
@@ -75,32 +96,36 @@ export default function DoctorsPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-                  {[
-                    { label: 'Consult Fee', value: d.consultation_fee ? `₦${d.consultation_fee.toLocaleString()}` : '—' },
-                    { label: 'Experience',  value: d.years_experience ? `${d.years_experience}yr` : '—' },
-                    { label: 'Virtual',     value: d.accepts_virtual ? '✓ Yes' : '✗ No' },
-                  ].map(s => (
-                    <div key={s.label} style={{ background: C.bgAlt, borderRadius: 10, padding: '10px',
-                      textAlign: 'center', transition: 'background .3s' }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{s.value}</div>
-                      <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
+                {!isFrontDesk && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                    {[
+                      { label: 'Consult Fee', value: d.consultation_fee ? `₦${d.consultation_fee.toLocaleString()}` : '—' },
+                      { label: 'Experience',  value: d.years_experience ? `${d.years_experience}yr` : '—' },
+                      { label: 'Virtual',     value: d.accepts_virtual ? '✓ Yes' : '✗ No' },
+                    ].map(s => (
+                      <div key={s.label} style={{ background: C.bgAlt, borderRadius: 10, padding: '10px',
+                        textAlign: 'center', transition: 'background .3s' }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{s.value}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={{ flex: 1, padding: '9px', borderRadius: 10,
-                    border: `1px solid ${C.border}`, background: C.card,
-                    color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    View Schedule
-                  </button>
-                  <button style={{ flex: 1, padding: '9px', borderRadius: 10,
-                    border: `1px solid ${C.accentBorder}`, background: C.accentLight,
-                    color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                    Edit Profile
-                  </button>
-                </div>
+                {!isFrontDesk && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button style={{ flex: 1, padding: '9px', borderRadius: 10,
+                      border: `1px solid ${C.border}`, background: C.card,
+                      color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      View Schedule
+                    </button>
+                    <button style={{ flex: 1, padding: '9px', borderRadius: 10,
+                      border: `1px solid ${C.accentBorder}`, background: C.accentLight,
+                      color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      Edit Profile
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

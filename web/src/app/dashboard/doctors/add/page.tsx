@@ -8,7 +8,7 @@ import type { SpecialtyRow } from '@/lib/admin-api'
 
 export default function AddDoctorPage() {
   const { theme: C }                          = useTheme()
-  const { hospital, clinicId, reload }        = useAdmin()
+  const { hospital, clinicId, reload, role }  = useAdmin()
   const router                                = useRouter()
 
   const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
@@ -31,8 +31,9 @@ export default function AddDoctorPage() {
   })
 
   useEffect(() => {
+    if (role === 'front_desk' || role === 'doctor') { router.replace('/dashboard'); return }
     getAllSpecialties().then(setSpecialties)
-  }, [])
+  }, [role])
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))

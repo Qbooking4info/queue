@@ -44,6 +44,7 @@ export interface AdminDoctor {
   avatar: string
   color: string
   clinic_id: string | null
+  availability_status: DoctorAvailabilityStatus
 }
 
 export interface AdminHospital {
@@ -468,11 +469,12 @@ export async function getWeekAppointments(hospitalId: string): Promise<Record<st
 }
 
 export async function getDoctors(hospitalId: string, clinicId?: string): Promise<AdminDoctor[]> {
-  let q = adminDb
+  let q = (adminDb as any)
     .from('doctors')
     .select(`
       id, full_name, title, avg_rating, review_count, is_active,
       accepts_virtual, consultation_fee, years_experience, clinic_id,
+      availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('hospital_id', hospitalId)
@@ -496,6 +498,7 @@ export async function getDoctors(hospitalId: string, clinicId?: string): Promise
     avatar: nameToInitials(d.full_name),
     color: nameToColor(d.full_name),
     clinic_id: d.clinic_id ?? null,
+    availability_status: ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
   }))
 }
 
@@ -567,11 +570,12 @@ export async function getClinicStaff(clinicId: string): Promise<ClinicStaffMembe
 }
 
 export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]> {
-  const { data, error } = await adminDb
+  const { data, error } = await (adminDb as any)
     .from('doctors')
     .select(`
       id, full_name, title, avg_rating, review_count, is_active,
       accepts_virtual, consultation_fee, years_experience, clinic_id,
+      availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('clinic_id', clinicId)
@@ -586,6 +590,7 @@ export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]>
     consultation_fee: d.consultation_fee, years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name), color: nameToColor(d.full_name),
     clinic_id: d.clinic_id ?? null,
+    availability_status: (d.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
   }))
 }
 

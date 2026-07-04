@@ -44,7 +44,7 @@ function clearAllAuthCookies(response: NextResponse, request: NextRequest) {
     .forEach(c => response.cookies.set(c.name, '', { maxAge: 0, path: '/' }))
 }
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const { direct, chunked } = getSessionCookies(request)
 
