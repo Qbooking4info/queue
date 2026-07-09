@@ -31,6 +31,8 @@ interface AdminContextValue {
   accessDenied: boolean
   reload: () => Promise<void>
   signOut: () => Promise<void>
+  switchHospital: (h: AdminHospital) => Promise<void>
+  clearHospital: () => void
 }
 
 const AdminContext = createContext<AdminContextValue>({
@@ -38,7 +40,7 @@ const AdminContext = createContext<AdminContextValue>({
   hospital: null, allHospitals: [],
   stats: { todayTotal: 0, todayCompleted: 0, activeDoctors: 0, avgRating: 4.8, totalBookings: 0, reviewCount: 0 },
   doctors: [], todayAppointments: [], loading: true, accessDenied: false,
-  reload: async () => {}, signOut: async () => {},
+  reload: async () => {}, signOut: async () => {}, switchHospital: async () => {}, clearHospital: () => {},
 })
 
 export const useAdmin = () => useContext(AdminContext)
@@ -156,6 +158,27 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { load() }, [])
 
+  function clearHospital() {
+    setHospital(null)
+    setDoctors([])
+    setTodayAppointments([])
+    setStats({ todayTotal: 0, todayCompleted: 0, activeDoctors: 0, avgRating: 4.8, totalBookings: 0, reviewCount: 0 })
+  }
+
+  async function switchHospital(h: AdminHospital) {
+    setHospital(h)
+    setLoading(true)
+    const [s, d, a] = await Promise.all([
+      getHospitalStats(h.id),
+      getDoctors(h.id),
+      getTodayAppointments(h.id),
+    ])
+    setStats(s)
+    setDoctors(d)
+    setTodayAppointments(a)
+    setLoading(false)
+  }
+
   async function signOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -165,7 +188,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   return (
     <AdminContext.Provider value={{
       user, role, doctorId, clinicId, clinicName, doctorAvailability, hospital, allHospitals, stats, doctors,
-      todayAppointments, loading, accessDenied, reload: load, signOut,
+      todayAppointments, loading, accessDenied, reload: load, signOut, switchHospital, clearHospital,
     }}>
       {children}
     </AdminContext.Provider>

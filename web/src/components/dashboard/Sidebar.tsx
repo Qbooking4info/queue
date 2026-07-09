@@ -5,6 +5,17 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { UserRole } from '@/lib/admin-api'
 
+const SUPER_ADMIN_HOSPITAL_NAV = [
+  { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
+  { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
+  { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
+  { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
+  { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
+  { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics' },
+  { href: '/dashboard/services',     icon: '🏷️', label: 'Services' },
+  { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings' },
+]
+
 const NAV: Record<UserRole, { href: string; icon: string; label: string }[]> = {
   super_admin: [
     { href: '/dashboard',           icon: '⊞',  label: 'Platform Overview' },
@@ -59,10 +70,14 @@ export function Sidebar() {
   const pathname = usePathname()
 
   const currentRole: UserRole = role ?? 'hospital_admin'
-  let navItems = NAV[currentRole] ?? NAV.hospital_admin
+  const isSuperWithHospital = currentRole === 'super_admin' && !!hospital
 
-  // Insert Clinics after Schedule for multi-clinic hospital admins
-  if (currentRole === 'hospital_admin' && hospital?.clinic_model === 'multi') {
+  let navItems: { href: string; icon: string; label: string }[] = isSuperWithHospital
+    ? SUPER_ADMIN_HOSPITAL_NAV
+    : (NAV[currentRole] ?? NAV.hospital_admin)
+
+  // Insert Clinics after Schedule for multi-clinic hospital admins (and super_admin managing a multi-clinic hospital)
+  if ((currentRole === 'hospital_admin' || isSuperWithHospital) && hospital?.clinic_model === 'multi') {
     const schedIdx = navItems.findIndex(i => i.href === '/dashboard/schedule')
     navItems = [
       ...navItems.slice(0, schedIdx + 1),
@@ -110,25 +125,33 @@ export function Sidebar() {
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8,
-            background: currentRole === 'super_admin' ? '#1A2A4A' : '#1A4A32',
+            background: (currentRole === 'super_admin' && !hospital) ? '#1A2A4A' : '#1A4A32',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 800,
-            color: currentRole === 'super_admin' ? '#a0b8f0' : '#a0e8c0', flexShrink: 0 }}>
+            color: (currentRole === 'super_admin' && !hospital) ? '#a0b8f0' : '#a0e8c0', flexShrink: 0 }}>
             {initials}
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentRole === 'super_admin' ? 'All Hospitals' : (hospital?.name ?? 'Loading…')}
+              {(currentRole === 'super_admin' && !hospital) ? 'All Hospitals' : (hospital?.name ?? 'Loading…')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent }} />
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                {currentRole === 'super_admin' ? 'Platform Admin' : (hospital?.is_verified ? 'Verified' : 'Pending')}
+                {(currentRole === 'super_admin' && !hospital) ? 'Platform Admin' : (hospital?.is_verified ? 'Verified' : 'Pending')}
               </span>
             </div>
           </div>
         </div>
+        {/* Back to All Hospitals link when super_admin is managing a specific hospital */}
+        {isSuperWithHospital && (
+          <Link href="/dashboard/hospitals"
+            style={{ display: 'block', marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)',
+              textDecoration: 'none', fontWeight: 500 }}>
+            ← All Hospitals
+          </Link>
+        )}
       </div>
 
       {/* Nav */}
