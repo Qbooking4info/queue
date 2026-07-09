@@ -589,7 +589,7 @@ function AddStaffModal({
 export default function ClinicDetailPage() {
   const { clinicId } = useParams() as { clinicId: string }
   const { theme: C } = useTheme()
-  const { hospital, role } = useAdmin()
+  const { hospital } = useAdmin()
   const router = useRouter()
 
   const col = clinicColor(clinicId)
@@ -613,8 +613,6 @@ export default function ClinicDetailPage() {
   const [rejectClinicAppt, setRejectClinicAppt] = useState<AdminAppointment | null>(null)
   const [rejectNote,       setRejectNote]       = useState('')
   const [rejectSaving,     setRejectSaving]     = useState(false)
-  const [removingStaffId,  setRemovingStaffId]  = useState<string | null>(null)
-  const canManageStaff = role === 'hospital_admin' || role === 'super_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -667,14 +665,6 @@ export default function ClinicDetailPage() {
     const { error } = await deleteClinic(clinicId)
     setDeleting(false)
     if (!error) router.push('/dashboard/clinics')
-  }
-
-  async function removeStaff(staffId: string) {
-    if (!confirm('Remove this staff member from the clinic?')) return
-    setRemovingStaffId(staffId)
-    await fetch('/api/clinic-staff', { method: 'DELETE', body: JSON.stringify({ staffId }), headers: { 'Content-Type': 'application/json' } })
-    setStaff(prev => prev.filter(s => s.id !== staffId))
-    setRemovingStaffId(null)
   }
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
@@ -879,11 +869,11 @@ export default function ClinicDetailPage() {
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Sub-Admin</div>
-                  {canManageStaff && (
+                  {!subAdmin && (
                     <button onClick={() => setShowAddStaff(true)}
                       style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
                         cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                      {subAdmin ? '+ Replace' : '+ Assign'}
+                      + Assign
                     </button>
                   )}
                 </div>
@@ -895,7 +885,7 @@ export default function ClinicDetailPage() {
                         fontSize: 11, fontWeight: 700, color: col.text, flexShrink: 0 }}>
                         {initials(subAdmin.full_name)}
                       </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {subAdmin.full_name}
@@ -905,14 +895,6 @@ export default function ClinicDetailPage() {
                           {subAdmin.email}
                         </div>
                       </div>
-                      {canManageStaff && (
-                        <button onClick={() => removeStaff(subAdmin.id)}
-                          disabled={removingStaffId === subAdmin.id}
-                          style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none',
-                            cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>
-                          {removingStaffId === subAdmin.id ? '…' : 'Remove'}
-                        </button>
-                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
@@ -927,13 +909,11 @@ export default function ClinicDetailPage() {
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Front Desk</div>
-                  {canManageStaff && (
-                    <button onClick={() => setShowAddStaff(true)}
-                      style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
-                        cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                      + Add
-                    </button>
-                  )}
+                  <button onClick={() => setShowAddStaff(true)}
+                    style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                    + Add
+                  </button>
                 </div>
                 {deskOfficers.length === 0 ? (
                   <div style={{ padding: '12px 16px', fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
@@ -954,14 +934,6 @@ export default function ClinicDetailPage() {
                       </div>
                       <div style={{ fontSize: 10, color: C.textMuted }}>Front Desk</div>
                     </div>
-                    {canManageStaff && (
-                      <button onClick={() => removeStaff(s.id)}
-                        disabled={removingStaffId === s.id}
-                        style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none',
-                          cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>
-                        {removingStaffId === s.id ? '…' : 'Remove'}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1106,14 +1078,12 @@ export default function ClinicDetailPage() {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {staff.length} Staff Member{staff.length !== 1 ? 's' : ''} · {clinic?.name}
             </div>
-            {canManageStaff && (
-              <button onClick={() => setShowAddStaff(true)}
-                style={{ background: col.text, color: '#061208', border: 'none',
-                  borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'inherit' }}>
-                + Add Staff Member
-              </button>
-            )}
+            <button onClick={() => setShowAddStaff(true)}
+              style={{ background: col.text, color: '#061208', border: 'none',
+                borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Add Staff Member
+            </button>
           </div>
 
           {/* Sub-admin section */}
@@ -1140,18 +1110,8 @@ export default function ClinicDetailPage() {
                       : '—'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
-                    background: col.bg, color: col.text }}>Sub-Admin</span>
-                  {canManageStaff && (
-                    <button onClick={() => removeStaff(subAdmin.id)}
-                      disabled={removingStaffId === subAdmin.id}
-                      style={{ fontSize: 11, color: '#ef4444', background: 'none', border: `1px solid #ef4444`,
-                        borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                      {removingStaffId === subAdmin.id ? 'Removing…' : 'Remove'}
-                    </button>
-                  )}
-                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                  background: col.bg, color: col.text }}>Sub-Admin</span>
               </div>
             ) : (
               <div style={{ background: C.card, border: `2px dashed ${C.borderMed}`,
@@ -1159,14 +1119,12 @@ export default function ClinicDetailPage() {
                 <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
                   No sub-admin assigned to this clinic yet
                 </div>
-                {canManageStaff && (
-                  <button onClick={() => setShowAddStaff(true)}
-                    style={{ background: col.bg, color: col.text, border: 'none',
-                      borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: 'inherit' }}>
-                    Assign Sub-Admin
-                  </button>
-                )}
+                <button onClick={() => setShowAddStaff(true)}
+                  style={{ background: col.bg, color: col.text, border: 'none',
+                    borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Assign Sub-Admin
+                </button>
               </div>
             )}
           </div>
@@ -1183,14 +1141,12 @@ export default function ClinicDetailPage() {
                 <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 12 }}>
                   No front desk officers yet
                 </div>
-                {canManageStaff && (
-                  <button onClick={() => setShowAddStaff(true)}
-                    style={{ background: col.bg, color: col.text, border: 'none',
-                      borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: 'inherit' }}>
-                    Add Front Desk Officer
-                  </button>
-                )}
+                <button onClick={() => setShowAddStaff(true)}
+                  style={{ background: col.bg, color: col.text, border: 'none',
+                    borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Add Front Desk Officer
+                </button>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px,1fr))', gap: 12 }}>
@@ -1218,18 +1174,9 @@ export default function ClinicDetailPage() {
                           : '—'}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                        background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}` }}>Desk</span>
-                      {canManageStaff && (
-                        <button onClick={() => removeStaff(s.id)}
-                          disabled={removingStaffId === s.id}
-                          style={{ fontSize: 10, color: '#ef4444', background: 'none', border: `1px solid #ef4444`,
-                            borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                          {removingStaffId === s.id ? '…' : 'Remove'}
-                        </button>
-                      )}
-                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                      background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}`,
+                      flexShrink: 0 }}>Desk</span>
                   </div>
                 ))}
               </div>

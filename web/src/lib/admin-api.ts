@@ -649,7 +649,6 @@ export async function getUnassignedDoctors(hospitalId: string): Promise<AdminDoc
     is_active: d.is_active, accepts_virtual: d.accepts_virtual,
     consultation_fee: d.consultation_fee, years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name), color: nameToColor(d.full_name),
-    clinic_id: null, availability_status: 'on_duty' as const,
   }))
 }
 
@@ -911,7 +910,7 @@ export async function createService(
   data: { name: string; description?: string; specialty_id?: string; base_price?: number; virtual_price?: number; duration_mins?: number },
   clinicId?: string
 ): Promise<{ error?: string }> {
-  const { error } = await (adminDb as any).from('services').insert({
+  const { error } = await adminDb.from('services').insert({
     hospital_id:   hospitalId,
     clinic_id:     clinicId ?? null,
     name:          data.name,

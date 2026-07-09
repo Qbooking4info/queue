@@ -42,7 +42,6 @@ export default function AddDoctorPage() {
     e.preventDefault()
     if (!hospital) return
     if (!form.full_name.trim()) { setError('Full name is required'); return }
-    if (form.login_email.trim() && !form.login_password) { setError('A temporary password is required when setting a login email'); return }
     setSaving(true); setError('')
 
     const res = await fetch('/api/doctors', {
@@ -191,10 +190,10 @@ export default function AddDoctorPage() {
           </div>
         </div>
 
-        <div style={{ background: C.accentLight, border: `1.5px solid ${C.accentBorder}`, borderRadius: 16, padding: 24, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 4 }}>Doctor Portal Login Credentials</div>
-          <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>
-            Set login credentials so the doctor can access their portal to view appointments, patient queue, and schedule.
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 4 }}>Dashboard login access (optional)</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
+            Give the doctor login credentials so they can view their appointments and schedule.
           </div>
           <div style={{ ...row, marginBottom: 0 }}>
             <div>

@@ -53,21 +53,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 }
-
-export async function DELETE(req: NextRequest) {
-  const db = createAdminClient()
-  try {
-    const { staffId } = await req.json()
-    if (!staffId) return NextResponse.json({ error: 'staffId required' }, { status: 400 })
-
-    const { error } = await db
-      .from('clinic_admins')
-      .update({ is_active: false })
-      .eq('id', staffId)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ success: true })
-  } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
-  }
-}
