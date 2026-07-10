@@ -584,12 +584,370 @@ function AddStaffModal({
   )
 }
 
+// ── Manage Staff Modal ────────────────────────────────────────────────────────
+
+function ManageStaffModal({ staff, col, C, onClose, onRemoved, onUpdated }: {
+  staff: ClinicStaffMember
+  col: { bg: string; text: string }
+  C: any
+  onClose: () => void
+  onRemoved: () => void
+  onUpdated: (s: ClinicStaffMember) => void
+}) {
+  const [tab,      setTab]      = useState<'edit'|'password'>('edit')
+  const [name,     setName]     = useState(staff.full_name)
+  const [email,    setEmail]    = useState(staff.email)
+  const [password, setPassword] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+  const [success,  setSuccess]  = useState('')
+
+  const overlay: React.CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+  }
+  const card: React.CSSProperties = {
+    width: '100%', maxWidth: 460, background: C.card,
+    border: `1px solid ${C.border}`, borderRadius: 20,
+    boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
+  }
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: 10,
+    border: `1px solid ${C.border}`, background: C.bgAlt,
+    color: C.text, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+  }
+  const lbl: React.CSSProperties = {
+    display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted,
+    marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase',
+  }
+
+  async function saveProfile() {
+    setSaving(true); setError(''); setSuccess('')
+    const res = await fetch('/api/clinic-staff', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id, full_name: name, email }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Profile updated')
+    onUpdated({ ...staff, full_name: name, email })
+  }
+
+  async function savePassword() {
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setSaving(true); setError(''); setSuccess('')
+    const res = await fetch('/api/clinic-staff/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id, newPassword: password }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Password updated successfully')
+    setPassword('')
+  }
+
+  async function removeStaff() {
+    if (!confirm(`Remove ${staff.full_name} from this clinic?`)) return
+    setSaving(true)
+    await fetch('/api/clinic-staff', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id }),
+    })
+    setSaving(false)
+    onRemoved()
+  }
+
+  const roleLabel = staff.role === 'clinic_admin' ? 'Sub-Admin' : 'Front Desk'
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{staff.full_name}</div>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+              background: col.bg, color: col.text }}>{roleLabel}</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+            fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: C.bgAlt,
+          borderRadius: 10, padding: 4 }}>
+          {(['edit', 'password'] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }}
+              style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: tab === t ? C.card : 'transparent',
+                color: tab === t ? C.text : C.textMuted,
+                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.15)' : 'none' }}>
+              {t === 'edit' ? 'Edit Profile' : 'Reset Password'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'edit' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={lbl}>Full Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Login Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inp} />
+            </div>
+          </div>
+        )}
+
+        {tab === 'password' && (
+          <div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
+              Set a new password for <strong>{staff.full_name}</strong>&apos;s login account.
+              Share it with them securely.
+            </div>
+            <label style={lbl}>New Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Min. 8 characters" style={inp} />
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+            color: '#f07070', fontSize: 12 }}>{error}</div>
+        )}
+        {success && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+            color: '#4ade80', fontSize: 12 }}>{success}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button onClick={removeStaff} disabled={saving}
+            style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+              color: '#f07070', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+            Remove
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+            background: C.bgAlt, border: `1px solid ${C.border}`,
+            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
+            style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: saving ? C.border : col.text,
+              color: '#061208', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Manage Doctor Modal ───────────────────────────────────────────────────────
+
+function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
+  doctor: AdminDoctor
+  col: { bg: string; text: string }
+  C: any
+  onClose: () => void
+  onUpdated: (d: AdminDoctor) => void
+}) {
+  const [tab,      setTab]      = useState<'edit'|'password'>('edit')
+  const [name,     setName]     = useState(doctor.full_name)
+  const [title,    setTitle]    = useState(doctor.title ?? '')
+  const [fee,      setFee]      = useState(doctor.consultation_fee?.toString() ?? '')
+  const [vFee,     setVFee]     = useState('')
+  const [exp,      setExp]      = useState(doctor.years_experience?.toString() ?? '')
+  const [password, setPassword] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+  const [success,  setSuccess]  = useState('')
+
+  const overlay: React.CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+  }
+  const card: React.CSSProperties = {
+    width: '100%', maxWidth: 480, background: C.card,
+    border: `1px solid ${C.border}`, borderRadius: 20,
+    boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
+    maxHeight: '90vh', overflowY: 'auto',
+  }
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: 10,
+    border: `1px solid ${C.border}`, background: C.bgAlt,
+    color: C.text, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+  }
+  const lbl: React.CSSProperties = {
+    display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted,
+    marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase',
+  }
+
+  async function saveProfile() {
+    setSaving(true); setError(''); setSuccess('')
+    const body: Record<string, unknown> = {
+      full_name: name.trim() || undefined,
+      title: title.trim() || null,
+      consultation_fee: fee ? Number(fee) : null,
+      virtual_fee: vFee ? Number(vFee) : undefined,
+      years_experience: exp ? Number(exp) : null,
+    }
+    const res = await fetch(`/api/doctors/${doctor.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Profile updated')
+    onUpdated({ ...doctor, full_name: name.trim() || doctor.full_name,
+      title: title.trim() || null, consultation_fee: fee ? Number(fee) : doctor.consultation_fee,
+      years_experience: exp ? Number(exp) : doctor.years_experience })
+  }
+
+  async function savePassword() {
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setSaving(true); setError(''); setSuccess('')
+    const res = await fetch(`/api/doctors/${doctor.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword: password }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Password updated successfully')
+    setPassword('')
+  }
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>
+              {doctor.title ? `${doctor.title} ` : ''}{doctor.full_name}
+            </div>
+            <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{doctor.specialty_name ?? 'Doctor'}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+            fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: C.bgAlt,
+          borderRadius: 10, padding: 4 }}>
+          {(['edit', 'password'] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }}
+              style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: tab === t ? C.card : 'transparent',
+                color: tab === t ? C.text : C.textMuted,
+                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.15)' : 'none' }}>
+              {t === 'edit' ? 'Edit Profile' : 'Reset Password'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'edit' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12 }}>
+              <div>
+                <label style={lbl}>Title</label>
+                <select value={title} onChange={e => setTitle(e.target.value)} style={inp}>
+                  <option value="">None</option>
+                  {['Dr.','Prof.','Assoc. Prof.','Mr.','Mrs.','Ms.'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Full Name</label>
+                <input value={name} onChange={e => setName(e.target.value)} style={inp} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={lbl}>Consultation Fee (₦)</label>
+                <input type="number" value={fee} onChange={e => setFee(e.target.value)}
+                  placeholder="e.g. 5000" min={0} style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Years Experience</label>
+                <input type="number" value={exp} onChange={e => setExp(e.target.value)}
+                  placeholder="e.g. 8" min={0} style={inp} />
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Virtual Fee (₦) — leave blank to keep current</label>
+              <input type="number" value={vFee} onChange={e => setVFee(e.target.value)}
+                placeholder="e.g. 3000" min={0} style={inp} />
+            </div>
+          </div>
+        )}
+
+        {tab === 'password' && (
+          <div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
+              Set a new portal password for <strong>{doctor.full_name}</strong>.
+              Share the new password with the doctor securely.
+            </div>
+            <label style={lbl}>New Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Min. 8 characters" style={inp} />
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+            color: '#f07070', fontSize: 12 }}>{error}</div>
+        )}
+        {success && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+            color: '#4ade80', fontSize: 12 }}>{success}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+            background: C.bgAlt, border: `1px solid ${C.border}`,
+            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
+            style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: saving ? C.border : col.text,
+              color: '#061208', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ClinicDetailPage() {
   const { clinicId } = useParams() as { clinicId: string }
   const { theme: C } = useTheme()
-  const { hospital } = useAdmin()
+  const { hospital, role } = useAdmin()
   const router = useRouter()
 
   const col = clinicColor(clinicId)
@@ -613,6 +971,9 @@ export default function ClinicDetailPage() {
   const [rejectClinicAppt, setRejectClinicAppt] = useState<AdminAppointment | null>(null)
   const [rejectNote,       setRejectNote]       = useState('')
   const [rejectSaving,     setRejectSaving]     = useState(false)
+  const [managingStaff,    setManagingStaff]    = useState<ClinicStaffMember | null>(null)
+  const [managingDoctor,   setManagingDoctor]   = useState<AdminDoctor | null>(null)
+  const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -885,7 +1246,7 @@ export default function ClinicDetailPage() {
                         fontSize: 11, fontWeight: 700, color: col.text, flexShrink: 0 }}>
                         {initials(subAdmin.full_name)}
                       </div>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {subAdmin.full_name}
@@ -895,6 +1256,14 @@ export default function ClinicDetailPage() {
                           {subAdmin.email}
                         </div>
                       </div>
+                      {canManageStaff && (
+                        <button onClick={() => setManagingStaff(subAdmin)}
+                          style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                            borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600,
+                            fontFamily: 'inherit', flexShrink: 0 }}>
+                          Manage
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
@@ -934,6 +1303,14 @@ export default function ClinicDetailPage() {
                       </div>
                       <div style={{ fontSize: 10, color: C.textMuted }}>Front Desk</div>
                     </div>
+                    {canManageStaff && (
+                      <button onClick={() => setManagingStaff(s)}
+                        style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                          borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600,
+                          fontFamily: 'inherit', flexShrink: 0 }}>
+                        Manage
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1046,24 +1423,34 @@ export default function ClinicDetailPage() {
                       </span>
                     )}
                   </div>
-                  <button onClick={async () => {
-                    await removeDoctorFromClinic(doc.id)
-                    setDoctors(prev => prev.filter(d => d.id !== doc.id))
-                  }}
-                    style={{ width: '100%', padding: '7px', borderRadius: 8, cursor: 'pointer',
-                      background: 'transparent', border: `1px solid ${C.border}`,
-                      color: C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      transition: 'all .15s' }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(220,60,60,0.3)'
-                      ;(e.currentTarget as HTMLButtonElement).style.color = '#f07070'
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {canManageStaff && (
+                      <button onClick={() => setManagingDoctor(doc)}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                          background: col.bg, border: 'none',
+                          color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Manage
+                      </button>
+                    )}
+                    <button onClick={async () => {
+                      await removeDoctorFromClinic(doc.id)
+                      setDoctors(prev => prev.filter(d => d.id !== doc.id))
                     }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = C.border
-                      ;(e.currentTarget as HTMLButtonElement).style.color = C.textMuted
-                    }}>
-                    Remove from Clinic
-                  </button>
+                      style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                        background: 'transparent', border: `1px solid ${C.border}`,
+                        color: C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        transition: 'all .15s' }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(220,60,60,0.3)'
+                        ;(e.currentTarget as HTMLButtonElement).style.color = '#f07070'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = C.border
+                        ;(e.currentTarget as HTMLButtonElement).style.color = C.textMuted
+                      }}>
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1110,8 +1497,17 @@ export default function ClinicDetailPage() {
                       : '—'}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
-                  background: col.bg, color: col.text }}>Sub-Admin</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                    background: col.bg, color: col.text }}>Sub-Admin</span>
+                  {canManageStaff && (
+                    <button onClick={() => setManagingStaff(subAdmin)}
+                      style={{ fontSize: 11, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                        borderRadius: 8, padding: '4px 14px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                      Manage
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ background: C.card, border: `2px dashed ${C.borderMed}`,
@@ -1174,9 +1570,17 @@ export default function ClinicDetailPage() {
                           : '—'}
                       </div>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                      background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}`,
-                      flexShrink: 0 }}>Desk</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                        background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}` }}>Desk</span>
+                      {canManageStaff && (
+                        <button onClick={() => setManagingStaff(s)}
+                          style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                            borderRadius: 6, padding: '2px 10px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                          Manage
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1539,6 +1943,29 @@ export default function ClinicDetailPage() {
             setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags } : prev)
             setShowEdit(false)
           }}
+        />
+      )}
+
+      {/* ── Manage Staff Modal ───────────────────────────────────────────── */}
+      {managingStaff && (
+        <ManageStaffModal
+          staff={managingStaff}
+          col={col}
+          C={C}
+          onClose={() => setManagingStaff(null)}
+          onRemoved={() => { setStaff(prev => prev.filter(s => s.id !== managingStaff!.id)); setManagingStaff(null) }}
+          onUpdated={(updated) => { setStaff(prev => prev.map(s => s.id === updated.id ? updated : s)); setManagingStaff(null) }}
+        />
+      )}
+
+      {/* ── Manage Doctor Modal ──────────────────────────────────────────── */}
+      {managingDoctor && (
+        <ManageDoctorModal
+          doctor={managingDoctor}
+          col={col}
+          C={C}
+          onClose={() => setManagingDoctor(null)}
+          onUpdated={(updated) => { setDoctors(prev => prev.map(d => d.id === updated.id ? updated : d)); setManagingDoctor(null) }}
         />
       )}
 
