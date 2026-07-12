@@ -13,7 +13,9 @@ export type DateRangeKey =
 
 export interface DateBounds { from: string; to: string }
 
-const fmt = (d: Date) => d.toISOString().split('T')[0]
+// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
+// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 const LABELS: Record<DateRangeKey, string> = {
   today:          'Today',

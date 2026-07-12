@@ -12,12 +12,15 @@ import {
   removeDoctorFromClinic, createClinicDoctor, updateAppointmentStatus,
   toggleClinicActive, deleteClinic, updateClinic,
   approveAppointment, rejectAppointment,
+  getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
 } from '@/lib/admin-api'
 import type {
-  ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment,
+  ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
 import { adminDb } from '@/lib/supabase/admin-client'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
+import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
+import { HoursEditor } from '@/components/dashboard/HoursEditor'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -160,6 +163,113 @@ function EditClinicModal({
                 cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit Clinic Hours Modal ────────────────────────────────────────────────────
+
+function EditClinicHoursModal({
+  clinicId, hospitalHours, initialHours, initialIsCustom, col, onClose, onSave,
+}: {
+  clinicId: string
+  hospitalHours: DayHours[]
+  initialHours: DayHours[]
+  initialIsCustom: boolean
+  col: typeof CLINIC_PALETTE[0]
+  onClose: () => void
+  onSave: (hours: DayHours[], isCustom: boolean) => void
+}) {
+  const { theme: C } = useTheme()
+  const [isCustom, setIsCustom] = useState(initialIsCustom)
+  const [hours,    setHours]    = useState<DayHours[]>(initialHours)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+
+  async function handleSave() {
+    setSaving(true); setError('')
+    const { error: err } = isCustom
+      ? await updateClinicHours(clinicId, hours)
+      : await clearClinicHours(clinicId)
+    setSaving(false)
+    if (err) { setError(err); return }
+    onSave(isCustom ? hours : hospitalHours, isCustom)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+
+      <div style={{ width: '100%', maxWidth: 460, maxHeight: '85vh', overflowY: 'auto',
+        background: C.card, border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Operating Hours</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
+              Set when this clinic accepts appointments
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
+              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
+              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ key: false, label: "Use hospital's hours" }, { key: true, label: 'Custom hours' }].map(o => (
+              <button key={String(o.key)} onClick={() => setIsCustom(o.key)}
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                  border: `1px solid ${isCustom === o.key ? col.text : C.border}`,
+                  background: isCustom === o.key ? col.bg : C.bgAlt }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: isCustom === o.key ? col.text : C.text }}>
+                  {o.label}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {isCustom ? (
+            <HoursEditor hours={hours} onChange={setHours} />
+          ) : (
+            <div style={{ fontSize: 12, color: C.textSub, background: C.bgAlt,
+              border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px' }}>
+              This clinic will follow the hospital's overall operating hours (editable in Settings).
+            </div>
+          )}
+
+          {error && (
+            <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose}
+              style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
+                background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
+                background: col.text, color: '#061208',
+                border: 'none', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : 'Save Hours'}
             </button>
           </div>
         </div>
@@ -755,193 +865,6 @@ function ManageStaffModal({ staff, col, C, onClose, onRemoved, onUpdated }: {
   )
 }
 
-// ── Manage Doctor Modal ───────────────────────────────────────────────────────
-
-function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
-  doctor: AdminDoctor
-  col: { bg: string; text: string }
-  C: any
-  onClose: () => void
-  onUpdated: (d: AdminDoctor) => void
-}) {
-  const [tab,      setTab]      = useState<'edit'|'password'>('edit')
-  const [name,     setName]     = useState(doctor.full_name)
-  const [title,    setTitle]    = useState(doctor.title ?? '')
-  const [fee,      setFee]      = useState(doctor.consultation_fee?.toString() ?? '')
-  const [vFee,     setVFee]     = useState('')
-  const [exp,      setExp]      = useState(doctor.years_experience?.toString() ?? '')
-  const [password, setPassword] = useState('')
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState('')
-  const [success,  setSuccess]  = useState('')
-
-  const overlay: React.CSSProperties = {
-    position: 'fixed', inset: 0, zIndex: 1000,
-    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-  }
-  const card: React.CSSProperties = {
-    width: '100%', maxWidth: 480, background: C.card,
-    border: `1px solid ${C.border}`, borderRadius: 20,
-    boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
-    maxHeight: '90vh', overflowY: 'auto',
-  }
-  const inp: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: 10,
-    border: `1px solid ${C.border}`, background: C.bgAlt,
-    color: C.text, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
-  }
-  const lbl: React.CSSProperties = {
-    display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted,
-    marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase',
-  }
-
-  async function saveProfile() {
-    setSaving(true); setError(''); setSuccess('')
-    const body: Record<string, unknown> = {
-      full_name: name.trim() || undefined,
-      title: title.trim() || null,
-      consultation_fee: fee ? Number(fee) : null,
-      virtual_fee: vFee ? Number(vFee) : undefined,
-      years_experience: exp ? Number(exp) : null,
-    }
-    const res = await fetch(`/api/doctors/${doctor.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (data.error) { setError(data.error); return }
-    setSuccess('Profile updated')
-    onUpdated({ ...doctor, full_name: name.trim() || doctor.full_name,
-      title: title.trim() || null, consultation_fee: fee ? Number(fee) : doctor.consultation_fee,
-      years_experience: exp ? Number(exp) : doctor.years_experience })
-  }
-
-  async function savePassword() {
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
-    setSaving(true); setError(''); setSuccess('')
-    const res = await fetch(`/api/doctors/${doctor.id}/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newPassword: password }),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (data.error) { setError(data.error); return }
-    setSuccess('Password updated successfully')
-    setPassword('')
-  }
-
-  return (
-    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>
-              {doctor.title ? `${doctor.title} ` : ''}{doctor.full_name}
-            </div>
-            <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{doctor.specialty_name ?? 'Doctor'}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
-            fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: C.bgAlt,
-          borderRadius: 10, padding: 4 }}>
-          {(['edit', 'password'] as const).map(t => (
-            <button key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }}
-              style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: tab === t ? C.card : 'transparent',
-                color: tab === t ? C.text : C.textMuted,
-                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.15)' : 'none' }}>
-              {t === 'edit' ? 'Edit Profile' : 'Reset Password'}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'edit' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12 }}>
-              <div>
-                <label style={lbl}>Title</label>
-                <select value={title} onChange={e => setTitle(e.target.value)} style={inp}>
-                  <option value="">None</option>
-                  {['Dr.','Prof.','Assoc. Prof.','Mr.','Mrs.','Ms.'].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Full Name</label>
-                <input value={name} onChange={e => setName(e.target.value)} style={inp} />
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={lbl}>Consultation Fee (₦)</label>
-                <input type="number" value={fee} onChange={e => setFee(e.target.value)}
-                  placeholder="e.g. 5000" min={0} style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Years Experience</label>
-                <input type="number" value={exp} onChange={e => setExp(e.target.value)}
-                  placeholder="e.g. 8" min={0} style={inp} />
-              </div>
-            </div>
-            <div>
-              <label style={lbl}>Virtual Fee (₦) — leave blank to keep current</label>
-              <input type="number" value={vFee} onChange={e => setVFee(e.target.value)}
-                placeholder="e.g. 3000" min={0} style={inp} />
-            </div>
-          </div>
-        )}
-
-        {tab === 'password' && (
-          <div>
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
-              Set a new portal password for <strong>{doctor.full_name}</strong>.
-              Share the new password with the doctor securely.
-            </div>
-            <label style={lbl}>New Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Min. 8 characters" style={inp} />
-          </div>
-        )}
-
-        {error && (
-          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
-            background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-            color: '#f07070', fontSize: 12 }}>{error}</div>
-        )}
-        {success && (
-          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
-            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
-            color: '#4ade80', fontSize: 12 }}>{success}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-            background: C.bgAlt, border: `1px solid ${C.border}`,
-            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
-            style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: saving ? C.border : col.text,
-              color: '#061208', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-              opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ClinicDetailPage() {
@@ -973,6 +896,10 @@ export default function ClinicDetailPage() {
   const [rejectSaving,     setRejectSaving]     = useState(false)
   const [managingStaff,    setManagingStaff]    = useState<ClinicStaffMember | null>(null)
   const [managingDoctor,   setManagingDoctor]   = useState<AdminDoctor | null>(null)
+  const [clinicHours,      setClinicHours]      = useState<DayHours[]>([])
+  const [hospitalHours,    setHospitalHours]    = useState<DayHours[]>([])
+  const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
+  const [showHours,        setShowHours]        = useState(false)
   const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
 
   // analytics range — separate from appointments range
@@ -984,18 +911,23 @@ export default function ClinicDetailPage() {
   const load = useCallback(async () => {
     if (!clinicId || !hospital?.id) return
     setLoading(true)
-    const [c, d, s, a, st] = await Promise.all([
+    const [c, d, s, a, st, ch, hh] = await Promise.all([
       getClinicDetail(clinicId),
       getClinicDoctors(clinicId),
       getClinicStaff(clinicId),
       getClinicAppointments(hospital.id, clinicId, bounds.from, bounds.to),
       getClinicRangeStats(hospital.id, clinicId, bounds.from, bounds.to),
+      getClinicHours(clinicId),
+      getHospitalHours(hospital.id),
     ])
     setClinic(c)
     setDoctors(d)
     setStaff(s)
     setAppts(a)
     setStats(st)
+    setClinicHours(ch.hours)
+    setHoursIsCustom(ch.isCustom)
+    setHospitalHours(hh)
     setLoading(false)
   }, [clinicId, hospital?.id, bounds])
 
@@ -1342,6 +1274,33 @@ export default function ClinicDetailPage() {
                         </span>
                       ))}
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Operating hours */}
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Operating Hours</div>
+                  {canManageStaff && (
+                    <button onClick={() => setShowHours(true)}
+                      style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                        cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                      Manage
+                    </button>
+                  )}
+                </div>
+                <div style={{ padding: '12px 16px', fontSize: 12, color: C.textSub }}>
+                  {hoursIsCustom ? (
+                    (() => {
+                      const open = clinicHours.filter(h => !h.closed)
+                      if (open.length === 0) return 'Closed every day'
+                      const DAY_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                      return open.map(h => `${DAY_LABELS[h.day]} ${h.open}–${h.close}`).join(' · ')
+                    })()
+                  ) : (
+                    <span style={{ fontStyle: 'italic', color: C.textMuted }}>Using hospital's hours</span>
                   )}
                 </div>
               </div>
@@ -1942,6 +1901,23 @@ export default function ClinicDetailPage() {
           onSave={(name, description, serviceTags) => {
             setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags } : prev)
             setShowEdit(false)
+          }}
+        />
+      )}
+
+      {/* ── Edit Clinic Hours Modal ─────────────────────────────────────────── */}
+      {showHours && (
+        <EditClinicHoursModal
+          clinicId={clinicId}
+          hospitalHours={hospitalHours}
+          initialHours={clinicHours}
+          initialIsCustom={hoursIsCustom}
+          col={col}
+          onClose={() => setShowHours(false)}
+          onSave={(hours, isCustom) => {
+            setClinicHours(hours)
+            setHoursIsCustom(isCustom)
+            setShowHours(false)
           }}
         />
       )}

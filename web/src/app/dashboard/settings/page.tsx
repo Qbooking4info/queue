@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import { getHospitalSettings, updateHospitalSettings } from '@/lib/admin-api'
+import { getHospitalSettings, updateHospitalSettings, getHospitalHours, updateHospitalHours } from '@/lib/admin-api'
+import type { DayHours } from '@/lib/admin-api'
+import { HoursEditor } from '@/components/dashboard/HoursEditor'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ export default function SettingsPage() {
   const [requiresRef,   setRequiresRef]   = useState(false)
   const [dailyLimit,    setDailyLimit]    = useState<string>('')
   const [opdFee,        setOpdFee]        = useState<string>('0')
+  const [hours,         setHours]         = useState<DayHours[]>([])
 
   // Notification preferences
   const [smsReminder,   setSmsReminder]   = useState(true)
@@ -61,14 +64,16 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!hospital?.id) return
-    getHospitalSettings(hospital.id).then(s => {
-      if (!s) return
-      setVirtual(s.accepts_virtual ?? false)
-      setEmergency(s.emergency_hours ?? false)
-      setApprovalMode((s.approval_mode ?? 'auto') as 'auto' | 'manual')
-      setRequiresRef(s.requires_referral ?? false)
-      setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
-      setOpdFee(String(s.opd_fee ?? 0))
+    Promise.all([getHospitalSettings(hospital.id), getHospitalHours(hospital.id)]).then(([s, h]) => {
+      if (s) {
+        setVirtual(s.accepts_virtual ?? false)
+        setEmergency(s.emergency_hours ?? false)
+        setApprovalMode((s.approval_mode ?? 'auto') as 'auto' | 'manual')
+        setRequiresRef(s.requires_referral ?? false)
+        setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
+        setOpdFee(String(s.opd_fee ?? 0))
+      }
+      setHours(h)
       setLoading(false)
     })
   }, [hospital?.id])
@@ -76,16 +81,19 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!hospital?.id) return
     setSaving(true); setSaveErr('')
-    const { error } = await updateHospitalSettings(hospital.id, {
-      accepts_virtual:     virtual,
-      emergency_hours:     emergency,
-      approval_mode:       approvalMode,
-      requires_referral:   requiresRef,
-      daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
-      opd_fee:             parseInt(opdFee) || 0,
-    })
+    const [{ error }, { error: hoursError }] = await Promise.all([
+      updateHospitalSettings(hospital.id, {
+        accepts_virtual:     virtual,
+        emergency_hours:     emergency,
+        approval_mode:       approvalMode,
+        requires_referral:   requiresRef,
+        daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
+        opd_fee:             parseInt(opdFee) || 0,
+      }),
+      updateHospitalHours(hospital.id, hours),
+    ])
     setSaving(false)
-    if (error) { setSaveErr(error); return }
+    if (error || hoursError) { setSaveErr(error ?? hoursError ?? 'Failed to save'); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -176,6 +184,14 @@ export default function SettingsPage() {
               <Toggle value={requiresRef} onChange={() => setRequiresRef(v => !v)}
                 label="Require Referral / Evidence"
                 sub="Patients must upload referral letter or describe symptoms for manual-approval bookings" />
+            </SectionCard>
+
+            {/* Operating Hours */}
+            <SectionCard title="Operating Hours">
+              <div style={{ fontSize: 12, color: C.textSub, marginBottom: 12 }}>
+                Drives the Schedule page grid and which days patients can book. Include weekends here if you're open.
+              </div>
+              <HoursEditor hours={hours} onChange={setHours} />
             </SectionCard>
 
             {/* Volume & Fees */}

@@ -1,10 +1,11 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import Link from 'next/link'
-import type { DoctorAvailabilityStatus } from '@/lib/admin-api'
+import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
+import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 
 const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
   on_duty:  { label: 'On Duty',   dot: '#22c55e', bg: 'rgba(34,197,94,0.12)',  text: '#16a34a' },
@@ -16,6 +17,7 @@ export default function DoctorsPage() {
   const { theme: C } = useTheme()
   const { doctors, stats, loading, reload, role } = useAdmin()
   const router = useRouter()
+  const [managingDoctor, setManagingDoctor] = useState<AdminDoctor | null>(null)
 
   const isFrontDesk = role === 'front_desk'
 
@@ -119,7 +121,8 @@ export default function DoctorsPage() {
                       color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                       View Schedule
                     </button>
-                    <button style={{ flex: 1, padding: '9px', borderRadius: 10,
+                    <button onClick={() => setManagingDoctor(d)}
+                      style={{ flex: 1, padding: '9px', borderRadius: 10,
                       border: `1px solid ${C.accentBorder}`, background: C.accentLight,
                       color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                       Edit Profile
@@ -130,6 +133,16 @@ export default function DoctorsPage() {
             )
           })}
         </div>
+      )}
+
+      {managingDoctor && (
+        <ManageDoctorModal
+          doctor={managingDoctor}
+          col={{ bg: C.accentLight, text: C.accent }}
+          C={C}
+          onClose={() => setManagingDoctor(null)}
+          onUpdated={() => { reload(); setManagingDoctor(null) }}
+        />
       )}
     </div>
   )

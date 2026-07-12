@@ -459,45 +459,70 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
   }))
 }
 
-export async function getWeekAppointments(hospitalId: string, doctorId?: string): Promise<Record<string, any[]>> {
-  const today = new Date()
-  const day = today.getDay()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1))
-  const friday = new Date(monday)
-  friday.setDate(monday.getDate() + 4)
+export interface ScheduleSlot {
+  id: string
+  date: string
+  time: string
+  doc: string
+  patient: string
+  type: string
+  status: string
+}
+
+// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
+// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export async function getWeekAppointments(
+  hospitalId: string,
+  weekStart?: string,
+  opts?: { doctorId?: string; clinicId?: string },
+): Promise<Record<string, ScheduleSlot[]>> {
+  const anchor = weekStart ? new Date(weekStart + 'T00:00:00') : new Date()
+  const day = anchor.getDay()
+  const monday = new Date(anchor)
+  monday.setDate(anchor.getDate() - (day === 0 ? 6 : day - 1))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
 
   let q = adminDb
     .from('appointments')
     .select(`
-      appointment_date, start_time, type, status,
+      id, appointment_date, start_time, type, status,
       patient:users!appointments_patient_id_fkey(full_name),
       doctor:doctors!appointments_doctor_id_fkey(full_name)
     `)
     .eq('hospital_id', hospitalId)
-    .gte('appointment_date', monday.toISOString().split('T')[0])
-    .lte('appointment_date', friday.toISOString().split('T')[0])
+    .gte('appointment_date', fmtLocalDate(monday))
+    .lte('appointment_date', fmtLocalDate(sunday))
     .neq('status', 'cancelled')
     .order('start_time')
-  if (doctorId) q = (q as any).eq('doctor_id', doctorId)
+  if (opts?.doctorId) q = (q as any).eq('doctor_id', opts.doctorId)
+  if (opts?.clinicId) q = (q as any).eq('clinic_id', opts.clinicId)
   const { data } = await q
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-  const schedule: Record<string, any[]> = Object.fromEntries(days.map(d => [d, []]))
+  const schedule: Record<string, ScheduleSlot[]> = {}
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i)
+    schedule[fmtLocalDate(d)] = []
+  }
 
   if (!data) return schedule
 
   ;(data as any[]).forEach(a => {
-    const date = new Date(a.appointment_date + 'T00:00:00')
-    const dayIdx = date.getDay() - 1
-    if (dayIdx >= 0 && dayIdx < 5) {
-      schedule[days[dayIdx]].push({
-        time: (a.start_time ?? '').slice(0, 5),
-        doc: a.doctor?.full_name ?? 'Doctor',
-        patient: a.patient?.full_name ?? 'Patient',
-        type: a.type,
-      })
-    }
+    const bucket = schedule[a.appointment_date]
+    if (!bucket) return
+    bucket.push({
+      id: a.id,
+      date: a.appointment_date,
+      time: (a.start_time ?? '').slice(0, 5),
+      doc: a.doctor?.full_name ?? 'Doctor',
+      patient: a.patient?.full_name ?? 'Patient',
+      type: a.type,
+      status: a.status,
+    })
   })
 
   return schedule
@@ -1128,6 +1153,70 @@ export async function updateHospitalSettings(hospitalId: string, settings: {
   emergency_hours?: boolean
 }): Promise<{ error: string | null }> {
   const { error } = await adminDb.from('hospitals').update(settings as any).eq('id', hospitalId)
+  return { error: error?.message ?? null }
+}
+
+// ── Operating hours (hospital-wide + per-clinic) ────────────────────────────────
+
+export interface DayHours { day: number; open: string; close: string; closed: boolean }
+
+// Mirrors onboarding's defaultHours: Mon–Sat 08:00–18:00 open, Sunday closed
+function defaultHours(): DayHours[] {
+  return Array.from({ length: 7 }, (_, day) => ({
+    day, open: '08:00', close: '18:00', closed: day === 0,
+  }))
+}
+
+function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
+  const byDay = new Map(rows.map(r => [r.day_of_week, r]))
+  return defaultHours().map(d => {
+    const r = byDay.get(d.day)
+    if (!r) return d
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+  })
+}
+
+export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> {
+  const { data } = await (adminDb as any)
+    .from('hospital_operating_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('hospital_id', hospitalId)
+  return fillHours(data ?? [])
+}
+
+export async function updateHospitalHours(hospitalId: string, hours: DayHours[]): Promise<{ error: string | null }> {
+  const rows = hours.map(h => ({
+    hospital_id: hospitalId, day_of_week: h.day,
+    open_time: h.open, close_time: h.close, is_closed: h.closed,
+  }))
+  const { error } = await (adminDb as any)
+    .from('hospital_operating_hours')
+    .upsert(rows, { onConflict: 'hospital_id,day_of_week' })
+  return { error: error?.message ?? null }
+}
+
+export async function getClinicHours(clinicId: string): Promise<{ hours: DayHours[]; isCustom: boolean }> {
+  const { data } = await (adminDb as any)
+    .from('hospital_clinic_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('clinic_id', clinicId)
+  const rows = data ?? []
+  return { hours: fillHours(rows), isCustom: rows.length > 0 }
+}
+
+export async function updateClinicHours(clinicId: string, hours: DayHours[]): Promise<{ error: string | null }> {
+  const rows = hours.map(h => ({
+    clinic_id: clinicId, day_of_week: h.day,
+    open_time: h.open, close_time: h.close, is_closed: h.closed,
+  }))
+  const { error } = await (adminDb as any)
+    .from('hospital_clinic_hours')
+    .upsert(rows, { onConflict: 'clinic_id,day_of_week' })
+  return { error: error?.message ?? null }
+}
+
+export async function clearClinicHours(clinicId: string): Promise<{ error: string | null }> {
+  const { error } = await (adminDb as any).from('hospital_clinic_hours').delete().eq('clinic_id', clinicId)
   return { error: error?.message ?? null }
 }
 
