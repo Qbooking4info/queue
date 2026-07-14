@@ -62,8 +62,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   async function load() {
     let session: any = null
+    let supabase: any = null
     try {
-      const supabase = createClient()
+      supabase = createClient()
       const result = await supabase.auth.getSession()
       session = result?.data?.session ?? null
     } catch {
@@ -81,7 +82,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     setUser({ id: session.user.id, email: session.user.email ?? '' })
 
-    const roleInfo = await getUserRole(session.user.id)
+    // Pass the authenticated client so getUserRole queries run with the user's
+    // session — this satisfies RLS without requiring a service role key in the browser.
+    const roleInfo = await getUserRole(session.user.id, supabase)
     if (!roleInfo) {
       setAccessDenied(true)
       setLoading(false)

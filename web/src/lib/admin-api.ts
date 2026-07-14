@@ -121,10 +121,14 @@ export interface UserRoleInfo {
   displayName?: string
 }
 
-export async function getUserRole(authId: string): Promise<UserRoleInfo | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getUserRole(authId: string, authedClient?: any): Promise<UserRoleInfo | null> {
+  // Use the caller's authenticated client when provided (satisfies RLS without service key).
+  // Fall back to adminDb for server-side callers that already have the service role.
+  const db = authedClient ?? adminDb
+
   // Try users table lookup
-  // Select via any to avoid type errors until is_super_admin migration runs
-  const { data: profileRaw } = await (adminDb as any)
+  const { data: profileRaw } = await (db as any)
     .from('users')
     .select('id, full_name, is_super_admin')
     .eq('auth_id', authId)
@@ -138,7 +142,7 @@ export async function getUserRole(authId: string): Promise<UserRoleInfo | null> 
     }
 
     // Hospital admin
-    const { data: adminRow } = await adminDb
+    const { data: adminRow } = await (db as any)
       .from('hospital_admins')
       .select('hospital_id')
       .eq('user_id', profile.id)
@@ -147,7 +151,7 @@ export async function getUserRole(authId: string): Promise<UserRoleInfo | null> 
     if (adminRow) return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
 
     // Clinic staff (clinic_admin / front_desk share the clinic_admins table, differentiated by role column)
-    const { data: clinicRow } = await adminDb
+    const { data: clinicRow } = await (db as any)
       .from('clinic_admins')
       .select('hospital_id, clinic_id, role')
       .eq('user_id', profile.id)
@@ -167,14 +171,16 @@ export async function getUserRole(authId: string): Promise<UserRoleInfo | null> 
   }
 
   // Doctor (auth_user_id stored directly on doctors row)
-  const { data: doctorRow } = await (adminDb.from('doctors') as any)
+  const { data: doctorRow } = await (db as any)
+    .from('doctors')
     .select('id, hospital_id, full_name')
     .eq('auth_user_id', authId)
     .single()
   if (doctorRow) return { role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id, displayName: doctorRow.full_name }
 
-  // Fallback: maybe clinic_admins uses auth_user_id directly (no users row)
-  const { data: caRow } = await (adminDb.from('clinic_admins') as any)
+  // Fallback: clinic_admins with auth_user_id directly (no users row)
+  const { data: caRow } = await (db as any)
+    .from('clinic_admins')
     .select('hospital_id, clinic_id, role')
     .eq('auth_user_id', authId)
     .eq('is_active', true)
