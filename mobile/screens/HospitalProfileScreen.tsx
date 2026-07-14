@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Alert } from 'react-native'
+import MapView, { Marker } from 'react-native-maps'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -28,6 +29,22 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
   function bookVirtual() {
     navigation.navigate('BookingFlow', { hospital, bookingType: 'virtual' })
+  }
+
+  function openDirections() {
+    const lat = hospital.latitude
+    const lng = hospital.longitude
+    const label = encodeURIComponent(hospital.name)
+    if (lat != null && lng != null) {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`
+      Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open Google Maps'))
+    } else if (hospital.address) {
+      const addr = encodeURIComponent(`${hospital.address}, ${hospital.city ?? ''}`)
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${addr}`)
+        .catch(() => Alert.alert('Error', 'Could not open Google Maps'))
+    } else {
+      Alert.alert('No location', 'This hospital has not set a map location yet.')
+    }
   }
 
   return (
@@ -147,20 +164,55 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
           </View>
         ))}
 
-        {tab === 'info' && [
-          { label: 'Address',      value: (hospital as any).address ?? 'See directions' },
-          { label: 'Phone',        value: (hospital as any).phone   ?? 'Contact hospital' },
-          { label: 'City',         value: (hospital as any).city    ?? hospital.distance },
-          { label: 'Daily Limit',  value: hospital.daily_booking_limit ? `${hospital.daily_booking_limit} bookings/day` : 'No limit' },
-          { label: 'OPD Fee',      value: hospital.opd_fee ? `₦${hospital.opd_fee.toLocaleString()}` : 'Free' },
-          { label: 'Approval',     value: hospital.approval_mode === 'manual' ? 'Manual review required' : 'Instant confirmation' },
-          { label: 'Emergency',    value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
-        ].map(item => (
-          <View key={item.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
-            <Text style={[styles.infoLabel, { color: t.textMuted }]}>{item.label}</Text>
-            <Text style={[styles.infoValue, { color: t.textPrimary }]}>{item.value}</Text>
-          </View>
-        ))}
+        {tab === 'info' && (
+          <>
+            {/* Map */}
+            {hospital.latitude != null && hospital.longitude != null && (
+              <View style={styles.mapWrap}>
+                <MapView
+                  style={styles.map}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  initialRegion={{
+                    latitude:  hospital.latitude!,
+                    longitude: hospital.longitude!,
+                    latitudeDelta:  0.01,
+                    longitudeDelta: 0.01,
+                  }}>
+                  <Marker coordinate={{ latitude: hospital.latitude!, longitude: hospital.longitude! }} title={hospital.name} />
+                </MapView>
+                <TouchableOpacity onPress={openDirections}
+                  style={[styles.directionsBtn, { backgroundColor: t.accent }]}>
+                  <Text style={styles.directionsBtnText}>🗺 Get Directions</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Info rows */}
+            {[
+              { label: 'Address',     value: hospital.address ?? 'See directions' },
+              { label: 'City',        value: hospital.city    ?? hospital.distance },
+              { label: 'Phone',       value: (hospital as any).phone ?? 'Contact hospital' },
+              { label: 'Daily Limit', value: hospital.daily_booking_limit ? `${hospital.daily_booking_limit} bookings/day` : 'No limit' },
+              { label: 'OPD Fee',     value: hospital.opd_fee ? `₦${hospital.opd_fee.toLocaleString()}` : 'Free' },
+              { label: 'Approval',    value: hospital.approval_mode === 'manual' ? 'Manual review required' : 'Instant confirmation' },
+              { label: 'Emergency',   value: hospital.emergencySlots ? '24/7 emergency line' : 'No emergency service' },
+            ].map(item => (
+              <View key={item.label} style={[styles.infoRow, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[styles.infoLabel, { color: t.textMuted }]}>{item.label}</Text>
+                <Text style={[styles.infoValue, { color: t.textPrimary }]}>{item.value}</Text>
+              </View>
+            ))}
+
+            {/* Directions button fallback when no map coords */}
+            {(hospital.latitude == null || hospital.longitude == null) && (
+              <TouchableOpacity onPress={openDirections}
+                style={[styles.directionsBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, marginTop: 12 }]}>
+                <Text style={[styles.directionsBtnText, { color: t.accent }]}>🗺 Get Directions</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
         <View style={{ height: 120 }} />
       </ScrollView>
 
@@ -246,4 +298,8 @@ const styles = StyleSheet.create({
   ctaBtnPrimary:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' },
   ctaBtnPrimaryText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
   ctaBtnFee:           { fontSize: 10, marginTop: 2 },
+  mapWrap:             { borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
+  map:                 { height: 180 },
+  directionsBtn:       { padding: 13, alignItems: 'center', borderRadius: 12, marginTop: 8 },
+  directionsBtnText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
 })

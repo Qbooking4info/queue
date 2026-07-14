@@ -6,8 +6,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { Text, View, ActivityIndicator } from 'react-native'
 
-import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import { AuthProvider, useAuth }   from './contexts/AuthContext'
+import { ThemeProvider, useTheme }     from './contexts/ThemeContext'
+import { AuthProvider, useAuth }       from './contexts/AuthContext'
+import { LocationProvider }            from './contexts/LocationContext'
 import { usePushNotifications }    from './hooks/usePushNotifications'
 
 import { SplashScreen }             from './screens/SplashScreen'
@@ -126,7 +127,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppNavigator />
+        <LocationProvider>
+          <AppNavigator />
+        </LocationProvider>
       </AuthProvider>
     </ThemeProvider>
   )

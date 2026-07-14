@@ -23,6 +23,11 @@ export interface DisplayHospital {
   doctors?:  any[]
   hmo?:      string[]
   emergencySlots?: number
+  // Geographic coordinates
+  latitude?:  number | null
+  longitude?: number | null
+  address?:   string | null
+  city?:      string | null
   // Booking policy fields
   hospitalType?:       string | null
   clinic_model?:       string | null

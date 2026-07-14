@@ -1475,7 +1475,7 @@ export async function getDailyBookingCount(
 export async function getHospitalSettings(hospitalId: string) {
   const { data } = await adminDb
     .from('hospitals')
-    .select('accepts_virtual, emergency_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee')
+    .select('accepts_virtual, emergency_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude')
     .eq('id', hospitalId)
     .single()
   return data as {
@@ -1485,6 +1485,8 @@ export async function getHospitalSettings(hospitalId: string) {
     approval_mode: string | null
     requires_referral: boolean | null
     opd_fee: number | null
+    latitude: number | null
+    longitude: number | null
   } | null
 }
 

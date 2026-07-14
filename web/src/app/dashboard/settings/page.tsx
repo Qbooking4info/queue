@@ -53,6 +53,13 @@ export default function SettingsPage() {
   const [opdFee,        setOpdFee]        = useState<string>('0')
   const [hours,         setHours]         = useState<DayHours[]>([])
 
+  // Location
+  const [lat,          setLat]          = useState<string>('')
+  const [lng,          setLng]          = useState<string>('')
+  const [geoQuery,     setGeoQuery]     = useState('')
+  const [geoLoading,   setGeoLoading]   = useState(false)
+  const [geoError,     setGeoError]     = useState('')
+
   // Notification preferences
   const [smsReminder,   setSmsReminder]   = useState(true)
   const [emailReminder, setEmailReminder] = useState(true)
@@ -72,15 +79,38 @@ export default function SettingsPage() {
         setRequiresRef(s.requires_referral ?? false)
         setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
         setOpdFee(String(s.opd_fee ?? 0))
+        if (s.latitude  != null) setLat(String(s.latitude))
+        if (s.longitude != null) setLng(String(s.longitude))
       }
       setHours(h)
       setLoading(false)
     })
   }, [hospital?.id])
 
+  async function geocodeAddress() {
+    const q = geoQuery.trim() || `${hospital?.name ?? ''} ${hospital?.city ?? ''} ${hospital?.state ?? ''}`
+    if (!q) return
+    setGeoLoading(true); setGeoError('')
+    try {
+      const res  = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'QueueApp/1.0' },
+      })
+      const data = await res.json() as { lat: string; lon: string }[]
+      if (!data.length) { setGeoError('Address not found — try a more specific query'); return }
+      setLat(parseFloat(data[0].lat).toFixed(6))
+      setLng(parseFloat(data[0].lon).toFixed(6))
+    } catch {
+      setGeoError('Network error — check your connection')
+    } finally {
+      setGeoLoading(false)
+    }
+  }
+
   async function handleSave() {
     if (!hospital?.id) return
     setSaving(true); setSaveErr('')
+    const parsedLat = lat ? parseFloat(lat) : null
+    const parsedLng = lng ? parseFloat(lng) : null
     const [{ error }, { error: hoursError }] = await Promise.all([
       updateHospitalSettings(hospital.id, {
         accepts_virtual:     virtual,
@@ -89,6 +119,7 @@ export default function SettingsPage() {
         requires_referral:   requiresRef,
         daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
         opd_fee:             parseInt(opdFee) || 0,
+        ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
       }),
       updateHospitalHours(hospital.id, hours),
     ])
@@ -121,6 +152,9 @@ export default function SettingsPage() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
+          {/* Left column: Profile + Location */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
           {/* Profile (read-only) */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 16 }}>Hospital Profile</div>
@@ -142,7 +176,81 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {/* Booking policies */}
+          {/* Hospital Location */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Hospital Location</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
+              Coordinates let patients see your clinic on the map and get directions. Search your address or enter them manually.
+            </div>
+
+            {/* Address search */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Search Address</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={geoQuery}
+                  onChange={e => setGeoQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && geocodeAddress()}
+                  placeholder={`${hospital?.name ?? ''}, ${hospital?.city ?? ''}, Nigeria`}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button onClick={geocodeAddress} disabled={geoLoading}
+                  style={{ padding: '9px 14px', borderRadius: 10, border: 'none',
+                    background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700,
+                    cursor: geoLoading ? 'not-allowed' : 'pointer', opacity: geoLoading ? 0.6 : 1,
+                    whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                  {geoLoading ? '…' : 'Find'}
+                </button>
+              </div>
+              {geoError && (
+                <div style={{ fontSize: 11, color: '#f07070', marginTop: 5 }}>{geoError}</div>
+              )}
+            </div>
+
+            {/* Coordinate fields */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={labelStyle}>Latitude</label>
+                <input value={lat} onChange={e => setLat(e.target.value)} placeholder="e.g. 6.524379"
+                  style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Longitude</label>
+                <input value={lng} onChange={e => setLng(e.target.value)} placeholder="e.g. 3.379206"
+                  style={inputStyle} />
+              </div>
+            </div>
+
+            {/* Map preview — shown once coordinates are set */}
+            {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && (
+              <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, marginBottom: 10 }}>
+                <iframe
+                  title="Hospital location preview"
+                  width="100%"
+                  height="200"
+                  style={{ border: 'none', display: 'block' }}
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng) - 0.008},${parseFloat(lat) - 0.008},${parseFloat(lng) + 0.008},${parseFloat(lat) + 0.008}&layer=mapnik&marker=${lat},${lng}`}
+                />
+              </div>
+            )}
+
+            {lat && lng ? (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+                ↗ Verify on Google Maps
+              </a>
+            ) : (
+              <div style={{ fontSize: 11, color: C.textMuted }}>
+                No coordinates set yet — search an address or type them in directly.
+              </div>
+            )}
+          </div>
+
+          </div>{/* end left column */}
+
+          {/* Booking policies (right column) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Appointment policies */}
