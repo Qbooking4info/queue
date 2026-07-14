@@ -3,19 +3,21 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
+import { VitalsModal } from '@/components/dashboard/VitalsModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
 import {
-  getAppointments, updateAppointmentStatus,
+  getAppointments, getClinicAppointments, getDoctorAppointments,
   assignDoctorToAppointment, markNoShow,
   approveAppointment, rejectAppointment,
+  checkInAppointment, startConsultation, endConsultation,
   getDoctors as getDoctorsForHospital,
 } from '@/lib/admin-api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_FILTERS = ['all','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
+const STATUS_FILTERS = ['all','pending_review','pending','confirmed','checked_in','in_progress','completed','cancelled','no_show']
 
 const DOC_COLORS: Record<string, string> = {}
 const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
@@ -24,7 +26,10 @@ function docColor(name: string) {
   return DOC_COLORS[name]
 }
 function filterLabel(f: string) {
-  const m: Record<string, string> = { checked_in: 'Checked In', in_progress: 'In Progress', no_show: 'No-Show' }
+  const m: Record<string, string> = {
+    pending_review: 'Pending Review', checked_in: 'Checked In',
+    in_progress: 'In Progress', no_show: 'No-Show',
+  }
   return m[f] ?? f.charAt(0).toUpperCase() + f.slice(1)
 }
 function urgencyColor(u?: string) {
@@ -39,15 +44,64 @@ function WalkInModal({
   hospitalId, doctors, onClose, onDone,
 }: { hospitalId: string; doctors: AdminDoctor[]; onClose: () => void; onDone: () => void }) {
   const { theme: C } = useTheme()
-  const [name,    setName]    = useState('')
-  const [phone,   setPhone]   = useState('')
-  const [doctorId, setDoctorId] = useState('')
-  const [date,    setDate]    = useState(new Date().toISOString().split('T')[0])
-  const [time,    setTime]    = useState('09:00')
-  const [reason,  setReason]  = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-  const [done,    setDone]    = useState('')
+  const [clinics,       setClinics]       = useState<{ id: string; name: string; is_opd: boolean }[]>([])
+  const [patientNumber, setPatientNumber] = useState('')
+  const [foundPatient,  setFoundPatient]  = useState<{ id: string; full_name: string; phone: string | null; patient_number: string } | null>(null)
+  const [searching,     setSearching]     = useState(false)
+  const [name,          setName]          = useState('')
+  const [phone,         setPhone]         = useState('')
+  const [clinicId,      setClinicId]      = useState('')
+  const [doctorId,      setDoctorId]      = useState('')
+
+  // Doctors filtered to the selected clinic; if no clinic chosen, show all
+  const availableDoctors = clinicId
+    ? doctors.filter(d => d.is_active && d.clinic_id === clinicId)
+    : doctors.filter(d => d.is_active)
+  const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
+  const [time,          setTime]          = useState('09:00')
+  const [reason,        setReason]        = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState('')
+  const [done,          setDone]          = useState('')
+
+  useEffect(() => {
+    fetch(`/api/clinics?hospitalId=${hospitalId}`)
+      .then(r => r.json())
+      .then(data => setClinics(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [hospitalId])
+
+  async function searchByPatientNumber() {
+    const q = patientNumber.trim().toUpperCase()
+    if (!q) return
+    setSearching(true); setFoundPatient(null); setError('')
+    const res = await fetch(`/api/appointments/walkin?patientNumber=${encodeURIComponent(q)}`)
+    const json = await res.json()
+    setSearching(false)
+    if (json.found) {
+      setFoundPatient(json.patient)
+      setName(json.patient.full_name)
+      setPhone(json.patient.phone ?? '')
+    } else {
+      setError(`No registered patient found with number ${q}`)
+    }
+  }
+
+  async function searchByPhone() {
+    const q = phone.trim()
+    if (!q || foundPatient) return
+    const res = await fetch(`/api/appointments/walkin?phone=${encodeURIComponent(q)}`)
+    const json = await res.json()
+    if (json.found) {
+      setFoundPatient(json.patient)
+      setName(json.patient.full_name)
+      setPatientNumber(json.patient.patient_number ?? '')
+    }
+  }
+
+  function clearPatient() {
+    setFoundPatient(null); setPatientNumber(''); setName(''); setPhone('')
+  }
 
   async function handleCreate() {
     if (!name.trim()) return
@@ -56,9 +110,12 @@ function WalkInModal({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        hospitalId, patientName: name.trim(),
-        patientPhone: phone.trim() || undefined,
-        doctorId: doctorId || undefined,
+        hospitalId,
+        patientName:   name.trim(),
+        patientPhone:  phone.trim()         || undefined,
+        patientNumber: patientNumber.trim() || undefined,
+        clinicId:      clinicId             || undefined,
+        doctorId:      doctorId             || undefined,
         date, startTime: time, reason: reason.trim(),
       }),
     })
@@ -74,6 +131,10 @@ function WalkInModal({
     borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
   }
+  const lbl: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em',
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
@@ -82,14 +143,15 @@ function WalkInModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ width: '100%', maxWidth: 480, background: C.card,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          position: 'sticky', top: 0, background: C.card, zIndex: 1 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Walk-in Booking</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
-              Book an appointment for a patient who has presented at the facility
+              Book an appointment for a patient at the front desk
             </div>
           </div>
           <button onClick={onClose}
@@ -116,36 +178,103 @@ function WalkInModal({
             </div>
           ) : (
             <>
+              {/* Patient number lookup */}
+              <div style={{ background: C.bgAlt, borderRadius: 12, padding: 14, border: `1px solid ${C.border}` }}>
+                <label style={lbl}>Patient Number (QB-XXXXXX)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={patientNumber}
+                    onChange={e => { setPatientNumber(e.target.value.toUpperCase()); setFoundPatient(null) }}
+                    onKeyDown={e => e.key === 'Enter' && searchByPatientNumber()}
+                    placeholder="QB-001234"
+                    style={{ ...inputStyle, flex: 1 }}
+                    disabled={!!foundPatient}
+                  />
+                  {foundPatient ? (
+                    <button onClick={clearPatient}
+                      style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${C.border}`,
+                        background: C.bgAlt, color: C.textMuted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      Clear
+                    </button>
+                  ) : (
+                    <button onClick={searchByPatientNumber} disabled={!patientNumber.trim() || searching}
+                      style={{ padding: '10px 16px', borderRadius: 10, border: 'none',
+                        background: patientNumber.trim() ? C.accent : C.bgAlt,
+                        color: patientNumber.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      {searching ? '…' : 'Look up'}
+                    </button>
+                  )}
+                </div>
+                {foundPatient && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: C.accentLight ?? 'rgba(0,200,100,0.08)',
+                    borderRadius: 8, border: `1px solid ${C.accentBorder}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 16 }}>✅</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{foundPatient.full_name}</div>
+                      <div style={{ fontSize: 11, color: C.textSub }}>
+                        {foundPatient.patient_number} · {foundPatient.phone ?? 'No phone'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!foundPatient && (
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>
+                    App patients have a QB number on their profile. Leave blank for first-time or unregistered patients.
+                  </div>
+                )}
+              </div>
+
+              {/* Manual patient details */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Patient Name *</label>
+                <label style={lbl}>Patient Name *</label>
                 <input value={name} onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Chukwuemeka Obi" style={inputStyle} />
+                  placeholder="e.g. Chukwuemeka Obi" style={inputStyle}
+                  disabled={!!foundPatient} />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Phone (optional)</label>
+                <label style={lbl}>Phone (optional)</label>
                 <input value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="08012345678" style={inputStyle} />
+                  onBlur={searchByPhone}
+                  placeholder="08012345678" style={inputStyle}
+                  disabled={!!foundPatient} />
               </div>
+
+              {clinics.length > 0 && (
+                <div>
+                  <label style={lbl}>Clinic / Department</label>
+                  <select value={clinicId} onChange={e => { setClinicId(e.target.value); setDoctorId('') }} style={inputStyle}>
+                    <option value="">— General / Main Hospital —</option>
+                    {clinics.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Date *</label>
+                  <label style={lbl}>Date *</label>
                   <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Time *</label>
+                  <label style={lbl}>Time *</label>
                   <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inputStyle} />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Assign Doctor (optional)</label>
-                <select value={doctorId} onChange={e => setDoctorId(e.target.value)} style={inputStyle}>
+                <label style={lbl}>
+                  Assign Doctor (optional)
+                  {clinicId && availableDoctors.length === 0 && (
+                    <span style={{ color: '#f07070', fontWeight: 400, marginLeft: 6, textTransform: 'none' }}>
+                      — no doctors in this clinic
+                    </span>
+                  )}
+                </label>
+                <select value={doctorId} onChange={e => setDoctorId(e.target.value)} style={inputStyle}
+                  disabled={clinicId !== '' && availableDoctors.length === 0}>
                   <option value="">— Assign later —</option>
-                  {doctors.filter(d => d.is_active).map(d => (
+                  {availableDoctors.map(d => (
                     <option key={d.id} value={d.id}>
                       {d.title ? `${d.title} ` : ''}{d.full_name}{d.specialty_name ? ` · ${d.specialty_name}` : ''}
                     </option>
@@ -153,8 +282,7 @@ function WalkInModal({
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
-                  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Reason / Chief Complaint</label>
+                <label style={lbl}>Reason / Chief Complaint</label>
                 <input value={reason} onChange={e => setReason(e.target.value)}
                   placeholder="e.g. Fever and headache" style={inputStyle} />
               </div>
@@ -198,6 +326,11 @@ function AssignDoctorModal({
   const [selected, setSelected] = useState('')
   const [saving,   setSaving]   = useState(false)
 
+  // Only show doctors from the appointment's clinic (if one is assigned)
+  const eligibleDoctors = appointment.clinic_id
+    ? doctors.filter(d => d.is_active && d.clinic_id === appointment.clinic_id)
+    : doctors.filter(d => d.is_active)
+
   async function handleAssign() {
     if (!selected) return
     setSaving(true)
@@ -225,8 +358,18 @@ function AssignDoctorModal({
             ✕
           </button>
         </div>
+        {appointment.clinic_id && (
+          <div style={{ padding: '8px 22px', background: C.bgAlt, borderBottom: `1px solid ${C.border}`,
+            fontSize: 11, color: C.textMuted }}>
+            Showing doctors registered to this appointment's clinic only
+          </div>
+        )}
         <div style={{ padding: '16px 22px', maxHeight: '55vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {doctors.filter(d => d.is_active).map(d => (
+          {eligibleDoctors.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: C.textMuted, fontSize: 13 }}>
+              No doctors registered to this clinic yet
+            </div>
+          ) : eligibleDoctors.map(d => (
             <button key={d.id} onClick={() => setSelected(d.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                 padding: '11px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
@@ -410,10 +553,13 @@ function DetailPanel({
 
 export default function AppointmentsPage() {
   const { theme: C } = useTheme()
-  const { hospital } = useAdmin()
+  const { hospital, role, clinicId: userClinicId, doctorId: userDoctorId } = useAdmin()
 
-  const [range,   setRange]   = useState<DateRangeKey>('upcoming')
-  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('upcoming'))
+  const isDoctor         = role === 'doctor'
+  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
+
+  const [range,   setRange]   = useState<DateRangeKey>('this_week')
+  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('this_week'))
   const [appts,   setAppts]   = useState<AdminAppointment[]>([])
   const [doctors, setDoctors] = useState<AdminDoctor[]>([])
   const [loading, setLoading] = useState(true)
@@ -424,44 +570,78 @@ export default function AppointmentsPage() {
   const [assignAppt,  setAssignAppt]  = useState<AdminAppointment | null>(null)
   const [rejectAppt,  setRejectAppt]  = useState<AdminAppointment | null>(null)
   const [detailAppt,  setDetailAppt]  = useState<AdminAppointment | null>(null)
+  const [vitalsAppt,  setVitalsAppt]  = useState<AdminAppointment | null>(null)
+  const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const [a, d] = await Promise.all([
-      getAppointments(hospital.id, bounds.from, bounds.to),
-      getDoctorsForHospital(hospital.id),
-    ])
-    setAppts(a); setDoctors(d)
+    if (isDoctor && userDoctorId) {
+      const a = await getDoctorAppointments(userDoctorId, bounds.from, bounds.to)
+      setAppts(a); setDoctors([])
+    } else {
+      const [a, d] = await Promise.all([
+        isScopedToClinic
+          ? getClinicAppointments(hospital.id, userClinicId!, bounds.from, bounds.to)
+          : getAppointments(hospital.id, bounds.from, bounds.to),
+        getDoctorsForHospital(hospital.id, isScopedToClinic ? userClinicId! : undefined),
+      ])
+      setAppts(a); setDoctors(d)
+    }
     setLoading(false)
-  }, [hospital?.id, bounds])
+  }, [hospital?.id, bounds, isDoctor, userDoctorId, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
 
-  async function handleStatusUpdate(id: string, status: string) {
-    await updateAppointmentStatus(id, status)
-    setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a))
-  }
-
   async function handleApprove(appt: AdminAppointment) {
     await approveAppointment(appt.id)
-    setAppts(prev => prev.map(a => a.id === appt.id
-      ? { ...a, approval_status: 'approved', status: 'confirmed' } : a))
+    await load()
   }
 
   async function handleNoShow(appt: AdminAppointment) {
     await markNoShow(appt.id)
-    const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-    setAppts(prev => prev.map(a => a.id === appt.id
-      ? { ...a, status: 'no_show', no_show_at: new Date().toISOString(), reschedule_deadline: deadline } : a))
+    await load()
+  }
+
+  async function handleCheckIn(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await checkInAppointment(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  async function handleStartConsult(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await startConsultation(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  async function handleEndConsult(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await endConsultation(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  function formatDuration(secs: number) {
+    const m = Math.round(secs / 60)
+    if (m < 60) return `${m} min`
+    const h = Math.floor(m / 60)
+    return `${h}h ${m % 60}m`
   }
 
   const filtered = appts.filter(a => {
-    const mf = filter === 'all' || a.status === filter
+    const mf = filter === 'all'
+      ? true
+      : filter === 'pending_review'
+        ? a.approval_status === 'pending_approval'
+        : a.status === filter
     const ms = !search.trim() ||
       a.patient_name.toLowerCase().includes(search.toLowerCase()) ||
       a.doctor_name.toLowerCase().includes(search.toLowerCase()) ||
-      a.booking_ref.toLowerCase().includes(search.toLowerCase())
+      a.booking_ref.toLowerCase().includes(search.toLowerCase()) ||
+      (a.clinic_name ?? '').toLowerCase().includes(search.toLowerCase())
     return mf && ms
   })
 
@@ -474,8 +654,9 @@ export default function AppointmentsPage() {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Appointments</div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            {appts.length} record{appts.length !== 1 ? 's' : ''} · all clinics
-            {pendingApproval > 0 && (
+            {appts.length} record{appts.length !== 1 ? 's' : ''}
+            {!isDoctor && ' · all clinics'}
+            {!isDoctor && pendingApproval > 0 && (
               <span style={{ marginLeft: 10, background: 'rgba(239,159,39,0.15)',
                 border: '1px solid rgba(239,159,39,0.3)', color: '#EF9F27',
                 fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
@@ -485,11 +666,13 @@ export default function AppointmentsPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowWalkIn(true)}
-            style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
-              borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            + Walk-in Booking
-          </button>
+          {!isDoctor && (
+            <button onClick={() => setShowWalkIn(true)}
+              style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              + Walk-in Booking
+            </button>
+          )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
@@ -531,12 +714,22 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
+      {actionError && (
+        <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+          borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+          marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>⚠️ {actionError}</span>
+          <button onClick={() => setActionError('')}
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+        </div>
+      )}
+
       {/* Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bgAlt }}>
-              {['Date','Time','ID','Patient','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
+              {['Date','Time','ID','Patient','Clinic','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700,
                   color: C.textMuted, letterSpacing: '.06em', textTransform: 'uppercase',
                   borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
@@ -545,11 +738,11 @@ export default function AppointmentsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
                 Loading appointments…
               </td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
+              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
                 No appointments match your filters.
               </td></tr>
             ) : filtered.map((a, i) => {
@@ -575,6 +768,17 @@ export default function AppointmentsPage() {
                       {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
                       {a.walkin_patient_phone ? ` · ${a.walkin_patient_phone}` : ''}
                     </div>
+                  </td>
+                  <td style={{ padding: '11px 14px' }}>
+                    {a.clinic_name ? (
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+                        background: 'rgba(180,156,240,0.12)', color: '#B49CF0',
+                        border: '1px solid rgba(180,156,240,0.25)', whiteSpace: 'nowrap' }}>
+                        {a.clinic_name}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: C.textMuted }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: '11px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -620,6 +824,16 @@ export default function AppointmentsPage() {
                         AWAITING REVIEW
                       </div>
                     )}
+                    {a.status === 'checked_in' && a.queue_position != null && (
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
+                        #{a.queue_position} in queue{a.estimated_wait != null ? ` · ~${a.estimated_wait}m wait` : ''}
+                      </div>
+                    )}
+                    {a.status === 'completed' && a.consult_duration_secs != null && (
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
+                        🕐 {formatDuration(a.consult_duration_secs)}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '11px 14px' }}>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -629,8 +843,18 @@ export default function AppointmentsPage() {
                           border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted, fontWeight: 600 }}>
                         Detail
                       </button>
-                      {/* Approve / Reject */}
-                      {needsApproval && (
+                      {/* Vitals — admins, front desk, doctors */}
+                      {!['cancelled'].includes(a.status) && (
+                        <button onClick={() => setVitalsAppt(a)}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                            border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
+                            background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
+                            color: a.vitals_recorded_at ? C.accent : C.textMuted, fontWeight: 600 }}>
+                          {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
+                        </button>
+                      )}
+                      {/* Approve / Reject — admins and front desk only */}
+                      {!isDoctor && needsApproval && (
                         <>
                           <button onClick={() => handleApprove(a)}
                             style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
@@ -646,8 +870,8 @@ export default function AppointmentsPage() {
                           </button>
                         </>
                       )}
-                      {/* Assign Doctor */}
-                      {needsAssign && (
+                      {/* Assign Doctor — admins only */}
+                      {!isDoctor && needsAssign && (
                         <button onClick={() => setAssignAppt(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
                             border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)',
@@ -656,21 +880,30 @@ export default function AppointmentsPage() {
                         </button>
                       )}
                       {/* Check In */}
-                      {!['cancelled','completed','no_show'].includes(a.status) && !needsApproval && (
-                        <button onClick={() => handleStatusUpdate(a.id, 'checked_in')}
+                      {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
+                        <button onClick={() => handleCheckIn(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
                             border: `1px solid ${C.accentBorder}`, background: C.accentLight,
                             color: C.accent, fontWeight: 600 }}>
                           Check In
                         </button>
                       )}
-                      {/* Complete */}
-                      {['checked_in','in_progress'].includes(a.status) && (
-                        <button onClick={() => handleStatusUpdate(a.id, 'completed')}
+                      {/* Start Consultation */}
+                      {a.status === 'checked_in' && (
+                        <button onClick={() => handleStartConsult(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: `1px solid ${C.border}`, background: C.card,
-                            color: C.textSub, fontWeight: 600 }}>
-                          Complete
+                            border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)',
+                            color: '#55A7EB', fontWeight: 700 }}>
+                          ▶ Start
+                        </button>
+                      )}
+                      {/* End Consultation */}
+                      {a.status === 'in_progress' && (
+                        <button onClick={() => handleEndConsult(a)}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                            border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
+                            color: '#00E87A', fontWeight: 700 }}>
+                          ■ End
                         </button>
                       )}
                       {/* No-Show */}
@@ -705,26 +938,25 @@ export default function AppointmentsPage() {
           appointment={assignAppt}
           doctors={doctors}
           onClose={() => setAssignAppt(null)}
-          onDone={(doctorId) => {
-            setAppts(prev => prev.map(a => a.id === assignAppt!.id
-              ? { ...a, assigned_doctor_id: doctorId, doctor_id: doctorId } : a))
-            setAssignAppt(null)
-          }}
+          onDone={() => { load(); setAssignAppt(null) }}
         />
       )}
       {rejectAppt && (
         <RejectModal
           appointment={rejectAppt}
           onClose={() => setRejectAppt(null)}
-          onDone={() => {
-            setAppts(prev => prev.map(a => a.id === rejectAppt!.id
-              ? { ...a, approval_status: 'rejected', status: 'cancelled' } : a))
-            setRejectAppt(null)
-          }}
+          onDone={() => { load(); setRejectAppt(null) }}
         />
       )}
       {detailAppt && (
         <DetailPanel appt={detailAppt} onClose={() => setDetailAppt(null)} />
+      )}
+      {vitalsAppt && (
+        <VitalsModal
+          appointment={vitalsAppt}
+          onClose={() => setVitalsAppt(null)}
+          onSaved={() => { load(); setVitalsAppt(null) }}
+        />
       )}
     </div>
   )

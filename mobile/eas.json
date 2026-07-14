@@ -1,17 +1,18 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": ">= 13.0.0",
     "appVersionSource": "local"
   },
   "build": {
     "preview": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
   }

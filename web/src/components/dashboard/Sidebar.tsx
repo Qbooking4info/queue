@@ -3,33 +3,95 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import type { UserRole } from '@/lib/admin-api'
 
-const baseNavItems = [
-  { href: '/dashboard',              icon: '⊞', label: 'Overview'     },
+const SUPER_ADMIN_HOSPITAL_NAV = [
+  { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
   { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
-  { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule'     },
-  { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors'      },
-  { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics'    },
-  { href: '/dashboard/services',     icon: '🏥', label: 'Services'     },
-  { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings'     },
+  { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
+  { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
+  { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
+  { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics' },
+  { href: '/dashboard/services',     icon: '🏷️', label: 'Services' },
+  { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings' },
 ]
+
+const NAV: Record<UserRole, { href: string; icon: string; label: string }[]> = {
+  super_admin: [
+    { href: '/dashboard',           icon: '⊞',  label: 'Platform Overview' },
+    { href: '/dashboard/hospitals', icon: '🏥', label: 'All Hospitals' },
+    { href: '/dashboard/analytics', icon: '📊', label: 'Analytics' },
+    { href: '/dashboard/settings',  icon: '⚙️',  label: 'Platform Settings' },
+  ],
+  hospital_admin: [
+    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
+    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
+    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
+    { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
+    { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
+    { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics' },
+    { href: '/dashboard/services',     icon: '🏷️', label: 'Services' },
+    { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings' },
+  ],
+  clinic_admin: [
+    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
+    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
+    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
+    { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
+    { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
+  ],
+  doctor: [
+    { href: '/dashboard',              icon: '⊞',  label: 'My Dashboard' },
+    { href: '/dashboard/queue',        icon: '🔢', label: "Today's Queue" },
+    { href: '/dashboard/appointments', icon: '📅', label: 'My Appointments' },
+    { href: '/dashboard/schedule',     icon: '📆', label: 'My Schedule' },
+  ],
+  front_desk: [
+    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
+    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
+    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
+  ],
+}
+
+// hospital_admin gets Clinics nav item when hospital is multi-clinic
+const CLINICS_ITEM = { href: '/dashboard/clinics', icon: '🏗️', label: 'Clinics' }
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin:    'Super Admin',
+  hospital_admin: 'Hospital Admin',
+  clinic_admin:   'Clinic Admin',
+  doctor:         'Doctor',
+  front_desk:     'Front Desk',
+}
 
 export function Sidebar() {
   const { theme: C } = useTheme()
-  const { hospital, stats, signOut } = useAdmin()
+  const { hospital, stats, signOut, role, user } = useAdmin()
   const pathname = usePathname()
 
-  const navItems = hospital?.clinic_model === 'multi'
-    ? [
-        baseNavItems[0], baseNavItems[1], baseNavItems[2],
-        { href: '/dashboard/clinics', icon: '🏗️', label: 'Clinics' },
-        ...baseNavItems.slice(3),
-      ]
-    : baseNavItems
+  const currentRole: UserRole = role ?? 'hospital_admin'
+  const isSuperWithHospital = currentRole === 'super_admin' && !!hospital
+
+  let navItems: { href: string; icon: string; label: string }[] = isSuperWithHospital
+    ? SUPER_ADMIN_HOSPITAL_NAV
+    : (NAV[currentRole] ?? NAV.hospital_admin)
+
+  // Insert Clinics after Schedule for multi-clinic hospital admins (and super_admin managing a multi-clinic hospital)
+  if ((currentRole === 'hospital_admin' || isSuperWithHospital) && hospital?.clinic_model === 'multi') {
+    const schedIdx = navItems.findIndex(i => i.href === '/dashboard/schedule')
+    navItems = [
+      ...navItems.slice(0, schedIdx + 1),
+      CLINICS_ITEM,
+      ...navItems.slice(schedIdx + 1),
+    ]
+  }
 
   const initials = hospital?.name
     ? hospital.name.split(' ').filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase().slice(0, 3)
-    : 'QUE'
+    : (currentRole === 'super_admin' ? 'SYS' : 'QUE')
+
+  const userInitials = (user?.displayName ?? user?.email ?? 'U')
+    .split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U'
 
   return (
     <div style={{ width: 220, flexShrink: 0, background: C.sidebar,
@@ -52,32 +114,44 @@ export function Sidebar() {
           </div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.03em' }}>Queue</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '.06em' }}>HOSPITAL PORTAL</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '.06em' }}>
+              {currentRole === 'super_admin' ? 'PLATFORM ADMIN' : 'HOSPITAL PORTAL'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Hospital chip */}
+      {/* Context chip: hospital name or platform badge */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1A4A32',
+          <div style={{ width: 32, height: 32, borderRadius: 8,
+            background: (currentRole === 'super_admin' && !hospital) ? '#1A2A4A' : '#1A4A32',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 800, color: '#a0e8c0', flexShrink: 0 }}>
+            fontSize: 10, fontWeight: 800,
+            color: (currentRole === 'super_admin' && !hospital) ? '#a0b8f0' : '#a0e8c0', flexShrink: 0 }}>
             {initials}
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {hospital?.name ?? 'Loading…'}
+              {(currentRole === 'super_admin' && !hospital) ? 'All Hospitals' : (hospital?.name ?? 'Loading…')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent }} />
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                {hospital?.is_verified ? 'Verified' : 'Pending'} · PRO
+                {(currentRole === 'super_admin' && !hospital) ? 'Platform Admin' : (hospital?.is_verified ? 'Verified' : 'Pending')}
               </span>
             </div>
           </div>
         </div>
+        {/* Back to All Hospitals link when super_admin is managing a specific hospital */}
+        {isSuperWithHospital && (
+          <Link href="/dashboard/hospitals"
+            style={{ display: 'block', marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)',
+              textDecoration: 'none', fontWeight: 500 }}>
+            ← All Hospitals
+          </Link>
+        )}
       </div>
 
       {/* Nav */}
@@ -103,6 +177,13 @@ export function Sidebar() {
                   {stats.todayTotal}
                 </span>
               )}
+              {item.href === '/dashboard/queue' && stats.todayTotal > 0 && (
+                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  background: 'rgba(239,159,39,0.8)', color: '#fff',
+                  padding: '1px 7px', borderRadius: 99 }}>
+                  {stats.todayTotal - stats.todayCompleted}
+                </span>
+              )}
             </Link>
           )
         })}
@@ -114,15 +195,17 @@ export function Sidebar() {
           <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentMid,
             border: `1px solid ${C.accentBorder}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 800, color: C.accent, flexShrink: 0 }}>HA</div>
+            fontSize: 11, fontWeight: 800, color: C.accent, flexShrink: 0 }}>
+            {userInitials}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Hospital Admin
+              {user?.displayName ?? ROLE_LABELS[currentRole]}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {hospital?.email ?? '—'}
+              {ROLE_LABELS[currentRole]}
             </div>
           </div>
         </div>

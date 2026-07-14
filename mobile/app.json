@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Queue",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.qbooking.queue"
     },
     "android": {
+      "package": "com.qbooking.queue",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -24,13 +26,21 @@
     },
     "extra": {
       "eas": {
-        "projectId": "a46342ec-6f59-459a-8885-da9aab8d39e0"
-      },
+        },
       "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0070F3",
+          "defaultChannel": "queue-notifications",
+          "androidMode": "default"
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"

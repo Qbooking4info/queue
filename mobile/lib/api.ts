@@ -5,18 +5,21 @@ import type { Hospital, Doctor, Appointment, TimeSlot } from '../types/database'
 
 export type HospitalWithDoctors = Hospital & {
   doctors: Doctor[]
-  // booking policy fields (new columns — may be null on older records)
   daily_booking_limit?: number | null
   approval_mode?: string | null
   requires_referral?: boolean | null
   opd_fee?: number | null
   clinic_model?: string | null
+  hospital_specialties?: { specialty: { name: string; icon: string | null } | null }[]
+  services?: { name: string; is_active: boolean | null }[]
 }
+
+const HOSPITAL_SELECT = '*, doctors(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), services(name, is_active)'
 
 export async function getHospitals(search?: string): Promise<HospitalWithDoctors[]> {
   let query = publicDb
     .from('hospitals')
-    .select('*, doctors(*, specialty:specialties!doctors_specialty_id_fkey(name, icon))')
+    .select(HOSPITAL_SELECT)
     .eq('is_active', true)
     .order('avg_rating', { ascending: false })
 
@@ -31,7 +34,7 @@ export async function getHospitals(search?: string): Promise<HospitalWithDoctors
 export async function getHospitalById(id: string): Promise<HospitalWithDoctors | null> {
   const { data } = await publicDb
     .from('hospitals')
-    .select('*, doctors(*, specialty:specialties!doctors_specialty_id_fkey(name, icon))')
+    .select(HOSPITAL_SELECT)
     .eq('id', id)
     .single()
   return data as any
@@ -48,6 +51,7 @@ export type Clinic = {
   is_active:           boolean
   sort_order:          number | null
   daily_booking_limit: number | null
+  service_tags:        string[]
 }
 
 export async function getClinicsForHospital(hospitalId: string): Promise<Clinic[]> {
@@ -274,27 +278,33 @@ export async function cancelAppointment(
 // ── Reschedule appointment (within 48-hr no-show window) ─────────────────────
 
 export async function rescheduleAppointment(payload: {
-  originalId:  string
-  patientId:   string
-  hospitalId:  string
-  doctorId?:   string
-  date:        string
-  startTime:   string
-  reason:      string
-}): Promise<{ id: string; bookingRef: string } | null> {
-  const bookingRef = `RSC-${Date.now().toString().slice(-6)}`
+  originalId:   string
+  patientId:    string
+  hospitalId:   string
+  doctorId?:    string
+  date:         string
+  startTime:    string
+  reason:       string
+  type?:        'in-person' | 'virtual'
+  clinicId?:    string
+  approvalMode?: string
+}): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
+  const bookingRef     = `RSC-${Date.now().toString().slice(-6)}`
+  const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
+
   const { data, error } = await supabase
     .from('appointments')
     .insert({
       patient_id:        payload.patientId,
       doctor_id:         payload.doctorId ?? null,
       hospital_id:       payload.hospitalId,
+      clinic_id:         payload.clinicId ?? null,
       appointment_date:  payload.date,
       start_time:        payload.startTime,
-      type:              'in-person',
+      type:              payload.type ?? 'in-person',
       reason:            payload.reason,
       status:            'pending',
-      approval_status:   'auto_approved',
+      approval_status:   approvalStatus,
       booking_mode:      'hospital',
       booking_ref:       bookingRef,
       rescheduled_from:  payload.originalId,
@@ -302,8 +312,21 @@ export async function rescheduleAppointment(payload: {
     })
     .select('id, booking_ref')
     .single()
-  if (error) return null
-  return { id: data.id, bookingRef: data.booking_ref }
+  if (error || !data) { console.warn('[rescheduleAppointment] insert failed:', error?.message); return null }
+
+  // Close out the original booking so the patient isn't left holding two active appointments
+  // for the same visit — the new row links back to it via rescheduled_from.
+  const { error: closeErr } = await supabase
+    .from('appointments')
+    .update({
+      status: 'cancelled',
+      cancellation_reason: `Rescheduled to ${payload.date} (${bookingRef})`,
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq('id', payload.originalId)
+  if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
+
+  return { id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -326,6 +349,12 @@ export async function markAllNotificationsRead(userId: string) {
   await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId)
 }
 
+// ── Push token ───────────────────────────────────────────────────────────────
+
+export async function savePushToken(userId: string, token: string): Promise<void> {
+  await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+}
+
 // ── User profile ─────────────────────────────────────────────────────────────
 
 export async function updateUserProfile(
@@ -334,6 +363,51 @@ export async function updateUserProfile(
 ) {
   const { error } = await supabase.from('users').update(data).eq('id', userId)
   return !error
+}
+
+// ── Medical history ──────────────────────────────────────────────────────────
+// Synced to the backend (not local-only) so the treating doctor can see it via
+// the hospital dashboard's "View Patient" chart.
+
+export interface MedicalHistory {
+  conditions: string[]
+  allergies: string[]
+  medications: string
+  surgeries: string
+  familyHistory: string
+}
+
+const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
+
+export async function getMedicalHistory(patientId: string): Promise<MedicalHistory> {
+  const { data, error } = await supabase
+    .from('patient_medical_history')
+    .select('conditions, allergies, medications, surgeries, family_history')
+    .eq('patient_id', patientId)
+    .maybeSingle()
+  if (error) { console.warn('getMedicalHistory error:', error.message); return EMPTY_MEDICAL_HISTORY }
+  if (!data) return EMPTY_MEDICAL_HISTORY
+  return {
+    conditions: data.conditions ?? [],
+    allergies: data.allergies ?? [],
+    medications: data.medications ?? '',
+    surgeries: data.surgeries ?? '',
+    familyHistory: data.family_history ?? '',
+  }
+}
+
+export async function updateMedicalHistory(patientId: string, notes: MedicalHistory): Promise<boolean> {
+  const { error } = await supabase.from('patient_medical_history').upsert({
+    patient_id: patientId,
+    conditions: notes.conditions,
+    allergies: notes.allergies,
+    medications: notes.medications || null,
+    surgeries: notes.surgeries || null,
+    family_history: notes.familyHistory || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'patient_id' })
+  if (error) { console.warn('updateMedicalHistory error:', error.message); return false }
+  return true
 }
 
 // ── Dependents ────────────────────────────────────────────────────────────────

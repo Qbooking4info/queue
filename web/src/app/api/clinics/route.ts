@@ -1,11 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { getServerUser } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getClinicsForHospital } from '@/lib/admin-api'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getServerUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const hospitalId = new URL(req.url).searchParams.get('hospitalId')
@@ -16,12 +15,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getServerUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const db = createAdminClient()
-  const { hospitalId, clinicName, subAdminName, subAdminEmail, tempPassword } = await req.json()
+  const { hospitalId, clinicName, subAdminName, subAdminEmail, tempPassword, serviceTags } = await req.json()
 
   if (!hospitalId || !clinicName?.trim()) {
     return NextResponse.json({ error: 'hospitalId and clinicName are required' }, { status: 400 })
@@ -30,7 +28,7 @@ export async function POST(req: NextRequest) {
   // Create the clinic
   const { data: clinic, error: clinicErr } = await db
     .from('hospital_clinics')
-    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0 })
+    .insert({ hospital_id: hospitalId, name: clinicName.trim(), is_active: true, sort_order: 0, service_tags: serviceTags ?? [] } as any)
     .select('id')
     .single()
   if (clinicErr) return NextResponse.json({ error: clinicErr.message }, { status: 400 })

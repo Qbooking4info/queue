@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database'
 
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+  return fetch(input, { ...init, signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+}
+
 export async function createClient() {
   const cookieStore = await cookies()
   return createServerClient<Database>(
@@ -18,6 +25,7 @@ export async function createClient() {
           } catch {} // Server component — middleware handles refresh
         },
       },
+      global: { fetch: fetchWithTimeout },
     }
   )
 }

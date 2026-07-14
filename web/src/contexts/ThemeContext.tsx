@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 export const themes = {
   forest: {
@@ -81,14 +81,24 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 export const useTheme = () => useContext(ThemeContext)
 
+const STORAGE_KEY = 'qb_dashboard_theme'
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeId, setThemeId] = useState<ThemeId>('clinical')
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY) as ThemeId | null
+    if (saved && saved in themes) setThemeId(saved)
+  }, [])
+
+  const toggleTheme = () => setThemeId(id => {
+    const next = id === 'forest' ? 'clinical' : 'forest'
+    localStorage.setItem(STORAGE_KEY, next)
+    return next
+  })
+
   return (
-    <ThemeContext.Provider value={{
-      theme: themes[themeId],
-      themeId,
-      toggleTheme: () => setThemeId(id => id === 'forest' ? 'clinical' : 'forest'),
-    }}>
+    <ThemeContext.Provider value={{ theme: themes[themeId], themeId, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   )

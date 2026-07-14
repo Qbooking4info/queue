@@ -4,10 +4,12 @@ export interface AdminAppointment {
   id: string
   booking_ref: string
   appointment_date: string
+  check_in_date?: string | null
   start_time: string
   status: string
   type: string
   reason: string | null
+  patient_id: string | null
   patient_name: string
   patient_age: number | null
   patient_gender: string | null
@@ -28,11 +30,32 @@ export interface AdminAppointment {
   refund_pct?: number
   walkin_patient_name?: string | null
   walkin_patient_phone?: string | null
+  vitals_weight_kg?: number | null
+  vitals_height_cm?: number | null
+  vitals_bp_systolic?: number | null
+  vitals_bp_diastolic?: number | null
+  vitals_blood_sugar?: number | null
+  vitals_bmi?: number | null
+  vitals_recorded_at?: string | null
+  queue_position?: number | null
+  estimated_wait?: number | null
+  consult_started_at?: string | null
+  consult_ended_at?: string | null
+  consult_duration_secs?: number | null
+}
+
+export interface AppointmentVitals {
+  weight_kg: number | null
+  height_cm: number | null
+  bp_systolic: number | null
+  bp_diastolic: number | null
+  blood_sugar: number | null
 }
 
 export interface AdminDoctor {
   id: string
   full_name: string
+  email?: string | null
   title: string | null
   specialty_name: string | null
   avg_rating: number | null
@@ -43,6 +66,8 @@ export interface AdminDoctor {
   years_experience: number | null
   avatar: string
   color: string
+  clinic_id: string | null
+  availability_status: DoctorAvailabilityStatus
 }
 
 export interface AdminHospital {
@@ -86,21 +111,91 @@ function calcAge(dob: string | null): number | null {
   return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
 }
 
-export async function getHospitalIdForUser(authId: string): Promise<string | null> {
-  const { data: profile } = await adminDb
-    .from('users')
-    .select('id')
-    .eq('auth_id', authId)
-    .single()
-  if (!profile) return null
+export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk'
 
-  const { data: adminRow } = await adminDb
-    .from('hospital_admins')
-    .select('hospital_id')
-    .eq('user_id', profile.id)
+export interface UserRoleInfo {
+  role: UserRole
+  hospitalId?: string   // undefined for super_admin
+  clinicId?: string
+  doctorId?: string
+  displayName?: string
+}
+
+export async function getUserRole(authId: string): Promise<UserRoleInfo | null> {
+  // Try users table lookup
+  // Select via any to avoid type errors until is_super_admin migration runs
+  const { data: profileRaw } = await (adminDb as any)
+    .from('users')
+    .select('id, full_name, is_super_admin')
+    .eq('auth_id', authId)
+    .single() as { data: { id: string; full_name: string | null; is_super_admin: boolean } | null; error: unknown }
+  const profile = profileRaw
+
+  if (profile) {
+    // Super admin
+    if (profile.is_super_admin) {
+      return { role: 'super_admin', displayName: profile.full_name ?? undefined }
+    }
+
+    // Hospital admin
+    const { data: adminRow } = await adminDb
+      .from('hospital_admins')
+      .select('hospital_id')
+      .eq('user_id', profile.id)
+      .limit(1)
+      .single()
+    if (adminRow) return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+
+    // Clinic staff (clinic_admin / front_desk share the clinic_admins table, differentiated by role column)
+    const { data: clinicRow } = await adminDb
+      .from('clinic_admins')
+      .select('hospital_id, clinic_id, role')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+    if (clinicRow) {
+      const r = ((clinicRow as any).role ?? 'clinic_admin') as string
+      const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
+      return {
+        role: isFrontDesk ? 'front_desk' : 'clinic_admin',
+        hospitalId: clinicRow.hospital_id,
+        clinicId: (clinicRow.clinic_id as string | undefined) ?? undefined,
+        displayName: profile.full_name ?? undefined,
+      }
+    }
+  }
+
+  // Doctor (auth_user_id stored directly on doctors row)
+  const { data: doctorRow } = await (adminDb.from('doctors') as any)
+    .select('id, hospital_id, full_name')
+    .eq('auth_user_id', authId)
+    .single()
+  if (doctorRow) return { role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id, displayName: doctorRow.full_name }
+
+  // Fallback: maybe clinic_admins uses auth_user_id directly (no users row)
+  const { data: caRow } = await (adminDb.from('clinic_admins') as any)
+    .select('hospital_id, clinic_id, role')
+    .eq('auth_user_id', authId)
+    .eq('is_active', true)
     .limit(1)
     .single()
-  return adminRow?.hospital_id ?? null
+  if (caRow) {
+    const r = (caRow.role ?? 'clinic_admin') as string
+    const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
+    return {
+      role: isFrontDesk ? 'front_desk' : 'clinic_admin',
+      hospitalId: caRow.hospital_id,
+      clinicId: caRow.clinic_id ?? undefined,
+    }
+  }
+
+  return null
+}
+
+export async function getHospitalIdForUser(authId: string): Promise<string | null> {
+  const info = await getUserRole(authId)
+  return info?.hospitalId ?? null
 }
 
 export interface ClinicWithAdmin {
@@ -110,6 +205,7 @@ export interface ClinicWithAdmin {
   is_active: boolean | null
   sort_order: number | null
   created_at: string | null
+  service_tags: string[]
   subAdmin: { id: string; full_name: string; email: string } | null
   doctorCount: number
 }
@@ -149,13 +245,13 @@ export async function getClinicsForHospital(hospitalId: string): Promise<ClinicW
     const u = row?.users as { id: string; full_name: string; email: string } | null
     return {
       ...clinic,
+      service_tags: (clinic as any).service_tags ?? [],
       subAdmin: u ? { id: u.id, full_name: u.full_name, email: u.email } : null,
       doctorCount: doctorCounts[clinic.id] ?? 0,
     }
-  })
+  }) as ClinicWithAdmin[]
 }
 
-// Fallback for demo/test accounts with no hospital_admins record
 export async function getFirstHospitalId(): Promise<string | null> {
   const { data } = await adminDb
     .from('hospitals')
@@ -164,6 +260,179 @@ export async function getFirstHospitalId(): Promise<string | null> {
     .limit(1)
     .single()
   return data?.id ?? null
+}
+
+export async function getAllHospitals(): Promise<AdminHospital[]> {
+  const { data } = await adminDb
+    .from('hospitals')
+    .select('*')
+    .order('name')
+  return (data as AdminHospital[]) ?? []
+}
+
+// ── Patient chart (doctor-facing) ───────────────────────────────────────────────
+
+export interface PatientProfile {
+  id: string
+  full_name: string
+  date_of_birth: string | null
+  gender: string | null
+  blood_group: string | null
+  phone: string | null
+  email: string | null
+  city: string | null
+  state: string | null
+}
+
+export interface PatientMedicalHistory {
+  conditions: string[]
+  allergies: string[]
+  medications: string | null
+  surgeries: string | null
+  family_history: string | null
+  updated_at: string | null
+}
+
+export async function getPatientProfile(patientId: string): Promise<PatientProfile | null> {
+  const { data } = await adminDb
+    .from('users')
+    .select('id, full_name, date_of_birth, gender, blood_group, phone, email, city, state')
+    .eq('id', patientId)
+    .single()
+  return data as PatientProfile | null
+}
+
+export async function getPatientMedicalHistory(patientId: string): Promise<PatientMedicalHistory | null> {
+  const { data } = await (adminDb as any)
+    .from('patient_medical_history')
+    .select('conditions, allergies, medications, surgeries, family_history, updated_at')
+    .eq('patient_id', patientId)
+    .maybeSingle()
+  return data as PatientMedicalHistory | null
+}
+
+export async function getDoctorTodayAppointments(doctorId: string): Promise<AdminAppointment[]> {
+  const today = todayLocalDate()
+  const select = `
+      id, booking_ref, appointment_date, start_time, status, type, reason,
+      queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+      patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender)
+    `
+  // "Today" for a doctor means scheduled for today OR physically checked in today (a future-dated
+  // booking that walked in early joins today's queue) — matched on either doctor_id or
+  // assigned_doctor_id (OPD bookings later assigned to this doctor).
+  const base = () => (adminDb as any).from('appointments').select(select)
+  const [byDoctorSched, byDoctorCheckedIn, byAssignedSched, byAssignedCheckedIn, doctorProfile] = await Promise.all([
+    base().eq('doctor_id', doctorId).eq('appointment_date', today),
+    base().eq('doctor_id', doctorId).eq('check_in_date', today),
+    base().eq('assigned_doctor_id', doctorId).eq('appointment_date', today),
+    base().eq('assigned_doctor_id', doctorId).eq('check_in_date', today),
+    (adminDb as any).from('doctors').select('full_name, specialty:specialties!doctors_specialty_id_fkey(name)').eq('id', doctorId).single(),
+  ])
+  const byId = new Map<string, any>()
+  for (const res of [byDoctorSched, byDoctorCheckedIn, byAssignedSched, byAssignedCheckedIn]) {
+    for (const row of (res.data ?? []) as any[]) byId.set(row.id, row)
+  }
+  const data = Array.from(byId.values()).sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))
+  if (data.length === 0) return []
+  const docName = doctorProfile.data?.full_name ?? 'Unknown'
+  const specName = doctorProfile.data?.specialty?.name ?? null
+  return data.map(a => ({
+    id: a.id, booking_ref: a.booking_ref,
+    appointment_date: a.appointment_date,
+    start_time: (a.start_time ?? '').slice(0, 5),
+    status: a.status, type: a.type, reason: a.reason,
+    queue_position: a.queue_position ?? null,
+    estimated_wait: a.estimated_wait ?? null,
+    consult_started_at: a.consult_started_at ?? null,
+    consult_ended_at: a.consult_ended_at ?? null,
+    consult_duration_secs: a.consult_duration_secs ?? null,
+    check_in_date: a.check_in_date ?? null,
+    patient_id: a.patient?.id ?? null,
+    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_age: calcAge(a.patient?.date_of_birth ?? null),
+    patient_gender: a.patient?.gender ?? null,
+    doctor_name: docName,
+    doctor_id: doctorId,
+    specialty_name: specName,
+  }))
+}
+
+export async function getDoctorAppointments(doctorId: string, from: string, to: string): Promise<AdminAppointment[]> {
+  const { data } = await adminDb
+    .from('appointments')
+    .select(`
+      id, booking_ref, appointment_date, start_time, status, type, reason,
+      approval_status, clinic_id,
+      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
+      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
+      queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+      patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
+      doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
+      clinic:hospital_clinics!appointments_clinic_id_fkey(name)
+    `)
+    .eq('doctor_id', doctorId)
+    .gte('appointment_date', from)
+    .lte('appointment_date', to)
+    .order('appointment_date', { ascending: false })
+    .order('start_time')
+  if (!data) return []
+  return (data as any[]).map(a => ({
+    id: a.id, booking_ref: a.booking_ref,
+    appointment_date: a.appointment_date,
+    start_time: (a.start_time ?? '').slice(0, 5),
+    status: a.status, type: a.type, reason: a.reason,
+    approval_status: a.approval_status ?? null,
+    clinic_id: a.clinic_id ?? null,
+    clinic_name: a.clinic?.name ?? null,
+    vitals_weight_kg: a.vitals_weight_kg ?? null,
+    vitals_height_cm: a.vitals_height_cm ?? null,
+    vitals_bp_systolic: a.vitals_bp_systolic ?? null,
+    vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
+    vitals_blood_sugar: a.vitals_blood_sugar ?? null,
+    vitals_bmi: a.vitals_bmi ?? null,
+    vitals_recorded_at: a.vitals_recorded_at ?? null,
+    queue_position: a.queue_position ?? null,
+    estimated_wait: a.estimated_wait ?? null,
+    consult_started_at: a.consult_started_at ?? null,
+    consult_ended_at: a.consult_ended_at ?? null,
+    consult_duration_secs: a.consult_duration_secs ?? null,
+    check_in_date: a.check_in_date ?? null,
+    patient_id: a.patient?.id ?? null,
+    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_age: calcAge(a.patient?.date_of_birth ?? null),
+    patient_gender: a.patient?.gender ?? null,
+    doctor_name: a.doctor?.full_name ?? 'Unknown',
+    doctor_id: a.doctor?.id ?? '',
+    specialty_name: a.doctor?.specialty?.name ?? null,
+  }))
+}
+
+export async function getClinicStats(hospitalId: string, clinicId: string) {
+  const today = new Date().toISOString().split('T')[0]
+  const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
+  const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
+  const orFilter = doctorIds.length > 0
+    ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+    : `clinic_id.eq.${clinicId}`
+
+  const base = () => adminDb.from('appointments').select('id', { count: 'exact', head: true })
+    .eq('hospital_id', hospitalId).eq('appointment_date', today).or(orFilter)
+
+  const [apptRes, completedRes, doctorRes] = await Promise.all([
+    base().neq('status', 'cancelled'),
+    base().eq('status', 'completed'),
+    adminDb.from('doctors').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId).eq('is_active', true),
+  ])
+
+  return {
+    todayTotal: apptRes.count ?? 0,
+    todayCompleted: completedRes.count ?? 0,
+    activeDoctors: doctorRes.count ?? 0,
+    avgRating: 0,
+    totalBookings: 0,
+    reviewCount: 0,
+  }
 }
 
 export async function getHospital(hospitalId: string): Promise<AdminHospital | null> {
@@ -183,7 +452,10 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
       booking_mode, approval_status, urgency, symptom_description, approval_note,
       assigned_doctor_id, no_show_at, reschedule_deadline, clinic_id,
       refund_pct, walkin_patient_name, walkin_patient_phone,
-      patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
+      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
+      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
+      queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+      patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
       assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
       clinic:hospital_clinics!appointments_clinic_id_fkey(name)
@@ -223,6 +495,20 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
       refund_pct: a.refund_pct ?? 100,
       walkin_patient_name: a.walkin_patient_name ?? null,
       walkin_patient_phone: a.walkin_patient_phone ?? null,
+      patient_id: isWalkin ? null : (a.patient?.id ?? null),
+      vitals_weight_kg: a.vitals_weight_kg ?? null,
+      vitals_height_cm: a.vitals_height_cm ?? null,
+      vitals_bp_systolic: a.vitals_bp_systolic ?? null,
+      vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
+      vitals_blood_sugar: a.vitals_blood_sugar ?? null,
+      vitals_bmi: a.vitals_bmi ?? null,
+      vitals_recorded_at: a.vitals_recorded_at ?? null,
+    queue_position: a.queue_position ?? null,
+    estimated_wait: a.estimated_wait ?? null,
+    consult_started_at: a.consult_started_at ?? null,
+    consult_ended_at: a.consult_ended_at ?? null,
+    consult_duration_secs: a.consult_duration_secs ?? null,
+    check_in_date: a.check_in_date ?? null,
       patient_name: patientName,
       patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
       patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
@@ -248,19 +534,29 @@ export async function getRangeStats(hospitalId: string, from: string, to: string
   return { total, completed, cancelled, pending: total - completed - cancelled }
 }
 
-export async function getTodayAppointments(hospitalId: string): Promise<AdminAppointment[]> {
+export async function getTodayAppointments(hospitalId: string, clinicId?: string): Promise<AdminAppointment[]> {
   const today = new Date().toISOString().split('T')[0]
-  const { data, error } = await adminDb
+
+  let query = adminDb
     .from('appointments')
     .select(`
-      id, booking_ref, appointment_date, start_time, status, type, reason,
-      patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
+      id, booking_ref, appointment_date, start_time, status, type, reason, clinic_id,
+      patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name))
     `)
     .eq('hospital_id', hospitalId)
     .eq('appointment_date', today)
-    .order('start_time')
 
+  if (clinicId) {
+    const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
+    const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
+    const orFilter = doctorIds.length > 0
+      ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+      : `clinic_id.eq.${clinicId}`
+    query = (query as any).or(orFilter)
+  }
+
+  const { data, error } = await (query as any).order('start_time')
   if (error || !data) return []
 
   return (data as any[]).map(a => ({
@@ -271,6 +567,8 @@ export async function getTodayAppointments(hospitalId: string): Promise<AdminApp
     status: a.status,
     type: a.type,
     reason: a.reason,
+    clinic_id: a.clinic_id ?? null,
+    patient_id: a.patient?.id ?? null,
     patient_name: a.patient?.full_name ?? 'Unknown',
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
@@ -280,65 +578,95 @@ export async function getTodayAppointments(hospitalId: string): Promise<AdminApp
   }))
 }
 
-export async function getWeekAppointments(hospitalId: string): Promise<Record<string, any[]>> {
-  const today = new Date()
-  const day = today.getDay()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1))
-  const friday = new Date(monday)
-  friday.setDate(monday.getDate() + 4)
+export interface ScheduleSlot {
+  id: string
+  date: string
+  time: string
+  doc: string
+  patient: string
+  type: string
+  status: string
+}
 
-  const { data } = await adminDb
+// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
+// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export async function getWeekAppointments(
+  hospitalId: string,
+  weekStart?: string,
+  opts?: { doctorId?: string; clinicId?: string },
+): Promise<Record<string, ScheduleSlot[]>> {
+  const anchor = weekStart ? new Date(weekStart + 'T00:00:00') : new Date()
+  const day = anchor.getDay()
+  const monday = new Date(anchor)
+  monday.setDate(anchor.getDate() - (day === 0 ? 6 : day - 1))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  let q = adminDb
     .from('appointments')
     .select(`
-      appointment_date, start_time, type, status,
+      id, appointment_date, start_time, type, status,
       patient:users!appointments_patient_id_fkey(full_name),
       doctor:doctors!appointments_doctor_id_fkey(full_name)
     `)
     .eq('hospital_id', hospitalId)
-    .gte('appointment_date', monday.toISOString().split('T')[0])
-    .lte('appointment_date', friday.toISOString().split('T')[0])
+    .gte('appointment_date', fmtLocalDate(monday))
+    .lte('appointment_date', fmtLocalDate(sunday))
     .neq('status', 'cancelled')
     .order('start_time')
+  if (opts?.doctorId) q = (q as any).eq('doctor_id', opts.doctorId)
+  if (opts?.clinicId) q = (q as any).eq('clinic_id', opts.clinicId)
+  const { data } = await q
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-  const schedule: Record<string, any[]> = Object.fromEntries(days.map(d => [d, []]))
+  const schedule: Record<string, ScheduleSlot[]> = {}
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i)
+    schedule[fmtLocalDate(d)] = []
+  }
 
   if (!data) return schedule
 
   ;(data as any[]).forEach(a => {
-    const date = new Date(a.appointment_date + 'T00:00:00')
-    const dayIdx = date.getDay() - 1
-    if (dayIdx >= 0 && dayIdx < 5) {
-      schedule[days[dayIdx]].push({
-        time: (a.start_time ?? '').slice(0, 5),
-        doc: a.doctor?.full_name ?? 'Doctor',
-        patient: a.patient?.full_name ?? 'Patient',
-        type: a.type,
-      })
-    }
+    const bucket = schedule[a.appointment_date]
+    if (!bucket) return
+    bucket.push({
+      id: a.id,
+      date: a.appointment_date,
+      time: (a.start_time ?? '').slice(0, 5),
+      doc: a.doctor?.full_name ?? 'Doctor',
+      patient: a.patient?.full_name ?? 'Patient',
+      type: a.type,
+      status: a.status,
+    })
   })
 
   return schedule
 }
 
-export async function getDoctors(hospitalId: string): Promise<AdminDoctor[]> {
-  const { data, error } = await adminDb
+export async function getDoctors(hospitalId: string, clinicId?: string): Promise<AdminDoctor[]> {
+  let q = (adminDb as any)
     .from('doctors')
     .select(`
-      id, full_name, title, avg_rating, review_count, is_active,
-      accepts_virtual, consultation_fee, years_experience,
+      id, full_name, email, title, avg_rating, review_count, is_active,
+      accepts_virtual, consultation_fee, years_experience, clinic_id,
+      availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('hospital_id', hospitalId)
     .eq('is_active', true)
-    .order('avg_rating', { ascending: false })
+  if (clinicId) q = (q as any).eq('clinic_id', clinicId)
+  const { data, error } = await (q as any).order('avg_rating', { ascending: false })
 
   if (error || !data) return []
 
   return (data as any[]).map(d => ({
     id: d.id,
     full_name: d.full_name,
+    email: d.email ?? null,
     title: d.title,
     specialty_name: d.specialty?.name ?? null,
     avg_rating: d.avg_rating,
@@ -349,6 +677,8 @@ export async function getDoctors(hospitalId: string): Promise<AdminDoctor[]> {
     years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name),
     color: nameToColor(d.full_name),
+    clinic_id: d.clinic_id ?? null,
+    availability_status: ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
   }))
 }
 
@@ -382,6 +712,7 @@ export interface ClinicDetail {
   hospital_id: string
   created_at: string | null
   sort_order: number | null
+  service_tags: string[]
 }
 
 export interface ClinicStaffMember {
@@ -419,11 +750,12 @@ export async function getClinicStaff(clinicId: string): Promise<ClinicStaffMembe
 }
 
 export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]> {
-  const { data, error } = await adminDb
+  const { data, error } = await (adminDb as any)
     .from('doctors')
     .select(`
-      id, full_name, title, avg_rating, review_count, is_active,
-      accepts_virtual, consultation_fee, years_experience,
+      id, full_name, email, title, avg_rating, review_count, is_active,
+      accepts_virtual, consultation_fee, years_experience, clinic_id,
+      availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('clinic_id', clinicId)
@@ -431,12 +763,14 @@ export async function getClinicDoctors(clinicId: string): Promise<AdminDoctor[]>
     .order('full_name')
   if (error || !data) return []
   return (data as any[]).map(d => ({
-    id: d.id, full_name: d.full_name, title: d.title,
+    id: d.id, full_name: d.full_name, email: d.email ?? null, title: d.title,
     specialty_name: d.specialty?.name ?? null,
     avg_rating: d.avg_rating, review_count: d.review_count,
     is_active: d.is_active, accepts_virtual: d.accepts_virtual,
     consultation_fee: d.consultation_fee, years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name), color: nameToColor(d.full_name),
+    clinic_id: d.clinic_id ?? null,
+    availability_status: (d.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
   }))
 }
 
@@ -460,7 +794,29 @@ export async function getUnassignedDoctors(hospitalId: string): Promise<AdminDoc
     is_active: d.is_active, accepts_virtual: d.accepts_virtual,
     consultation_fee: d.consultation_fee, years_experience: d.years_experience,
     avatar: nameToInitials(d.full_name), color: nameToColor(d.full_name),
+    clinic_id: null, availability_status: 'on_duty' as const,
   }))
+}
+
+export async function createDoctor(hospitalId: string, payload: {
+  full_name:         string
+  title?:            string
+  specialty_id?:     string
+  consultation_fee?: number
+  virtual_fee?:      number
+  years_experience?: number
+  accepts_virtual:   boolean
+  bio?:              string
+  qualification?:    string
+  mdcn_number?:      string
+}): Promise<{ id: string } | { error: string }> {
+  const { data, error } = await adminDb
+    .from('doctors')
+    .insert({ hospital_id: hospitalId, is_active: true, ...payload } as any)
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  return { id: data.id }
 }
 
 export async function assignDoctorToClinic(doctorId: string, clinicId: string): Promise<void> {
@@ -474,57 +830,103 @@ export async function removeDoctorFromClinic(doctorId: string): Promise<void> {
 export async function getClinicAppointments(
   hospitalId: string, clinicId: string, from: string, to: string
 ): Promise<AdminAppointment[]> {
+  // Query by clinic_id directly (covers OPD-mode bookings) OR by doctor assigned to the clinic
   const { data: docs } = await adminDb
     .from('doctors').select('id').eq('clinic_id', clinicId)
-  if (!docs || docs.length === 0) return []
-  const doctorIds = (docs as any[]).map(d => d.id)
+  const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
 
-  const { data, error } = await adminDb
+  const baseQuery = adminDb
     .from('appointments')
     .select(`
       id, booking_ref, appointment_date, start_time, status, type, reason,
-      patient:users!appointments_patient_id_fkey(full_name, date_of_birth, gender),
-      doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name))
+      booking_mode, approval_status, urgency, symptom_description, approval_note,
+      assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
+      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
+      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
+      queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+      patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
+      doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
+      assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
+      clinic:hospital_clinics!appointments_clinic_id_fkey(name)
     `)
     .eq('hospital_id', hospitalId)
-    .in('doctor_id', doctorIds)
     .gte('appointment_date', from)
     .lte('appointment_date', to)
     .order('appointment_date', { ascending: false })
     .order('start_time')
+
+  // Match appointments routed to this clinic or assigned to a doctor in this clinic
+  const orFilter = doctorIds.length > 0
+    ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+    : `clinic_id.eq.${clinicId}`
+
+  const { data, error } = await baseQuery.or(orFilter)
   if (error || !data) return []
-  return (data as any[]).map(a => ({
-    id: a.id, booking_ref: a.booking_ref,
-    appointment_date: a.appointment_date,
-    start_time: (a.start_time ?? '').slice(0, 5),
-    status: a.status, type: a.type, reason: a.reason,
-    patient_name: a.patient?.full_name ?? 'Unknown',
-    patient_age: calcAge(a.patient?.date_of_birth ?? null),
-    patient_gender: a.patient?.gender ?? null,
-    doctor_name: a.doctor?.full_name ?? 'Unknown',
-    doctor_id: a.doctor?.id ?? '',
-    specialty_name: a.doctor?.specialty?.name ?? null,
-  }))
+
+  return (data as any[]).map(a => {
+    const isWalkin = a.booking_mode === 'walkin'
+    const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown')
+    return {
+      id: a.id, booking_ref: a.booking_ref,
+      appointment_date: a.appointment_date,
+      start_time: (a.start_time ?? '').slice(0, 5),
+      status: a.status, type: a.type, reason: a.reason,
+      booking_mode: a.booking_mode ?? 'doctor',
+      approval_status: a.approval_status ?? 'auto_approved',
+      urgency: a.urgency ?? 'routine',
+      symptom_description: a.symptom_description ?? null,
+      approval_note: a.approval_note ?? null,
+      assigned_doctor_id: a.assigned_doctor_id ?? null,
+      assigned_doctor_name: a.assigned_doctor?.full_name ?? null,
+      clinic_id: a.clinic_id ?? null,
+      clinic_name: a.clinic?.name ?? null,
+      refund_pct: a.refund_pct ?? 100,
+      walkin_patient_name: a.walkin_patient_name ?? null,
+      walkin_patient_phone: a.walkin_patient_phone ?? null,
+      patient_id: isWalkin ? null : (a.patient?.id ?? null),
+      vitals_weight_kg: a.vitals_weight_kg ?? null,
+      vitals_height_cm: a.vitals_height_cm ?? null,
+      vitals_bp_systolic: a.vitals_bp_systolic ?? null,
+      vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
+      vitals_blood_sugar: a.vitals_blood_sugar ?? null,
+      vitals_bmi: a.vitals_bmi ?? null,
+      vitals_recorded_at: a.vitals_recorded_at ?? null,
+    queue_position: a.queue_position ?? null,
+    estimated_wait: a.estimated_wait ?? null,
+    consult_started_at: a.consult_started_at ?? null,
+    consult_ended_at: a.consult_ended_at ?? null,
+    consult_duration_secs: a.consult_duration_secs ?? null,
+    check_in_date: a.check_in_date ?? null,
+      patient_name: patientName,
+      patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
+      patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
+      doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
+      doctor_id: a.doctor?.id ?? a.assigned_doctor_id ?? '',
+      specialty_name: a.doctor?.specialty?.name ?? null,
+    }
+  })
 }
 
 export async function getClinicRangeStats(
   hospitalId: string, clinicId: string, from: string, to: string
 ) {
+  // Count both direct clinic bookings and doctor-routed bookings
   const { data: docs } = await adminDb
     .from('doctors').select('id').eq('clinic_id', clinicId)
-  if (!docs || docs.length === 0) return { total: 0, completed: 0, cancelled: 0, pending: 0 }
-  const doctorIds = (docs as any[]).map(d => d.id)
+  const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
+  const orFilter = doctorIds.length > 0
+    ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+    : `clinic_id.eq.${clinicId}`
+
+  const base = () => adminDb.from('appointments').select('id', { count: 'exact', head: true })
+    .eq('hospital_id', hospitalId)
+    .gte('appointment_date', from).lte('appointment_date', to)
+    .or(orFilter)
 
   const [totalRes, completedRes, cancelledRes] = await Promise.all([
-    adminDb.from('appointments').select('id', { count: 'exact', head: true })
-      .eq('hospital_id', hospitalId).in('doctor_id', doctorIds)
-      .gte('appointment_date', from).lte('appointment_date', to),
-    adminDb.from('appointments').select('id', { count: 'exact', head: true })
-      .eq('hospital_id', hospitalId).in('doctor_id', doctorIds)
-      .gte('appointment_date', from).lte('appointment_date', to).eq('status', 'completed'),
-    adminDb.from('appointments').select('id', { count: 'exact', head: true })
-      .eq('hospital_id', hospitalId).in('doctor_id', doctorIds)
-      .gte('appointment_date', from).lte('appointment_date', to).eq('status', 'cancelled'),
+    base(),
+    base().eq('status', 'completed'),
+    base().eq('status', 'cancelled'),
   ])
   const total = totalRes.count ?? 0
   const completed = completedRes.count ?? 0
@@ -550,8 +952,8 @@ export async function createClinicDoctor(
   return data as { id: string }
 }
 
-export async function updateClinic(clinicId: string, updates: { name?: string; description?: string | null; is_active?: boolean }): Promise<{ error: { message: string } | null }> {
-  const { error } = await adminDb.from('hospital_clinics').update(updates).eq('id', clinicId)
+export async function updateClinic(clinicId: string, updates: { name?: string; description?: string | null; is_active?: boolean; service_tags?: string[] }): Promise<{ error: { message: string } | null }> {
+  const { error } = await adminDb.from('hospital_clinics').update(updates as any).eq('id', clinicId)
   return { error }
 }
 
@@ -568,6 +970,213 @@ export async function updateAppointmentStatus(id: string, status: string) {
   await adminDb.from('appointments').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
 }
 
+export async function updateAppointmentVitals(id: string, vitals: AppointmentVitals): Promise<{ error: string | null }> {
+  const { error } = await (adminDb as any).from('appointments').update({
+    vitals_weight_kg: vitals.weight_kg,
+    vitals_height_cm: vitals.height_cm,
+    vitals_bp_systolic: vitals.bp_systolic,
+    vitals_bp_diastolic: vitals.bp_diastolic,
+    vitals_blood_sugar: vitals.blood_sugar,
+    vitals_recorded_at: new Date().toISOString(),
+  }).eq('id', id)
+  return { error: error?.message ?? null }
+}
+
+// ── Queue & consultation timing ─────────────────────────────────────────────────
+
+export async function getDoctorAvgConsultDuration(doctorId: string): Promise<number | null> {
+  const { data } = await (adminDb as any)
+    .from('appointments')
+    .select('consult_duration_secs')
+    .eq('doctor_id', doctorId)
+    .not('consult_duration_secs', 'is', null)
+  if (!data || data.length === 0) return null
+  const total = (data as { consult_duration_secs: number }[]).reduce((sum, r) => sum + r.consult_duration_secs, 0)
+  return total / data.length
+}
+
+function todayLocalDate(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+const QUEUE_SELECT = `
+  id, booking_ref, appointment_date, start_time, status, type, reason,
+  booking_mode, approval_status, urgency, symptom_description, approval_note,
+  assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
+  queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+  patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
+  doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
+  assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
+  clinic:hospital_clinics!appointments_clinic_id_fkey(name)
+`
+
+function mapQueueRow(a: any): AdminAppointment {
+  const isWalkin = a.booking_mode === 'walkin'
+  return {
+    id: a.id, booking_ref: a.booking_ref,
+    appointment_date: a.appointment_date,
+    start_time: (a.start_time ?? '').slice(0, 5),
+    status: a.status, type: a.type, reason: a.reason,
+    booking_mode: a.booking_mode ?? 'doctor',
+    approval_status: a.approval_status ?? 'auto_approved',
+    urgency: a.urgency ?? 'routine',
+    symptom_description: a.symptom_description ?? null,
+    approval_note: a.approval_note ?? null,
+    assigned_doctor_id: a.assigned_doctor_id ?? null,
+    assigned_doctor_name: a.assigned_doctor?.full_name ?? null,
+    clinic_id: a.clinic_id ?? null,
+    clinic_name: a.clinic?.name ?? null,
+    refund_pct: a.refund_pct ?? 100,
+    walkin_patient_name: a.walkin_patient_name ?? null,
+    walkin_patient_phone: a.walkin_patient_phone ?? null,
+    queue_position: a.queue_position ?? null,
+    estimated_wait: a.estimated_wait ?? null,
+    consult_started_at: a.consult_started_at ?? null,
+    consult_ended_at: a.consult_ended_at ?? null,
+    consult_duration_secs: a.consult_duration_secs ?? null,
+    check_in_date: a.check_in_date ?? null,
+    patient_id: isWalkin ? null : (a.patient?.id ?? null),
+    patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown'),
+    patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
+    patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
+    doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
+    doctor_id: a.doctor?.id ?? a.assigned_doctor_id ?? '',
+    specialty_name: a.doctor?.specialty?.name ?? null,
+  }
+}
+
+// Today's physical queue: appointments scheduled for today OR physically checked in today —
+// a future-dated booking that walks in early joins today's queue rather than waiting for its
+// original date.
+export async function getQueueForToday(hospitalId: string, clinicId?: string): Promise<AdminAppointment[]> {
+  const today = todayLocalDate()
+  let doctorIds: string[] = []
+  if (clinicId) {
+    const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
+    doctorIds = ((docs as any[]) ?? []).map((d: any) => d.id)
+  }
+
+  function scoped(query: any) {
+    if (!clinicId) return query.eq('hospital_id', hospitalId)
+    const orFilter = doctorIds.length > 0
+      ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
+      : `clinic_id.eq.${clinicId}`
+    return query.eq('hospital_id', hospitalId).or(orFilter)
+  }
+
+  const [byAppointmentDate, byCheckIn] = await Promise.all([
+    scoped((adminDb as any).from('appointments').select(QUEUE_SELECT)).eq('appointment_date', today),
+    scoped((adminDb as any).from('appointments').select(QUEUE_SELECT)).eq('check_in_date', today),
+  ])
+
+  const byId = new Map<string, any>()
+  for (const row of (byAppointmentDate.data ?? []) as any[]) byId.set(row.id, row)
+  for (const row of (byCheckIn.data ?? []) as any[]) byId.set(row.id, row)
+
+  return Array.from(byId.values())
+    .map(mapQueueRow)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time))
+}
+
+export async function checkInAppointment(id: string): Promise<{ error: string | null }> {
+  const { data: appt, error: fetchErr } = await (adminDb as any)
+    .from('appointments')
+    .select('hospital_id, doctor_id, assigned_doctor_id')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !appt) return { error: fetchErr?.message ?? 'Appointment not found' }
+
+  const checkInDate = todayLocalDate()
+  const doctorId = appt.doctor_id ?? appt.assigned_doctor_id
+  let queuePosition: number | null = null
+  let estimatedWait: number | null = null
+
+  // Queue scope is "checked in today," not the originally booked appointment_date — a
+  // future-dated booking that walks in today joins today's physical queue, per doctor.
+  if (doctorId) {
+    const [byDoctor, byAssigned] = await Promise.all([
+      (adminDb as any).from('appointments').select('id', { count: 'exact', head: true })
+        .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
+        .in('status', ['checked_in', 'in_progress']).eq('doctor_id', doctorId).neq('id', id),
+      (adminDb as any).from('appointments').select('id', { count: 'exact', head: true })
+        .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
+        .in('status', ['checked_in', 'in_progress']).eq('assigned_doctor_id', doctorId).neq('id', id),
+    ])
+    // Doctor-specific bookings use doctor_id; OPD bookings later assigned use assigned_doctor_id —
+    // a given appointment only ever matches one of the two, so the counts don't overlap.
+    const ahead = (byDoctor.count ?? 0) + (byAssigned.count ?? 0)
+    queuePosition = ahead + 1
+
+    const avgSecs = await getDoctorAvgConsultDuration(doctorId)
+    if (avgSecs != null) estimatedWait = Math.round((ahead * avgSecs) / 60)
+  }
+
+  const { error } = await (adminDb as any).from('appointments').update({
+    status: 'checked_in',
+    check_in_date: checkInDate,
+    queue_position: queuePosition,
+    estimated_wait: estimatedWait,
+    updated_at: new Date().toISOString(),
+  }).eq('id', id)
+  return { error: error?.message ?? null }
+}
+
+export async function startConsultation(id: string): Promise<{ error: string | null }> {
+  const { data: appt, error: fetchErr } = await (adminDb as any)
+    .from('appointments')
+    .select('hospital_id, doctor_id, assigned_doctor_id')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !appt) return { error: fetchErr?.message ?? 'Appointment not found' }
+
+  const doctorId = appt.doctor_id ?? appt.assigned_doctor_id
+  const checkInDate = todayLocalDate()
+
+  // Auto-end whatever this doctor was previously seeing, if it was never explicitly ended.
+  // Scoped by check_in_date (today's physical queue), not appointment_date — a future-dated
+  // booking that walked in today is in today's queue regardless of when it was booked for.
+  // Two-step (find IDs, then update by ID) instead of a single filtered update — a doctor's
+  // in-progress consult may be recorded under either doctor_id (direct booking) or
+  // assigned_doctor_id (OPD booking later assigned), and querying both columns via .in()
+  // per-column is unambiguous where chaining .or() with several other .eq() filters is not.
+  if (doctorId) {
+    const [byDoctor, byAssigned] = await Promise.all([
+      (adminDb as any).from('appointments').select('id')
+        .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
+        .eq('status', 'in_progress').eq('doctor_id', doctorId).neq('id', id),
+      (adminDb as any).from('appointments').select('id')
+        .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
+        .eq('status', 'in_progress').eq('assigned_doctor_id', doctorId).neq('id', id),
+    ])
+    const staleIds = Array.from(new Set([
+      ...((byDoctor.data ?? []) as { id: string }[]).map(r => r.id),
+      ...((byAssigned.data ?? []) as { id: string }[]).map(r => r.id),
+    ]))
+    if (staleIds.length > 0) {
+      const { error: autoEndErr } = await (adminDb as any)
+        .from('appointments')
+        .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
+        .in('id', staleIds)
+      if (autoEndErr) return { error: `Failed to auto-end previous consult: ${autoEndErr.message}` }
+    }
+  }
+
+  const { error } = await (adminDb as any).from('appointments').update({
+    status: 'in_progress',
+    consult_started_at: new Date().toISOString(),
+  }).eq('id', id)
+  return { error: error?.message ?? null }
+}
+
+export async function endConsultation(id: string): Promise<{ error: string | null }> {
+  const { error } = await (adminDb as any).from('appointments').update({
+    status: 'completed',
+    consult_ended_at: new Date().toISOString(),
+  }).eq('id', id)
+  return { error: error?.message ?? null }
+}
+
 export async function getHospitalSpecialties(hospitalId: string) {
   const { data } = await adminDb
     .from('doctors')
@@ -580,6 +1189,125 @@ export async function getHospitalSpecialties(hospitalId: string) {
   return (data as any[])
     .filter(d => d.specialty?.id && !seen.has(d.specialty.id) && seen.add(d.specialty.id))
     .map(d => d.specialty)
+}
+
+// ── Specialties ───────────────────────────────────────────────────────────────
+
+export interface SpecialtyRow { id: string; name: string; icon: string | null; slug: string }
+
+export async function getAllSpecialties(): Promise<SpecialtyRow[]> {
+  const { data } = await adminDb
+    .from('specialties')
+    .select('id, name, icon, slug')
+    .order('name')
+  return (data as SpecialtyRow[]) ?? []
+}
+
+export async function getRegisteredSpecialties(hospitalId: string): Promise<SpecialtyRow[]> {
+  // Union: specialties linked via hospital_specialties OR via doctors
+  const [hsRes, docRes] = await Promise.all([
+    adminDb.from('hospital_specialties')
+      .select('specialty:specialties!hospital_specialties_specialty_id_fkey(id, name, icon, slug)')
+      .eq('hospital_id', hospitalId),
+    adminDb.from('doctors')
+      .select('specialty:specialties!doctors_specialty_id_fkey(id, name, icon, slug)')
+      .eq('hospital_id', hospitalId).eq('is_active', true),
+  ])
+  const seen = new Set<string>()
+  const combined = [
+    ...((hsRes.data as any[]) ?? []),
+    ...((docRes.data as any[]) ?? []),
+  ]
+  return combined
+    .map(r => r.specialty)
+    .filter(s => s?.id && !seen.has(s.id) && seen.add(s.id)) as SpecialtyRow[]
+}
+
+export async function addHospitalSpecialty(hospitalId: string, specialtyId: string): Promise<{ error?: string }> {
+  const { error } = await adminDb
+    .from('hospital_specialties')
+    .insert({ hospital_id: hospitalId, specialty_id: specialtyId })
+  return { error: error?.message }
+}
+
+export async function removeHospitalSpecialty(hospitalId: string, specialtyId: string): Promise<void> {
+  await adminDb
+    .from('hospital_specialties')
+    .delete()
+    .eq('hospital_id', hospitalId)
+    .eq('specialty_id', specialtyId)
+}
+
+// ── Services ──────────────────────────────────────────────────────────────────
+
+export interface HospitalService {
+  id:           string
+  name:         string
+  description:  string | null
+  specialty_id: string | null
+  specialty_name: string | null
+  base_price:   number | null
+  virtual_price: number | null
+  duration_mins: number | null
+  is_active:    boolean
+  clinic_id:    string | null
+}
+
+export async function getHospitalServices(hospitalId: string, clinicId?: string): Promise<HospitalService[]> {
+  let q = adminDb
+    .from('services')
+    .select('id, name, description, specialty_id, base_price, virtual_price, duration_mins, is_active, clinic_id, specialty:specialties!services_specialty_id_fkey(name)')
+    .eq('hospital_id', hospitalId)
+  // Clinic-scoped users see only their clinic's services (+ hospital-wide ones with no clinic)
+  if (clinicId) q = (q as any).or(`clinic_id.eq.${clinicId},clinic_id.is.null`)
+  const { data } = await (q as any).order('name')
+  return ((data as any[]) ?? []).map(s => ({
+    id:           s.id,
+    name:         s.name,
+    description:  s.description ?? null,
+    specialty_id: s.specialty_id ?? null,
+    specialty_name: s.specialty?.name ?? null,
+    base_price:   s.base_price ?? null,
+    virtual_price: s.virtual_price ?? null,
+    duration_mins: s.duration_mins ?? null,
+    is_active:    s.is_active ?? true,
+    clinic_id:    s.clinic_id ?? null,
+  }))
+}
+
+export async function createService(
+  hospitalId: string,
+  data: { name: string; description?: string; specialty_id?: string; base_price?: number; virtual_price?: number; duration_mins?: number },
+  clinicId?: string
+): Promise<{ error?: string }> {
+  const { error } = await (adminDb as any).from('services').insert({
+    hospital_id:   hospitalId,
+    clinic_id:     clinicId ?? null,
+    name:          data.name,
+    description:   data.description ?? null,
+    specialty_id:  data.specialty_id ?? null,
+    base_price:    data.base_price ?? null,
+    virtual_price: data.virtual_price ?? null,
+    duration_mins: data.duration_mins ?? null,
+    is_active:     true,
+  })
+  return { error: error?.message }
+}
+
+export async function updateService(
+  serviceId: string,
+  data: { name?: string; description?: string | null; specialty_id?: string | null; base_price?: number | null; virtual_price?: number | null; duration_mins?: number | null }
+): Promise<{ error?: string }> {
+  const { error } = await adminDb.from('services').update(data).eq('id', serviceId)
+  return { error: error?.message }
+}
+
+export async function toggleServiceActive(serviceId: string, isActive: boolean): Promise<void> {
+  await adminDb.from('services').update({ is_active: isActive }).eq('id', serviceId)
+}
+
+export async function deleteService(serviceId: string): Promise<void> {
+  await adminDb.from('services').delete().eq('id', serviceId)
 }
 
 export async function getHospitalStats(hospitalId: string) {
@@ -613,7 +1341,7 @@ export async function assignDoctorToAppointment(appointmentId: string, doctorId:
     assigned_doctor_id: doctorId,
     doctor_id: doctorId,
     updated_at: new Date().toISOString(),
-  }).eq('id', appointmentId)
+  } as any).eq('id', appointmentId)
 }
 
 export async function markNoShow(appointmentId: string): Promise<void> {
@@ -624,19 +1352,92 @@ export async function markNoShow(appointmentId: string): Promise<void> {
     no_show_at: now,
     reschedule_deadline: deadline,
     updated_at: now,
-  }).eq('id', appointmentId)
+  } as any).eq('id', appointmentId)
+}
+
+async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
+    })
+  } catch { /* best-effort */ }
+}
+
+async function notifyPatient(
+  appointmentId: string,
+  type: 'confirmed' | 'cancelled',
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+) {
+  try {
+    const { data: appt } = await adminDb
+      .from('appointments')
+      .select('patient_id, booking_ref')
+      .eq('id', appointmentId)
+      .single()
+    if (!appt?.patient_id) return
+
+    const { data: patient } = await adminDb
+      .from('users')
+      .select('push_token')
+      .eq('id', appt.patient_id)
+      .single()
+
+    // In-app notification
+    await adminDb.from('notifications').insert({
+      user_id:  appt.patient_id,
+      type,
+      title,
+      body,
+      data:     { appointment_id: appointmentId, booking_ref: appt.booking_ref, ...data },
+      is_read:  false,
+      sent_via: ['in_app'],
+    } as any)
+
+    // Device push notification
+    const pushToken = (patient as any)?.push_token
+    if (pushToken) await sendExpoPush(pushToken, title, body, { appointment_id: appointmentId })
+  } catch { /* best-effort — never block the approval action */ }
 }
 
 export async function approveAppointment(appointmentId: string, note?: string): Promise<void> {
+  const { data: appt } = await adminDb
+    .from('appointments')
+    .select('booking_ref, appointment_date, hospital:hospitals!appointments_hospital_id_fkey(name), clinic:hospital_clinics!appointments_clinic_id_fkey(name)')
+    .eq('id', appointmentId)
+    .single()
+
   await adminDb.from('appointments').update({
-    approval_status: 'approved',
+    approval_status: 'auto_approved',
     status: 'confirmed',
     approval_note: note ?? null,
     updated_at: new Date().toISOString(),
-  }).eq('id', appointmentId)
+  } as any).eq('id', appointmentId)
+
+  const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'
+  const clinicName   = (appt as any)?.clinic?.name
+  const ref          = (appt as any)?.booking_ref ?? appointmentId
+  const dateStr      = (appt as any)?.appointment_date
+    ? new Date((appt as any).appointment_date + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
+    : ''
+
+  const notifBody = clinicName
+    ? `Your booking (${ref}) at ${hospitalName} — ${clinicName} on ${dateStr} has been confirmed.`
+    : `Your booking (${ref}) at ${hospitalName} on ${dateStr} has been confirmed.`
+
+  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved ✅', notifBody)
 }
 
 export async function rejectAppointment(appointmentId: string, note: string): Promise<void> {
+  const { data: appt } = await adminDb
+    .from('appointments')
+    .select('booking_ref, hospital:hospitals!appointments_hospital_id_fkey(name)')
+    .eq('id', appointmentId)
+    .single()
+
   await adminDb.from('appointments').update({
     approval_status: 'rejected',
     status: 'cancelled',
@@ -645,7 +1446,16 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
     cancelled_at: new Date().toISOString(),
     refund_pct: 100,
     updated_at: new Date().toISOString(),
-  }).eq('id', appointmentId)
+  } as any).eq('id', appointmentId)
+
+  const ref          = (appt as any)?.booking_ref ?? appointmentId
+  const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'
+
+  await notifyPatient(
+    appointmentId, 'cancelled',
+    'Booking Not Approved ❌',
+    `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. A full refund has been issued.`,
+  )
 }
 
 export async function getDailyBookingCount(
@@ -657,7 +1467,7 @@ export async function getDailyBookingCount(
     .eq('hospital_id', hospitalId)
     .eq('appointment_date', date)
     .neq('status', 'cancelled')
-  if (clinicId) q = q.eq('clinic_id', clinicId)
+  if (clinicId) q = (q as any).eq('clinic_id', clinicId)
   const { count } = await q
   return count ?? 0
 }
@@ -686,6 +1496,97 @@ export async function updateHospitalSettings(hospitalId: string, settings: {
   accepts_virtual?: boolean
   emergency_hours?: boolean
 }): Promise<{ error: string | null }> {
-  const { error } = await adminDb.from('hospitals').update(settings).eq('id', hospitalId)
+  const { error } = await adminDb.from('hospitals').update(settings as any).eq('id', hospitalId)
   return { error: error?.message ?? null }
+}
+
+// ── Operating hours (hospital-wide + per-clinic) ────────────────────────────────
+
+export interface DayHours { day: number; open: string; close: string; closed: boolean }
+
+// Mirrors onboarding's defaultHours: Mon–Sat 08:00–18:00 open, Sunday closed
+function defaultHours(): DayHours[] {
+  return Array.from({ length: 7 }, (_, day) => ({
+    day, open: '08:00', close: '18:00', closed: day === 0,
+  }))
+}
+
+function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
+  const byDay = new Map(rows.map(r => [r.day_of_week, r]))
+  return defaultHours().map(d => {
+    const r = byDay.get(d.day)
+    if (!r) return d
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+  })
+}
+
+export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> {
+  const { data } = await (adminDb as any)
+    .from('hospital_operating_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('hospital_id', hospitalId)
+  return fillHours(data ?? [])
+}
+
+export async function updateHospitalHours(hospitalId: string, hours: DayHours[]): Promise<{ error: string | null }> {
+  const rows = hours.map(h => ({
+    hospital_id: hospitalId, day_of_week: h.day,
+    open_time: h.open, close_time: h.close, is_closed: h.closed,
+  }))
+  const { error } = await (adminDb as any)
+    .from('hospital_operating_hours')
+    .upsert(rows, { onConflict: 'hospital_id,day_of_week' })
+  return { error: error?.message ?? null }
+}
+
+export async function getClinicHours(clinicId: string): Promise<{ hours: DayHours[]; isCustom: boolean }> {
+  const { data } = await (adminDb as any)
+    .from('hospital_clinic_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('clinic_id', clinicId)
+  const rows = data ?? []
+  return { hours: fillHours(rows), isCustom: rows.length > 0 }
+}
+
+export async function updateClinicHours(clinicId: string, hours: DayHours[]): Promise<{ error: string | null }> {
+  const rows = hours.map(h => ({
+    clinic_id: clinicId, day_of_week: h.day,
+    open_time: h.open, close_time: h.close, is_closed: h.closed,
+  }))
+  const { error } = await (adminDb as any)
+    .from('hospital_clinic_hours')
+    .upsert(rows, { onConflict: 'clinic_id,day_of_week' })
+  return { error: error?.message ?? null }
+}
+
+export async function clearClinicHours(clinicId: string): Promise<{ error: string | null }> {
+  const { error } = await (adminDb as any).from('hospital_clinic_hours').delete().eq('clinic_id', clinicId)
+  return { error: error?.message ?? null }
+}
+
+// ── Doctor self-service ───────────────────────────────────────────────────────
+
+export type DoctorAvailabilityStatus = 'on_duty' | 'on_break' | 'off_duty'
+
+export async function getDoctorProfile(doctorId: string): Promise<{
+  avg_rating: number
+  review_count: number
+  total_bookings: number
+  availability_status: DoctorAvailabilityStatus
+} | null> {
+  const { data } = await (adminDb.from('doctors') as any)
+    .select('avg_rating, review_count, total_bookings, availability_status')
+    .eq('id', doctorId)
+    .single()
+  if (!data) return null
+  return {
+    avg_rating:          data.avg_rating ?? 0,
+    review_count:        data.review_count ?? 0,
+    total_bookings:      data.total_bookings ?? 0,
+    availability_status: (data.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
+  }
+}
+
+export async function setDoctorAvailability(doctorId: string, status: DoctorAvailabilityStatus): Promise<void> {
+  await (adminDb.from('doctors') as any).update({ availability_status: status }).eq('id', doctorId)
 }

@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
 import { toggleClinicActive, deleteClinic } from '@/lib/admin-api'
+import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,25 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
         )}
       </div>
 
+      {/* Service tags */}
+      {clinic.service_tags?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {clinic.service_tags.slice(0, 5).map(tag => (
+            <span key={tag} style={{
+              fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+              background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`,
+            }}>
+              {tag}
+            </span>
+          ))}
+          {clinic.service_tags.length > 5 && (
+            <span style={{ fontSize: 10, color: C.textMuted, padding: '2px 4px' }}>
+              +{clinic.service_tags.length - 5} more
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Stats row */}
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1, background: C.bgAlt, border: `1px solid ${C.border}`,
@@ -165,15 +185,16 @@ interface CreateModalProps {
 
 function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps) {
   const { theme: C } = useTheme()
-  const [clinicName, setClinicName]     = useState('')
-  const [adminName,  setAdminName]      = useState('')
-  const [adminEmail, setAdminEmail]     = useState('')
-  const [password,   setPassword]       = useState(generatePassword)
-  const [loading,    setLoading]        = useState(false)
-  const [error,      setError]          = useState('')
-  const [success,    setSuccess]        = useState(false)
-  const [copied,     setCopied]         = useState(false)
-  const [showPass,   setShowPass]       = useState(true)
+  const [clinicName,   setClinicName]   = useState('')
+  const [serviceTags,  setServiceTags]  = useState<string[]>([])
+  const [adminName,    setAdminName]    = useState('')
+  const [adminEmail,   setAdminEmail]   = useState('')
+  const [password,     setPassword]     = useState(generatePassword)
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [success,      setSuccess]      = useState(false)
+  const [copied,       setCopied]       = useState(false)
+  const [showPass,     setShowPass]     = useState(true)
   const skipAdmin = !adminEmail.trim() && !adminName.trim()
 
   async function handleCreate() {
@@ -183,7 +204,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        hospitalId, clinicName,
+        hospitalId, clinicName, serviceTags,
         subAdminName: adminName || null,
         subAdminEmail: adminEmail || null,
         tempPassword: adminEmail ? password : null,
@@ -247,6 +268,15 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                 <input value={clinicName} onChange={e => setClinicName(e.target.value)}
                   placeholder="e.g. OPD Clinic, General Surgery, Cardiology…"
                   style={inputStyle} />
+              </div>
+
+              {/* Services */}
+              <div>
+                <label style={labelStyle}>Services Offered</label>
+                <ServiceTagPicker selected={serviceTags} onChange={setServiceTags} />
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                  Helps patients find this clinic when searching by service type.
+                </div>
               </div>
 
               {/* Divider */}

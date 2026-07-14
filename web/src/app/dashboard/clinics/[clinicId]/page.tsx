@@ -11,11 +11,16 @@ import {
   getClinicRangeStats, getUnassignedDoctors, assignDoctorToClinic,
   removeDoctorFromClinic, createClinicDoctor, updateAppointmentStatus,
   toggleClinicActive, deleteClinic, updateClinic,
+  approveAppointment, rejectAppointment,
+  getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
 } from '@/lib/admin-api'
 import type {
-  ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment,
+  ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
 import { adminDb } from '@/lib/supabase/admin-client'
+import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
+import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
+import { HoursEditor } from '@/components/dashboard/HoursEditor'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -51,12 +56,13 @@ type Tab = 'overview' | 'doctors' | 'staff' | 'appointments' | 'analytics'
 
 function EditClinicModal({
   clinic, col, onClose, onSave,
-}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined) => void }) {
+}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined, serviceTags: string[]) => void }) {
   const { theme: C } = useTheme()
-  const [name, setName]   = useState(clinic.name)
-  const [desc, setDesc]   = useState(clinic.description ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [name,        setName]        = useState(clinic.name)
+  const [desc,        setDesc]        = useState(clinic.description ?? '')
+  const [serviceTags, setServiceTags] = useState<string[]>(clinic.service_tags ?? [])
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
 
   async function handleSave() {
     if (!name.trim()) return
@@ -64,10 +70,11 @@ function EditClinicModal({
     const { error: err } = await updateClinic(clinic.id, {
       name: name.trim(),
       description: desc.trim() || null,
+      service_tags: serviceTags,
     })
     setSaving(false)
     if (err) { setError(err.message ?? 'Failed to save'); return }
-    onSave(name.trim(), desc.trim() || undefined)
+    onSave(name.trim(), desc.trim() || undefined, serviceTags)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -123,6 +130,17 @@ function EditClinicModal({
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
 
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+              marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+              Services Offered
+            </label>
+            <ServiceTagPicker selected={serviceTags} onChange={setServiceTags} />
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+              Helps patients find this clinic when searching by service type.
+            </div>
+          </div>
+
           {error && (
             <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
               borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
@@ -145,6 +163,113 @@ function EditClinicModal({
                 cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit Clinic Hours Modal ────────────────────────────────────────────────────
+
+function EditClinicHoursModal({
+  clinicId, hospitalHours, initialHours, initialIsCustom, col, onClose, onSave,
+}: {
+  clinicId: string
+  hospitalHours: DayHours[]
+  initialHours: DayHours[]
+  initialIsCustom: boolean
+  col: typeof CLINIC_PALETTE[0]
+  onClose: () => void
+  onSave: (hours: DayHours[], isCustom: boolean) => void
+}) {
+  const { theme: C } = useTheme()
+  const [isCustom, setIsCustom] = useState(initialIsCustom)
+  const [hours,    setHours]    = useState<DayHours[]>(initialHours)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+
+  async function handleSave() {
+    setSaving(true); setError('')
+    const { error: err } = isCustom
+      ? await updateClinicHours(clinicId, hours)
+      : await clearClinicHours(clinicId)
+    setSaving(false)
+    if (err) { setError(err); return }
+    onSave(isCustom ? hours : hospitalHours, isCustom)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+
+      <div style={{ width: '100%', maxWidth: 460, maxHeight: '85vh', overflowY: 'auto',
+        background: C.card, border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Operating Hours</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
+              Set when this clinic accepts appointments
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
+              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
+              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ key: false, label: "Use hospital's hours" }, { key: true, label: 'Custom hours' }].map(o => (
+              <button key={String(o.key)} onClick={() => setIsCustom(o.key)}
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                  border: `1px solid ${isCustom === o.key ? col.text : C.border}`,
+                  background: isCustom === o.key ? col.bg : C.bgAlt }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: isCustom === o.key ? col.text : C.text }}>
+                  {o.label}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {isCustom ? (
+            <HoursEditor hours={hours} onChange={setHours} />
+          ) : (
+            <div style={{ fontSize: 12, color: C.textSub, background: C.bgAlt,
+              border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px' }}>
+              This clinic will follow the hospital's overall operating hours (editable in Settings).
+            </div>
+          )}
+
+          {error && (
+            <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose}
+              style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
+                background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
+                background: col.text, color: '#061208',
+                border: 'none', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : 'Save Hours'}
             </button>
           </div>
         </div>
@@ -569,12 +694,183 @@ function AddStaffModal({
   )
 }
 
+// ── Manage Staff Modal ────────────────────────────────────────────────────────
+
+function ManageStaffModal({ staff, col, C, onClose, onRemoved, onUpdated }: {
+  staff: ClinicStaffMember
+  col: { bg: string; text: string }
+  C: any
+  onClose: () => void
+  onRemoved: () => void
+  onUpdated: (s: ClinicStaffMember) => void
+}) {
+  const [tab,      setTab]      = useState<'edit'|'password'>('edit')
+  const [name,     setName]     = useState(staff.full_name)
+  const [email,    setEmail]    = useState(staff.email)
+  const [password, setPassword] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+  const [success,  setSuccess]  = useState('')
+
+  const overlay: React.CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+  }
+  const card: React.CSSProperties = {
+    width: '100%', maxWidth: 460, background: C.card,
+    border: `1px solid ${C.border}`, borderRadius: 20,
+    boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
+  }
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: 10,
+    border: `1px solid ${C.border}`, background: C.bgAlt,
+    color: C.text, fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+  }
+  const lbl: React.CSSProperties = {
+    display: 'block', fontSize: 11, fontWeight: 700, color: C.textMuted,
+    marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase',
+  }
+
+  async function saveProfile() {
+    setSaving(true); setError(''); setSuccess('')
+    const res = await fetch('/api/clinic-staff', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id, full_name: name, email }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Profile updated')
+    onUpdated({ ...staff, full_name: name, email })
+  }
+
+  async function savePassword() {
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setSaving(true); setError(''); setSuccess('')
+    const res = await fetch('/api/clinic-staff/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id, newPassword: password }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.error) { setError(data.error); return }
+    setSuccess('Password updated successfully')
+    setPassword('')
+  }
+
+  async function removeStaff() {
+    if (!confirm(`Remove ${staff.full_name} from this clinic?`)) return
+    setSaving(true)
+    await fetch('/api/clinic-staff', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staff.id }),
+    })
+    setSaving(false)
+    onRemoved()
+  }
+
+  const roleLabel = staff.role === 'clinic_admin' ? 'Sub-Admin' : 'Front Desk'
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{staff.full_name}</div>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+              background: col.bg, color: col.text }}>{roleLabel}</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+            fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: C.bgAlt,
+          borderRadius: 10, padding: 4 }}>
+          {(['edit', 'password'] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }}
+              style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: tab === t ? C.card : 'transparent',
+                color: tab === t ? C.text : C.textMuted,
+                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.15)' : 'none' }}>
+              {t === 'edit' ? 'Edit Profile' : 'Reset Password'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'edit' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={lbl}>Full Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Login Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inp} />
+            </div>
+          </div>
+        )}
+
+        {tab === 'password' && (
+          <div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
+              Set a new password for <strong>{staff.full_name}</strong>&apos;s login account.
+              Share it with them securely.
+            </div>
+            <label style={lbl}>New Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Min. 8 characters" style={inp} />
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+            color: '#f07070', fontSize: 12 }}>{error}</div>
+        )}
+        {success && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8,
+            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+            color: '#4ade80', fontSize: 12 }}>{success}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button onClick={removeStaff} disabled={saving}
+            style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+              color: '#f07070', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+            Remove
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
+            background: C.bgAlt, border: `1px solid ${C.border}`,
+            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
+            style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: saving ? C.border : col.text,
+              color: '#061208', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ClinicDetailPage() {
   const { clinicId } = useParams() as { clinicId: string }
   const { theme: C } = useTheme()
-  const { hospital } = useAdmin()
+  const { hospital, role } = useAdmin()
   const router = useRouter()
 
   const col = clinicColor(clinicId)
@@ -587,14 +883,24 @@ export default function ClinicDetailPage() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState<Tab>('overview')
 
-  const [range,  setRange]  = useState<DateRangeKey>('today')
-  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('today'))
+  const [range,  setRange]  = useState<DateRangeKey>('this_week')
+  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('this_week'))
 
-  const [showAssign,    setShowAssign]    = useState(false)
-  const [showAddStaff,  setShowAddStaff]  = useState(false)
-  const [showEdit,      setShowEdit]      = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
+  const [showAssign,      setShowAssign]      = useState(false)
+  const [showAddStaff,    setShowAddStaff]    = useState(false)
+  const [showEdit,        setShowEdit]        = useState(false)
+  const [confirmDelete,   setConfirmDelete]   = useState(false)
+  const [deleting,        setDeleting]        = useState(false)
+  const [rejectClinicAppt, setRejectClinicAppt] = useState<AdminAppointment | null>(null)
+  const [rejectNote,       setRejectNote]       = useState('')
+  const [rejectSaving,     setRejectSaving]     = useState(false)
+  const [managingStaff,    setManagingStaff]    = useState<ClinicStaffMember | null>(null)
+  const [managingDoctor,   setManagingDoctor]   = useState<AdminDoctor | null>(null)
+  const [clinicHours,      setClinicHours]      = useState<DayHours[]>([])
+  const [hospitalHours,    setHospitalHours]    = useState<DayHours[]>([])
+  const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
+  const [showHours,        setShowHours]        = useState(false)
+  const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -605,18 +911,23 @@ export default function ClinicDetailPage() {
   const load = useCallback(async () => {
     if (!clinicId || !hospital?.id) return
     setLoading(true)
-    const [c, d, s, a, st] = await Promise.all([
+    const [c, d, s, a, st, ch, hh] = await Promise.all([
       getClinicDetail(clinicId),
       getClinicDoctors(clinicId),
       getClinicStaff(clinicId),
       getClinicAppointments(hospital.id, clinicId, bounds.from, bounds.to),
       getClinicRangeStats(hospital.id, clinicId, bounds.from, bounds.to),
+      getClinicHours(clinicId),
+      getHospitalHours(hospital.id),
     ])
     setClinic(c)
     setDoctors(d)
     setStaff(s)
     setAppts(a)
     setStats(st)
+    setClinicHours(ch.hours)
+    setHoursIsCustom(ch.isCustom)
+    setHospitalHours(hh)
     setLoading(false)
   }, [clinicId, hospital?.id, bounds])
 
@@ -650,7 +961,7 @@ export default function ClinicDetailPage() {
   }
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
-  const deskOfficers = staff.filter(s => s.role === 'desk_officer')
+  const deskOfficers = staff.filter(s => s.role === 'desk_officer' || s.role === 'front_desk')
   const todayAppts   = appts.filter(a => a.appointment_date === new Date().toISOString().split('T')[0])
 
   // analytics — specialty breakdown from aAppts
@@ -867,7 +1178,7 @@ export default function ClinicDetailPage() {
                         fontSize: 11, fontWeight: 700, color: col.text, flexShrink: 0 }}>
                         {initials(subAdmin.full_name)}
                       </div>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {subAdmin.full_name}
@@ -877,6 +1188,14 @@ export default function ClinicDetailPage() {
                           {subAdmin.email}
                         </div>
                       </div>
+                      {canManageStaff && (
+                        <button onClick={() => setManagingStaff(subAdmin)}
+                          style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                            borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600,
+                            fontFamily: 'inherit', flexShrink: 0 }}>
+                          Manage
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
@@ -916,8 +1235,74 @@ export default function ClinicDetailPage() {
                       </div>
                       <div style={{ fontSize: 10, color: C.textMuted }}>Front Desk</div>
                     </div>
+                    {canManageStaff && (
+                      <button onClick={() => setManagingStaff(s)}
+                        style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                          borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontWeight: 600,
+                          fontFamily: 'inherit', flexShrink: 0 }}>
+                        Manage
+                      </button>
+                    )}
                   </div>
                 ))}
+              </div>
+
+              {/* Services offered */}
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Services Offered</div>
+                  <button onClick={() => setShowEdit(true)}
+                    style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                    Edit
+                  </button>
+                </div>
+                <div style={{ padding: '12px 16px' }}>
+                  {(clinic?.service_tags ?? []).length === 0 ? (
+                    <div style={{ fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
+                      No services configured — click Edit to add.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(clinic?.service_tags ?? []).map(tag => (
+                        <span key={tag} style={{
+                          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
+                          background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`,
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Operating hours */}
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Operating Hours</div>
+                  {canManageStaff && (
+                    <button onClick={() => setShowHours(true)}
+                      style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                        cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                      Manage
+                    </button>
+                  )}
+                </div>
+                <div style={{ padding: '12px 16px', fontSize: 12, color: C.textSub }}>
+                  {hoursIsCustom ? (
+                    (() => {
+                      const open = clinicHours.filter(h => !h.closed)
+                      if (open.length === 0) return 'Closed every day'
+                      const DAY_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                      return open.map(h => `${DAY_LABELS[h.day]} ${h.open}–${h.close}`).join(' · ')
+                    })()
+                  ) : (
+                    <span style={{ fontStyle: 'italic', color: C.textMuted }}>Using hospital's hours</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -997,24 +1382,34 @@ export default function ClinicDetailPage() {
                       </span>
                     )}
                   </div>
-                  <button onClick={async () => {
-                    await removeDoctorFromClinic(doc.id)
-                    setDoctors(prev => prev.filter(d => d.id !== doc.id))
-                  }}
-                    style={{ width: '100%', padding: '7px', borderRadius: 8, cursor: 'pointer',
-                      background: 'transparent', border: `1px solid ${C.border}`,
-                      color: C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      transition: 'all .15s' }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(220,60,60,0.3)'
-                      ;(e.currentTarget as HTMLButtonElement).style.color = '#f07070'
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {canManageStaff && (
+                      <button onClick={() => setManagingDoctor(doc)}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                          background: col.bg, border: 'none',
+                          color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Manage
+                      </button>
+                    )}
+                    <button onClick={async () => {
+                      await removeDoctorFromClinic(doc.id)
+                      setDoctors(prev => prev.filter(d => d.id !== doc.id))
                     }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = C.border
-                      ;(e.currentTarget as HTMLButtonElement).style.color = C.textMuted
-                    }}>
-                    Remove from Clinic
-                  </button>
+                      style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                        background: 'transparent', border: `1px solid ${C.border}`,
+                        color: C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        transition: 'all .15s' }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(220,60,60,0.3)'
+                        ;(e.currentTarget as HTMLButtonElement).style.color = '#f07070'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = C.border
+                        ;(e.currentTarget as HTMLButtonElement).style.color = C.textMuted
+                      }}>
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1061,8 +1456,17 @@ export default function ClinicDetailPage() {
                       : '—'}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
-                  background: col.bg, color: col.text }}>Sub-Admin</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                    background: col.bg, color: col.text }}>Sub-Admin</span>
+                  {canManageStaff && (
+                    <button onClick={() => setManagingStaff(subAdmin)}
+                      style={{ fontSize: 11, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                        borderRadius: 8, padding: '4px 14px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                      Manage
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ background: C.card, border: `2px dashed ${C.borderMed}`,
@@ -1125,9 +1529,17 @@ export default function ClinicDetailPage() {
                           : '—'}
                       </div>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                      background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}`,
-                      flexShrink: 0 }}>Desk</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                        background: C.bgAlt, color: C.textMuted, border: `1px solid ${C.border}` }}>Desk</span>
+                      {canManageStaff && (
+                        <button onClick={() => setManagingStaff(s)}
+                          style={{ fontSize: 10, color: col.text, background: 'none', border: `1px solid ${col.text}`,
+                            borderRadius: 6, padding: '2px 10px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                          Manage
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1157,12 +1569,27 @@ export default function ClinicDetailPage() {
             <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} label="Period" />
           </div>
 
+          {/* Pending approvals banner */}
+          {(() => {
+            const pending = appts.filter(a => a.approval_status === 'pending_approval')
+            return pending.length > 0 ? (
+              <div style={{ background: 'rgba(239,159,39,0.08)', border: '1px solid rgba(239,159,39,0.25)',
+                borderRadius: 12, padding: '10px 16px', marginBottom: 14,
+                display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⏳</span>
+                <span style={{ fontSize: 13, color: '#EF9F27', fontWeight: 700 }}>
+                  {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting your review
+                </span>
+              </div>
+            ) : null
+          })()}
+
           {/* Table */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: C.bgAlt }}>
-                  {['Date','Time','Patient','Doctor','Type','Status','Actions'].map(h => (
+                  {['Date','ID','Patient','Reason / Note','Doctor','Status','Actions'].map(h => (
                     <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11,
                       fontWeight: 700, color: C.textMuted, letterSpacing: '.06em',
                       textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`,
@@ -1177,66 +1604,166 @@ export default function ClinicDetailPage() {
                   </td></tr>
                 ) : appts.length === 0 ? (
                   <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
-                    {doctors.length === 0
-                      ? 'Add doctors to this clinic first to see appointments.'
-                      : 'No appointments for this period.'}
+                    No appointments for this period.
                   </td></tr>
-                ) : appts.map((a, i) => (
-                  <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
-                    background: i % 2 === 0 ? C.card : C.rowAlt }}>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
-                      {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
-                    </td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
-                      <div style={{ fontSize: 11, color: C.textSub }}>
-                        {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
-                      </div>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{a.doctor_name}</div>
-                      <div style={{ fontSize: 11, color: C.textSub }}>{a.specialty_name ?? 'General'}</div>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 600,
-                        background: a.type === 'virtual' ? C.blueLight : C.accentLight,
-                        color: a.type === 'virtual' ? C.blue : C.accent }}>
-                        {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '11px 14px' }}><Badge status={a.status} /></td>
-                    <td style={{ padding: '11px 14px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {a.status !== 'cancelled' && a.status !== 'completed' && (
-                          <button onClick={async () => {
-                            await updateAppointmentStatus(a.id, 'checked_in')
-                            setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
-                          }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
-                              border: `1px solid ${col.bg.replace('0.14','0.3')}`,
-                              background: col.bg, color: col.text, cursor: 'pointer', fontWeight: 600 }}>
-                            Check In
-                          </button>
+                ) : appts.map((a, i) => {
+                  const needsApproval = a.approval_status === 'pending_approval'
+                  return (
+                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
+                      background: needsApproval
+                        ? 'rgba(239,159,39,0.04)'
+                        : i % 2 === 0 ? C.card : C.rowAlt,
+                      outline: needsApproval ? '1px solid rgba(239,159,39,0.15)' : 'none' }}>
+                      <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
+                        <div>{new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted }}>{a.start_time}</div>
+                      </td>
+                      <td style={{ padding: '11px 14px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
+                        {a.booking_ref}
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
+                        <div style={{ fontSize: 11, color: C.textSub }}>
+                          {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
+                        </div>
+                      </td>
+                      <td style={{ padding: '11px 14px', maxWidth: 200 }}>
+                        <div style={{ fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.reason ?? '—'}
+                        </div>
+                        {a.symptom_description && (
+                          <div style={{ fontSize: 11, color: '#EF9F27', marginTop: 2,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={a.symptom_description}>
+                            📋 {a.symptom_description}
+                          </div>
                         )}
-                        {(a.status === 'checked_in' || a.status === 'in_progress') && (
-                          <button onClick={async () => {
-                            await updateAppointmentStatus(a.id, 'completed')
-                            setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'completed' } : x))
-                          }}
-                            style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
-                              border: `1px solid ${C.border}`, background: C.card,
-                              color: C.textSub, cursor: 'pointer', fontWeight: 600 }}>
-                            Complete
-                          </button>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+                          {a.assigned_doctor_name ?? a.doctor_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textSub }}>{a.specialty_name ?? 'General'}</div>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <Badge status={a.status} />
+                        {needsApproval && (
+                          <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
+                            color: '#EF9F27', background: 'rgba(239,159,39,0.1)',
+                            borderRadius: 6, padding: '2px 6px', display: 'inline-block' }}>
+                            AWAITING REVIEW
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {/* Approve */}
+                          {needsApproval && (
+                            <button onClick={async () => {
+                              await approveAppointment(a.id)
+                              setAppts(prev => prev.map(x => x.id === a.id
+                                ? { ...x, approval_status: 'auto_approved', status: 'confirmed' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
+                                border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
+                                color: '#00E87A', fontWeight: 700 }}>
+                              Approve
+                            </button>
+                          )}
+                          {/* Reject */}
+                          {needsApproval && (
+                            <button onClick={() => { setRejectClinicAppt(a); setRejectNote('') }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
+                                border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)',
+                                color: '#f07070', fontWeight: 700 }}>
+                              Reject
+                            </button>
+                          )}
+                          {/* Check In */}
+                          {!needsApproval && !['cancelled','completed','no_show'].includes(a.status) && (
+                            <button onClick={async () => {
+                              await updateAppointmentStatus(a.id, 'checked_in')
+                              setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
+                                border: `1px solid ${col.bg.replace('0.14','0.3')}`,
+                                background: col.bg, color: col.text, cursor: 'pointer', fontWeight: 600 }}>
+                              Check In
+                            </button>
+                          )}
+                          {/* Complete */}
+                          {['checked_in','in_progress'].includes(a.status) && (
+                            <button onClick={async () => {
+                              await updateAppointmentStatus(a.id, 'completed')
+                              setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'completed' } : x))
+                            }}
+                              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
+                                border: `1px solid ${C.border}`, background: C.card,
+                                color: C.textSub, cursor: 'pointer', fontWeight: 600 }}>
+                              Complete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Reject modal for clinic sub-admin */}
+          {rejectClinicAppt && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              onClick={e => { if (e.target === e.currentTarget) setRejectClinicAppt(null) }}>
+              <div style={{ width: '100%', maxWidth: 420, background: C.card,
+                border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
+                boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
+                  Reject Booking
+                </div>
+                <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
+                  Patient <strong style={{ color: C.text }}>{rejectClinicAppt.patient_name}</strong> will be notified with a full refund.
+                </div>
+                <textarea
+                  value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                  placeholder="Reason for rejection (required)…" rows={3}
+                  style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                    borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
+                    outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' as const }} />
+                <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                  <button onClick={() => setRejectClinicAppt(null)}
+                    style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+                      background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                      color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!rejectNote.trim()) return
+                      setRejectSaving(true)
+                      await rejectAppointment(rejectClinicAppt.id, rejectNote.trim())
+                      setAppts(prev => prev.map(x => x.id === rejectClinicAppt.id
+                        ? { ...x, approval_status: 'rejected', status: 'cancelled' } : x))
+                      setRejectSaving(false)
+                      setRejectClinicAppt(null)
+                    }}
+                    disabled={rejectSaving || !rejectNote.trim()}
+                    style={{ flex: 1, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
+                      background: rejectNote.trim() ? 'rgba(220,60,60,0.15)' : C.bgAlt,
+                      border: rejectNote.trim() ? '1px solid rgba(220,60,60,0.3)' : `1px solid ${C.border}`,
+                      color: rejectNote.trim() ? '#f07070' : C.textMuted,
+                      fontSize: 13, fontWeight: 700,
+                      cursor: !rejectNote.trim() || rejectSaving ? 'not-allowed' : 'pointer',
+                      opacity: rejectSaving ? 0.7 : 1 }}>
+                    {rejectSaving ? 'Rejecting…' : 'Reject & Refund'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1371,10 +1898,50 @@ export default function ClinicDetailPage() {
           clinic={clinic}
           col={col}
           onClose={() => setShowEdit(false)}
-          onSave={(name, description) => {
-            setClinic(prev => prev ? { ...prev, name, description: description ?? null } : prev)
+          onSave={(name, description, serviceTags) => {
+            setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags } : prev)
             setShowEdit(false)
           }}
+        />
+      )}
+
+      {/* ── Edit Clinic Hours Modal ─────────────────────────────────────────── */}
+      {showHours && (
+        <EditClinicHoursModal
+          clinicId={clinicId}
+          hospitalHours={hospitalHours}
+          initialHours={clinicHours}
+          initialIsCustom={hoursIsCustom}
+          col={col}
+          onClose={() => setShowHours(false)}
+          onSave={(hours, isCustom) => {
+            setClinicHours(hours)
+            setHoursIsCustom(isCustom)
+            setShowHours(false)
+          }}
+        />
+      )}
+
+      {/* ── Manage Staff Modal ───────────────────────────────────────────── */}
+      {managingStaff && (
+        <ManageStaffModal
+          staff={managingStaff}
+          col={col}
+          C={C}
+          onClose={() => setManagingStaff(null)}
+          onRemoved={() => { setStaff(prev => prev.filter(s => s.id !== managingStaff!.id)); setManagingStaff(null) }}
+          onUpdated={(updated) => { setStaff(prev => prev.map(s => s.id === updated.id ? updated : s)); setManagingStaff(null) }}
+        />
+      )}
+
+      {/* ── Manage Doctor Modal ──────────────────────────────────────────── */}
+      {managingDoctor && (
+        <ManageDoctorModal
+          doctor={managingDoctor}
+          col={col}
+          C={C}
+          onClose={() => setManagingDoctor(null)}
+          onUpdated={(updated) => { setDoctors(prev => prev.map(d => d.id === updated.id ? updated : d)); setManagingDoctor(null) }}
         />
       )}
 

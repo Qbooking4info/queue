@@ -1,225 +1,233 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-
-interface Specialty { id: string; name: string; icon: string | null }
+import { useTheme } from '@/contexts/ThemeContext'
+import { useAdmin } from '@/contexts/AdminContext'
+import { getAllSpecialties } from '@/lib/admin-api'
+import type { SpecialtyRow } from '@/lib/admin-api'
 
 export default function AddDoctorPage() {
-  const router = useRouter()
-  const supabase = createClient()
+  const { theme: C }                          = useTheme()
+  const { hospital, clinicId, reload, role }  = useAdmin()
+  const router                                = useRouter()
 
-  const [specialties, setSpecialties] = useState<Specialty[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState<{ loginEmail: string; loginPassword: string } | null>(null)
-  const [copied, setCopied] = useState<'email' | 'password' | null>(null)
+  const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
+  const [saving, setSaving]           = useState(false)
+  const [error,  setError]            = useState('')
 
   const [form, setForm] = useState({
-    full_name: '',
-    title: 'Dr.',
-    qualification: '',
-    specialty_id: '',
+    full_name:        '',
+    title:            '',
+    specialty_id:     '',
     consultation_fee: '',
-    virtual_fee: '',
-    accepts_virtual: false,
-    bio: '',
+    virtual_fee:      '',
+    years_experience: '',
+    accepts_virtual:  false,
+    bio:              '',
+    qualification:    '',
+    mdcn_number:      '',
+    login_email:      '',
+    login_password:   '',
   })
 
   useEffect(() => {
-    supabase.from('specialties').select('id, name, icon').order('name').then(({ data }) => {
-      if (data) setSpecialties(data)
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (role === 'front_desk' || role === 'doctor') { router.replace('/dashboard'); return }
+    getAllSpecialties().then(setSpecialties)
+  }, [role])
 
-  function set(field: string, value: string | boolean) {
-    setForm(f => ({ ...f, [field]: value }))
-  }
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true); setError('')
+    if (!hospital) return
+    if (!form.full_name.trim()) { setError('Full name is required'); return }
+    setSaving(true); setError('')
 
-    const res = await fetch('/api/doctors/create', {
+    const res = await fetch('/api/doctors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        hospitalId:       hospital.id,
+        clinicId:         clinicId ?? null,
+        full_name:        form.full_name.trim(),
+        title:            form.title.trim() || null,
+        specialty_id:     form.specialty_id || null,
+        consultation_fee: form.consultation_fee  ? Number(form.consultation_fee)  : null,
+        virtual_fee:      form.virtual_fee       ? Number(form.virtual_fee)       : null,
+        years_experience: form.years_experience  ? Number(form.years_experience)  : null,
+        accepts_virtual:  form.accepts_virtual,
+        bio:              form.bio.trim()           || null,
+        qualification:    form.qualification.trim() || null,
+        mdcn_number:      form.mdcn_number.trim()   || null,
+        login_email:      form.login_email.trim()   || null,
+        login_password:   form.login_password       || null,
+      }),
     })
-    const json = await res.json()
+    const result = await res.json()
 
-    if (!res.ok) {
-      setError(json.error ?? 'Failed to add doctor')
-      setLoading(false)
-      return
-    }
-
-    if (json.loginCreated) {
-      setSuccess({ loginEmail: json.loginEmail, loginPassword: json.loginPassword })
-      setLoading(false)
-    } else if (json.loginError) {
-      setError(`Doctor saved, but login could not be created: ${json.loginError}. Use the Staff page to set up their login manually.`)
-      setLoading(false)
-    } else {
-      router.push('/dashboard/doctors')
-    }
+    setSaving(false)
+    if (result.error) { setError(result.error); return }
+    await reload()
+    router.push('/dashboard/doctors')
   }
 
-  async function copyText(text: string, field: 'email' | 'password') {
-    await navigator.clipboard.writeText(text)
-    setCopied(field)
-    setTimeout(() => setCopied(null), 2000)
+  const input: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: 10,
+    border: `1px solid ${C.border}`, background: C.bgAlt,
+    color: C.text, fontSize: 14, outline: 'none', boxSizing: 'border-box',
   }
-
-  if (success) {
-    return (
-      <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
-        <div className="bg-[#111915] border border-white/7 rounded-2xl p-8">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-              <span className="text-2xl">👨‍⚕️</span>
-            </div>
-            <h2 className="text-xl font-bold">Doctor Added</h2>
-            <p className="text-sm text-[#7A9089] mt-1">
-              Save these credentials and share them with the doctor.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 mb-6">
-            <div>
-              <div className="text-xs text-[#7A9089] mb-1">Login Email</div>
-              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
-                <span className="flex-1 text-sm font-mono text-white break-all">{success.loginEmail}</span>
-                <button onClick={() => copyText(success!.loginEmail, 'email')}
-                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
-                  {copied === 'email' ? '✓ Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#7A9089] mb-1">Password</div>
-              <div className="flex items-center gap-2 bg-[#060A07] border border-white/10 rounded-xl px-3 py-2.5">
-                <span className="flex-1 text-sm font-mono text-white tracking-widest">{success.loginPassword}</span>
-                <button onClick={() => copyText(success!.loginPassword, 'password')}
-                  className="text-xs text-[#7A9089] hover:text-green-400 shrink-0 transition-colors px-2 py-1 rounded-lg hover:bg-green-500/10">
-                  {copied === 'password' ? '✓ Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 mb-6">
-            <p className="text-xs text-amber-400 leading-relaxed">
-              <span className="font-semibold">Important:</span> This password will not be shown again. Copy it now and share it with the doctor securely.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <Link href="/dashboard/doctors"
-              className="flex-1 text-center py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition-all">
-              Back to Doctors
-            </Link>
-            <button onClick={() => { setSuccess(null); setCopied(null); setForm({ full_name: '', title: 'Dr.', qualification: '', specialty_id: '', consultation_fee: '', virtual_fee: '', accepts_virtual: false, bio: '' }) }}
-              className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-[#7A9089] hover:text-white hover:border-white/20 transition-all">
-              Add Another
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+  const label: React.CSSProperties = {
+    display: 'block', fontSize: 12, fontWeight: 700,
+    color: C.textMuted, marginBottom: 6, letterSpacing: '.03em', textTransform: 'uppercase',
   }
+  const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }
 
   return (
-    <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard/doctors" className="text-[#4A6058] hover:text-white transition-colors text-sm">← Doctors</Link>
-        <span className="text-[#4A6058]">/</span>
-        <span className="text-sm">Add Doctor</span>
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <button onClick={() => router.back()}
+          style={{ background: 'none', border: 'none', color: C.textSub, fontSize: 13,
+            cursor: 'pointer', padding: 0, marginBottom: 12 }}>
+          ← Back to Doctors
+        </button>
+        <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Add Doctor</div>
+        <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>Register a new practitioner at {hospital?.name}</div>
       </div>
 
-      <h1 className="text-2xl font-bold mb-6">Add a Doctor</h1>
+      <form onSubmit={handleSubmit}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 16 }}>Basic information</div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {/* Name row */}
-        <div className="flex gap-3">
-          <div className="w-24">
-            <label className="text-xs text-[#7A9089] mb-1.5 block">Title</label>
-            <select value={form.title} onChange={e => set('title', e.target.value)}
-              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
-              {['Dr.','Prof.','Mr.','Mrs.','Ms.'].map(t => <option key={t}>{t}</option>)}
+          <div style={{ ...row, marginBottom: 16 }}>
+            <div>
+              <label style={label}>Title</label>
+              <select value={form.title} onChange={set('title')} style={input}>
+                <option value="">None</option>
+                {['Dr.', 'Prof.', 'Assoc. Prof.', 'Mr.', 'Mrs.', 'Ms.'].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={label}>Full Name *</label>
+              <input required value={form.full_name} onChange={set('full_name')}
+                placeholder="e.g. Amina Okonkwo" style={input} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>Specialty</label>
+            <select value={form.specialty_id} onChange={set('specialty_id')} style={input}>
+              <option value="">Select specialty…</option>
+              {specialties.map(s => (
+                <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.name}</option>
+              ))}
             </select>
           </div>
-          <div className="flex-1">
-            <label className="text-xs text-[#7A9089] mb-1.5 block">Full Name *</label>
-            <input required value={form.full_name} onChange={e => set('full_name', e.target.value)}
-              placeholder="Amaka Okafor"
-              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>Bio / Qualifications</label>
+            <textarea value={form.bio} onChange={set('bio') as any}
+              placeholder="Brief bio, qualifications, areas of expertise…"
+              rows={3} style={{ ...input, resize: 'vertical', fontFamily: 'inherit' }} />
           </div>
         </div>
 
-        {/* Qualification */}
-        <div>
-          <label className="text-xs text-[#7A9089] mb-1.5 block">Qualification</label>
-          <input value={form.qualification} onChange={e => set('qualification', e.target.value)}
-            placeholder="MBBS, FWACS"
-            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
-        </div>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 16 }}>Fees & Experience</div>
 
-        {/* Specialty */}
-        <div>
-          <label className="text-xs text-[#7A9089] mb-1.5 block">Specialty</label>
-          <select value={form.specialty_id} onChange={e => set('specialty_id', e.target.value)}
-            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
-            <option value="">Select specialty</option>
-            {specialties.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
-          </select>
-        </div>
-
-        {/* Fees */}
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <label className="text-xs text-[#7A9089] mb-1.5 block">Consultation Fee (₦)</label>
-            <input type="number" min="0" value={form.consultation_fee} onChange={e => set('consultation_fee', e.target.value)}
-              placeholder="5000"
-              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+          <div style={{ ...row, marginBottom: 16 }}>
+            <div>
+              <label style={label}>Consultation Fee (₦)</label>
+              <input type="number" value={form.consultation_fee} onChange={set('consultation_fee')}
+                placeholder="e.g. 5000" min={0} style={input} />
+            </div>
+            <div>
+              <label style={label}>Years of Experience</label>
+              <input type="number" value={form.years_experience} onChange={set('years_experience')}
+                placeholder="e.g. 8" min={0} max={60} style={input} />
+            </div>
           </div>
-          <div className="flex-1">
-            <label className="text-xs text-[#7A9089] mb-1.5 block">Virtual Fee (₦)</label>
-            <input type="number" min="0" value={form.virtual_fee} onChange={e => set('virtual_fee', e.target.value)}
-              placeholder="3500"
-              disabled={!form.accepts_virtual}
-              className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50 disabled:opacity-40" />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+            background: C.bgAlt, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 16 }}>
+            <input type="checkbox" id="accepts_virtual" checked={form.accepts_virtual}
+              onChange={e => setForm(f => ({ ...f, accepts_virtual: e.target.checked }))}
+              style={{ width: 16, height: 16, accentColor: C.accent }} />
+            <div>
+              <label htmlFor="accepts_virtual" style={{ fontSize: 13, fontWeight: 700, color: C.text, cursor: 'pointer' }}>
+                Accepts virtual consultations
+              </label>
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>
+                Patient can book a video/phone call instead of an in-person visit
+              </div>
+            </div>
+          </div>
+
+          {form.accepts_virtual && (
+            <div>
+              <label style={label}>Virtual Consultation Fee (₦)</label>
+              <input type="number" value={form.virtual_fee} onChange={set('virtual_fee')}
+                placeholder="Leave blank to use consultation fee" min={0} style={input} />
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 16 }}>Credentials (optional)</div>
+          <div style={row}>
+            <div>
+              <label style={label}>Qualifications</label>
+              <input value={form.qualification} onChange={set('qualification')}
+                placeholder="e.g. MBBS, FWACP" style={input} />
+            </div>
+            <div>
+              <label style={label}>MDCN Number</label>
+              <input value={form.mdcn_number} onChange={set('mdcn_number')}
+                placeholder="Medical licence number" style={input} />
+            </div>
           </div>
         </div>
 
-        {/* Virtual toggle */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div className={`w-10 h-6 rounded-full transition-colors relative ${form.accepts_virtual ? 'bg-green-500' : 'bg-white/10'}`}
-            onClick={() => set('accepts_virtual', !form.accepts_virtual)}>
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.accepts_virtual ? 'translate-x-5' : 'translate-x-1'}`} />
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 4 }}>Dashboard login access (optional)</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
+            Give the doctor login credentials so they can view their appointments and schedule.
           </div>
-          <span className="text-sm">Accepts virtual consultations</span>
-        </label>
-
-        {/* Bio */}
-        <div>
-          <label className="text-xs text-[#7A9089] mb-1.5 block">Bio (optional)</label>
-          <textarea value={form.bio} onChange={e => set('bio', e.target.value)}
-            rows={3} placeholder="Brief professional background..."
-            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50 resize-none" />
+          <div style={{ ...row, marginBottom: 0 }}>
+            <div>
+              <label style={label}>Login Email</label>
+              <input type="email" value={form.login_email} onChange={set('login_email')}
+                placeholder="doctor@hospital.ng" style={input} />
+            </div>
+            <div>
+              <label style={label}>Temporary Password</label>
+              <input type="password" value={form.login_password} onChange={set('login_password')}
+                placeholder="Min. 8 characters" minLength={8} style={input} />
+            </div>
+          </div>
         </div>
 
-        {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>}
+        {error && (
+          <div style={{ background: C.redLight, border: `1px solid ${C.red}`, borderRadius: 10,
+            padding: '10px 14px', marginBottom: 16, color: C.red, fontSize: 13 }}>
+            {error}
+          </div>
+        )}
 
-        <div className="flex gap-3 pt-2">
-          <Link href="/dashboard/doctors"
-            className="flex-1 text-center py-2.5 rounded-xl border border-white/10 text-sm text-[#7A9089] hover:text-white hover:border-white/20 transition-all">
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={() => router.back()}
+            style={{ padding: '11px 22px', borderRadius: 10, border: `1px solid ${C.border}`,
+              background: C.card, color: C.textSub, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             Cancel
-          </Link>
-          <button type="submit" disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition-all disabled:opacity-50">
-            {loading ? 'Adding…' : 'Add Doctor'}
+          </button>
+          <button type="submit" disabled={saving}
+            style={{ padding: '11px 28px', borderRadius: 10, border: 'none',
+              background: saving ? C.border : C.accent,
+              color: C.id === 'forest' ? '#061208' : '#fff',
+              fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Add Doctor'}
           </button>
         </div>
       </form>
