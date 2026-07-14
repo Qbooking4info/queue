@@ -1,6 +1,9 @@
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
 import { FrontDeskActions } from './FrontDeskActions'
+import { AutoRefresh } from './AutoRefresh'
+
+export const dynamic = 'force-dynamic'
 
 const STATUS_COLOR: Record<string, string> = {
   pending:     'text-amber-400 bg-amber-500/10 border-amber-500/20',
@@ -46,6 +49,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
+      <AutoRefresh intervalMs={30_000} />
       <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Front Desk Queue</h1>

@@ -1,11 +1,12 @@
 'use client'
 import { useTheme } from '@/contexts/ThemeContext'
 
-export type DateRangeKey = 'today' | 'this_week' | 'last_week' | 'this_month' | 'all_time'
+export type DateRangeKey = 'today' | 'upcoming' | 'this_week' | 'last_week' | 'this_month' | 'all_time'
 export interface DateBounds { from: string; to: string }
 
 const FILTERS: { key: DateRangeKey; label: string }[] = [
   { key: 'today',      label: 'Today'      },
+  { key: 'upcoming',   label: 'Upcoming'   },
   { key: 'this_week',  label: 'This Week'  },
   { key: 'last_week',  label: 'Last Week'  },
   { key: 'this_month', label: 'This Month' },
@@ -20,10 +21,16 @@ export function getDateBounds(range: DateRangeKey): DateBounds {
 
   if (range === 'today') return { from: today, to: today }
 
+  if (range === 'upcoming') {
+    const end = new Date(now); end.setDate(now.getDate() + 30)
+    return { from: today, to: fmt(end) }
+  }
+
   if (range === 'this_week') {
     const dow = now.getDay() || 7
     const mon = new Date(now); mon.setDate(now.getDate() - dow + 1)
-    return { from: fmt(mon), to: today }
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+    return { from: fmt(mon), to: fmt(sun) }
   }
 
   if (range === 'last_week') {
@@ -36,11 +43,12 @@ export function getDateBounds(range: DateRangeKey): DateBounds {
 
   if (range === 'this_month') {
     const first = new Date(now.getFullYear(), now.getMonth(), 1)
-    return { from: fmt(first), to: today }
+    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    return { from: fmt(first), to: fmt(last) }
   }
 
-  // all_time
-  return { from: '2020-01-01', to: today }
+  // all_time — include future bookings
+  return { from: '2020-01-01', to: '2099-12-31' }
 }
 
 export function rangeDateLabel(range: DateRangeKey, bounds: DateBounds): string {

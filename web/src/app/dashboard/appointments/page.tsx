@@ -412,8 +412,8 @@ export default function AppointmentsPage() {
   const { theme: C } = useTheme()
   const { hospital } = useAdmin()
 
-  const [range,   setRange]   = useState<DateRangeKey>('today')
-  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('today'))
+  const [range,   setRange]   = useState<DateRangeKey>('upcoming')
+  const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('upcoming'))
   const [appts,   setAppts]   = useState<AdminAppointment[]>([])
   const [doctors, setDoctors] = useState<AdminDoctor[]>([])
   const [loading, setLoading] = useState(true)
