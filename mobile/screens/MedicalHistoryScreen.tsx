@@ -3,11 +3,11 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
-import { getCompletedAppointments, updateUserProfile } from '../lib/api'
+import { getCompletedAppointments, updateUserProfile, getMedicalHistory, updateMedicalHistory } from '../lib/api'
+import type { MedicalHistory } from '../lib/api'
 
 interface Props { navigation: any }
 
@@ -25,24 +25,14 @@ const ALLERGY_PROMPTS = [
   'Latex', 'Peanuts', 'Shellfish', 'Pollen', 'Dust', 'Bee stings',
 ]
 
-const STORAGE_KEY = 'queue:health_notes'
-
-interface HealthNotes {
-  conditions: string[]
-  allergies:  string[]
-  medications: string
-  surgeries:   string
-  familyHistory: string
-}
-
-const DEFAULT_NOTES: HealthNotes = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
+const DEFAULT_NOTES: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
 
 export function MedicalHistoryScreen({ navigation }: Props) {
   const { theme: t }          = useTheme()
   const { user, refreshProfile } = useAuth()
 
   const [appts,    setAppts]   = useState<any[]>([])
-  const [notes,    setNotes]   = useState<HealthNotes>(DEFAULT_NOTES)
+  const [notes,    setNotes]   = useState<MedicalHistory>(DEFAULT_NOTES)
   const [loading,  setLoading] = useState(true)
   const [tab,      setTab]     = useState<'history' | 'profile'>('profile')
   const [saving,   setSaving]  = useState(false)
@@ -55,20 +45,21 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const [completed, stored] = await Promise.all([
+    const [completed, history] = await Promise.all([
       getCompletedAppointments(user.id),
-      AsyncStorage.getItem(STORAGE_KEY),
+      getMedicalHistory(user.id),
     ])
     setAppts(completed)
-    if (stored) setNotes(JSON.parse(stored))
+    setNotes(history)
     setLoading(false)
   }, [user])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  async function saveNotes(updated: HealthNotes) {
+  async function saveNotes(updated: MedicalHistory) {
     setNotes(updated)
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    if (!user) return
+    await updateMedicalHistory(user.id, updated)
   }
 
   function toggleCondition(c: string) {
@@ -271,6 +262,43 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                         <Text style={[s.apptSectionValue, { color: t.textPrimary }]}>{a.reason}</Text>
                       </View>
                     )}
+                    {(a.vitals_weight_kg || a.vitals_height_cm || a.vitals_bp_systolic || a.vitals_blood_sugar) && (
+                      <View style={[s.apptSection, { borderTopColor: t.cardBorder }]}>
+                        <Text style={[s.apptSectionLabel, { color: t.textMuted }]}>Vitals</Text>
+                        <View style={s.vitalsRow}>
+                          {a.vitals_weight_kg != null && (
+                            <View style={[s.vitalPill, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                              <Text style={[s.vitalPillText, { color: t.textPrimary }]}>{a.vitals_weight_kg} kg</Text>
+                              <Text style={[s.vitalPillLabel, { color: t.textMuted }]}>Weight</Text>
+                            </View>
+                          )}
+                          {a.vitals_height_cm != null && (
+                            <View style={[s.vitalPill, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                              <Text style={[s.vitalPillText, { color: t.textPrimary }]}>{a.vitals_height_cm} cm</Text>
+                              <Text style={[s.vitalPillLabel, { color: t.textMuted }]}>Height</Text>
+                            </View>
+                          )}
+                          {a.vitals_bmi != null && (
+                            <View style={[s.vitalPill, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                              <Text style={[s.vitalPillText, { color: t.accent }]}>{a.vitals_bmi}</Text>
+                              <Text style={[s.vitalPillLabel, { color: t.accent }]}>BMI</Text>
+                            </View>
+                          )}
+                          {a.vitals_bp_systolic != null && a.vitals_bp_diastolic != null && (
+                            <View style={[s.vitalPill, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                              <Text style={[s.vitalPillText, { color: t.textPrimary }]}>{a.vitals_bp_systolic}/{a.vitals_bp_diastolic}</Text>
+                              <Text style={[s.vitalPillLabel, { color: t.textMuted }]}>Blood Pressure</Text>
+                            </View>
+                          )}
+                          {a.vitals_blood_sugar != null && (
+                            <View style={[s.vitalPill, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                              <Text style={[s.vitalPillText, { color: t.textPrimary }]}>{a.vitals_blood_sugar} mg/dL</Text>
+                              <Text style={[s.vitalPillLabel, { color: t.textMuted }]}>Blood Sugar</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    )}
                     {a.diagnosis && (
                       <View style={[s.apptSection, { borderTopColor: t.cardBorder }]}>
                         <Text style={[s.apptSectionLabel, { color: t.textMuted }]}>Diagnosis</Text>
@@ -337,4 +365,8 @@ const s = StyleSheet.create({
   apptFooter:        { borderTopWidth: 1, padding: 10, flexDirection: 'row' },
   apptTypeBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   apptTypeBadgeText: { fontSize: 10, fontWeight: '600' },
+  vitalsRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  vitalPill:         { borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 68 },
+  vitalPillText:     { fontSize: 13, fontWeight: '700' },
+  vitalPillLabel:    { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 1 },
 })

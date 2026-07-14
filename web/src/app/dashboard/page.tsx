@@ -4,11 +4,12 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Badge } from '@/components/dashboard/Badge'
+import { ViewPatientModal } from '@/components/dashboard/ViewPatientModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import {
   getAppointments, getClinicAppointments, getRangeStats, getClinicRangeStats,
-  setDoctorAvailability,
+  setDoctorAvailability, getDoctorAvgConsultDuration,
 } from '@/lib/admin-api'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import Link from 'next/link'
@@ -64,13 +65,20 @@ export default function OverviewPage() {
 
   const [range,       setRange]       = useState<DateRangeKey>('today')
   const [bounds,      setBounds]      = useState<DateBounds>(getDateBounds('today'))
+  const [viewingPatient, setViewingPatient] = useState<{ id: string; name: string } | null>(null)
   const [appts,       setAppts]       = useState<AdminAppointment[]>([])
   const [rangeStats,  setRangeStats]  = useState({ total: 0, completed: 0, cancelled: 0, pending: 0 })
   const [loading,     setLoading]     = useState(true)
   const [avail,       setAvail]       = useState<DoctorAvailabilityStatus>(doctorAvailability ?? 'on_duty')
   const [savingAvail, setSavingAvail] = useState(false)
+  const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
 
   useEffect(() => { if (doctorAvailability) setAvail(doctorAvailability) }, [doctorAvailability])
+
+  useEffect(() => {
+    if (role !== 'doctor' || !doctorId) return
+    getDoctorAvgConsultDuration(doctorId).then(setAvgConsultSecs)
+  }, [role, doctorId])
 
   const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!clinicId
 
@@ -156,7 +164,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Doctor stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 24 }}>
           <StatCard icon="📅" label="Today's Appointments"
             value={ctxLoading ? '…' : stats.todayTotal}
             sub={`${stats.todayCompleted} completed`} colorKey="accent" />
@@ -171,6 +179,10 @@ export default function OverviewPage() {
             value={ctxLoading ? '…' : (stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—')}
             sub={stats.reviewCount > 0 ? `${stats.reviewCount} reviews` : 'No reviews yet'}
             colorKey="amber" />
+          <StatCard icon="🕐" label="Avg Consultation Time"
+            value={avgConsultSecs == null ? '—' : `${Math.round(avgConsultSecs / 60)}m`}
+            sub={avgConsultSecs == null ? 'No data yet' : 'Per patient'}
+            colorKey="blue" />
         </div>
 
         {/* Today's queue */}
@@ -198,11 +210,27 @@ export default function OverviewPage() {
                     {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}{a.reason ? ` · ${a.reason}` : ''}
                   </div>
                 </div>
+                {a.patient_id && (
+                  <button onClick={() => setViewingPatient({ id: a.patient_id!, name: a.patient_name })}
+                    style={{ fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 8,
+                      background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`,
+                      cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                    View Patient
+                  </button>
+                )}
                 <Badge status={a.status} />
               </div>
             ))}
           </div>
         </div>
+
+        {viewingPatient && (
+          <ViewPatientModal
+            patientId={viewingPatient.id}
+            patientName={viewingPatient.name}
+            onClose={() => setViewingPatient(null)}
+          />
+        )}
       </div>
     )
   }

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
-import { updateAppointmentStatus, getAppointments, getClinicAppointments } from '@/lib/admin-api'
+import { checkInAppointment, startConsultation, endConsultation, getQueueForToday } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
@@ -38,29 +38,35 @@ export default function QueuePage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('active')
-
-  const today = new Date().toISOString().split('T')[0]
+  const [actionError, setActionError] = useState('')
 
   const fetchQueue = useCallback(async () => {
     if (!hospital?.id) { setAppts(todayAppointments); setLoading(false); return }
     setLoading(true)
     let data: AdminAppointment[]
     if (role === 'doctor' && doctorId) {
+      // Already scoped to today (scheduled or checked-in) via getDoctorTodayAppointments in AdminContext
       data = todayAppointments
     } else if ((role === 'clinic_admin' || role === 'front_desk') && clinicId) {
-      data = await getClinicAppointments(hospital.id, clinicId, today, today)
+      data = await getQueueForToday(hospital.id, clinicId)
     } else {
-      data = await getAppointments(hospital.id, today, today)
+      data = await getQueueForToday(hospital.id)
     }
     setAppts(data)
     setLoading(false)
-  }, [hospital?.id, role, doctorId, clinicId, today, todayAppointments])
+  }, [hospital?.id, role, doctorId, clinicId, todayAppointments])
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
 
   async function advance(id: string, next: string) {
     setUpdating(id)
-    await updateAppointmentStatus(id, next)
+    setActionError('')
+    const { error } =
+      next === 'checked_in'  ? await checkInAppointment(id) :
+      next === 'in_progress' ? await startConsultation(id) :
+      next === 'completed'   ? await endConsultation(id) :
+      { error: null }
+    if (error) setActionError(error)
     await fetchQueue()
     setUpdating(null)
   }
@@ -99,6 +105,16 @@ export default function QueuePage() {
           </div>
         ))}
       </div>
+
+      {actionError && (
+        <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+          borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+          marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>⚠️ {actionError}</span>
+          <button onClick={() => setActionError('')}
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -147,7 +163,7 @@ export default function QueuePage() {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
-                  {idx + 1}
+                  {appt.queue_position ?? idx + 1}
                 </div>
 
                 {/* Patient info */}
@@ -156,6 +172,9 @@ export default function QueuePage() {
                   <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
                     {appt.start_time} · Dr. {appt.doctor_name}
                     {appt.booking_ref ? ` · #${appt.booking_ref}` : ''}
+                    {appt.status === 'checked_in' && appt.estimated_wait != null ? ` · ~${appt.estimated_wait}m wait` : ''}
+                    {appt.status === 'completed' && appt.consult_duration_secs != null
+                      ? ` · 🕐 ${Math.round(appt.consult_duration_secs / 60)} min` : ''}
                   </div>
                 </div>
 

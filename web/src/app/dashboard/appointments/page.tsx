@@ -3,14 +3,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
+import { VitalsModal } from '@/components/dashboard/VitalsModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
 import {
   getAppointments, getClinicAppointments, getDoctorAppointments,
-  updateAppointmentStatus,
   assignDoctorToAppointment, markNoShow,
   approveAppointment, rejectAppointment,
+  checkInAppointment, startConsultation, endConsultation,
   getDoctors as getDoctorsForHospital,
 } from '@/lib/admin-api'
 
@@ -569,6 +570,8 @@ export default function AppointmentsPage() {
   const [assignAppt,  setAssignAppt]  = useState<AdminAppointment | null>(null)
   const [rejectAppt,  setRejectAppt]  = useState<AdminAppointment | null>(null)
   const [detailAppt,  setDetailAppt]  = useState<AdminAppointment | null>(null)
+  const [vitalsAppt,  setVitalsAppt]  = useState<AdminAppointment | null>(null)
+  const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
     if (!hospital?.id) return
@@ -590,22 +593,42 @@ export default function AppointmentsPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function handleStatusUpdate(id: string, status: string) {
-    await updateAppointmentStatus(id, status)
-    setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a))
-  }
-
   async function handleApprove(appt: AdminAppointment) {
     await approveAppointment(appt.id)
-    setAppts(prev => prev.map(a => a.id === appt.id
-      ? { ...a, approval_status: 'auto_approved', status: 'confirmed' } : a))
+    await load()
   }
 
   async function handleNoShow(appt: AdminAppointment) {
     await markNoShow(appt.id)
-    const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-    setAppts(prev => prev.map(a => a.id === appt.id
-      ? { ...a, status: 'no_show', no_show_at: new Date().toISOString(), reschedule_deadline: deadline } : a))
+    await load()
+  }
+
+  async function handleCheckIn(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await checkInAppointment(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  async function handleStartConsult(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await startConsultation(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  async function handleEndConsult(appt: AdminAppointment) {
+    setActionError('')
+    const { error } = await endConsultation(appt.id)
+    if (error) { setActionError(error); return }
+    await load()
+  }
+
+  function formatDuration(secs: number) {
+    const m = Math.round(secs / 60)
+    if (m < 60) return `${m} min`
+    const h = Math.floor(m / 60)
+    return `${h}h ${m % 60}m`
   }
 
   const filtered = appts.filter(a => {
@@ -690,6 +713,16 @@ export default function AppointmentsPage() {
           ))}
         </div>
       </div>
+
+      {actionError && (
+        <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+          borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+          marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>⚠️ {actionError}</span>
+          <button onClick={() => setActionError('')}
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -791,6 +824,16 @@ export default function AppointmentsPage() {
                         AWAITING REVIEW
                       </div>
                     )}
+                    {a.status === 'checked_in' && a.queue_position != null && (
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
+                        #{a.queue_position} in queue{a.estimated_wait != null ? ` · ~${a.estimated_wait}m wait` : ''}
+                      </div>
+                    )}
+                    {a.status === 'completed' && a.consult_duration_secs != null && (
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
+                        🕐 {formatDuration(a.consult_duration_secs)}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '11px 14px' }}>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -800,6 +843,16 @@ export default function AppointmentsPage() {
                           border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted, fontWeight: 600 }}>
                         Detail
                       </button>
+                      {/* Vitals — admins, front desk, doctors */}
+                      {!['cancelled'].includes(a.status) && (
+                        <button onClick={() => setVitalsAppt(a)}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                            border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
+                            background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
+                            color: a.vitals_recorded_at ? C.accent : C.textMuted, fontWeight: 600 }}>
+                          {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
+                        </button>
+                      )}
                       {/* Approve / Reject — admins and front desk only */}
                       {!isDoctor && needsApproval && (
                         <>
@@ -827,21 +880,30 @@ export default function AppointmentsPage() {
                         </button>
                       )}
                       {/* Check In */}
-                      {!['cancelled','completed','no_show'].includes(a.status) && !needsApproval && (
-                        <button onClick={() => handleStatusUpdate(a.id, 'checked_in')}
+                      {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
+                        <button onClick={() => handleCheckIn(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
                             border: `1px solid ${C.accentBorder}`, background: C.accentLight,
                             color: C.accent, fontWeight: 600 }}>
                           Check In
                         </button>
                       )}
-                      {/* Complete */}
-                      {['checked_in','in_progress'].includes(a.status) && (
-                        <button onClick={() => handleStatusUpdate(a.id, 'completed')}
+                      {/* Start Consultation */}
+                      {a.status === 'checked_in' && (
+                        <button onClick={() => handleStartConsult(a)}
                           style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: `1px solid ${C.border}`, background: C.card,
-                            color: C.textSub, fontWeight: 600 }}>
-                          Complete
+                            border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)',
+                            color: '#55A7EB', fontWeight: 700 }}>
+                          ▶ Start
+                        </button>
+                      )}
+                      {/* End Consultation */}
+                      {a.status === 'in_progress' && (
+                        <button onClick={() => handleEndConsult(a)}
+                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                            border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
+                            color: '#00E87A', fontWeight: 700 }}>
+                          ■ End
                         </button>
                       )}
                       {/* No-Show */}
@@ -876,26 +938,25 @@ export default function AppointmentsPage() {
           appointment={assignAppt}
           doctors={doctors}
           onClose={() => setAssignAppt(null)}
-          onDone={(doctorId) => {
-            setAppts(prev => prev.map(a => a.id === assignAppt!.id
-              ? { ...a, assigned_doctor_id: doctorId, doctor_id: doctorId } : a))
-            setAssignAppt(null)
-          }}
+          onDone={() => { load(); setAssignAppt(null) }}
         />
       )}
       {rejectAppt && (
         <RejectModal
           appointment={rejectAppt}
           onClose={() => setRejectAppt(null)}
-          onDone={() => {
-            setAppts(prev => prev.map(a => a.id === rejectAppt!.id
-              ? { ...a, approval_status: 'rejected', status: 'cancelled' } : a))
-            setRejectAppt(null)
-          }}
+          onDone={() => { load(); setRejectAppt(null) }}
         />
       )}
       {detailAppt && (
         <DetailPanel appt={detailAppt} onClose={() => setDetailAppt(null)} />
+      )}
+      {vitalsAppt && (
+        <VitalsModal
+          appointment={vitalsAppt}
+          onClose={() => setVitalsAppt(null)}
+          onSaved={() => { load(); setVitalsAppt(null) }}
+        />
       )}
     </div>
   )

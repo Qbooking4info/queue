@@ -72,7 +72,16 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     rating:         doctorRating,
     queue_position: raw.queue_position,
     estimated_wait: raw.estimated_wait,
+    vitals_weight_kg:    (raw as any).vitals_weight_kg    ?? null,
+    vitals_height_cm:    (raw as any).vitals_height_cm    ?? null,
+    vitals_bp_systolic:  (raw as any).vitals_bp_systolic  ?? null,
+    vitals_bp_diastolic: (raw as any).vitals_bp_diastolic ?? null,
+    vitals_blood_sugar:  (raw as any).vitals_blood_sugar  ?? null,
+    vitals_bmi:          (raw as any).vitals_bmi          ?? null,
   }
+
+  const hasVitals = appt.vitals_weight_kg != null || appt.vitals_height_cm != null
+    || appt.vitals_bp_systolic != null || appt.vitals_blood_sugar != null
 
   const isVirtual   = appt.type === 'virtual'
   const isInPerson  = !isVirtual
@@ -357,6 +366,19 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {appt.clinic && <InfoRow label="Clinic" value={appt.clinic + (isOpdClinic ? ' (General)' : '')} />}
             <InfoRow label="Fee"       value={appt.payment} accent />
           </Section>
+
+          {/* Vitals — recorded by hospital staff during this visit */}
+          {hasVitals && (
+            <Section title="Vitals recorded during visit">
+              {appt.vitals_weight_kg != null && <InfoRow label="Weight" value={`${appt.vitals_weight_kg} kg`} />}
+              {appt.vitals_height_cm != null && <InfoRow label="Height" value={`${appt.vitals_height_cm} cm`} />}
+              {appt.vitals_bmi != null && <InfoRow label="BMI" value={String(appt.vitals_bmi)} accent />}
+              {appt.vitals_bp_systolic != null && appt.vitals_bp_diastolic != null && (
+                <InfoRow label="Blood Pressure" value={`${appt.vitals_bp_systolic}/${appt.vitals_bp_diastolic}`} />
+              )}
+              {appt.vitals_blood_sugar != null && <InfoRow label="Blood Sugar" value={`${appt.vitals_blood_sugar} mg/dL`} />}
+            </Section>
+          )}
 
           {/* Doctor info — only show if a doctor was assigned */}
           {appt.doctor ? (

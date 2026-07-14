@@ -12,6 +12,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     for (const k of allowed) {
       if (k in body) updates[k] = body[k]
     }
+
+    if ('email' in body) {
+      const email = (body.email as string)?.trim()
+      if (!email) return NextResponse.json({ error: 'Email cannot be blank' }, { status: 400 })
+
+      const { data: doc } = await (db as any).from('doctors').select('auth_user_id').eq('id', id).single()
+      if (doc?.auth_user_id) {
+        const { error: authErr } = await db.auth.admin.updateUserById(doc.auth_user_id, { email })
+        if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 })
+      }
+      updates.email = email
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }

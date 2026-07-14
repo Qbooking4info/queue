@@ -11,6 +11,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
 }) {
   const [tab,      setTab]      = useState<'edit'|'password'>('edit')
   const [name,     setName]     = useState(doctor.full_name)
+  const [email,    setEmail]    = useState(doctor.email ?? '')
   const [title,    setTitle]    = useState(doctor.title ?? '')
   const [fee,      setFee]      = useState(doctor.consultation_fee?.toString() ?? '')
   const [vFee,     setVFee]     = useState('')
@@ -49,6 +50,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
       consultation_fee: fee ? Number(fee) : null,
       virtual_fee: vFee ? Number(vFee) : undefined,
       years_experience: exp ? Number(exp) : null,
+      ...(email.trim() ? { email: email.trim() } : {}),
     }
     const res = await fetch(`/api/doctors/${doctor.id}`, {
       method: 'PATCH',
@@ -60,6 +62,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
     if (data.error) { setError(data.error); return }
     setSuccess('Profile updated')
     onUpdated({ ...doctor, full_name: name.trim() || doctor.full_name,
+      email: email.trim() || doctor.email,
       title: title.trim() || null, consultation_fee: fee ? Number(fee) : doctor.consultation_fee,
       years_experience: exp ? Number(exp) : doctor.years_experience })
   }
@@ -123,6 +126,14 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
               <div>
                 <label style={lbl}>Full Name</label>
                 <input value={name} onChange={e => setName(e.target.value)} style={inp} />
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="doctor@hospital.ng" style={inp} />
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                If this doctor has a portal login, changing this also updates their sign-in email.
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

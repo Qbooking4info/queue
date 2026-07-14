@@ -346,6 +346,51 @@ export async function updateUserProfile(
   return !error
 }
 
+// ── Medical history ──────────────────────────────────────────────────────────
+// Synced to the backend (not local-only) so the treating doctor can see it via
+// the hospital dashboard's "View Patient" chart.
+
+export interface MedicalHistory {
+  conditions: string[]
+  allergies: string[]
+  medications: string
+  surgeries: string
+  familyHistory: string
+}
+
+const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
+
+export async function getMedicalHistory(patientId: string): Promise<MedicalHistory> {
+  const { data, error } = await supabase
+    .from('patient_medical_history')
+    .select('conditions, allergies, medications, surgeries, family_history')
+    .eq('patient_id', patientId)
+    .maybeSingle()
+  if (error) { console.warn('getMedicalHistory error:', error.message); return EMPTY_MEDICAL_HISTORY }
+  if (!data) return EMPTY_MEDICAL_HISTORY
+  return {
+    conditions: data.conditions ?? [],
+    allergies: data.allergies ?? [],
+    medications: data.medications ?? '',
+    surgeries: data.surgeries ?? '',
+    familyHistory: data.family_history ?? '',
+  }
+}
+
+export async function updateMedicalHistory(patientId: string, notes: MedicalHistory): Promise<boolean> {
+  const { error } = await supabase.from('patient_medical_history').upsert({
+    patient_id: patientId,
+    conditions: notes.conditions,
+    allergies: notes.allergies,
+    medications: notes.medications || null,
+    surgeries: notes.surgeries || null,
+    family_history: notes.familyHistory || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'patient_id' })
+  if (error) { console.warn('updateMedicalHistory error:', error.message); return false }
+  return true
+}
+
 // ── Dependents ────────────────────────────────────────────────────────────────
 
 export async function getDependents(userId: string) {

@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       bio: bio?.trim() || null,
       qualification: qualification?.trim() || null,
       mdcn_number: mdcn_number?.trim() || null,
+      email: login_email?.trim() || null,
       ...(auth_user_id ? { auth_user_id } : {}),
     } as any)
     .select('id')
