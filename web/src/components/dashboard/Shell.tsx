@@ -1,21 +1,22 @@
 'use client'
 import { ReactNode, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
 import { AdminProvider, useAdmin } from '@/contexts/AdminContext'
+import { createClient } from '@/lib/supabase/client'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { theme: C } = useTheme()
   const { accessDenied, loading } = useAdmin()
-  const router = useRouter()
 
   useEffect(() => {
     if (!loading && accessDenied) {
-      router.replace('/login')
+      createClient().auth.signOut().finally(() => {
+        window.location.href = '/login'
+      })
     }
-  }, [loading, accessDenied, router])
+  }, [loading, accessDenied])
 
   if (!loading && accessDenied) return null
 
