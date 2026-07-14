@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  getUserRole, getHospital, getHospitalStats, getClinicStats,
+  getHospital, getHospitalStats, getClinicStats,
   getDoctors, getTodayAppointments, getDoctorTodayAppointments,
   getAllHospitals, getClinicDetail, getDoctorProfile,
 } from '@/lib/admin-api'
@@ -82,16 +82,17 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     setUser({ id: session.user.id, email: session.user.email ?? '' })
 
-    // Pass the authenticated client so getUserRole queries run with the user's
-    // session — this satisfies RLS without requiring a service role key in the browser.
-    const roleInfo = await getUserRole(session.user.id, supabase)
+    // Fetch role via server-side API route (uses service role key, bypasses RLS)
+    const roleRes = await fetch('/api/me/role')
+    const roleInfo: { role: string; hospitalId?: string; clinicId?: string; doctorId?: string; displayName?: string } | null =
+      roleRes.ok ? await roleRes.json() : null
     if (!roleInfo) {
       setAccessDenied(true)
       setLoading(false)
       return
     }
 
-    setRole(roleInfo.role)
+    setRole(roleInfo.role as UserRole)
     setDoctorId(roleInfo.doctorId ?? null)
     setClinicId(roleInfo.clinicId ?? null)
     if (roleInfo.displayName) {
