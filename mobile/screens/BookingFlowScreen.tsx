@@ -8,7 +8,7 @@ import { useAuth }  from '../contexts/AuthContext'
 import {
   getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
-  getClinicsForHospital,
+  getClinicsForHospital, rescheduleAppointment,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
@@ -88,6 +88,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   // Params — HospitalProfile can pre-fill these to skip earlier steps
   const presetType:     'virtual' | 'physical' | undefined = route.params?.bookingType
   const presetHospital: DisplayHospital | undefined        = route.params?.hospital
+  const rescheduleCtx: { originalId: string; doctorId?: string | null; clinicId?: string | null; reason?: string } | undefined
+    = route.params?.reschedule
 
   const startStep = presetType && presetHospital ? STEP_DETAILS
                   : presetType                   ? STEP_HOSPITAL
@@ -104,7 +106,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [loadingHosp,  setLoadingHosp]  = useState(false)
 
   // Step 2 — details
-  const [reason,  setReason]  = useState('')
+  const [reason,  setReason]  = useState(rescheduleCtx?.reason ?? '')
   const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'emergency'>('routine')
 
   // Step 3 — schedule
@@ -227,7 +229,20 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
     const arrivalTime = opdSlot?.time ?? '09:00'
 
-    if (bookingType === 'physical' || !preferredDoc) {
+    if (rescheduleCtx) {
+      result = await rescheduleAppointment({
+        originalId:   rescheduleCtx.originalId,
+        patientId:    user.id,
+        hospitalId:   String(hospital.id),
+        doctorId:     rescheduleCtx.doctorId ?? undefined,
+        clinicId:     selectedClinic?.id ?? rescheduleCtx.clinicId ?? undefined,
+        date:         selectedDate,
+        startTime:    arrivalTime,
+        reason,
+        type:         bookingType === 'virtual' ? 'virtual' : 'in-person',
+        approvalMode: clinicApprovalMode,
+      })
+    } else if (bookingType === 'physical' || !preferredDoc) {
       result = await createHospitalAppointment({
         patientId:          user.id,
         hospitalId:         String(hospital.id),
@@ -260,10 +275,13 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
     if (result) {
       const isPending = result.approvalStatus === 'pending_approval'
+      const isReschedule = !!rescheduleCtx
       await addNotification({
         userId: user.id,
         type:   isPending ? 'pending' : 'confirmed',
-        title:  isPending ? 'Booking Submitted — Pending Review' : 'Booking Confirmed',
+        title:  isReschedule
+          ? (isPending ? 'Reschedule Submitted — Pending Review' : 'Appointment Rescheduled')
+          : (isPending ? 'Booking Submitted — Pending Review' : 'Booking Confirmed'),
         body:   isPending
           ? `${result.bookingRef} · ${hospital.name}\nUnder review — you'll be notified when approved.`
           : `${result.bookingRef} · ${preferredDoc?.full_name ?? (bookingType === 'virtual' ? 'Virtual visit' : 'OPD visit')} · ${hospital.name}`,
@@ -299,9 +317,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           <Text style={[s.title, { color: t.textPrimary }]}>
             {step === STEP_TYPE     && 'New Appointment'}
             {step === STEP_HOSPITAL && 'Choose Hospital'}
-            {step === STEP_DETAILS  && 'Tell Us More'}
-            {step === STEP_SCHEDULE && 'Pick a Time'}
-            {step === STEP_CONFIRM  && 'Review & Confirm'}
+            {step === STEP_DETAILS  && (rescheduleCtx ? 'Reschedule Visit' : 'Tell Us More')}
+            {step === STEP_SCHEDULE && (rescheduleCtx ? 'Pick a New Time' : 'Pick a Time')}
+            {step === STEP_CONFIRM  && (rescheduleCtx ? 'Confirm New Date' : 'Review & Confirm')}
           </Text>
           <View style={{ width: 32 }} />
         </View>

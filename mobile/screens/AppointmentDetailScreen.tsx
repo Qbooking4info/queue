@@ -145,6 +145,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     navigation.navigate('BookingFlow', {
       hospital:    toDisplayHospital(raw.hospital),
       bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
+      reschedule: {
+        originalId: raw.id,
+        doctorId:   raw.doctor_id ?? raw.doctor?.id ?? null,
+        clinicId:   (raw as any).clinic_id ?? null,
+        reason:     raw.reason ?? '',
+      },
     })
   }
 

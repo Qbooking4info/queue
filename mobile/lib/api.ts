@@ -278,27 +278,33 @@ export async function cancelAppointment(
 // ── Reschedule appointment (within 48-hr no-show window) ─────────────────────
 
 export async function rescheduleAppointment(payload: {
-  originalId:  string
-  patientId:   string
-  hospitalId:  string
-  doctorId?:   string
-  date:        string
-  startTime:   string
-  reason:      string
-}): Promise<{ id: string; bookingRef: string } | null> {
-  const bookingRef = `RSC-${Date.now().toString().slice(-6)}`
+  originalId:   string
+  patientId:    string
+  hospitalId:   string
+  doctorId?:    string
+  date:         string
+  startTime:    string
+  reason:       string
+  type?:        'in-person' | 'virtual'
+  clinicId?:    string
+  approvalMode?: string
+}): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
+  const bookingRef     = `RSC-${Date.now().toString().slice(-6)}`
+  const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
+
   const { data, error } = await supabase
     .from('appointments')
     .insert({
       patient_id:        payload.patientId,
       doctor_id:         payload.doctorId ?? null,
       hospital_id:       payload.hospitalId,
+      clinic_id:         payload.clinicId ?? null,
       appointment_date:  payload.date,
       start_time:        payload.startTime,
-      type:              'in-person',
+      type:              payload.type ?? 'in-person',
       reason:            payload.reason,
       status:            'pending',
-      approval_status:   'auto_approved',
+      approval_status:   approvalStatus,
       booking_mode:      'hospital',
       booking_ref:       bookingRef,
       rescheduled_from:  payload.originalId,
@@ -306,8 +312,21 @@ export async function rescheduleAppointment(payload: {
     })
     .select('id, booking_ref')
     .single()
-  if (error) return null
-  return { id: data.id, bookingRef: data.booking_ref }
+  if (error || !data) { console.warn('[rescheduleAppointment] insert failed:', error?.message); return null }
+
+  // Close out the original booking so the patient isn't left holding two active appointments
+  // for the same visit — the new row links back to it via rescheduled_from.
+  const { error: closeErr } = await supabase
+    .from('appointments')
+    .update({
+      status: 'cancelled',
+      cancellation_reason: `Rescheduled to ${payload.date} (${bookingRef})`,
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq('id', payload.originalId)
+  if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
+
+  return { id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
