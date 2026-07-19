@@ -19,6 +19,28 @@ export async function POST(req: NextRequest) {
   if (!adminRecord || (adminRecord.role !== 'admin' && adminRecord.role !== 'owner'))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
+  // ── Plan: doctor seat limit check ──────────────────────────────────────────
+  const { data: sub } = await db
+    .from('hospital_subscriptions')
+    .select('subscription_plans(max_doctors)')
+    .eq('hospital_id', adminRecord.hospital_id)
+    .eq('status', 'active')
+    .single() as { data: { subscription_plans: { max_doctors: number | null } | null } | null; error: unknown }
+
+  const maxDoctors: number | null = (sub?.subscription_plans as any)?.max_doctors ?? null
+  if (maxDoctors !== null) {
+    const { count } = await db.from('doctors')
+      .select('*', { count: 'exact', head: true })
+      .eq('hospital_id', adminRecord.hospital_id)
+      .eq('is_active', true)
+    if ((count ?? 0) >= maxDoctors) {
+      return NextResponse.json(
+        { error: `Your plan allows up to ${maxDoctors} doctors. Upgrade your plan to add more.` },
+        { status: 403 },
+      )
+    }
+  }
+
   const body = await req.json()
   const { full_name, title, qualification, specialty_id, consultation_fee, virtual_fee, accepts_virtual, bio } = body
 
