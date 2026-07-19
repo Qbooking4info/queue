@@ -1,8 +1,11 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRole } from '@/lib/supabase/auth-server'
 
 // GET — look up a registered patient by patient_number or phone
 export async function GET(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+  if (auth instanceof NextResponse) return auth
   const db     = createAdminClient()
   const { searchParams } = new URL(req.url)
   const patientNumber = searchParams.get('patientNumber')?.trim().toUpperCase()
@@ -38,6 +41,8 @@ export async function GET(req: NextRequest) {
 // POST — front desk creates a walk-in appointment
 // Body: { hospitalId, patientName, patientPhone?, patientNumber?, doctorId?, clinicId?, date, startTime, reason, staffId? }
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+  if (auth instanceof NextResponse) return auth
   const db = createAdminClient()
   try {
     const body = await req.json()

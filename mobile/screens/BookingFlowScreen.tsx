@@ -175,7 +175,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       DATES.map(d =>
         getDailyBookingCount(String(hospital.id), d.iso).then(count => ({
           date: d.iso,
-          full: hospital.daily_booking_limit != null && count >= hospital.daily_booking_limit,
+          full: urgency !== 'emergency' && hospital.daily_booking_limit != null && count >= hospital.daily_booking_limit,
         }))
       )
     ).then(results => {
