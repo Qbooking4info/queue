@@ -49,7 +49,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-      <AutoRefresh intervalMs={30_000} />
+      <AutoRefresh hospitalId={adminRecord.hospital_id} />
       <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Front Desk Queue</h1>
