@@ -92,13 +92,11 @@ export default function SettingsPage() {
     if (!q) return
     setGeoLoading(true); setGeoError('')
     try {
-      const res  = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
-        headers: { 'Accept-Language': 'en', 'User-Agent': 'QueueApp/1.0' },
-      })
-      const data = await res.json() as { lat: string; lon: string }[]
-      if (!data.length) { setGeoError('Address not found — try a more specific query'); return }
-      setLat(parseFloat(data[0].lat).toFixed(6))
-      setLng(parseFloat(data[0].lon).toFixed(6))
+      const res  = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+      const data = await res.json() as { lat: string; lon: string } | null
+      if (!data) { setGeoError('Address not found — try a more specific query'); return }
+      setLat(parseFloat(data.lat).toFixed(6))
+      setLng(parseFloat(data.lon).toFixed(6))
     } catch {
       setGeoError('Network error — check your connection')
     } finally {
