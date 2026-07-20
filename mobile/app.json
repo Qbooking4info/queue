@@ -8,7 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.qbooking.queue"
+      "bundleIdentifier": "com.qbooking.queue",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
+        "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor."
+      }
     },
     "android": {
       "package": "com.qbooking.queue",
@@ -22,7 +26,10 @@
       "package": "com.qbooking.mobile",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {

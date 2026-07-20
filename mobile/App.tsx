@@ -30,6 +30,7 @@ import { DependentsScreen }            from './screens/DependentsScreen'
 import { PrescriptionsScreen }         from './screens/PrescriptionsScreen'
 import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
 import { SupportScreen }               from './screens/SupportScreen'
+import { VideoCallScreen }             from './screens/VideoCallScreen'
 
 const Tab   = createBottomTabNavigator()
 const Stack = createNativeStackNavigator()
@@ -77,6 +78,7 @@ function AppStack() {
       <Stack.Screen name="Prescriptions"     component={PrescriptionsScreen} />
       <Stack.Screen name="PrivacySecurity"   component={PrivacySecurityScreen} />
       <Stack.Screen name="Support"           component={SupportScreen} />
+      <Stack.Screen name="VideoCall"         component={VideoCallScreen} options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack.Navigator>
   )
 }

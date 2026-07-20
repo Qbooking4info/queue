@@ -349,11 +349,17 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
         {/* Virtual join banner */}
         {isVirtual && isConfirmed && !cancelled && (
-          <TouchableOpacity style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)' }]}>
+          <TouchableOpacity
+            style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)' }]}
+            onPress={() => navigation.navigate('VideoCall', {
+              appointmentId: raw.id,
+              doctorName:    appt.doctor ?? 'your doctor',
+            })}
+          >
             <Text style={{ fontSize: 22 }}>📹</Text>
             <View style={{ flex: 1 }}>
               <Text style={[st.joinTitle, { color: '#85B7EB' }]}>Virtual consultation</Text>
-              <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Your video room opens 5 minutes before your slot</Text>
+              <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
             </View>
             <View style={[st.joinBtn, { backgroundColor: '#1A7FC1' }]}>
               <Text style={st.joinBtnText}>Join</Text>
