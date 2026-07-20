@@ -32,8 +32,15 @@ import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
 import { SupportScreen }               from './screens/SupportScreen'
 import { VideoCallScreen }             from './screens/VideoCallScreen'
 
-const Tab   = createBottomTabNavigator()
-const Stack = createNativeStackNavigator()
+import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScreen'
+import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
+import { DoctorVideoCallScreen }   from './screens/specialist/DoctorVideoCallScreen'
+import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+
+const Tab        = createBottomTabNavigator()
+const Stack      = createNativeStackNavigator()
+const DocTab     = createBottomTabNavigator()
+const DocStack   = createNativeStackNavigator()
 
 function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; color: string }) {
   return <Text style={{ fontSize: 18, color }}>{icon}</Text>
@@ -59,6 +66,36 @@ function MainTabs() {
       <Tab.Screen name="Profile" component={ProfileScreen}
         options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
+  )
+}
+
+function SpecialistTabs() {
+  const { theme: t } = useTheme()
+  return (
+    <DocTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarActiveTintColor:   t.accent,
+        tabBarInactiveTintColor: t.textMuted,
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      }}>
+      <DocTab.Screen name="Queue" component={SpecialistQueueScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="◉" {...p} />, tabBarLabel: 'Queue' }} />
+      <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
+    </DocTab.Navigator>
+  )
+}
+
+function SpecialistStack() {
+  return (
+    <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
+      <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
+      <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any}
+        options={{ animation: 'fade', gestureEnabled: false }} />
+    </DocStack.Navigator>
   )
 }
 
@@ -94,8 +131,8 @@ function AuthStack() {
 
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user }  = useAuth()
-  const { theme: t }                = useTheme()
+  const { session, loading, user, doctorProfile } = useAuth()
+  const { theme: t }                              = useTheme()
   usePushNotifications(user?.id)
 
   if (!splashDone) {
@@ -119,7 +156,10 @@ function AppNavigator() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        {session ? <AppStack /> : <AuthStack />}
+        {session
+          ? (doctorProfile ? <SpecialistStack /> : <AppStack />)
+          : <AuthStack />
+        }
       </NavigationContainer>
     </SafeAreaProvider>
   )
