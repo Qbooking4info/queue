@@ -1,22 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { Errors } from '@/lib/api-error'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (authError || !user) return Errors.unauthenticated()
 
   const db = createAdminClient()
 
   const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+  if (!profile) return Errors.forbidden('Profile not found')
 
   const { data: adminRecord } = await db
     .from('hospital_admins').select('hospital_id, role')
     .eq('user_id', profile.id).single()
   if (!adminRecord || (adminRecord.role !== 'admin' && adminRecord.role !== 'owner'))
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    return Errors.forbidden()
 
   const body = await req.json()
   const {
@@ -27,27 +28,27 @@ export async function POST(req: NextRequest) {
     slot_duration,     // minutes: 15|20|30|45|60
     days_ahead,        // how many days to generate: 14|30|60|90
     accepts_virtual,   // bool
-    clear_existing,    // bool — wipe unbooked future slots first
   } = body
+  // clear_existing was removed — use POST /api/doctors/schedule/clear instead
 
   if (!doctor_id || !working_days?.length || !start_time || !end_time || !slot_duration)
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    return Errors.validation('Missing required fields')
 
   const timeRe = /^\d{2}:\d{2}$/
   if (!timeRe.test(start_time) || !timeRe.test(end_time))
-    return NextResponse.json({ error: 'start_time and end_time must be HH:MM' }, { status: 400 })
+    return Errors.validation('start_time and end_time must be HH:MM')
 
   const [sh, sm] = start_time.split(':').map(Number)
   const [eh, em] = end_time.split(':').map(Number)
   if (sh * 60 + sm >= eh * 60 + em)
-    return NextResponse.json({ error: 'start_time must be before end_time' }, { status: 400 })
+    return Errors.validation('start_time must be before end_time')
 
   if (!Number.isInteger(days_ahead) || days_ahead < 1 || days_ahead > 180)
-    return NextResponse.json({ error: 'days_ahead must be between 1 and 180' }, { status: 400 })
+    return Errors.validation('days_ahead must be between 1 and 180')
 
   const VALID_DURATIONS = [10, 15, 20, 30, 45, 60]
   if (!VALID_DURATIONS.includes(slot_duration))
-    return NextResponse.json({ error: `slot_duration must be one of ${VALID_DURATIONS.join(', ')}` }, { status: 400 })
+    return Errors.validation(`slot_duration must be one of ${VALID_DURATIONS.join(', ')}`)
 
   // Verify doctor belongs to this hospital
   const { data: doctor } = await db.from('doctors')
@@ -55,20 +56,10 @@ export async function POST(req: NextRequest) {
     .eq('id', doctor_id)
     .eq('hospital_id', adminRecord.hospital_id)
     .single()
-  if (!doctor) return NextResponse.json({ error: 'Doctor not found' }, { status: 404 })
+  if (!doctor) return Errors.notFound('Doctor')
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
-  // Clear unbooked future slots if requested
-  if (clear_existing) {
-    const { error: deleteErr } = await db.from('time_slots')
-      .delete()
-      .eq('doctor_id', doctor_id)
-      .gte('slot_date', today.toISOString().split('T')[0])
-      .eq('booked_count', 0)
-    if (deleteErr) return NextResponse.json({ error: 'Failed to clear existing slots: ' + deleteErr.message }, { status: 500 })
-  }
 
   // Build slots to insert
   const slots: {
@@ -116,14 +107,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (!slots.length)
-    return NextResponse.json({ error: 'No slots generated — check working days and time range' }, { status: 400 })
+    return Errors.validation('No slots generated — check working days and time range')
 
   // Insert in batches of 500 to avoid request size limits
   let inserted = 0
   for (let i = 0; i < slots.length; i += 500) {
     const batch = slots.slice(i, i + 500)
     const { error } = await db.from('time_slots').insert(batch)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return Errors.internal(error.message)
     inserted += batch.length
   }
 
@@ -134,11 +125,11 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (!user) return Errors.unauthenticated()
 
   const db = createAdminClient()
   const doctor_id = req.nextUrl.searchParams.get('doctor_id')
-  if (!doctor_id) return NextResponse.json({ error: 'doctor_id required' }, { status: 400 })
+  if (!doctor_id) return Errors.validation('doctor_id is required')
 
   const today = new Date().toISOString().split('T')[0]
 

@@ -52,6 +52,33 @@ export interface AppointmentVitals {
   blood_sugar: number | null
 }
 
+interface VitalsRow {
+  appointment_id: string
+  weight_kg: number | null
+  height_cm: number | null
+  bp_systolic: number | null
+  bp_diastolic: number | null
+  blood_sugar: number | null
+  bmi: number | null
+  recorded_at: string | null
+}
+
+// Batch-fetch latest vitals for a list of appointment IDs from vitals_audit_log.
+// Returns a Map<appointment_id, vitals> so callers can merge without N+1 queries.
+async function fetchVitalsBatch(ids: string[]): Promise<Map<string, VitalsRow>> {
+  if (!ids.length) return new Map()
+  const { data } = await (adminDb as any)
+    .from('vitals_audit_log')
+    .select('appointment_id, weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, bmi, recorded_at')
+    .in('appointment_id', ids)
+    .order('recorded_at', { ascending: false })
+  const map = new Map<string, VitalsRow>()
+  for (const v of (data ?? []) as VitalsRow[]) {
+    if (!map.has(v.appointment_id)) map.set(v.appointment_id, v)
+  }
+  return map
+}
+
 export interface AdminDoctor {
   id: string
   full_name: string
@@ -130,14 +157,20 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
   // Try users table lookup
   const { data: profileRaw } = await (db as any)
     .from('users')
-    .select('id, full_name, is_super_admin')
+    .select('id, full_name')
     .eq('auth_id', authId)
-    .single() as { data: { id: string; full_name: string | null; is_super_admin: boolean } | null; error: unknown }
+    .single() as { data: { id: string; full_name: string | null } | null; error: unknown }
   const profile = profileRaw
 
   if (profile) {
-    // Super admin
-    if (profile.is_super_admin) {
+    // Platform admin (replaces deprecated users.is_super_admin boolean)
+    const { data: paRow } = await (db as any)
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (paRow) {
       return { role: 'super_admin', displayName: profile.full_name ?? undefined }
     }
 
@@ -372,8 +405,6 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
     .select(`
       id, booking_ref, appointment_date, start_time, status, type, reason,
       approval_status, clinic_id,
-      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
-      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
       queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
       patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
@@ -385,35 +416,39 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
     .order('appointment_date', { ascending: false })
     .order('start_time')
   if (!data) return []
-  return (data as any[]).map(a => ({
-    id: a.id, booking_ref: a.booking_ref,
-    appointment_date: a.appointment_date,
-    start_time: (a.start_time ?? '').slice(0, 5),
-    status: a.status, type: a.type, reason: a.reason,
-    approval_status: a.approval_status ?? null,
-    clinic_id: a.clinic_id ?? null,
-    clinic_name: a.clinic?.name ?? null,
-    vitals_weight_kg: a.vitals_weight_kg ?? null,
-    vitals_height_cm: a.vitals_height_cm ?? null,
-    vitals_bp_systolic: a.vitals_bp_systolic ?? null,
-    vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
-    vitals_blood_sugar: a.vitals_blood_sugar ?? null,
-    vitals_bmi: a.vitals_bmi ?? null,
-    vitals_recorded_at: a.vitals_recorded_at ?? null,
-    queue_position: a.queue_position ?? null,
-    estimated_wait: a.estimated_wait ?? null,
-    consult_started_at: a.consult_started_at ?? null,
-    consult_ended_at: a.consult_ended_at ?? null,
-    consult_duration_secs: a.consult_duration_secs ?? null,
-    check_in_date: a.check_in_date ?? null,
-    patient_id: a.patient?.id ?? null,
-    patient_name: a.patient?.full_name ?? 'Unknown',
-    patient_age: calcAge(a.patient?.date_of_birth ?? null),
-    patient_gender: a.patient?.gender ?? null,
-    doctor_name: a.doctor?.full_name ?? 'Unknown',
-    doctor_id: a.doctor?.id ?? '',
-    specialty_name: a.doctor?.specialty?.name ?? null,
-  }))
+  const vitalsMap = await fetchVitalsBatch((data as any[]).map(a => a.id))
+  return (data as any[]).map(a => {
+    const v = vitalsMap.get(a.id)
+    return {
+      id: a.id, booking_ref: a.booking_ref,
+      appointment_date: a.appointment_date,
+      start_time: (a.start_time ?? '').slice(0, 5),
+      status: a.status, type: a.type, reason: a.reason,
+      approval_status: a.approval_status ?? null,
+      clinic_id: a.clinic_id ?? null,
+      clinic_name: a.clinic?.name ?? null,
+      vitals_weight_kg: v?.weight_kg ?? null,
+      vitals_height_cm: v?.height_cm ?? null,
+      vitals_bp_systolic: v?.bp_systolic ?? null,
+      vitals_bp_diastolic: v?.bp_diastolic ?? null,
+      vitals_blood_sugar: v?.blood_sugar ?? null,
+      vitals_bmi: v?.bmi ?? null,
+      vitals_recorded_at: v?.recorded_at ?? null,
+      queue_position: a.queue_position ?? null,
+      estimated_wait: a.estimated_wait ?? null,
+      consult_started_at: a.consult_started_at ?? null,
+      consult_ended_at: a.consult_ended_at ?? null,
+      consult_duration_secs: a.consult_duration_secs ?? null,
+      check_in_date: a.check_in_date ?? null,
+      patient_id: a.patient?.id ?? null,
+      patient_name: a.patient?.full_name ?? 'Unknown',
+      patient_age: calcAge(a.patient?.date_of_birth ?? null),
+      patient_gender: a.patient?.gender ?? null,
+      doctor_name: a.doctor?.full_name ?? 'Unknown',
+      doctor_id: a.doctor?.id ?? '',
+      specialty_name: a.doctor?.specialty?.name ?? null,
+    }
+  })
 }
 
 export async function getClinicStats(hospitalId: string, clinicId: string) {
@@ -460,8 +495,6 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
       booking_mode, approval_status, urgency, symptom_description, approval_note,
       assigned_doctor_id, no_show_at, reschedule_deadline, clinic_id,
       refund_pct, walkin_patient_name, walkin_patient_phone,
-      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
-      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
       queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
       patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
@@ -476,11 +509,14 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
 
   if (error || !data) return []
 
+  const vitalsMap = await fetchVitalsBatch((data as any[]).map(a => a.id))
+
   return (data as any[]).map(a => {
     const isWalkin = a.booking_mode === 'walkin'
     const patientName = isWalkin
       ? (a.walkin_patient_name ?? 'Walk-in Patient')
       : (a.patient?.full_name ?? 'Unknown')
+    const v = vitalsMap.get(a.id)
     return {
       id: a.id,
       booking_ref: a.booking_ref,
@@ -504,13 +540,13 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
       walkin_patient_name: a.walkin_patient_name ?? null,
       walkin_patient_phone: a.walkin_patient_phone ?? null,
       patient_id: isWalkin ? null : (a.patient?.id ?? null),
-      vitals_weight_kg: a.vitals_weight_kg ?? null,
-      vitals_height_cm: a.vitals_height_cm ?? null,
-      vitals_bp_systolic: a.vitals_bp_systolic ?? null,
-      vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
-      vitals_blood_sugar: a.vitals_blood_sugar ?? null,
-      vitals_bmi: a.vitals_bmi ?? null,
-      vitals_recorded_at: a.vitals_recorded_at ?? null,
+      vitals_weight_kg: v?.weight_kg ?? null,
+      vitals_height_cm: v?.height_cm ?? null,
+      vitals_bp_systolic: v?.bp_systolic ?? null,
+      vitals_bp_diastolic: v?.bp_diastolic ?? null,
+      vitals_blood_sugar: v?.blood_sugar ?? null,
+      vitals_bmi: v?.bmi ?? null,
+      vitals_recorded_at: v?.recorded_at ?? null,
     queue_position: a.queue_position ?? null,
     estimated_wait: a.estimated_wait ?? null,
     consult_started_at: a.consult_started_at ?? null,
@@ -851,8 +887,6 @@ export async function getClinicAppointments(
       id, booking_ref, appointment_date, start_time, status, type, reason,
       booking_mode, approval_status, urgency, symptom_description, approval_note,
       assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
-      vitals_weight_kg, vitals_height_cm, vitals_bp_systolic, vitals_bp_diastolic,
-      vitals_blood_sugar, vitals_bmi, vitals_recorded_at,
       queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
       patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
       doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
@@ -873,9 +907,12 @@ export async function getClinicAppointments(
   const { data, error } = await baseQuery.or(orFilter)
   if (error || !data) return []
 
+  const vitalsMap = await fetchVitalsBatch((data as any[]).map(a => a.id))
+
   return (data as any[]).map(a => {
     const isWalkin = a.booking_mode === 'walkin'
     const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown')
+    const v = vitalsMap.get(a.id)
     return {
       id: a.id, booking_ref: a.booking_ref,
       appointment_date: a.appointment_date,
@@ -894,19 +931,19 @@ export async function getClinicAppointments(
       walkin_patient_name: a.walkin_patient_name ?? null,
       walkin_patient_phone: a.walkin_patient_phone ?? null,
       patient_id: isWalkin ? null : (a.patient?.id ?? null),
-      vitals_weight_kg: a.vitals_weight_kg ?? null,
-      vitals_height_cm: a.vitals_height_cm ?? null,
-      vitals_bp_systolic: a.vitals_bp_systolic ?? null,
-      vitals_bp_diastolic: a.vitals_bp_diastolic ?? null,
-      vitals_blood_sugar: a.vitals_blood_sugar ?? null,
-      vitals_bmi: a.vitals_bmi ?? null,
-      vitals_recorded_at: a.vitals_recorded_at ?? null,
-    queue_position: a.queue_position ?? null,
-    estimated_wait: a.estimated_wait ?? null,
-    consult_started_at: a.consult_started_at ?? null,
-    consult_ended_at: a.consult_ended_at ?? null,
-    consult_duration_secs: a.consult_duration_secs ?? null,
-    check_in_date: a.check_in_date ?? null,
+      vitals_weight_kg: v?.weight_kg ?? null,
+      vitals_height_cm: v?.height_cm ?? null,
+      vitals_bp_systolic: v?.bp_systolic ?? null,
+      vitals_bp_diastolic: v?.bp_diastolic ?? null,
+      vitals_blood_sugar: v?.blood_sugar ?? null,
+      vitals_bmi: v?.bmi ?? null,
+      vitals_recorded_at: v?.recorded_at ?? null,
+      queue_position: a.queue_position ?? null,
+      estimated_wait: a.estimated_wait ?? null,
+      consult_started_at: a.consult_started_at ?? null,
+      consult_ended_at: a.consult_ended_at ?? null,
+      consult_duration_secs: a.consult_duration_secs ?? null,
+      check_in_date: a.check_in_date ?? null,
       patient_name: patientName,
       patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
       patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
@@ -1005,29 +1042,19 @@ export async function updateAppointmentVitals(
     ? Math.round((vitals.weight_kg / Math.pow(vitals.height_cm / 100, 2)) * 10) / 10
     : null
 
-  const { error } = await (adminDb as any).from('appointments').update({
-    vitals_weight_kg:   vitals.weight_kg,
-    vitals_height_cm:   vitals.height_cm,
-    vitals_bp_systolic: vitals.bp_systolic,
-    vitals_bp_diastolic: vitals.bp_diastolic,
-    vitals_blood_sugar: vitals.blood_sugar,
-    vitals_bmi:         bmi,
-    vitals_recorded_at: now,
-  }).eq('id', id)
-
-  if (!error) {
-    await (adminDb as any).from('vitals_audit_log').insert({
-      appointment_id:      id,
-      recorded_by_auth_id: recordedByAuthId ?? null,
-      recorded_at:         now,
-      weight_kg:           vitals.weight_kg,
-      height_cm:           vitals.height_cm,
-      bp_systolic:         vitals.bp_systolic,
-      bp_diastolic:        vitals.bp_diastolic,
-      blood_sugar:         vitals.blood_sugar,
-      bmi,
-    })
-  }
+  // vitals_audit_log is the single source of truth; appointments no longer
+  // stores denormalized vitals columns (dropped in migration 20260719000004).
+  const { error } = await (adminDb as any).from('vitals_audit_log').insert({
+    appointment_id:      id,
+    recorded_by_auth_id: recordedByAuthId ?? null,
+    recorded_at:         now,
+    weight_kg:           vitals.weight_kg,
+    height_cm:           vitals.height_cm,
+    bp_systolic:         vitals.bp_systolic,
+    bp_diastolic:        vitals.bp_diastolic,
+    blood_sugar:         vitals.blood_sugar,
+    bmi,
+  })
 
   return { error: error?.message ?? null }
 }

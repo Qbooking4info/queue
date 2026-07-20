@@ -30,14 +30,20 @@ export async function requireRole(allowed: CallerRole[]): Promise<{ caller: Call
 
   const { data: profile } = await db
     .from('users')
-    .select('id, is_super_admin')
+    .select('id')
     .eq('auth_id', authId)
-    .single() as { data: { id: string; is_super_admin: boolean } | null; error: unknown }
+    .single() as { data: { id: string } | null; error: unknown }
 
   let caller: CallerInfo | null = null
 
   if (profile) {
-    if ((profile as any).is_super_admin) {
+    const { data: paRow } = await (db as any)
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (paRow) {
       caller = { authId, role: 'super_admin' }
     } else {
       const { data: adminRow } = await db

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireRole } from '@/lib/supabase/auth-server'
+import { getServerUser } from '@/lib/supabase/auth-server'
+import { Errors } from '@/lib/api-error'
 
 // In-process cache: survives across requests in the same Node.js process.
 // Prevents duplicate Nominatim calls for the same query and respects the 1 req/sec rate limit.
@@ -8,11 +9,13 @@ let lastCallAt = 0
 const RATE_LIMIT_MS = 1100
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
-  if (auth instanceof NextResponse) return auth
+  // getServerUser (any authenticated user) allows the onboarding flow to geocode
+  // before a hospital record (and therefore a role) exists.
+  const user = await getServerUser()
+  if (!user) return Errors.unauthenticated()
 
   const q = new URL(req.url).searchParams.get('q')?.trim()
-  if (!q) return NextResponse.json({ error: 'q required' }, { status: 400 })
+  if (!q) return Errors.validation('q is required')
 
   const key = q.toLowerCase()
   if (cache.has(key)) {

@@ -2,22 +2,24 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
+import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (authError || !user) return Errors.unauthenticated()
 
   const db = createAdminClient()
 
   const { data: profile } = await db.from('users').select('id').eq('auth_id', user.id).single()
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+  if (!profile) return Errors.forbidden('Profile not found')
 
   const { data: adminRecord } = await db
     .from('hospital_admins').select('hospital_id, role')
     .eq('user_id', profile.id).single()
   if (!adminRecord || (adminRecord.role !== 'admin' && adminRecord.role !== 'owner'))
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    return Errors.forbidden()
 
   // ── Plan: doctor seat limit check ──────────────────────────────────────────
   const { data: sub } = await db
@@ -33,18 +35,17 @@ export async function POST(req: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('is_active', true)
-    if ((count ?? 0) >= maxDoctors) {
-      return NextResponse.json(
-        { error: `Your plan allows up to ${maxDoctors} doctors. Upgrade your plan to add more.` },
-        { status: 403 },
-      )
-    }
+    if ((count ?? 0) >= maxDoctors) return Errors.planLimitDoctors(maxDoctors)
   }
+
+  // 10 doctor creations per hospital per hour
+  const rlAllowed = await checkRateLimit(db, `doctors-create:${adminRecord.hospital_id}`, 10, 3600)
+  if (!rlAllowed) return Errors.forbidden('Too many doctor creation attempts. Please try again later.')
 
   const body = await req.json()
   const { full_name, title, qualification, specialty_id, consultation_fee, virtual_fee, accepts_virtual, bio } = body
 
-  if (!full_name?.trim()) return NextResponse.json({ error: 'Doctor name is required' }, { status: 400 })
+  if (!full_name?.trim()) return Errors.validation('Doctor name is required')
 
   // Auto-generate specialist login credentials
   const nameSlug = full_name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.')
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     is_active: true,
   }).select('id').single()
 
-  if (doctorErr) return NextResponse.json({ error: doctorErr.message }, { status: 400 })
+  if (doctorErr) return Errors.internal(doctorErr.message)
 
   const { data: authUser, error: authErr } = await db.auth.admin.createUser({
     email: loginEmail,

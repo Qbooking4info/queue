@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { saveAppointmentNotes } from '../actions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { VideoCallPanel } from '@/components/video/VideoCallPanel'
 
 const STATUS_OPTS = ['in_progress', 'completed', 'no_show']
 
@@ -75,7 +76,16 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
         </div>
 
         {/* Notes Form */}
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 flex flex-col gap-4">
+
+          {/* Virtual call panel — shown only for virtual appointments */}
+          {appt.type === 'virtual' && (
+            <VideoCallPanel
+              appointmentId={appt.id}
+              patientName={patient?.full_name ?? 'Patient'}
+            />
+          )}
+
           <form action={saveAppointmentNotes} className="flex flex-col gap-4">
             <input type="hidden" name="appointment_id" value={appt.id} />
 
@@ -134,7 +144,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
               Save Notes & Update Status
             </button>
           </form>
-        </div>
+        </div>   {/* end md:col-span-3 */}
       </div>
     </div>
   )

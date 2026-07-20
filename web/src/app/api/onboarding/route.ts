@@ -1,16 +1,20 @@
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getServerUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
+    if (!user) return Errors.unauthenticated()
 
     // All DB writes use service role — bypasses RLS safely server-side
     const db = createAdminClient()
+
+    // 5 onboarding attempts per user per hour
+    const allowed = await checkRateLimit(db, `onboarding:${user.id}`, 5, 3600)
+    if (!allowed) return Errors.forbidden('Too many onboarding attempts. Please wait before trying again.')
     const body = await req.json()
     const {
       name, type, description,
@@ -28,8 +32,19 @@ export async function POST(req: NextRequest) {
         .from('users')
         .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
         .select('id').single()
-      if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 })
+      if (pErr) return Errors.internal(pErr.message)
       profile = np
+    }
+
+    // Prevent spam: each user can only own one hospital
+    const { data: existingAdmin } = await db
+      .from('hospital_admins')
+      .select('id')
+      .eq('user_id', profile!.id)
+      .limit(1)
+      .maybeSingle()
+    if (existingAdmin) {
+      return Errors.forbidden('Your account is already associated with a hospital. Contact support to register an additional hospital.')
     }
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
@@ -46,7 +61,7 @@ export async function POST(req: NextRequest) {
       clinic_model: clinicModel ?? 'single',
       is_verified: false,
     }).select('id').single()
-    if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 })
+    if (hErr) return Errors.internal(hErr.message)
 
     // Link admin as owner
     await db.from('hospital_admins').insert({
@@ -104,7 +119,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, hospitalId: hospital.id })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return Errors.internal(e instanceof Error ? e.message : String(e))
   }
 }

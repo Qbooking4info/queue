@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
+import { Errors } from '@/lib/api-error'
 
 // GET — look up a registered patient by patient_number or phone.
 // super_admin excluded: patient contact details are PHI and super_admin
@@ -74,12 +75,7 @@ export async function POST(req: NextRequest) {
         .eq('hospital_id', hospitalId)
         .gte('created_at', monthStart.toISOString())
         .neq('status', 'cancelled')
-      if ((count ?? 0) >= maxMonthly) {
-        return NextResponse.json(
-          { error: `Monthly booking limit of ${maxMonthly} reached. Upgrade your plan to accept more bookings.` },
-          { status: 403 },
-        )
-      }
+      if ((count ?? 0) >= maxMonthly) return Errors.planLimitMonthly(maxMonthly)
     }
 
     // Try to link to a registered patient — look up by patient_number first, then phone

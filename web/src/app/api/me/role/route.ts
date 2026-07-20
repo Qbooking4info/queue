@@ -20,12 +20,18 @@ export async function GET() {
   // 2. Look up users row
   const { data: profile } = await db
     .from('users')
-    .select('id, full_name, is_super_admin')
+    .select('id, full_name')
     .eq('auth_id', authId)
-    .single() as { data: { id: string; full_name: string | null; is_super_admin: boolean } | null; error: unknown }
+    .single() as { data: { id: string; full_name: string | null } | null; error: unknown }
 
   if (profile) {
-    if ((profile as any).is_super_admin) {
+    const { data: paRow } = await (db as any)
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (paRow) {
       return NextResponse.json({ role: 'super_admin', displayName: profile.full_name })
     }
 

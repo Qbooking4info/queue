@@ -1,9 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
+import { Errors } from '@/lib/api-error'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+  const auth = await requireRole(['hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
   const db = createAdminClient()
   try {
@@ -18,23 +19,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if ('email' in body) {
       const email = (body.email as string)?.trim()
-      if (!email) return NextResponse.json({ error: 'Email cannot be blank' }, { status: 400 })
+      if (!email) return Errors.validation('Email cannot be blank')
 
       const { data: doc } = await (db as any).from('doctors').select('auth_user_id').eq('id', id).single()
       if (doc?.auth_user_id) {
         const { error: authErr } = await db.auth.admin.updateUserById(doc.auth_user_id, { email })
-        if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 })
+        if (authErr) return Errors.internal(authErr.message)
       }
       updates.email = email
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+      return Errors.validation('No fields to update')
     }
     const { error } = await (db as any).from('doctors').update(updates).eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return Errors.internal(error.message)
     return NextResponse.json({ success: true })
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    return Errors.internal(e instanceof Error ? e.message : String(e))
   }
 }
