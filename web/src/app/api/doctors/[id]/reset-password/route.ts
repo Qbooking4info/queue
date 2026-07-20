@@ -1,7 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRole } from '@/lib/supabase/auth-server'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+  if (auth instanceof NextResponse) return auth
   const db = createAdminClient()
   try {
     const { newPassword } = await req.json()

@@ -1,9 +1,14 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRole } from '@/lib/supabase/auth-server'
 
-// GET — look up a registered patient by patient_number or phone
+// GET — look up a registered patient by patient_number or phone.
+// super_admin excluded: patient contact details are PHI and super_admin
+// has no operational need to query individual patients.
 export async function GET(req: NextRequest) {
-  const db     = createAdminClient()
+  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
+  if (auth instanceof NextResponse) return auth
+  const db = createAdminClient()
   const { searchParams } = new URL(req.url)
   const patientNumber = searchParams.get('patientNumber')?.trim().toUpperCase()
   const phone         = searchParams.get('phone')?.trim()
@@ -35,9 +40,11 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// POST — front desk creates a walk-in appointment
-// Body: { hospitalId, patientName, patientPhone?, patientNumber?, doctorId?, clinicId?, date, startTime, reason, staffId? }
+// POST — front desk creates a walk-in appointment.
+// super_admin excluded: walk-in intake creates patient records (PHI).
 export async function POST(req: NextRequest) {
+  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
+  if (auth instanceof NextResponse) return auth
   const db = createAdminClient()
   try {
     const body = await req.json()
@@ -48,6 +55,31 @@ export async function POST(req: NextRequest) {
 
     if (!hospitalId || !patientName || !date || !startTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // ── Plan: monthly booking cap (belt-and-suspenders above DB trigger) ───────
+    const { data: sub } = await db
+      .from('hospital_subscriptions')
+      .select('subscription_plans(max_monthly_bookings)')
+      .eq('hospital_id', hospitalId)
+      .eq('status', 'active')
+      .single() as { data: { subscription_plans: { max_monthly_bookings: number | null } | null } | null; error: unknown }
+
+    const maxMonthly: number | null = (sub?.subscription_plans as any)?.max_monthly_bookings ?? null
+    if (maxMonthly !== null) {
+      const monthStart = new Date()
+      monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const { count } = await db.from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('hospital_id', hospitalId)
+        .gte('created_at', monthStart.toISOString())
+        .neq('status', 'cancelled')
+      if ((count ?? 0) >= maxMonthly) {
+        return NextResponse.json(
+          { error: `Monthly booking limit of ${maxMonthly} reached. Upgrade your plan to accept more bookings.` },
+          { status: 403 },
+        )
+      }
     }
 
     // Try to link to a registered patient — look up by patient_number first, then phone
@@ -72,7 +104,6 @@ export async function POST(req: NextRequest) {
       if (data) patientUserId = data.id
     }
 
-    // patient_id is now nullable — walk-in patients without an app account are fine
     const bookingRef = `WLK-${Date.now().toString().slice(-6)}`
 
     const { data, error } = await db

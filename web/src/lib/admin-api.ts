@@ -995,15 +995,40 @@ export async function updateAppointmentStatus(id: string, status: string) {
   await adminDb.from('appointments').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
 }
 
-export async function updateAppointmentVitals(id: string, vitals: AppointmentVitals): Promise<{ error: string | null }> {
+export async function updateAppointmentVitals(
+  id: string,
+  vitals: AppointmentVitals,
+  recordedByAuthId?: string,
+): Promise<{ error: string | null }> {
+  const now = new Date().toISOString()
+  const bmi = vitals.weight_kg && vitals.height_cm && vitals.height_cm > 0
+    ? Math.round((vitals.weight_kg / Math.pow(vitals.height_cm / 100, 2)) * 10) / 10
+    : null
+
   const { error } = await (adminDb as any).from('appointments').update({
-    vitals_weight_kg: vitals.weight_kg,
-    vitals_height_cm: vitals.height_cm,
+    vitals_weight_kg:   vitals.weight_kg,
+    vitals_height_cm:   vitals.height_cm,
     vitals_bp_systolic: vitals.bp_systolic,
     vitals_bp_diastolic: vitals.bp_diastolic,
     vitals_blood_sugar: vitals.blood_sugar,
-    vitals_recorded_at: new Date().toISOString(),
+    vitals_bmi:         bmi,
+    vitals_recorded_at: now,
   }).eq('id', id)
+
+  if (!error) {
+    await (adminDb as any).from('vitals_audit_log').insert({
+      appointment_id:      id,
+      recorded_by_auth_id: recordedByAuthId ?? null,
+      recorded_at:         now,
+      weight_kg:           vitals.weight_kg,
+      height_cm:           vitals.height_cm,
+      bp_systolic:         vitals.bp_systolic,
+      bp_diastolic:        vitals.bp_diastolic,
+      blood_sugar:         vitals.blood_sugar,
+      bmi,
+    })
+  }
+
   return { error: error?.message ?? null }
 }
 

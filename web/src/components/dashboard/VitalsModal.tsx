@@ -17,10 +17,11 @@ function bmiCategory(bmi: number): { label: string; color: string } {
   return { label: 'Obese', color: '#f07070' }
 }
 
-export function VitalsModal({ appointment, onClose, onSaved }: {
+export function VitalsModal({ appointment, onClose, onSaved, recordedByAuthId }: {
   appointment: AdminAppointment
   onClose: () => void
   onSaved: () => void
+  recordedByAuthId?: string
 }) {
   const { theme: C } = useTheme()
   const [weight,   setWeight]   = useState(appointment.vitals_weight_kg?.toString() ?? '')
@@ -42,7 +43,7 @@ export function VitalsModal({ appointment, onClose, onSaved }: {
       bp_systolic: systolic ? Number(systolic) : null,
       bp_diastolic: diastolic ? Number(diastolic) : null,
       blood_sugar: sugar ? Number(sugar) : null,
-    })
+    }, recordedByAuthId)
     setSaving(false)
     if (err) { setError(err); return }
     onSaved()

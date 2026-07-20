@@ -55,7 +55,12 @@ export function SearchScreen({ navigation }: Props) {
         filter === 'Emergency'    ? (h.emergencySlots ?? 0) > 0 : true
       return matchesQuery && matchesFilter
     })
-    .sort((a, b) => (a._km ?? Infinity) - (b._km ?? Infinity))
+    .sort((a, b) => {
+      if (a._km != null && b._km != null) return a._km - b._km
+      if (a._km != null) return -1
+      if (b._km != null) return 1
+      return a.name.localeCompare(b.name) // alphabetical when no GPS
+    })
 
   // Hospitals with coordinates for the map view
   const mappable = results.filter(h => h.latitude != null && h.longitude != null)

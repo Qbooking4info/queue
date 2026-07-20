@@ -167,6 +167,9 @@ export function DateFilter({ value, onChange, label }: Props) {
 
   function applyCustom() {
     if (!customFrom || !customTo) return
+    const diffDays = (new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86_400_000
+    if (diffDays < 0) return // end before start
+    if (diffDays > 90) { alert('Custom range cannot exceed 90 days.'); return }
     const bounds = { from: customFrom, to: customTo }
     onChange('custom', bounds)
     setOpen(false)
