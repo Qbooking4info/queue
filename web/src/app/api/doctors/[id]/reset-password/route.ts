@@ -5,11 +5,23 @@ import { requireRole } from '@/lib/supabase/auth-server'
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const { newPassword } = await req.json()
     if (!newPassword || newPassword.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    }
+
+    // BC5: verify the doctor belongs to the caller's hospital before resetting password
+    if (caller.hospitalId) {
+      const { data: ownerCheck } = await (db as any)
+        .from('doctors')
+        .select('id')
+        .eq('id', params.id)
+        .eq('hospital_id', caller.hospitalId)
+        .single()
+      if (!ownerCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { data: doc } = await (db as any)

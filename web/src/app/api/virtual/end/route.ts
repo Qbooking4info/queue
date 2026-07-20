@@ -49,16 +49,19 @@ export async function POST(req: NextRequest) {
     ? Math.round((Date.now() - new Date(session.started_at).getTime()) / 1000)
     : null
 
+  // BM9: write the appointment first (most critical record), then the virtual session.
+  // A mid-flight failure leaves the appointment complete with a stale session (recoverable)
+  // rather than a completed session with no appointment update (inconsistent).
+  await db.from('appointments')
+    .update({ status: 'completed' })
+    .eq('id', appointmentId)
+    .eq('status', 'in_progress')
+
   await db.from('virtual_sessions').update({
     status:        'ended',
     ended_at:      now,
     duration_secs: durationSecs,
   }).eq('appointment_id', appointmentId)
-
-  await db.from('appointments')
-    .update({ status: 'completed' })
-    .eq('id', appointmentId)
-    .eq('status', 'in_progress')
 
   return NextResponse.json({ success: true, durationSecs })
 }

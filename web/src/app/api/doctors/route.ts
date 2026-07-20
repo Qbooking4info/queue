@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const auth = await requireRole(['hospital_admin', 'clinic_admin'])
@@ -28,6 +29,29 @@ export async function POST(req: NextRequest) {
   if (caller.role === 'clinic_admin' && caller.hospitalId !== hospitalId) {
     return Errors.forbidden()
   }
+
+  // BH8: plan doctor-seat limit check (mirrors doctors/create/route.ts)
+  const { data: sub } = await db
+    .from('hospital_subscriptions')
+    .select('subscription_plans(max_doctors)')
+    .eq('hospital_id', hospitalId)
+    .in('status', ['active', 'trialing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single() as { data: { subscription_plans: { max_doctors: number | null } | null } | null; error: unknown }
+
+  const maxDoctors: number | null = (sub?.subscription_plans as any)?.max_doctors ?? null
+  if (maxDoctors !== null) {
+    const { count } = await db.from('doctors')
+      .select('*', { count: 'exact', head: true })
+      .eq('hospital_id', hospitalId)
+      .eq('is_active', true)
+    if ((count ?? 0) >= maxDoctors) return Errors.planLimitDoctors(maxDoctors)
+  }
+
+  // BH8: rate limit — 10 doctor creations per hospital per hour
+  const rlAllowed = await checkRateLimit(db, `doctors-create:${hospitalId}`, 10, 3600)
+  if (!rlAllowed) return Errors.forbidden('Too many doctor creation attempts. Please try again later.')
 
   let auth_user_id: string | null = null
 

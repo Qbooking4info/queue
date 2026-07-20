@@ -36,6 +36,17 @@ export async function POST(req: NextRequest) {
       profile = np
     }
 
+    // BH7: block super_admins from onboarding hospitals — they have no operational hospital context
+    const { data: paRow } = await (db as any)
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', profile!.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (paRow) {
+      return Errors.forbidden('Super admins are not permitted to onboard hospitals via this flow.')
+    }
+
     // Prevent spam: each user can only own one hospital
     const { data: existingAdmin } = await db
       .from('hospital_admins')
@@ -45,6 +56,23 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     if (existingAdmin) {
       return Errors.forbidden('Your account is already associated with a hospital. Contact support to register an additional hospital.')
+    }
+
+    // BM8: planId is required — every hospital must have a subscription from day one.
+    // If not provided, auto-assign the free/starter plan; if none exists return 400.
+    let resolvedPlanId: string | null = planId ?? null
+    if (!resolvedPlanId) {
+      const { data: defaultPlan } = await (db as any)
+        .from('subscription_plans')
+        .select('id')
+        .or('name.ilike.%free%,slug.ilike.%free%,name.ilike.%starter%,slug.ilike.%starter%')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+      resolvedPlanId = defaultPlan?.id ?? null
+    }
+    if (!resolvedPlanId) {
+      return NextResponse.json({ error: 'planId is required' }, { status: 400 })
     }
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
@@ -87,13 +115,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Save subscription
-    if (planId) {
-      await db.from('hospital_subscriptions').insert({
-        hospital_id: hospital.id, plan_id: planId, status: 'trialing',
-        trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      })
-    }
+    // BM8: always create a subscription row — every hospital must have one
+    await db.from('hospital_subscriptions').insert({
+      hospital_id: hospital.id, plan_id: resolvedPlanId, status: 'trialing',
+      trial_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    })
 
     // Save clinics (multi-clinic model) — requires hospital_clinics table
     if (clinicModel === 'multi' && Array.isArray(clinics) && clinics.length > 0) {

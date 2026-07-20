@@ -46,10 +46,14 @@ export async function requireRole(allowed: CallerRole[]): Promise<{ caller: Call
     if (paRow) {
       caller = { authId, role: 'super_admin' }
     } else {
+      // BC1: filter to admin/owner roles only — specialists must not get hospital_admin privileges
+      // BL2: filter to is_active=true — deactivated admins must not authenticate
       const { data: adminRow } = await db
         .from('hospital_admins')
         .select('hospital_id')
         .eq('user_id', profile.id)
+        .in('role', ['admin', 'owner'])
+        .eq('is_active', true)
         .limit(1)
         .single()
       if (adminRow) {
@@ -143,16 +147,21 @@ export async function getServerUser() {
     jwt = decodeAndParseSession(direct)
   }
 
-  // If direct was absent or corrupt, try chunked cookies
+  // BL3: If direct was absent or corrupt, try chunked cookies.
+  // Collect all chunk-like cookies and sort them numerically by the trailing index so that
+  // sb-access-token.0, .1, .2 … are always joined in the correct order regardless of the
+  // order in which Set-Cookie headers were received.
   if (!jwt) {
-    const parts: string[] = []
-    for (let i = 0; i < 10; i++) {
-      const chunk = allCookies.find(c => c.name === `${cookieKey}.${i}`)?.value
-      if (!chunk) break
-      parts.push(chunk)
-    }
-    if (parts.length) {
-      jwt = decodeAndParseSession(parts.join(''))
+    const chunkPattern = new RegExp(`^${cookieKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.(\\d+)$`)
+    const chunks = allCookies
+      .filter(c => chunkPattern.test(c.name))
+      .sort((a, b) => {
+        const ai = parseInt(a.name.match(chunkPattern)![1], 10)
+        const bi = parseInt(b.name.match(chunkPattern)![1], 10)
+        return ai - bi
+      })
+    if (chunks.length) {
+      jwt = decodeAndParseSession(chunks.map(c => c.value).join(''))
     }
   }
 

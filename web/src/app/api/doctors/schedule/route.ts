@@ -109,11 +109,16 @@ export async function POST(req: NextRequest) {
   if (!slots.length)
     return Errors.validation('No slots generated — check working days and time range')
 
-  // Insert in batches of 500 to avoid request size limits
+  // BM5: upsert (not insert) in batches of 500 to prevent duplicate slots when the schedule
+  // is regenerated. ON CONFLICT on (doctor_id, slot_date, start_time, is_virtual) is a no-op
+  // for existing future slots, preserving booked_count and is_available values.
   let inserted = 0
   for (let i = 0; i < slots.length; i += 500) {
     const batch = slots.slice(i, i + 500)
-    const { error } = await db.from('time_slots').insert(batch)
+    const { error } = await (db.from('time_slots') as any).upsert(batch, {
+      onConflict: 'doctor_id,slot_date,start_time,is_virtual',
+      ignoreDuplicates: true,
+    })
     if (error) return Errors.internal(error.message)
     inserted += batch.length
   }

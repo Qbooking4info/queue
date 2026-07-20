@@ -6,10 +6,23 @@ import { Errors } from '@/lib/api-error'
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireRole(['hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const { id } = params
     const body = await req.json()
+
+    // BC2: verify the doctor belongs to the caller's hospital before any write
+    if (caller.hospitalId) {
+      const { data: ownerCheck } = await (db as any)
+        .from('doctors')
+        .select('id')
+        .eq('id', id)
+        .eq('hospital_id', caller.hospitalId)
+        .single()
+      if (!ownerCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const allowed = ['full_name','title','specialty_id','consultation_fee','virtual_fee',
                      'years_experience','accepts_virtual','bio','qualification','mdcn_number']
     const updates: Record<string, unknown> = {}

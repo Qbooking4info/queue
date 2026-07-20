@@ -7,7 +7,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:     ['confirmed', 'cancelled'],
   confirmed:   ['checked_in', 'cancelled'],
   checked_in:  ['in_progress', 'cancelled'],
-  in_progress: ['completed', 'no_show'],
+  in_progress: ['completed'],  // BL1: in_progress cannot be no-showed — consultation has already started
   completed:   [],
   cancelled:   [],
   no_show:     [],
