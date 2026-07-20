@@ -11,6 +11,7 @@ import {
   getClinicRangeStats, getUnassignedDoctors, assignDoctorToClinic,
   removeDoctorFromClinic, createClinicDoctor, updateAppointmentStatus,
   toggleClinicActive, deleteClinic, updateClinic,
+  setEmergencyClinic, clearEmergencyClinic,
   approveAppointment, rejectAppointment,
   getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
 } from '@/lib/admin-api'
@@ -953,6 +954,17 @@ export default function ClinicDetailPage() {
     setClinic(prev => prev ? { ...prev, is_active: next } : prev)
   }
 
+  async function handleToggleEmergency() {
+    if (!clinic || !hospital) return
+    if (clinic.is_emergency) {
+      await clearEmergencyClinic(clinicId)
+      setClinic(prev => prev ? { ...prev, is_emergency: false } : prev)
+    } else {
+      await setEmergencyClinic(hospital.id, clinicId)
+      setClinic(prev => prev ? { ...prev, is_emergency: true } : prev)
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true)
     const { error } = await deleteClinic(clinicId)
@@ -1015,6 +1027,13 @@ export default function ClinicDetailPage() {
                 {clinic.is_active ? 'Active' : 'Inactive'}
               </span>
             )}
+            {clinic?.is_emergency && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                background: 'rgba(220,60,60,0.12)', color: '#f07070',
+                border: '1px solid rgba(220,60,60,0.3)' }}>
+                🚨 Emergency Dept
+              </span>
+            )}
             {clinic && (
               <button onClick={() => setShowEdit(true)}
                 title="Edit clinic name & description"
@@ -1059,6 +1078,15 @@ export default function ClinicDetailPage() {
                   border: `1px solid ${clinic.is_active ? 'rgba(239,159,39,0.3)' : 'rgba(0,232,122,0.3)'}`,
                   color: clinic.is_active ? '#EF9F27' : '#00E87A' }}>
                 {clinic.is_active ? 'Deactivate' : 'Reactivate'}
+              </button>
+              <button onClick={handleToggleEmergency}
+                title={clinic.is_emergency ? 'Unset this as the Emergency Department' : 'Mark this clinic as the hospital\'s Emergency Department — it becomes the only clinic patients can pick when booking an emergency'}
+                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  background: clinic.is_emergency ? 'rgba(220,60,60,0.1)' : C.bgAlt,
+                  border: `1px solid ${clinic.is_emergency ? 'rgba(220,60,60,0.3)' : C.border}`,
+                  color: clinic.is_emergency ? '#f07070' : C.textMuted }}>
+                {clinic.is_emergency ? 'Unset Emergency Dept' : 'Set as Emergency Dept'}
               </button>
               <button onClick={() => setConfirmDelete(true)}
                 style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,

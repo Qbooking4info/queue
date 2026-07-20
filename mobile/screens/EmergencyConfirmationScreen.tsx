@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Animated,
+  StyleSheet, SafeAreaView, Animated, Linking, Alert,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -11,7 +11,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const {
     urgency, urgencyLabel, urgencyColor,
-    symptom, hospital, doctor, slot, total, bookingRef,
+    symptom, hospital, slot, total, bookingRef,
   } = route.params
 
   const [show, setShow] = useState(false)
@@ -38,6 +38,27 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
     return () => clearInterval(t)
   }, [])
 
+  function callHospital() {
+    if (!hospital?.phone) { Alert.alert('No phone number', 'This hospital has not listed a phone number.'); return }
+    Linking.openURL(`tel:${hospital.phone}`).catch(() => Alert.alert('Error', 'Could not start a call.'))
+  }
+
+  function getDirections() {
+    const lat = hospital?.latitude
+    const lng = hospital?.longitude
+    if (lat != null && lng != null) {
+      const label = encodeURIComponent(hospital?.name ?? '')
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`)
+        .catch(() => Alert.alert('Error', 'Could not open Google Maps.'))
+    } else if (hospital?.address) {
+      const addr = encodeURIComponent(`${hospital.address}, ${hospital.city ?? ''}`)
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${addr}`)
+        .catch(() => Alert.alert('Error', 'Could not open Google Maps.'))
+    } else {
+      Alert.alert('No location', 'This hospital has not set a map location yet.')
+    }
+  }
+
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: '#0A0301' }]}>
       <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
@@ -61,7 +82,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
         <View style={[st.queueCard, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}0D`, opacity: show ? 1 : 0 }]}>
           <View style={st.queueStat}>
             <Text style={[st.queueNum, { color: urgencyColor }]}>#{queuePos}</Text>
-            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Queue position</Text>
+            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Position on arrival</Text>
           </View>
           <View style={[st.queueDivider, { backgroundColor: `${urgencyColor}30` }]} />
           <View style={st.queueStat}>
@@ -88,7 +109,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
 
           {[
             { label: 'Hospital',   value: hospital?.name ?? '—' },
-            { label: 'Doctor',     value: doctor?.full_name ?? doctor?.name ?? '—' },
+            { label: 'Doctor',     value: 'Assigned on arrival' },
             { label: 'Arrival',    value: slot ?? '—' },
             { label: 'Urgency',    value: urgencyLabel },
             { label: 'Condition',  value: symptom ?? '—' },
@@ -119,10 +140,10 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
 
         {/* Actions */}
         <View style={[st.actions, { opacity: show ? 1 : 0 }]}>
-          <TouchableOpacity style={[st.callBtn, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}18` }]}>
+          <TouchableOpacity onPress={callHospital} style={[st.callBtn, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}18` }]}>
             <Text style={[st.callBtnText, { color: urgencyColor }]}>📞  Call hospital</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[st.callBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+          <TouchableOpacity onPress={getDirections} style={[st.callBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
             <Text style={[st.callBtnText, { color: 'rgba(255,255,255,0.6)' }]}>🗺  Get directions</Text>
           </TouchableOpacity>
         </View>

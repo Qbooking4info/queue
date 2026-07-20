@@ -63,6 +63,7 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     longitude: (h as any).longitude ?? null,
     address:   (h as any).address   ?? null,
     city:      h.city               ?? null,
+    phone:     (h as any).phone     ?? null,
     tag, tagType,
     avatar:    initials(h.name),
     avatarBg:  bgFromName(h.name),

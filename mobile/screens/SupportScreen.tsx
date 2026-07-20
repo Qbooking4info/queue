@@ -14,7 +14,7 @@ const FAQS = [
   { q: 'What payment methods are accepted?', a: 'We accept debit/credit cards, bank transfer, USSD, and HMO insurance. You can switch your payment method before confirming.' },
   { q: 'How does the virtual consultation work?', a: 'Choose "Virtual" when selecting consultation type. A video room link will be sent to you 5 minutes before your slot. Join from the Bookings tab.' },
   { q: 'Is my health data secure?', a: 'Yes. All data is encrypted in transit and at rest. We comply with NDPR (Nigeria Data Protection Regulation) and never share identifiable data without consent.' },
-  { q: 'What is the emergency booking premium?', a: 'Emergency bookings carry a 2× fee and urgent a 1.5× fee. This ensures priority queue placement and immediate availability at the hospital.' },
+  { q: 'What is the emergency booking premium?', a: 'A dedicated Emergency Booking (from the red banner on Home) carries a 2× fee and places you at the top of the queue. Flagging a regular booking as "Emergency" during Details carries a 1.5× fee. Either way, a doctor is prioritized for you at the hospital.' },
   { q: 'How do I get a refund?', a: 'Refunds for eligible cancellations are processed within 2–3 business days to your original payment method. Contact support if you have not received your refund.' },
 ]
 

@@ -209,6 +209,7 @@ export interface ClinicWithAdmin {
   name: string
   description: string | null
   is_active: boolean | null
+  is_emergency: boolean
   sort_order: number | null
   created_at: string | null
   service_tags: string[]
@@ -252,6 +253,7 @@ export async function getClinicsForHospital(hospitalId: string): Promise<ClinicW
     return {
       ...clinic,
       service_tags: (clinic as any).service_tags ?? [],
+      is_emergency: (clinic as any).is_emergency ?? false,
       subAdmin: u ? { id: u.id, full_name: u.full_name, email: u.email } : null,
       doctorCount: doctorCounts[clinic.id] ?? 0,
     }
@@ -715,6 +717,7 @@ export interface ClinicDetail {
   name: string
   description: string | null
   is_active: boolean | null
+  is_emergency: boolean
   hospital_id: string
   created_at: string | null
   sort_order: number | null
@@ -733,7 +736,8 @@ export interface ClinicStaffMember {
 
 export async function getClinicDetail(clinicId: string): Promise<ClinicDetail | null> {
   const { data } = await adminDb.from('hospital_clinics').select('*').eq('id', clinicId).single()
-  return data as ClinicDetail | null
+  if (!data) return null
+  return { ...data, is_emergency: (data as any).is_emergency ?? false } as ClinicDetail
 }
 
 export async function getClinicStaff(clinicId: string): Promise<ClinicStaffMember[]> {
@@ -963,6 +967,21 @@ export async function updateClinic(clinicId: string, updates: { name?: string; d
   return { error }
 }
 
+// A hospital has at most one Emergency Department clinic — setting a new one clears
+// whichever clinic previously held the flag so the two updates can't both land "true".
+export async function setEmergencyClinic(hospitalId: string, clinicId: string): Promise<{ error: string | null }> {
+  const { error: clearErr } = await adminDb.from('hospital_clinics')
+    .update({ is_emergency: false } as any).eq('hospital_id', hospitalId).eq('is_emergency', true)
+  if (clearErr) return { error: clearErr.message }
+  const { error } = await adminDb.from('hospital_clinics').update({ is_emergency: true } as any).eq('id', clinicId)
+  return { error: error?.message ?? null }
+}
+
+export async function clearEmergencyClinic(clinicId: string): Promise<{ error: string | null }> {
+  const { error } = await adminDb.from('hospital_clinics').update({ is_emergency: false } as any).eq('id', clinicId)
+  return { error: error?.message ?? null }
+}
+
 export async function toggleClinicActive(clinicId: string, isActive: boolean): Promise<void> {
   await adminDb.from('hospital_clinics').update({ is_active: isActive }).eq('id', clinicId)
 }
@@ -1082,19 +1101,30 @@ export async function getQueueForToday(hospitalId: string, clinicId?: string): P
 
   return Array.from(byId.values())
     .map(mapQueueRow)
-    .sort((a, b) => a.start_time.localeCompare(b.start_time))
+    .sort((a, b) => {
+      // Emergency appointments always sort first; within a tier, whoever has an actual queue
+      // position (checked in) sorts by it, then everyone else falls back to start time.
+      const aEmergency = a.urgency === 'emergency' ? 0 : 1
+      const bEmergency = b.urgency === 'emergency' ? 0 : 1
+      if (aEmergency !== bEmergency) return aEmergency - bEmergency
+      const aPos = a.queue_position ?? Infinity
+      const bPos = b.queue_position ?? Infinity
+      if (aPos !== bPos) return aPos - bPos
+      return a.start_time.localeCompare(b.start_time)
+    })
 }
 
 export async function checkInAppointment(id: string): Promise<{ error: string | null }> {
   const { data: appt, error: fetchErr } = await (adminDb as any)
     .from('appointments')
-    .select('hospital_id, doctor_id, assigned_doctor_id')
+    .select('hospital_id, doctor_id, assigned_doctor_id, urgency')
     .eq('id', id)
     .single()
   if (fetchErr || !appt) return { error: fetchErr?.message ?? 'Appointment not found' }
 
   const checkInDate = todayLocalDate()
   const doctorId = appt.doctor_id ?? appt.assigned_doctor_id
+  const isEmergency = appt.urgency === 'emergency'
   let queuePosition: number | null = null
   let estimatedWait: number | null = null
 
@@ -1102,20 +1132,33 @@ export async function checkInAppointment(id: string): Promise<{ error: string | 
   // future-dated booking that walks in today joins today's physical queue, per doctor.
   if (doctorId) {
     const [byDoctor, byAssigned] = await Promise.all([
-      (adminDb as any).from('appointments').select('id', { count: 'exact', head: true })
+      (adminDb as any).from('appointments').select('id, queue_position')
         .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
         .in('status', ['checked_in', 'in_progress']).eq('doctor_id', doctorId).neq('id', id),
-      (adminDb as any).from('appointments').select('id', { count: 'exact', head: true })
+      (adminDb as any).from('appointments').select('id, queue_position')
         .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
         .in('status', ['checked_in', 'in_progress']).eq('assigned_doctor_id', doctorId).neq('id', id),
     ])
     // Doctor-specific bookings use doctor_id; OPD bookings later assigned use assigned_doctor_id —
-    // a given appointment only ever matches one of the two, so the counts don't overlap.
-    const ahead = (byDoctor.count ?? 0) + (byAssigned.count ?? 0)
-    queuePosition = ahead + 1
+    // a given appointment only ever matches one of the two, so the lists don't overlap.
+    const others = [...(byDoctor.data ?? []), ...(byAssigned.data ?? [])] as { id: string; queue_position: number | null }[]
+    const ahead = others.length
 
-    const avgSecs = await getDoctorAvgConsultDuration(doctorId)
-    if (avgSecs != null) estimatedWait = Math.round((ahead * avgSecs) / 60)
+    if (isEmergency) {
+      // Emergency jumps straight to the front — shift everyone already in this doctor's
+      // queue today back by one instead of just appending to the end.
+      queuePosition = 1
+      estimatedWait = 0
+      await Promise.all(others.map(o =>
+        (adminDb as any).from('appointments')
+          .update({ queue_position: (o.queue_position ?? ahead) + 1 })
+          .eq('id', o.id)
+      ))
+    } else {
+      queuePosition = ahead + 1
+      const avgSecs = await getDoctorAvgConsultDuration(doctorId)
+      if (avgSecs != null) estimatedWait = Math.round((ahead * avgSecs) / 60)
+    }
   }
 
   const { error } = await (adminDb as any).from('appointments').update({

@@ -70,6 +70,13 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
               border: `1px solid ${clinic.is_active ? 'rgba(0,232,122,0.25)' : C.border}` }}>
               {clinic.is_active ? 'Active' : 'Inactive'}
             </span>
+            {clinic.is_emergency && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                background: 'rgba(220,60,60,0.12)', color: '#f07070',
+                border: '1px solid rgba(220,60,60,0.3)' }}>
+                🚨 Emergency Dept
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>Created {createdDate}</div>
         </div>

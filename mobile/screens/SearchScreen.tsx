@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native'
-import MapView, { Marker, Callout } from 'react-native-maps'
+import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLocation, distanceKm, formatDistance } from '../contexts/LocationContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
@@ -119,29 +119,19 @@ export function SearchScreen({ navigation }: Props) {
         {loading ? (
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : viewMode === 'map' ? (
-          <MapView
+          <HospitalsMap
             style={{ flex: 1, borderRadius: 16, marginHorizontal: 20, marginBottom: 16 }}
             initialRegion={{ ...mapCenter, latitudeDelta: 0.15, longitudeDelta: 0.15 }}
             showsUserLocation={!!coords}
-            showsMyLocationButton
-          >
-            {mappable.map(h => (
-              <Marker
-                key={String(h.id)}
-                coordinate={{ latitude: h.latitude!, longitude: h.longitude! }}
-                title={h.name}
-                pinColor="#00CC66"
-              >
-                <Callout onPress={() => navigation.navigate('HospitalProfile', { hospital: h })}>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutName}>{h.name}</Text>
-                    <Text style={styles.calloutSub}>{h.specialty}</Text>
-                    <Text style={styles.calloutLink}>Tap to view →</Text>
-                  </View>
-                </Callout>
-              </Marker>
-            ))}
-          </MapView>
+            markers={mappable.map(h => ({
+              id: String(h.id), latitude: h.latitude!, longitude: h.longitude!,
+              title: h.name, subtitle: h.specialty,
+            }))}
+            onMarkerPress={id => {
+              const h = mappable.find(m => String(m.id) === id)
+              if (h) navigation.navigate('HospitalProfile', { hospital: h })
+            }}
+          />
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 20 }}>
             {results.length === 0 && (
@@ -173,8 +163,4 @@ const styles = StyleSheet.create({
   emptyText:   { fontSize: 13 },
   viewToggle:  { flexDirection: 'row', borderRadius: 10, borderWidth: 1, overflow: 'hidden', marginRight: 20 },
   toggleBtn:   { paddingHorizontal: 10, paddingVertical: 6 },
-  callout:     { width: 180, padding: 4 },
-  calloutName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  calloutSub:  { fontSize: 11, color: '#666', marginBottom: 4 },
-  calloutLink: { fontSize: 11, color: '#00CC66', fontWeight: '600' },
 })

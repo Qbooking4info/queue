@@ -289,15 +289,15 @@ export type Database = {
       hospital_clinics: {
         Row: {
           id: string; hospital_id: string; name: string; description: string | null
-          is_active: boolean | null; sort_order: number | null; created_at: string | null
+          is_active: boolean | null; is_emergency: boolean | null; sort_order: number | null; created_at: string | null
         }
         Insert: {
           id?: string; hospital_id: string; name: string; description?: string | null
-          is_active?: boolean | null; sort_order?: number | null; created_at?: string | null
+          is_active?: boolean | null; is_emergency?: boolean | null; sort_order?: number | null; created_at?: string | null
         }
         Update: {
           id?: string; hospital_id?: string; name?: string; description?: string | null
-          is_active?: boolean | null; sort_order?: number | null; created_at?: string | null
+          is_active?: boolean | null; is_emergency?: boolean | null; sort_order?: number | null; created_at?: string | null
         }
         Relationships: [
           { foreignKeyName: "hospital_clinics_hospital_id_fkey"; columns: ["hospital_id"]; isOneToOne: false; referencedRelation: "hospitals"; referencedColumns: ["id"] },

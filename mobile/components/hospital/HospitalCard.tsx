@@ -28,6 +28,7 @@ export interface DisplayHospital {
   longitude?: number | null
   address?:   string | null
   city?:      string | null
+  phone?:     string | null
   // Booking policy fields
   hospitalType?:       string | null
   clinic_model?:       string | null

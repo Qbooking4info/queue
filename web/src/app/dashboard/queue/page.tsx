@@ -153,22 +153,34 @@ export default function QueuePage() {
             const sc = statusColor(appt.status)
             const action = nextAction(appt.status)
             const isUpdating = updating === appt.id
+            const isEmergency = appt.urgency === 'emergency'
             return (
               <div key={appt.id} style={{ display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 18px', borderRadius: 14, background: C.card,
-                border: `1px solid ${appt.status === 'in_progress' ? C.accentBorder : C.border}`,
-                boxShadow: appt.status === 'in_progress' ? `0 0 0 1px ${C.accentBorder}` : 'none' }}>
+                padding: '14px 18px', borderRadius: 14,
+                background: isEmergency ? C.redLight : C.card,
+                border: `1px solid ${isEmergency ? C.red : appt.status === 'in_progress' ? C.accentBorder : C.border}`,
+                borderLeftWidth: isEmergency ? 4 : 1,
+                boxShadow: appt.status === 'in_progress' && !isEmergency ? `0 0 0 1px ${C.accentBorder}` : 'none' }}>
 
                 {/* Queue number */}
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)',
+                <div style={{ width: 36, height: 36, borderRadius: 10,
+                  background: isEmergency ? C.red : 'rgba(255,255,255,0.06)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                  fontSize: 13, fontWeight: 800, color: isEmergency ? '#fff' : 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
                   {appt.queue_position ?? idx + 1}
                 </div>
 
                 {/* Patient info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{appt.patient_name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{appt.patient_name}</div>
+                    {isEmergency && (
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
+                        background: C.red, color: '#fff', whiteSpace: 'nowrap' }}>
+                        🚨 EMERGENCY
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
                     {appt.start_time} · Dr. {appt.doctor_name}
                     {appt.booking_ref ? ` · #${appt.booking_ref}` : ''}

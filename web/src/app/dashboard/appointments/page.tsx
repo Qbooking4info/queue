@@ -32,8 +32,8 @@ function filterLabel(f: string) {
   }
   return m[f] ?? f.charAt(0).toUpperCase() + f.slice(1)
 }
-function urgencyColor(u?: string) {
-  if (u === 'emergency') return { bg: 'rgba(220,60,60,0.12)', text: '#f07070', border: 'rgba(220,60,60,0.3)' }
+function urgencyColor(u: string | undefined, C: any) {
+  if (u === 'emergency') return { bg: C.redLight, text: C.red, border: `${C.red}4D` }
   if (u === 'urgent')    return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
   return null
 }
@@ -478,7 +478,7 @@ function DetailPanel({
   appt, onClose,
 }: { appt: AdminAppointment; onClose: () => void }) {
   const { theme: C } = useTheme()
-  const urg = urgencyColor(appt.urgency)
+  const urg = urgencyColor(appt.urgency, C)
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 999,
       background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
@@ -746,12 +746,14 @@ export default function AppointmentsPage() {
                 No appointments match your filters.
               </td></tr>
             ) : filtered.map((a, i) => {
-              const urg = urgencyColor(a.urgency)
+              const urg = urgencyColor(a.urgency, C)
               const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
               const needsApproval = a.approval_status === 'pending_approval'
+              const isEmergency = a.urgency === 'emergency'
               return (
                 <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
-                  background: i % 2 === 0 ? C.card : C.rowAlt,
+                  background: isEmergency ? C.redLight : i % 2 === 0 ? C.card : C.rowAlt,
+                  boxShadow: isEmergency ? `inset 3px 0 0 ${C.red}` : 'none',
                   outline: needsApproval ? `1px solid rgba(239,159,39,0.2)` : 'none' }}>
                   <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
                     {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-GB', {

@@ -49,6 +49,7 @@ export type Clinic = {
   description:         string | null
   is_opd:              boolean
   is_active:           boolean
+  is_emergency:        boolean
   sort_order:          number | null
   daily_booking_limit: number | null
   service_tags:        string[]
@@ -61,7 +62,39 @@ export async function getClinicsForHospital(hospitalId: string): Promise<Clinic[
     .eq('hospital_id', hospitalId)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
-  return (data as Clinic[]) ?? []
+  return ((data ?? []) as any[]).map(c => ({ ...c, is_emergency: c.is_emergency ?? false })) as Clinic[]
+}
+
+// ── Operating hours ──────────────────────────────────────────────────────────
+
+export interface DayHours { day: number; open: string; close: string; closed: boolean }
+
+// Mirrors the web dashboard's default: Mon–Sat 08:00–18:00 open, Sunday closed
+function defaultDayHours(): DayHours[] {
+  return Array.from({ length: 7 }, (_, day) => ({ day, open: '08:00', close: '18:00', closed: day === 0 }))
+}
+
+export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> {
+  const { data } = await publicDb
+    .from('hospital_operating_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('hospital_id', hospitalId)
+  const byDay = new Map((data ?? []).map((r: any) => [r.day_of_week, r]))
+  return defaultDayHours().map(d => {
+    const r = byDay.get(d.day)
+    if (!r) return d
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+  })
+}
+
+export function isOpenNow(hours: DayHours[]): boolean {
+  const now = new Date()
+  const today = hours.find(h => h.day === now.getDay())
+  if (!today || today.closed) return false
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const [oh, om] = today.open.split(':').map(Number)
+  const [ch, cm] = today.close.split(':').map(Number)
+  return nowMins >= oh * 60 + om && nowMins < ch * 60 + cm
 }
 
 // ── Doctors ──────────────────────────────────────────────────────────────────

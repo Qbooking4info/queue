@@ -151,6 +151,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
               const clinicLabel    = clinicObj && !clinicObj.is_opd ? clinicObj.name : null
               const doctorName     = a.doctor?.full_name
                 ?? (bookingMode === 'hospital' ? null : 'Doctor')
+              const isEmergency    = (a as any).urgency === 'emergency'
 
               return (
                 <TouchableOpacity
@@ -160,8 +161,9 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   style={[
                     s.card,
                     {
-                      backgroundColor: t.cardBg,
-                      borderColor: isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
+                      backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+                      borderColor: isEmergency ? '#FF5C5C' : isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
+                      borderLeftWidth: isEmergency ? 4 : 1,
                     },
                   ]}>
 
@@ -170,6 +172,11 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                     <View style={s.refLeft}>
                       <Text style={s.refIcon}>{isVirtual ? '💻' : '🏥'}</Text>
                       <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
+                      {isEmergency && (
+                        <View style={{ backgroundColor: '#FF5C5C', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>🚨 EMERGENCY</Text>
+                        </View>
+                      )}
                     </View>
                     <View style={[s.statusPill, { backgroundColor: sc.bg, borderColor: sc.border }]}>
                       <Text style={[s.statusText, { color: sc.color }]}>

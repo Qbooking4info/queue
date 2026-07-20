@@ -202,10 +202,19 @@ export default function OverviewPage() {
             ) : todayAppointments.map((a, i) => (
               <div key={a.id} style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', gap: 12,
-                background: i % 2 === 1 ? C.rowAlt : C.card }}>
+                background: a.urgency === 'emergency' ? C.redLight : i % 2 === 1 ? C.rowAlt : C.card,
+                borderLeft: a.urgency === 'emergency' ? `3px solid ${C.red}` : 'none' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, minWidth: 42 }}>{a.start_time}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
+                    {a.urgency === 'emergency' && (
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 7px', borderRadius: 99,
+                        background: C.red, color: '#fff', whiteSpace: 'nowrap' }}>
+                        🚨 EMERGENCY
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11, color: C.textSub }}>
                     {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}{a.reason ? ` · ${a.reason}` : ''}
                   </div>

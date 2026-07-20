@@ -78,10 +78,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     vitals_bp_diastolic: (raw as any).vitals_bp_diastolic ?? null,
     vitals_blood_sugar:  (raw as any).vitals_blood_sugar  ?? null,
     vitals_bmi:          (raw as any).vitals_bmi          ?? null,
+    urgency:             (raw as any).urgency ?? 'routine',
   }
 
   const hasVitals = appt.vitals_weight_kg != null || appt.vitals_height_cm != null
     || appt.vitals_bp_systolic != null || appt.vitals_blood_sugar != null
+  const isEmergency = appt.urgency === 'emergency'
 
   const isVirtual   = appt.type === 'virtual'
   const isInPerson  = !isVirtual
@@ -329,6 +331,21 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             ))}
           </View>
         </View>
+
+        {/* Emergency banner */}
+        {isEmergency && !cancelled && (
+          <View style={[st.joinBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.4)' }]}>
+            <Text style={{ fontSize: 22 }}>🚨</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.joinTitle, { color: '#FF5C5C' }]}>Emergency booking</Text>
+              <Text style={[st.joinSub, { color: 'rgba(255,92,92,0.7)' }]}>
+                {appt.status === 'checked_in' || appt.status === 'in_progress'
+                  ? "You've been placed at the front of today's queue."
+                  : 'You will be prioritized to the front of the queue once checked in.'}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Virtual join banner */}
         {isVirtual && isConfirmed && !cancelled && (

@@ -9,6 +9,7 @@ import {
   getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
+  getHospitalHours, isOpenNow,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
@@ -28,6 +29,12 @@ const STEP_LABELS = ['Type', 'Hospital', 'Details', 'Schedule', 'Confirm']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
+// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function getBookingDates(n = 8) {
   const dates: { iso: string; label: string }[] = []
   let offset = 0
@@ -35,7 +42,7 @@ function getBookingDates(n = 8) {
     const d = new Date()
     d.setDate(d.getDate() + offset)
     if (d.getDay() !== 0) {
-      const iso  = d.toISOString().split('T')[0]
+      const iso  = fmtLocalDate(d)
       const day  = d.toLocaleDateString('en-NG', { weekday: 'short' })
       const num  = d.getDate()
       const mon  = d.toLocaleDateString('en-NG', { month: 'short' })
@@ -45,8 +52,6 @@ function getBookingDates(n = 8) {
   }
   return dates
 }
-
-const DATES = getBookingDates(8)
 
 const ALL_OPD_SLOTS = [
   { id: 's1',  label: '8:00 AM',  time: '08:00' },
@@ -62,7 +67,7 @@ const ALL_OPD_SLOTS = [
 ]
 
 function getAvailableOpdSlots(dateIso: string) {
-  const todayIso = new Date().toISOString().split('T')[0]
+  const todayIso = fmtLocalDate(new Date())
   if (dateIso !== todayIso) return ALL_OPD_SLOTS
   const now  = new Date()
   const nowMins = now.getHours() * 60 + now.getMinutes() + 30 // 30-min buffer
@@ -91,6 +96,10 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const rescheduleCtx: { originalId: string; doctorId?: string | null; clinicId?: string | null; reason?: string } | undefined
     = route.params?.reschedule
 
+  // Computed fresh on every screen visit — a module-level constant here would get cached
+  // for the lifetime of the JS bundle and silently go stale ("Today" pointing at an old date).
+  const [DATES] = useState(() => getBookingDates(8))
+
   const startStep = presetType && presetHospital ? STEP_DETAILS
                   : presetType                   ? STEP_HOSPITAL
                   : STEP_TYPE
@@ -107,11 +116,32 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   // Step 2 — details
   const [reason,  setReason]  = useState(rescheduleCtx?.reason ?? '')
-  const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'emergency'>('routine')
+  const [urgency, setUrgency] = useState<'routine' | 'emergency'>('routine')
+  const isEmergency = urgency === 'emergency'
+
+  // Emergency bookings never leave "today" — no future date, no exceptions. If this hospital
+  // is closed today (and isn't a 24/7 emergency_hours hospital), the patient needs to pick
+  // a different hospital rather than queue up for a day that doesn't exist for an emergency.
+  const [hospitalOpenNow, setHospitalOpenNow] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!isEmergency || !hospital?.id) { setHospitalOpenNow(null); return }
+    if ((hospital as any).emergencySlots) { setHospitalOpenNow(true); return }
+    let cancelled = false
+    getHospitalHours(String(hospital.id)).then(hours => {
+      if (!cancelled) setHospitalOpenNow(isOpenNow(hours))
+    })
+    return () => { cancelled = true }
+  }, [isEmergency, hospital?.id])
 
   // Step 3 — schedule
   const [selectedDate, setSelectedDate] = useState(DATES[0].iso)
-  const [opdSlot,      setOpdSlot]      = useState<typeof OPD_SLOTS[0] | null>(null)
+
+  // Force today the moment urgency becomes emergency — an emergency booking can't be for
+  // a future date, even if the patient had already picked one before switching urgency.
+  useEffect(() => {
+    if (isEmergency) setSelectedDate(DATES[0].iso)
+  }, [isEmergency])
+  const [opdSlot,      setOpdSlot]      = useState<typeof ALL_OPD_SLOTS[0] | null>(null)
   const [preferredDoc, setPreferredDoc] = useState<any | null>(null)
   const [dateFullMap,  setDateFullMap]  = useState<Record<string, boolean>>({})
   const [checkingLim,  setCheckingLim]  = useState(false)
@@ -127,6 +157,15 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null)
   const [referralNote,   setReferralNote]   = useState('')
 
+  // Forces opdSlots to re-filter periodically — otherwise a slot that was valid when this
+  // screen first rendered can keep showing as bookable long after it's actually passed if
+  // the user just sits on the schedule step without triggering any other re-render.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => forceTick(t => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const opdSlots       = getAvailableOpdSlots(selectedDate)
   const virtualDoctors = (hospital?.doctors ?? []).filter((d: any) => d.accepts_virtual)
@@ -136,6 +175,22 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     : (hospital?.opd_fee ?? 0)
   const emergencyExtra = urgency === 'emergency' ? Math.round(baseFee * 0.5) : 0
   const totalFee       = baseFee + emergencyExtra + 500
+
+  // Once emergency is flagged at a multi-clinic hospital, only the hospital's designated
+  // Emergency Department clinic is selectable — every other clinic (specialist or OPD) is
+  // hidden so patients can't accidentally route a life-threatening visit through a normal
+  // referral queue.
+  const emergencyClinic    = clinics.find(c => c.is_emergency) ?? null
+  const visibleClinics     = isEmergency ? (emergencyClinic ? [emergencyClinic] : []) : clinics
+  const noEmergencyClinic  = isEmergency && hospital?.clinic_model === 'multi' && !loadingClinics && !emergencyClinic
+
+  // Auto-select the Emergency Department the moment it's the only option — no need to make
+  // someone tap a single-item list while triaging.
+  useEffect(() => {
+    if (isEmergency && emergencyClinic && selectedClinic?.id !== emergencyClinic.id) {
+      setSelectedClinic(emergencyClinic)
+    }
+  }, [isEmergency, emergencyClinic?.id])
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
@@ -207,7 +262,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   function canAdvance() {
     if (step === STEP_HOSPITAL) return !!hospital
-    if (step === STEP_DETAILS)  return reason.trim().length >= 3 && !(hospital?.clinic_model === 'multi' && !selectedClinic)
+    if (step === STEP_DETAILS) {
+      if (isEmergency && hospitalOpenNow === false) return false
+      if (noEmergencyClinic) return false
+      return reason.trim().length >= 3 && !(hospital?.clinic_model === 'multi' && !selectedClinic)
+    }
     if (step === STEP_SCHEDULE) {
       return !!opdSlot && !dateFullMap[selectedDate]
     }
@@ -222,10 +281,13 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
     let result: { id: string; bookingRef: string; approvalStatus: string } | null = null
 
-    // Specialist clinic forces manual approval regardless of hospital setting
-    const clinicApprovalMode = (selectedClinic && !selectedClinic.is_opd)
-      ? 'manual'
-      : (hospital.approval_mode ?? 'auto')
+    // Specialist clinic forces manual approval regardless of hospital setting — except for
+    // emergencies, which must never wait on review even if routed to a non-OPD clinic.
+    const clinicApprovalMode = isEmergency
+      ? 'auto'
+      : (selectedClinic && !selectedClinic.is_opd)
+        ? 'manual'
+        : (hospital.approval_mode ?? 'auto')
 
     const arrivalTime = opdSlot?.time ?? '09:00'
 
@@ -501,44 +563,82 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               <View style={{ gap: 8 }}>
                 {([
                   ['routine',   '🩺', 'Routine',   'Regular check-up or follow-up'],
-                  ['urgent',    '⚡', 'Urgent',    'Needs attention soon, not an emergency'],
                   ['emergency', '🚨', 'Emergency', 'Severe symptoms requiring prompt care (1.5× fee)'],
-                ] as const).map(([id, icon, label, sub]) => (
-                  <TouchableOpacity key={id} onPress={() => setUrgency(id)}
-                    style={[s.urgRow, {
-                      borderColor:     urgency === id ? t.accent   : t.cardBorder,
-                      backgroundColor: urgency === id ? t.accentBg : t.cardBg,
-                    }]}>
-                    <Text style={{ fontSize: 20 }}>{icon}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.urgLabel, { color: urgency === id ? t.accent : t.textPrimary }]}>{label}</Text>
-                      <Text style={[s.urgSub,   { color: t.textMuted }]}>{sub}</Text>
-                    </View>
-                    <View style={[s.radio, {
-                      borderColor:     urgency === id ? t.accent : t.cardBorder,
-                      backgroundColor: urgency === id ? t.accent : 'transparent',
-                    }]}>
-                      {urgency === id && <Text style={{ color: '#000', fontSize: 8, fontWeight: '900' }}>✓</Text>}
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                ] as const).map(([id, icon, label, sub]) => {
+                  const active = urgency === id
+                  const danger = id === 'emergency'
+                  const activeColor = danger ? '#FF5C5C' : t.accent
+                  const activeBg    = danger ? 'rgba(255,92,92,0.08)' : t.accentBg
+                  return (
+                    <TouchableOpacity key={id} onPress={() => setUrgency(id)}
+                      style={[s.urgRow, {
+                        borderColor:     active ? activeColor : t.cardBorder,
+                        backgroundColor: active ? activeBg    : t.cardBg,
+                      }]}>
+                      <Text style={{ fontSize: 20 }}>{icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.urgLabel, { color: active ? activeColor : t.textPrimary }]}>{label}</Text>
+                        <Text style={[s.urgSub,   { color: t.textMuted }]}>{sub}</Text>
+                      </View>
+                      <View style={[s.radio, {
+                        borderColor:     active ? activeColor : t.cardBorder,
+                        backgroundColor: active ? activeColor : 'transparent',
+                      }]}>
+                        {active && <Text style={{ color: '#000', fontSize: 8, fontWeight: '900' }}>✓</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  )
+                })}
               </View>
+
+              {isEmergency && (
+                <View style={[s.noticeBox, {
+                  marginTop: 12,
+                  backgroundColor: hospitalOpenNow === false ? 'rgba(255,92,92,0.1)' : 'rgba(255,92,92,0.06)',
+                  borderColor: 'rgba(255,92,92,0.35)',
+                }]}>
+                  {hospitalOpenNow === false ? (
+                    <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                      🚨 <Text style={{ fontWeight: '800' }}>{hospital?.name} is closed right now.</Text> Emergency
+                      bookings can only be for today, so please go back and choose a hospital that's currently open.
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                      🚨 Emergency bookings are for <Text style={{ fontWeight: '800' }}>today only</Text> — you won't
+                      be able to pick a future date, and you'll be prioritized to the front of today's queue.
+                    </Text>
+                  )}
+                </View>
+              )}
 
               {/* ── Clinic selector (multi-clinic hospitals) ────────── */}
               {hospital?.clinic_model === 'multi' && (
                 <View style={{ marginTop: 20 }}>
-                  <Text style={[s.label, { color: t.textMuted }]}>Select a clinic *</Text>
+                  <Text style={[s.label, { color: t.textMuted }]}>
+                    {isEmergency ? 'Emergency department' : 'Select a clinic *'}
+                  </Text>
 
-                  <View style={[s.noticeBox, { backgroundColor: 'rgba(26,127,193,0.08)', borderColor: 'rgba(26,127,193,0.25)', marginBottom: 12 }]}>
-                    <Text style={{ fontSize: 12, color: '#1A7FC1', lineHeight: 18 }}>
-                      {'💡 '}<Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
-                    </Text>
-                  </View>
+                  {!isEmergency && (
+                    <View style={[s.noticeBox, { backgroundColor: 'rgba(26,127,193,0.08)', borderColor: 'rgba(26,127,193,0.25)', marginBottom: 12 }]}>
+                      <Text style={{ fontSize: 12, color: '#1A7FC1', lineHeight: 18 }}>
+                        {'💡 '}<Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {noEmergencyClinic && (
+                    <View style={[s.noticeBox, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)', marginBottom: 12 }]}>
+                      <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                        🚨 <Text style={{ fontWeight: '800' }}>{hospital?.name} hasn't set up an Emergency Department.</Text> Please
+                        go back and choose a different hospital for an emergency booking.
+                      </Text>
+                    </View>
+                  )}
 
                   {loadingClinics ? (
                     <ActivityIndicator color={t.accent} style={{ marginVertical: 12 }} />
                   ) : (
-                    clinics.map(clinic => {
+                    visibleClinics.map(clinic => {
                       const active = selectedClinic?.id === clinic.id
                       return (
                         <TouchableOpacity key={clinic.id}
@@ -551,12 +651,15 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
                               <Text style={[s.urgLabel, { color: active ? t.accent : t.textPrimary }]}>{clinic.name}</Text>
-                              {clinic.is_opd && (
+                              {isEmergency ? (
+                                <View style={[s.miniTag, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
+                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FF5C5C' }}>🚨 Emergency</Text>
+                                </View>
+                              ) : clinic.is_opd ? (
                                 <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: t.accent }}>Recommended</Text>
                                 </View>
-                              )}
-                              {!clinic.is_opd && (
+                              ) : (
                                 <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.3)' }]}>
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#EF9F27' }}>Needs referral</Text>
                                 </View>
@@ -594,7 +697,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     })
                   )}
 
-                  {selectedClinic && !selectedClinic.is_opd && (
+                  {selectedClinic && !selectedClinic.is_opd && !isEmergency && (
                     <>
                       <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginTop: 4 }]}>
                         <Text style={{ fontSize: 12, color: '#EF9F27', lineHeight: 18 }}>
@@ -629,7 +732,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
-                    {DATES.map(d => {
+                    {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
                       const active = selectedDate === d.iso
                       const full   = !!dateFullMap[d.iso]
                       return (
@@ -648,6 +751,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       )
                     })}
                   </ScrollView>
+                  {isEmergency && (
+                    <Text style={{ fontSize: 11, color: '#FF5C5C', marginBottom: 8 }}>
+                      🚨 Emergency bookings are today only — no other dates available.
+                    </Text>
+                  )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
                       <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ This date is fully booked. Please pick another day.</Text>
@@ -764,7 +872,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
-                    {DATES.map(d => {
+                    {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
                       const active = selectedDate === d.iso
                       const full   = !!dateFullMap[d.iso]
                       return (
@@ -783,6 +891,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       )
                     })}
                   </ScrollView>
+                  {isEmergency && (
+                    <Text style={{ fontSize: 11, color: '#FF5C5C', marginBottom: 8 }}>
+                      🚨 Emergency bookings are today only — no other dates available.
+                    </Text>
+                  )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
                       <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ This date is fully booked. Please pick another day.</Text>

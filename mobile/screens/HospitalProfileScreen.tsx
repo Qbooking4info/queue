@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Alert } from 'react-native'
-import MapView, { Marker } from 'react-native-maps'
+import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
 import { StatusBadge } from '../components/ui/StatusBadge'
@@ -169,18 +169,17 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             {/* Map */}
             {hospital.latitude != null && hospital.longitude != null && (
               <View style={styles.mapWrap}>
-                <MapView
+                <HospitalsMap
                   style={styles.map}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
+                  interactive={false}
                   initialRegion={{
                     latitude:  hospital.latitude!,
                     longitude: hospital.longitude!,
                     latitudeDelta:  0.01,
                     longitudeDelta: 0.01,
-                  }}>
-                  <Marker coordinate={{ latitude: hospital.latitude!, longitude: hospital.longitude! }} title={hospital.name} />
-                </MapView>
+                  }}
+                  markers={[{ id: String(hospital.id), latitude: hospital.latitude!, longitude: hospital.longitude!, title: hospital.name }]}
+                />
                 <TouchableOpacity onPress={openDirections}
                   style={[styles.directionsBtn, { backgroundColor: t.accent }]}>
                   <Text style={styles.directionsBtnText}>🗺 Get Directions</Text>

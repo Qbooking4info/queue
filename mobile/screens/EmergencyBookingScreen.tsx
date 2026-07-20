@@ -5,30 +5,25 @@ import {
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
-import { getHospitals, createAppointment, addNotification } from '../lib/api'
+import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
 interface Props { navigation: any }
 
-const STEPS = ['Triage', 'Hospital & Doctor', 'Payment']
+const STEPS = ['Triage', 'Hospital', 'Payment']
 
-const URGENCY_OPTIONS = [
-  {
-    id: 'emergency', label: '🚨 Emergency',
-    sub: 'Life-threatening — needs immediate attention',
-    multiplier: 2.0, badge: '2× fee',
-    color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)', border: 'rgba(255,92,92,0.35)',
-  },
-  {
-    id: 'urgent', label: '⚡ Urgent',
-    sub: 'Serious but stable — seen within the hour',
-    multiplier: 1.5, badge: '1.5× fee',
-    color: '#FFB547', bg: 'rgba(255,181,71,0.1)', border: 'rgba(255,181,71,0.35)',
-  },
-] as const
+// Every booking made through this screen is, by definition, an emergency — there is no
+// tier to pick. A separate "urgent" tier was removed because patients confused it with
+// emergency and expected the same queue-jump priority, which it never actually granted.
+const EMERGENCY_TIER = {
+  id: 'emergency' as const, label: '🚨 Emergency',
+  multiplier: 2.0, badge: '2× fee', color: '#FF5C5C',
+}
 
-type UrgencyId = typeof URGENCY_OPTIONS[number]['id']
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const ARRIVAL_OPTIONS = ['Now (walk-in)', '15 min', '30 min', '45 min', '1 hr']
 
@@ -64,60 +59,80 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const { user }      = useAuth()
 
   const [step,              setStep]             = useState(0)
-  const [urgency,           setUrgency]          = useState<UrgencyId>('emergency')
   const [symptom,           setSymptom]          = useState('')
   const [customSymptom,     setCustomSymptom]    = useState('')
   const [forDependent,      setForDependent]     = useState(false)
   const [hospitals,         setHospitals]        = useState<DisplayHospital[]>([])
   const [loadingHospitals,  setLoadingHospitals] = useState(false)
   const [selectedHospital,  setSelectedHospital] = useState<DisplayHospital | null>(null)
-  const [selectedDoctor,    setSelectedDoctor]   = useState<any | null>(null)
+  const [erClinicId,        setErClinicId]       = useState<string | undefined>(undefined)
   const [arrival,           setArrival]          = useState<string | null>(null)
   const [paymentMethod,     setPaymentMethod]    = useState('card')
   const [submitting,        setSubmitting]       = useState(false)
   const [submitError,       setSubmitError]      = useState('')
 
-  const u = URGENCY_OPTIONS.find(o => o.id === urgency) ?? URGENCY_OPTIONS[0]
-  const baseFee   = selectedDoctor?.consultation_fee ?? 15000
+  const u = EMERGENCY_TIER
+  const baseFee   = selectedHospital?.opd_fee ?? 15000
   const premium   = Math.round(baseFee * (u.multiplier - 1))
   const total     = baseFee + premium + 500
 
-  // Load emergency hospitals
+  // Load hospitals genuinely available right now — 24/7 emergency_hours hospitals always
+  // qualify; everyone else only if they're actually open at this moment. A closed hospital
+  // is never shown here — for emergencies the patient needs somewhere real to go now.
   const loadHospitals = useCallback(async () => {
     setLoadingHospitals(true)
     const raw = await getHospitals()
-    const emergency = raw.filter(h => h.emergency_hours).map(toDisplayHospital)
-    // fallback: show all hospitals if none have emergency_hours set
-    setHospitals(emergency.length > 0 ? emergency : raw.map(toDisplayHospital))
+    const checks = await Promise.all(raw.map(async h => {
+      if (h.emergency_hours) return true
+      const hours = await getHospitalHours(String(h.id))
+      return isOpenNow(hours)
+    }))
+    setHospitals(raw.filter((_, i) => checks[i]).map(toDisplayHospital))
     setLoadingHospitals(false)
   }, [])
 
   useEffect(() => { loadHospitals() }, [loadHospitals])
 
+  // Best-effort: if this is a multi-clinic hospital and it has a designated Emergency
+  // Department, route the booking straight there. If not, it still falls through as a
+  // general hospital-level booking — unlike the regular booking flow, this dedicated
+  // emergency screen never blocks a walk-in just because a clinic isn't tagged yet.
+  useEffect(() => {
+    setErClinicId(undefined)
+    if (!selectedHospital || selectedHospital.clinic_model !== 'multi') return
+    let cancelled = false
+    getClinicsForHospital(String(selectedHospital.id)).then(clinics => {
+      if (cancelled) return
+      const er = clinics.find(c => c.is_emergency)
+      if (er) setErClinicId(er.id)
+    })
+    return () => { cancelled = true }
+  }, [selectedHospital?.id])
+
   const canProceed = () => {
-    if (step === 0) return !!(urgency && (symptom || customSymptom.trim()))
-    if (step === 1) return !!(selectedHospital && selectedDoctor && arrival)
+    if (step === 0) return !!(symptom || customSymptom.trim())
+    if (step === 1) return !!(selectedHospital && arrival)
     return true
   }
 
   async function handleConfirm() {
-    if (!user || !selectedHospital || !selectedDoctor) return
+    if (!user || !selectedHospital) return
     setSubmitError('')
     setSubmitting(true)
 
-    const today     = new Date().toISOString().split('T')[0]
+    const today     = fmtLocalDate(new Date())
     const startTime = arrivalToTime(arrival ?? 'Now (walk-in)')
-    const reason    = `EMERGENCY · ${u.label} · ${symptom || customSymptom}`
+    const reason    = `EMERGENCY · ${symptom || customSymptom}`
 
-    const result = await createAppointment({
+    const result = await createHospitalAppointment({
       patientId:  user.id,
-      doctorId:   selectedDoctor.id,
       hospitalId: String(selectedHospital.id),
-      slotId:     null,
       date:       today,
       startTime,
       type:       'in-person',
       reason,
+      urgency:    u.id,
+      clinicId:   erClinicId,
     })
 
     if (result) {
@@ -125,7 +140,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         userId: user.id,
         type:   'confirmed',
         title:  '🚨 Emergency Booking Confirmed',
-        body:   `${result.bookingRef} · ${selectedDoctor.full_name ?? selectedDoctor.name} at ${selectedHospital.name}\nArrival: ${arrival} · ${u.label}`,
+        body:   `${result.bookingRef} · ${selectedHospital.name}\nArrival: ${arrival} · A doctor will be assigned on arrival`,
         data:   { appointment_id: result.id, booking_ref: result.bookingRef },
       })
     }
@@ -134,12 +149,11 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
     if (result) {
       navigation.navigate('EmergencyConfirmation', {
-        urgency,
+        urgency:      u.id,
         urgencyLabel: u.label,
         urgencyColor: u.color,
         symptom:      symptom || customSymptom,
         hospital:     selectedHospital,
-        doctor:       selectedDoctor,
         slot:         arrival,
         total,
         bookingRef:   result.bookingRef,
@@ -185,30 +199,6 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             <Text style={[s.alertText, { color: '#FF5C5C' }]}>
               If life-threatening, call <Text style={{ fontWeight: '900' }}>112</Text> immediately.
             </Text>
-          </View>
-
-          <Text style={[s.label, { color: t.textMuted }]}>How urgent is this?</Text>
-          <View style={s.urgencyGrid}>
-            {URGENCY_OPTIONS.map(opt => (
-              <TouchableOpacity key={opt.id} onPress={() => setUrgency(opt.id)}
-                style={[s.urgencyCard, {
-                  borderColor:     urgency === opt.id ? opt.color : t.cardBorder,
-                  backgroundColor: urgency === opt.id ? opt.bg   : t.cardBg,
-                }]}>
-                <View style={s.urgencyTop}>
-                  <Text style={[s.urgencyLabel, { color: urgency === opt.id ? opt.color : t.textPrimary }]}>{opt.label}</Text>
-                  <View style={[s.urgencyBadge, { backgroundColor: opt.bg, borderColor: opt.border }]}>
-                    <Text style={[s.urgencyBadgeText, { color: opt.color }]}>{opt.badge}</Text>
-                  </View>
-                </View>
-                <Text style={[s.urgencySub, { color: t.textMuted }]}>{opt.sub}</Text>
-                {urgency === opt.id && (
-                  <View style={[s.urgencyCheck, { backgroundColor: opt.color }]}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
           </View>
 
           <Text style={[s.label, { color: t.textMuted }]}>What's the issue? <Text style={{ color: '#FF5C5C' }}>*</Text></Text>
@@ -258,11 +248,18 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           {loadingHospitals ? (
             <ActivityIndicator color="#FF5C5C" style={{ marginTop: 20 }} />
           ) : hospitals.length === 0 ? (
-            <Text style={[s.emptyText, { color: t.textMuted }]}>No hospitals available.</Text>
+            <View style={[s.noHospitalsBox, { borderColor: 'rgba(255,92,92,0.35)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
+              <Text style={{ fontSize: 28, marginBottom: 8 }}>🚨</Text>
+              <Text style={[s.noHospitalsTitle, { color: '#FF5C5C' }]}>No hospitals currently available</Text>
+              <Text style={[s.noHospitalsText, { color: t.textMuted }]}>
+                Every hospital on Queue is closed right now. If this is life-threatening, call{' '}
+                <Text style={{ fontWeight: '800', color: '#FF5C5C' }}>112</Text> immediately instead of waiting on a booking.
+              </Text>
+            </View>
           ) : (
             hospitals.map(h => (
               <TouchableOpacity key={h.id}
-                onPress={() => { setSelectedHospital(h); setSelectedDoctor(null) }}
+                onPress={() => setSelectedHospital(h)}
                 style={[s.hospitalCard, {
                   borderColor:     selectedHospital?.id === h.id ? '#FF5C5C' : t.cardBorder,
                   backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
@@ -300,44 +297,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             ))
           )}
 
-          {/* Doctor selection */}
-          {selectedHospital && (selectedHospital.doctors ?? []).length > 0 && (
-            <>
-              <Text style={[s.label, { color: t.textMuted }]}>Select doctor</Text>
-              {(selectedHospital.doctors as any[]).map((d: any) => {
-                const name = d.full_name ?? d.name ?? 'Doctor'
-                const spec = d.specialty?.name ?? d.spec ?? 'Specialist'
-                const fee  = d.consultation_fee ? `₦${Number(d.consultation_fee).toLocaleString()}` : '₦15,000'
-                const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-                const active = selectedDoctor?.id === d.id
-                return (
-                  <TouchableOpacity key={d.id} onPress={() => setSelectedDoctor(d)}
-                    style={[s.doctorCard, {
-                      borderColor:     active ? '#FF5C5C' : t.cardBorder,
-                      backgroundColor: active ? 'rgba(255,92,92,0.05)' : t.cardBg,
-                    }]}>
-                    <View style={[s.doctorAvatar, { backgroundColor: t.inputBg, borderColor: active ? '#FF5C5C' : t.cardBorder }]}>
-                      <Text style={[s.doctorAvatarText, { color: t.textMuted }]}>{initials}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.doctorName, { color: t.textPrimary }]}>{name}</Text>
-                      <Text style={[s.doctorSpec, { color: t.textMuted }]}>{spec}</Text>
-                    </View>
-                    <Text style={[s.doctorFee, { color: active ? '#FF5C5C' : t.accent }]}>{fee}</Text>
-                    {active && (
-                      <View style={[s.selectedCheck, { backgroundColor: '#FF5C5C' }]}>
-                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )
-              })}
-            </>
-          )}
-
           {/* Arrival time */}
-          {selectedHospital && selectedDoctor && (
+          {selectedHospital && (
             <>
+              <Text style={[s.noteInline, { color: t.textMuted }]}>
+                🩺 A doctor will be assigned by the hospital's front desk when you arrive.
+              </Text>
               <Text style={[s.label, { color: t.textMuted }]}>When can you arrive?</Text>
               <View style={s.slotRow}>
                 {ARRIVAL_OPTIONS.map(opt => (
@@ -366,7 +331,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Booking summary</Text>
             {[
               { label: 'Hospital',       value: selectedHospital?.name ?? '—' },
-              { label: 'Doctor',         value: selectedDoctor?.full_name ?? selectedDoctor?.name ?? '—' },
+              { label: 'Doctor',         value: 'Assigned on arrival' },
               { label: 'Arrival',        value: arrival ?? '—' },
               { label: 'Urgency',        value: u.label },
               { label: 'Condition',      value: symptom || customSymptom || '—' },
@@ -424,7 +389,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)' }]}>
             <Text style={[s.noteText, { color: '#FFB547' }]}>
-              ⚡ Emergency bookings are placed at the top of the doctor's queue immediately after payment.
+              ⚡ Emergency bookings are placed at the top of the queue immediately after payment.
             </Text>
           </View>
           <View style={{ height: 20 }} />
@@ -474,18 +439,13 @@ const s = StyleSheet.create({
   stepScroll:        { flex: 1, paddingHorizontal: 20 },
   label:             { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginTop: 16 },
   emptyText:         { fontSize: 13, textAlign: 'center', marginTop: 20 },
+  noHospitalsBox:    { borderWidth: 1, borderRadius: 16, padding: 20, alignItems: 'center', marginTop: 16 },
+  noHospitalsTitle:  { fontSize: 14, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
+  noHospitalsText:   { fontSize: 12, textAlign: 'center', lineHeight: 18 },
   // Alert
   alertBanner:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, padding: 13, marginTop: 12, marginBottom: 4, borderWidth: 1 },
   alertText:         { fontSize: 12, flex: 1, lineHeight: 17, fontWeight: '500' },
-  // Urgency
-  urgencyGrid:       { gap: 8, marginBottom: 4 },
-  urgencyCard:       { borderRadius: 16, padding: 14, borderWidth: 1.5, position: 'relative' },
-  urgencyTop:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  urgencyLabel:      { fontSize: 14, fontWeight: '700' },
-  urgencyBadge:      { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  urgencyBadgeText:  { fontSize: 10, fontWeight: '700' },
-  urgencySub:        { fontSize: 11, lineHeight: 16 },
-  urgencyCheck:      { position: 'absolute', top: 10, right: 10, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  noteInline:        { fontSize: 11, lineHeight: 16, marginTop: 4 },
   // Symptoms
   symptomGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   symptomChip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
@@ -506,13 +466,6 @@ const s = StyleSheet.create({
   hospitalMeta:      { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   metaChip:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   metaText:          { fontSize: 11 },
-  // Doctor
-  doctorCard:        { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1.5 },
-  doctorAvatar:      { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  doctorAvatarText:  { fontSize: 11, fontWeight: '700' },
-  doctorName:        { fontSize: 13, fontWeight: '700' },
-  doctorSpec:        { fontSize: 11, marginTop: 1 },
-  doctorFee:         { fontSize: 12, fontWeight: '700' },
   // Arrival
   slotRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   slotChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5 },
