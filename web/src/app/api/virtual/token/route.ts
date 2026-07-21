@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
 
   if (!appt) return Errors.notFound('Appointment')
   if (appt.type !== 'virtual') return Errors.validation('This appointment is not a virtual consultation')
-  if (appt.status === 'cancelled' || appt.status === 'completed') {
-    return Errors.validation(`Appointment is already ${appt.status}`)
+  // BM1: only confirmed/checked_in/in_progress appointments may start a virtual session;
+  // pending, no_show, cancelled, and completed are all invalid for a new token.
+  if (!['confirmed', 'checked_in', 'in_progress'].includes(appt.status)) {
+    return Errors.validation(`Appointment status '${appt.status}' does not permit a virtual session`)
   }
 
   // Verify caller is the doctor for this appointment

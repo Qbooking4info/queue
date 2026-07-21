@@ -1213,13 +1213,14 @@ export async function checkInAppointment(id: string): Promise<{ error: string | 
     }
   }
 
+  // BH6: enforce SOP — only 'confirmed' appointments may be checked in (pending→confirmed→checked_in)
   const { error } = await (adminDb as any).from('appointments').update({
     status: 'checked_in',
     check_in_date: checkInDate,
     queue_position: queuePosition,
     estimated_wait: estimatedWait,
     updated_at: new Date().toISOString(),
-  }).eq('id', id)
+  }).eq('id', id).in('status', ['confirmed'])
   return { error: error?.message ?? null }
 }
 
@@ -1260,22 +1261,40 @@ export async function startConsultation(id: string): Promise<{ error: string | n
         .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
         .in('id', staleIds)
       if (autoEndErr) return { error: `Failed to auto-end previous consult: ${autoEndErr.message}` }
+
+      // BM3: end any orphaned virtual sessions for auto-completed appointments
+      await (adminDb as any)
+        .from('virtual_sessions')
+        .update({ status: 'ended', ended_at: new Date().toISOString() })
+        .in('appointment_id', staleIds)
+        .eq('status', 'active')
     }
   }
 
+  // BH5: enforce state machine — only 'checked_in' or 'confirmed' may start a consultation
   const { error } = await (adminDb as any).from('appointments').update({
     status: 'in_progress',
     consult_started_at: new Date().toISOString(),
-  }).eq('id', id)
+  }).eq('id', id).in('status', ['checked_in', 'confirmed'])
   return { error: error?.message ?? null }
 }
 
 export async function endConsultation(id: string): Promise<{ error: string | null }> {
+  // BH5: enforce state machine — only 'in_progress' may be ended
   const { error } = await (adminDb as any).from('appointments').update({
     status: 'completed',
     consult_ended_at: new Date().toISOString(),
-  }).eq('id', id)
-  return { error: error?.message ?? null }
+  }).eq('id', id).eq('status', 'in_progress')
+  if (error) return { error: error?.message ?? null }
+
+  // BM4: end the virtual session (if any) now that the appointment is completed
+  await (adminDb as any)
+    .from('virtual_sessions')
+    .update({ status: 'ended', ended_at: new Date().toISOString() })
+    .eq('appointment_id', id)
+    .eq('status', 'active')
+
+  return { error: null }
 }
 
 export async function getHospitalSpecialties(hospitalId: string) {
@@ -1448,12 +1467,14 @@ export async function assignDoctorToAppointment(appointmentId: string, doctorId:
 export async function markNoShow(appointmentId: string): Promise<void> {
   const now = new Date().toISOString()
   const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-  await adminDb.from('appointments').update({
+  // BM2: only pending/confirmed/checked_in appointments can be marked no-show;
+  // in_progress consultations have already started and cannot be no-showed.
+  await (adminDb as any).from('appointments').update({
     status: 'no_show',
     no_show_at: now,
     reschedule_deadline: deadline,
     updated_at: now,
-  } as any).eq('id', appointmentId)
+  }).eq('id', appointmentId).in('status', ['pending', 'confirmed', 'checked_in'])
 }
 
 async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
@@ -1511,12 +1532,16 @@ export async function approveAppointment(appointmentId: string, note?: string): 
     .eq('id', appointmentId)
     .single()
 
+  // BH1: manual admin approval should use 'approved', not 'auto_approved'
+  // BH2: guard against re-approving already-decided or closed appointments
   await adminDb.from('appointments').update({
-    approval_status: 'auto_approved',
+    approval_status: 'approved',
     status: 'confirmed',
     approval_note: note ?? null,
     updated_at: new Date().toISOString(),
   } as any).eq('id', appointmentId)
+    .eq('approval_status', 'pending_approval')
+    .not('status', 'in', '("cancelled","completed")')
 
   const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'
   const clinicName   = (appt as any)?.clinic?.name
@@ -1539,6 +1564,7 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
     .eq('id', appointmentId)
     .single()
 
+  // BH2: guard against re-rejecting already-decided or closed appointments
   await adminDb.from('appointments').update({
     approval_status: 'rejected',
     status: 'cancelled',
@@ -1548,6 +1574,8 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
     refund_pct: 100,
     updated_at: new Date().toISOString(),
   } as any).eq('id', appointmentId)
+    .eq('approval_status', 'pending_approval')
+    .not('status', 'in', '("cancelled","completed")')
 
   const ref          = (appt as any)?.booking_ref ?? appointmentId
   const hospitalName = (appt as any)?.hospital?.name ?? 'the hospital'

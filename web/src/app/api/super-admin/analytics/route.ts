@@ -18,7 +18,8 @@ export async function GET() {
     { data: allTime },
     { data: doctors },
   ] = await Promise.all([
-    db.from('hospitals').select('id, name, city, state, type, is_verified, created_at'),
+    // BL6: filter to active hospitals only so deactivated/offboarded hospitals don't inflate totals
+    db.from('hospitals').select('id, name, city, state, type, is_verified, created_at').eq('is_active', true),
 
     // Monthly booking count per hospital (excluding cancelled)
     db.from('appointments')

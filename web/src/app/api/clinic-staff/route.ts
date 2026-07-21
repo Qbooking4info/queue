@@ -63,18 +63,23 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const { staffId, full_name, email } = await req.json()
     if (!staffId) return NextResponse.json({ error: 'staffId required' }, { status: 400 })
 
-    // Get the user_id linked to this staff record
+    // BC3: verify the staff member belongs to the caller's hospital
     const { data: caRow, error: caErr } = await db
       .from('clinic_admins')
-      .select('user_id')
+      .select('user_id, hospital_id')
       .eq('id', staffId)
       .single()
     if (caErr || !caRow) return Errors.notFound('Staff')
+
+    if (caller.role !== 'super_admin' && caller.hospitalId !== (caRow as any).hospital_id) {
+      return Errors.forbidden()
+    }
 
     // Get auth_id from users table
     const { data: userRow } = await db
@@ -105,14 +110,26 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const { staffId } = await req.json()
     if (!staffId) return Errors.validation('staffId is required')
 
+    // BC3: verify the staff member belongs to the caller's hospital before deactivating
+    const { data: caRow } = await db
+      .from('clinic_admins')
+      .select('user_id, hospital_id')
+      .eq('id', staffId)
+      .single()
+
+    if (!caRow) return Errors.notFound('Staff')
+    if (caller.role !== 'super_admin' && caller.hospitalId !== (caRow as any).hospital_id) {
+      return Errors.forbidden()
+    }
+
     // Resolve auth UID before deactivating so we can revoke sessions
     let staffAuthId: string | null = null
-    const { data: caRow } = await db.from('clinic_admins').select('user_id').eq('id', staffId).single()
     if (caRow?.user_id) {
       const { data: userRow } = await db.from('users').select('auth_id').eq('id', caRow.user_id).single()
       staffAuthId = userRow?.auth_id ?? null

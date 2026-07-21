@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { randomBytes } from 'crypto'
 
 // GET — look up a registered patient by patient_number or phone.
 // super_admin excluded: patient contact details are PHI and super_admin
@@ -58,22 +59,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // ── Plan: monthly booking cap (belt-and-suspenders above DB trigger) ───────
-    const { data: sub } = await db
+    // ── Plan: subscription status + monthly booking cap ──────────────────────
+    // BH3+BH4: fetch subscription (any status) and block suspended/cancelled
+    const { data: sub } = await (db as any)
       .from('hospital_subscriptions')
-      .select('subscription_plans(max_monthly_bookings)')
+      .select('status, subscription_plans(max_monthly_bookings)')
       .eq('hospital_id', hospitalId)
-      .eq('status', 'active')
-      .single() as { data: { subscription_plans: { max_monthly_bookings: number | null } | null } | null; error: unknown }
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single() as { data: { status: string; subscription_plans: { max_monthly_bookings: number | null } | null } | null; error: unknown }
 
-    const maxMonthly: number | null = (sub?.subscription_plans as any)?.max_monthly_bookings ?? null
+    // BH4: explicitly block suspended or cancelled subscriptions
+    if (sub?.status === 'suspended' || sub?.status === 'cancelled') {
+      return NextResponse.json(
+        { error: `Hospital subscription is ${sub.status}. Contact support to restore access.` },
+        { status: 403 },
+      )
+    }
+
+    // BH3: enforce monthly cap for active and trialing subscriptions
+    const maxMonthly: number | null =
+      (sub?.status === 'active' || sub?.status === 'trialing')
+        ? ((sub?.subscription_plans as any)?.max_monthly_bookings ?? null)
+        : null
+
     if (maxMonthly !== null) {
+      // BL4: count by appointment_date in the current month, not created_at
       const monthStart = new Date()
       monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const monthStartDate = monthStart.toISOString().split('T')[0]
       const { count } = await db.from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
-        .gte('created_at', monthStart.toISOString())
+        .gte('appointment_date', monthStartDate)
         .neq('status', 'cancelled')
       if ((count ?? 0) >= maxMonthly) return Errors.planLimitMonthly(maxMonthly)
     }
@@ -100,7 +118,8 @@ export async function POST(req: NextRequest) {
       if (data) patientUserId = data.id
     }
 
-    const bookingRef = `WLK-${Date.now().toString().slice(-6)}`
+    // BM7: use cryptographically random suffix — Date.now() modulo collides every ~16 minutes
+    const bookingRef = `WLK-${randomBytes(4).toString('hex').toUpperCase()}`
 
     const { data, error } = await db
       .from('appointments')
