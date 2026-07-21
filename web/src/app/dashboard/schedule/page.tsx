@@ -192,9 +192,15 @@ export default function SchedulePage() {
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.borderMed}`, borderRadius: 20, color: C.textMuted }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚪</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>No open days configured</div>
-          <div style={{ fontSize: 13 }}>
-            Set operating hours in {clinicId ? "this clinic's Manage Hours" : 'Settings → Operating Hours'} to see the schedule grid.
+          <div style={{ fontSize: 13, marginBottom: 16 }}>
+            Set operating hours to see the schedule grid.
           </div>
+          <a href="/dashboard/clinics"
+            style={{ fontSize: 13, fontWeight: 700, color: C.accent, textDecoration: 'none',
+              background: C.accentLight, border: `1px solid ${C.accentBorder}`,
+              borderRadius: 10, padding: '9px 18px', display: 'inline-block' }}>
+            Set up clinic hours in Clinics → Manage Hours
+          </a>
         </div>
       ) : (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -302,7 +308,7 @@ export default function SchedulePage() {
                   {selected.items.length} appointment{selected.items.length !== 1 ? 's' : ''}
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none',
+              <button onClick={() => setSelected(null)} aria-label="Close" style={{ background: 'none', border: 'none',
                 color: C.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 

@@ -62,7 +62,7 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
                 .filter(Boolean).join(' · ') || 'Patient chart'}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: C.textMuted,
             fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 

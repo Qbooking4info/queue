@@ -44,3 +44,34 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
   revalidatePath('/dashboard/specialist')
   revalidatePath('/dashboard')
 }
+
+// Used by FrontDeskActions to cancel a pending_approval appointment via the reject flow
+export async function rejectPendingApprovalAppointment(appointmentId: string) {
+  const { adminRecord } = await getHospitalContext()
+  const db = createAdminClient()
+
+  const { data: appt, error: fetchErr } = await db
+    .from('appointments')
+    .select('status, approval_status, hospital_id')
+    .eq('id', appointmentId)
+    .single()
+
+  if (fetchErr || !appt) throw new Error('Appointment not found')
+  if (appt.hospital_id !== adminRecord.hospital_id) throw new Error('Unauthorized')
+
+  const { error } = await db
+    .from('appointments')
+    .update({
+      status: 'cancelled',
+      approval_status: 'rejected',
+      approval_note: 'Cancelled from front desk',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', appointmentId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/dashboard/appointments')
+  revalidatePath('/dashboard/frontdesk')
+  revalidatePath('/dashboard')
+}

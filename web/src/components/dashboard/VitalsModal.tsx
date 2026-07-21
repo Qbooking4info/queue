@@ -73,7 +73,7 @@ export function VitalsModal({ appointment, onClose, onSaved, recordedByAuthId }:
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Record Vitals</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{appointment.patient_name}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: C.textMuted,
             fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 

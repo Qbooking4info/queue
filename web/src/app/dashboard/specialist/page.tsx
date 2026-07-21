@@ -17,7 +17,7 @@ export default async function SpecialistPage() {
   noStore()
   const { db, profile, adminRecord } = await getHospitalContext()
 
-  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
+  if (adminRecord.role !== 'doctor' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const [{ data: doctor }, { data: hospital }] = await Promise.all([
     db.from('doctors')
@@ -64,7 +64,7 @@ export default async function SpecialistPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {doctor ? `${doctor.title} ${doctor.full_name}` : 'My Schedule'}
+            {doctor ? ([doctor.title, doctor.full_name].filter(Boolean).join(' ') || 'My Schedule') : 'My Schedule'}
           </h1>
           <p className="text-sm text-[#7A9089] mt-0.5">
             {specialty?.name ?? 'Specialist'} · {new Date(today + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}

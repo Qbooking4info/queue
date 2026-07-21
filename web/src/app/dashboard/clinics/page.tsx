@@ -258,7 +258,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
               Set up a clinic and assign a sub-admin
             </div>
           </div>
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="Close"
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
               fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -432,6 +432,7 @@ export default function ClinicsPage() {
   const [showModal, setShowModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Redirect single-clinic hospitals away from this page
   useEffect(() => {
@@ -458,9 +459,12 @@ export default function ClinicsPage() {
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
+    setDeleteError('')
     const { error } = await deleteClinic(deleteTarget.id)
     setDeleting(false)
-    if (!error) {
+    if (error) {
+      setDeleteError(error)
+    } else {
       setClinics(prev => prev.filter(c => c.id !== deleteTarget.id))
       setDeleteTarget(null)
     }
@@ -559,7 +563,7 @@ export default function ClinicsPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) setDeleteTarget(null) }}>
+          onClick={e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteError('') } }}>
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
@@ -570,11 +574,17 @@ export default function ClinicsPage() {
             <div style={{ fontSize: 13, color: C.textSub, textAlign: 'center', marginBottom: 6 }}>
               This will permanently remove the clinic and all its staff accounts.
             </div>
-            <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginBottom: 16 }}>
               Doctors assigned to this clinic will remain in the hospital pool. This action cannot be undone.
             </div>
+            {deleteError && (
+              <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+                borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f07070', marginBottom: 14, textAlign: 'center' }}>
+                ⚠️ {deleteError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setDeleteTarget(null)}
+              <button onClick={() => { setDeleteTarget(null); setDeleteError('') }}
                 style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
                   background: C.bgAlt, border: `1px solid ${C.borderMed}`,
                   color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>

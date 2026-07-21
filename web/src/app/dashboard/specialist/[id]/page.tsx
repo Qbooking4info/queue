@@ -4,6 +4,7 @@ import { saveAppointmentNotes } from '../actions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { VideoCallPanel } from '@/components/video/VideoCallPanel'
+import { SubmitNotesButton } from '../SubmitNotesButton'
 
 const STATUS_OPTS = ['in_progress', 'completed', 'no_show']
 
@@ -11,7 +12,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   const { id } = await params
   const { adminRecord } = await getHospitalContext()
 
-  if (adminRecord.role !== 'specialist' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
+  if (adminRecord.role !== 'doctor' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const db = createAdminClient()
   const { data: appt } = await db
@@ -62,9 +63,9 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
               {[
                 { label: 'Date',   value: appt.appointment_date },
                 { label: 'Time',   value: appt.start_time?.slice(0, 5) },
-                { label: 'Type',   value: appt.type },
-                { label: 'Status', value: appt.status?.replace(/_/g, ' ') },
-                { label: 'Doctor', value: `${doctor?.title} ${doctor?.full_name}` },
+                { label: 'Type',   value: appt.type === 'virtual' ? 'Virtual' : 'In-person' },
+                { label: 'Status', value: (appt.status ?? '').split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || '—' },
+                { label: 'Doctor', value: [doctor?.title, doctor?.full_name].filter(Boolean).join(' ') || '—' },
               ].map(r => (
                 <div key={r.label} className="flex justify-between py-1 border-b border-white/5">
                   <span className="text-[#4A6058]">{r.label}</span>
@@ -139,10 +140,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
               </div>
             </div>
 
-            <button type="submit"
-              className="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-bold text-sm rounded-xl transition-all">
-              Save Notes & Update Status
-            </button>
+            <SubmitNotesButton />
           </form>
         </div>   {/* end md:col-span-3 */}
       </div>

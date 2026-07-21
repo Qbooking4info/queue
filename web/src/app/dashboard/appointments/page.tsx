@@ -154,7 +154,7 @@ function WalkInModal({
               Book an appointment for a patient at the front desk
             </div>
           </div>
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="Close"
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
               fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -255,7 +255,7 @@ function WalkInModal({
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Date *</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+                  <input type="date" value={date} min={new Date().toISOString().split('T')[0]} onChange={e => setDate(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Time *</label>
@@ -352,7 +352,7 @@ function AssignDoctorModal({
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
             Assign Doctor — {appointment.patient_name}
           </div>
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>
             ✕
@@ -490,7 +490,7 @@ function DetailPanel({
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Appointment Detail</div>
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>✕</button>
         </div>
@@ -566,12 +566,13 @@ export default function AppointmentsPage() {
   const [filter,  setFilter]  = useState('all')
   const [search,  setSearch]  = useState('')
 
-  const [showWalkIn,  setShowWalkIn]  = useState(false)
-  const [assignAppt,  setAssignAppt]  = useState<AdminAppointment | null>(null)
-  const [rejectAppt,  setRejectAppt]  = useState<AdminAppointment | null>(null)
-  const [detailAppt,  setDetailAppt]  = useState<AdminAppointment | null>(null)
-  const [vitalsAppt,  setVitalsAppt]  = useState<AdminAppointment | null>(null)
-  const [actionError, setActionError] = useState('')
+  const [showWalkIn,     setShowWalkIn]     = useState(false)
+  const [assignAppt,     setAssignAppt]     = useState<AdminAppointment | null>(null)
+  const [rejectAppt,     setRejectAppt]     = useState<AdminAppointment | null>(null)
+  const [detailAppt,     setDetailAppt]     = useState<AdminAppointment | null>(null)
+  const [vitalsAppt,     setVitalsAppt]     = useState<AdminAppointment | null>(null)
+  const [actionError,    setActionError]    = useState('')
+  const [pendingActionId,setPendingActionId]= useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!hospital?.id) return
@@ -594,34 +595,40 @@ export default function AppointmentsPage() {
   useEffect(() => { load() }, [load])
 
   async function handleApprove(appt: AdminAppointment) {
-    await approveAppointment(appt.id)
-    await load()
+    setPendingActionId(appt.id)
+    try { await approveAppointment(appt.id); await load() } finally { setPendingActionId(null) }
   }
 
   async function handleNoShow(appt: AdminAppointment) {
-    await markNoShow(appt.id)
-    await load()
+    setPendingActionId(appt.id)
+    try { await markNoShow(appt.id); await load() } finally { setPendingActionId(null) }
   }
 
   async function handleCheckIn(appt: AdminAppointment) {
-    setActionError('')
-    const { error } = await checkInAppointment(appt.id)
-    if (error) { setActionError(error); return }
-    await load()
+    setActionError(''); setPendingActionId(appt.id)
+    try {
+      const { error } = await checkInAppointment(appt.id)
+      if (error) { setActionError(error); return }
+      await load()
+    } finally { setPendingActionId(null) }
   }
 
   async function handleStartConsult(appt: AdminAppointment) {
-    setActionError('')
-    const { error } = await startConsultation(appt.id)
-    if (error) { setActionError(error); return }
-    await load()
+    setActionError(''); setPendingActionId(appt.id)
+    try {
+      const { error } = await startConsultation(appt.id)
+      if (error) { setActionError(error); return }
+      await load()
+    } finally { setPendingActionId(null) }
   }
 
   async function handleEndConsult(appt: AdminAppointment) {
-    setActionError('')
-    const { error } = await endConsultation(appt.id)
-    if (error) { setActionError(error); return }
-    await load()
+    setActionError(''); setPendingActionId(appt.id)
+    try {
+      const { error } = await endConsultation(appt.id)
+      if (error) { setActionError(error); return }
+      await load()
+    } finally { setPendingActionId(null) }
   }
 
   function formatDuration(secs: number) {
@@ -719,13 +726,14 @@ export default function AppointmentsPage() {
           borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
           marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>⚠️ {actionError}</span>
-          <button onClick={() => setActionError('')}
+          <button onClick={() => setActionError('')} aria-label="Close"
             style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
         </div>
       )}
 
       {/* Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bgAlt }}>
@@ -756,8 +764,9 @@ export default function AppointmentsPage() {
                   boxShadow: isEmergency ? `inset 3px 0 0 ${C.red}` : 'none',
                   outline: needsApproval ? `1px solid rgba(239,159,39,0.2)` : 'none' }}>
                   <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
-                    {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-GB', {
-                      day: 'numeric', month: 'short', year: range === 'all_time' ? 'numeric' : undefined,
+                    {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', {
+                      weekday: 'short', day: 'numeric', month: 'short',
+                      ...(range === 'all_time' ? { year: 'numeric' } : {}),
                     })}
                   </td>
                   <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
@@ -838,92 +847,83 @@ export default function AppointmentsPage() {
                     )}
                   </td>
                   <td style={{ padding: '11px 14px' }}>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                      {/* Detail */}
-                      <button onClick={() => setDetailAppt(a)}
-                        style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                          border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted, fontWeight: 600 }}>
-                        Detail
-                      </button>
-                      {/* Vitals — admins, front desk, doctors */}
-                      {!['cancelled'].includes(a.status) && (
-                        <button onClick={() => setVitalsAppt(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
-                            background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
-                            color: a.vitals_recorded_at ? C.accent : C.textMuted, fontWeight: 600 }}>
-                          {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
+                    {(() => {
+                      const isPending = pendingActionId === a.id
+                      const btnBase: React.CSSProperties = { fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1 }
+                      return (
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        {/* Detail */}
+                        <button onClick={() => setDetailAppt(a)}
+                          style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                          Detail
                         </button>
-                      )}
-                      {/* Approve / Reject — admins and front desk only */}
-                      {!isDoctor && needsApproval && (
-                        <>
-                          <button onClick={() => handleApprove(a)}
-                            style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                              border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
-                              color: '#00E87A', fontWeight: 700 }}>
-                            Approve
+                        {/* Vitals — admins, front desk, doctors */}
+                        {!['cancelled'].includes(a.status) && (
+                          <button onClick={() => setVitalsAppt(a)}
+                            style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
+                              background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
+                              color: a.vitals_recorded_at ? C.accent : C.textMuted }}>
+                            {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
                           </button>
-                          <button onClick={() => setRejectAppt(a)}
-                            style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                              border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)',
-                              color: '#f07070', fontWeight: 700 }}>
-                            Reject
+                        )}
+                        {/* Approve / Reject — admins and front desk only */}
+                        {!isDoctor && needsApproval && (
+                          <>
+                            <button onClick={() => handleApprove(a)} disabled={isPending}
+                              style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                              {isPending ? '…' : 'Approve'}
+                            </button>
+                            <button onClick={() => setRejectAppt(a)} disabled={isPending}
+                              style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)', color: '#f07070' }}>
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {/* Assign Doctor — admins only */}
+                        {!isDoctor && needsAssign && (
+                          <button onClick={() => setAssignAppt(a)} disabled={isPending}
+                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)', color: '#EF9F27' }}>
+                            Assign Dr.
                           </button>
-                        </>
-                      )}
-                      {/* Assign Doctor — admins only */}
-                      {!isDoctor && needsAssign && (
-                        <button onClick={() => setAssignAppt(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)',
-                            color: '#EF9F27', fontWeight: 700 }}>
-                          Assign Dr.
-                        </button>
-                      )}
-                      {/* Check In */}
-                      {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
-                        <button onClick={() => handleCheckIn(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: `1px solid ${C.accentBorder}`, background: C.accentLight,
-                            color: C.accent, fontWeight: 600 }}>
-                          Check In
-                        </button>
-                      )}
-                      {/* Start Consultation */}
-                      {a.status === 'checked_in' && (
-                        <button onClick={() => handleStartConsult(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)',
-                            color: '#55A7EB', fontWeight: 700 }}>
-                          ▶ Start
-                        </button>
-                      )}
-                      {/* End Consultation */}
-                      {a.status === 'in_progress' && (
-                        <button onClick={() => handleEndConsult(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
-                            color: '#00E87A', fontWeight: 700 }}>
-                          ■ End
-                        </button>
-                      )}
-                      {/* No-Show */}
-                      {['confirmed','checked_in'].includes(a.status) && (
-                        <button onClick={() => handleNoShow(a)}
-                          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                            border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.08)',
-                            color: '#55A7EB', fontWeight: 600 }}>
-                          No-Show
-                        </button>
-                      )}
-                    </div>
+                        )}
+                        {/* Check In */}
+                        {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
+                          <button onClick={() => handleCheckIn(a)} disabled={isPending}
+                            style={{ ...btnBase, border: `1px solid ${C.accentBorder}`, background: C.accentLight, color: C.accent }}>
+                            {isPending ? '…' : 'Check In'}
+                          </button>
+                        )}
+                        {/* Start Consultation */}
+                        {a.status === 'checked_in' && (
+                          <button onClick={() => handleStartConsult(a)} disabled={isPending}
+                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)', color: '#55A7EB' }}>
+                            {isPending ? '…' : '▶ Start'}
+                          </button>
+                        )}
+                        {/* End Consultation */}
+                        {a.status === 'in_progress' && (
+                          <button onClick={() => handleEndConsult(a)} disabled={isPending}
+                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                            {isPending ? '…' : '■ End'}
+                          </button>
+                        )}
+                        {/* No-Show */}
+                        {['confirmed','checked_in'].includes(a.status) && (
+                          <button onClick={() => handleNoShow(a)} disabled={isPending}
+                            style={{ ...btnBase, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.08)', color: '#55A7EB' }}>
+                            {isPending ? '…' : 'No-Show'}
+                          </button>
+                        )}
+                      </div>
+                      )
+                    })()}
                   </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Modals */}

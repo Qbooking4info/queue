@@ -14,7 +14,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
   const [email,    setEmail]    = useState(doctor.email ?? '')
   const [title,    setTitle]    = useState(doctor.title ?? '')
   const [fee,      setFee]      = useState(doctor.consultation_fee?.toString() ?? '')
-  const [vFee,     setVFee]     = useState('')
+  const [vFee,     setVFee]     = useState(String((doctor as any).virtual_fee ?? ''))
   const [exp,      setExp]      = useState(doctor.years_experience?.toString() ?? '')
   const [password, setPassword] = useState('')
   const [saving,   setSaving]   = useState(false)
@@ -92,7 +92,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
             </div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{doctor.specialty_name ?? 'Doctor'}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted,
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: C.textMuted,
             fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 

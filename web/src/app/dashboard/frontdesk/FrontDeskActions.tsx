@@ -1,6 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { updateAppointmentStatus } from '../appointments/actions'
+import { updateAppointmentStatus, rejectPendingApprovalAppointment } from '../appointments/actions'
 
 const NEXT: Record<string, { label: string; status: string; color: string }[]> = {
   pending:    [{ label: '✓ Confirm',   status: 'confirmed',  color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: '✕ Cancel', status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
@@ -8,17 +8,27 @@ const NEXT: Record<string, { label: string; status: string; color: string }[]> =
   checked_in: [{ label: '▶ Start',    status: 'in_progress', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }],
 }
 
-export function FrontDeskActions({ appointmentId, currentStatus, bookingRef }: { appointmentId: string; currentStatus: string; bookingRef: string }) {
+export function FrontDeskActions({ appointmentId, currentStatus, approvalStatus, bookingRef }: {
+  appointmentId: string
+  currentStatus: string
+  approvalStatus: string | null
+  bookingRef: string
+}) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const actions = NEXT[currentStatus] ?? []
   if (!actions.length) return null
 
-  function handleClick(status: string) {
+  function handleClick(targetStatus: string) {
     setError(null)
     startTransition(async () => {
       try {
-        await updateAppointmentStatus(appointmentId, status)
+        // WM11: cancelling a pending_approval appointment routes through reject flow
+        if (targetStatus === 'cancelled' && approvalStatus === 'pending_approval') {
+          await rejectPendingApprovalAppointment(appointmentId)
+        } else {
+          await updateAppointmentStatus(appointmentId, targetStatus)
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed')
       }
