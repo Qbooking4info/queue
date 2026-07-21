@@ -9,13 +9,13 @@
 -- all SELECT queries to fetch vitals from vitals_audit_log.
 
 ALTER TABLE appointments
-  DROP COLUMN IF EXISTS vitals_weight_kg,
-  DROP COLUMN IF EXISTS vitals_height_cm,
-  DROP COLUMN IF EXISTS vitals_bp_systolic,
-  DROP COLUMN IF EXISTS vitals_bp_diastolic,
-  DROP COLUMN IF EXISTS vitals_blood_sugar,
-  DROP COLUMN IF EXISTS vitals_bmi,
-  DROP COLUMN IF EXISTS vitals_recorded_at;
+  DROP COLUMN IF EXISTS vitals_bmi CASCADE,
+  DROP COLUMN IF EXISTS vitals_weight_kg CASCADE,
+  DROP COLUMN IF EXISTS vitals_height_cm CASCADE,
+  DROP COLUMN IF EXISTS vitals_bp_systolic CASCADE,
+  DROP COLUMN IF EXISTS vitals_bp_diastolic CASCADE,
+  DROP COLUMN IF EXISTS vitals_blood_sugar CASCADE,
+  DROP COLUMN IF EXISTS vitals_recorded_at CASCADE;
 
 -- Convenience view: latest vitals per appointment joined to the base row.
 -- Useful for direct Supabase queries from client apps.
