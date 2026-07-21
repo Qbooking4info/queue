@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Act
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
-import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/api'
+import { getNotifications, markNotificationRead, markAllNotificationsRead, getAppointmentById } from '../lib/api'
 
 type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescription' | 'lab' | 'payment' | 'waitlist' | 'review' | 'system'
 
@@ -85,6 +85,32 @@ export function NotificationsScreen({ navigation }: Props) {
     await markNotificationRead(id)
   }
 
+  // Types that carry an appointment_id we can navigate to
+  const APPT_TYPES = new Set(['confirmed', 'pending', 'cancelled', 'reminder', 'virtual', 'payment', 'waitlist', 'review'])
+
+  async function handleTap(n: any) {
+    // Always mark read first
+    if (!n.is_read) handleMarkRead(n.id)
+
+    const appointmentId = n.data?.appointment_id
+    const type: string  = n.type ?? ''
+
+    if (APPT_TYPES.has(type) && appointmentId) {
+      const appointment = await getAppointmentById(appointmentId)
+      if (appointment) {
+        navigation.navigate('AppointmentDetail', { appointment })
+      }
+      return
+    }
+
+    if (type === 'prescription' || type === 'lab') {
+      navigation.navigate('Prescriptions')
+      return
+    }
+
+    // system / unknown — no-op (already marked read)
+  }
+
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <View style={st.header}>
@@ -135,7 +161,7 @@ export function NotificationsScreen({ navigation }: Props) {
                   const iconBg = ICON_BG[n.type] ?? '#1A1A1A'
                   const icon   = ICONS[n.type]   ?? '🔔'
                   return (
-                    <TouchableOpacity key={n.id} onPress={() => handleMarkRead(n.id)} activeOpacity={0.7}
+                    <TouchableOpacity key={n.id} onPress={() => handleTap(n)} activeOpacity={0.7}
                       style={[st.row, {
                         backgroundColor: n.is_read ? t.canvasBg : t.cardBg,
                         borderBottomColor: t.cardBorder,
@@ -152,6 +178,10 @@ export function NotificationsScreen({ navigation }: Props) {
                         </View>
                         <Text style={[st.body, { color: t.textSecondary }]} numberOfLines={2}>{n.body}</Text>
                       </View>
+                      {(APPT_TYPES.has(n.type) && n.data?.appointment_id) || n.type === 'prescription' || n.type === 'lab'
+                        ? <Text style={[st.chevron, { color: t.textMuted }]}>›</Text>
+                        : null
+                      }
                     </TouchableOpacity>
                   )
                 })}
@@ -199,4 +229,5 @@ const st = StyleSheet.create({
   empty:           { alignItems: 'center', padding: 48 },
   emptyTitle:      { fontSize: 17, fontWeight: '700', marginBottom: 8 },
   emptySub:        { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  chevron:         { fontSize: 20, fontWeight: '300', alignSelf: 'center', marginLeft: 4 },
 })

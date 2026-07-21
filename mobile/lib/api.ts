@@ -159,6 +159,15 @@ export async function getPatientAppointments(
   return (data as any[]) ?? []
 }
 
+export async function getAppointmentById(appointmentId: string): Promise<AppointmentWithRelations | null> {
+  const { data } = await supabase
+    .from('appointments')
+    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .eq('id', appointmentId)
+    .single()
+  return (data as any) ?? null
+}
+
 export async function getNextAppointment(
   patientId: string
 ): Promise<AppointmentWithRelations | null> {
