@@ -20,24 +20,30 @@ export function PrivacySecurityScreen({ navigation }: Props) {
   const [pwSuccess,  setPwSuccess]  = useState(false)
   const [saving,     setSaving]     = useState(false)
 
+  // MC1: Verify current password before allowing the update
   async function handleChangePassword() {
     setPwError(''); setPwSuccess(false)
     if (!currentPw)          { setPwError('Enter your current password.'); return }
     if (newPw.length < 6)    { setPwError('New password must be at least 6 characters.'); return }
     if (newPw !== confirmPw) { setPwError('Passwords do not match.'); return }
     setSaving(true)
+
+    // Re-authenticate with the current password first
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user?.email ?? '',
+      password: currentPw,
+    })
+    if (signInError) {
+      setSaving(false)
+      setPwError('Current password is incorrect.')
+      return
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPw })
     setSaving(false)
     if (error) { setPwError(error.message) }
     else { setPwSuccess(true); setCurrentPw(''); setNewPw(''); setConfirmPw('') }
   }
-
-  const privacyItems = [
-    { icon: '📍', title: 'Location access', sub: 'Used to find nearby hospitals', value: 'Off' },
-    { icon: '🔔', title: 'Push notifications', sub: 'Appointment reminders & updates', value: 'On' },
-    { icon: '📊', title: 'Analytics & usage data', sub: 'Help improve the app experience', value: 'On' },
-    { icon: '🤝', title: 'Share data with partners', sub: 'Third-party health services', value: 'Off' },
-  ]
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
@@ -94,26 +100,12 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Privacy preferences */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Privacy preferences</Text>
-        <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 0, overflow: 'hidden' }]}>
-          {privacyItems.map((item, i) => (
-            <View key={item.title} style={[s.privacyRow, { borderBottomColor: t.cardBorder, borderBottomWidth: i < privacyItems.length - 1 ? 1 : 0 }]}>
-              <Text style={{ fontSize: 18 }}>{item.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.privacyTitle, { color: t.textPrimary }]}>{item.title}</Text>
-                <Text style={[s.privacySub, { color: t.textMuted }]}>{item.sub}</Text>
-              </View>
-              <View style={[s.valueBadge, { backgroundColor: item.value === 'On' ? t.accentBg : t.inputBg, borderColor: item.value === 'On' ? t.accentBorder : t.cardBorder }]}>
-                <Text style={[s.valueText, { color: item.value === 'On' ? t.accent : t.textMuted }]}>{item.value}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+        {/* MM12: Privacy preference toggles removed — they were static decorations with no backing state */}
 
         {/* Danger zone */}
         <Text style={[s.sectionTitle, { color: t.textMuted }]}>Account</Text>
-        <TouchableOpacity onPress={() => { navigation.goBack(); signOut() }}
+        {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
+        <TouchableOpacity onPress={() => signOut()}
           style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
           <Text style={{ fontSize: 16 }}>🚪</Text>
           <Text style={[s.dangerBtnText, { color: '#FF5C5C' }]}>Sign out of all devices</Text>
@@ -148,11 +140,6 @@ const s = StyleSheet.create({
   successText:      { color: '#4ADE80', fontSize: 12, marginBottom: 8 },
   saveBtn:          { borderRadius: 12, padding: 13, alignItems: 'center' },
   saveBtnText:      { color: '#fff', fontSize: 13, fontWeight: '700' },
-  privacyRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  privacyTitle:     { fontSize: 13, fontWeight: '600' },
-  privacySub:       { fontSize: 11, marginTop: 1 },
-  valueBadge:       { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  valueText:        { fontSize: 11, fontWeight: '600' },
   dangerBtn:        { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 13, borderWidth: 1 },
   dangerBtnText:    { fontSize: 13, fontWeight: '600' },
 })

@@ -195,7 +195,7 @@ export async function createAppointment(payload: {
 }): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
   const bookingRef     = `QUE-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
-  const status         = approvalStatus === 'auto_approved' ? 'pending' : 'pending'
+  const status         = approvalStatus === 'auto_approved' ? 'confirmed' : 'pending'
 
   const { data, error } = await supabase
     .from('appointments')

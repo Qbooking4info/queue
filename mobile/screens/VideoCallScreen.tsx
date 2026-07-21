@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Platform, PermissionsAndroid, Alert,
+  StatusBar, Platform, PermissionsAndroid, Alert, Linking,
 } from 'react-native'
 import {
   createAgoraRtcEngine,
@@ -29,7 +29,9 @@ interface SessionRow {
 export function VideoCallScreen({ navigation, route }: Props) {
   const { appointmentId, doctorName } = route.params
 
-  const engine   = useRef<IRtcEngine | null>(null)
+  const engine    = useRef<IRtcEngine | null>(null)
+  // ML2: track mount state to avoid setting state after unmount
+  const mountedRef = useRef(true)
   const [session,      setSession]      = useState<SessionRow | null>(null)
   const [joined,       setJoined]       = useState(false)
   const [remoteUid,    setRemoteUid]    = useState<number | null>(null)
@@ -37,6 +39,12 @@ export function VideoCallScreen({ navigation, route }: Props) {
   const [camEnabled,   setCamEnabled]   = useState(true)
   const [elapsed,      setElapsed]      = useState(0)
   const [error,        setError]        = useState<string | null>(null)
+
+  // ML2: clear mountedRef on unmount
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // ── 1. Fetch session (guest_token) from Supabase ─────────────────────────
   useEffect(() => {
@@ -57,6 +65,8 @@ export function VideoCallScreen({ navigation, route }: Props) {
       }
 
       // Doctor hasn't started yet — subscribe to Realtime for this session
+      // ML2: guard against subscribing after unmount
+      if (!mountedRef.current) return
       const channel = supabase
         .channel(`vs:${appointmentId}`)
         .on(
@@ -117,7 +127,22 @@ export function VideoCallScreen({ navigation, route }: Props) {
         if (active && uid === remoteUid) setRemoteUid(null)
       })
       engine.current.addListener('onError', (errCode: number) => {
-        if (active) setError(`Call error ${errCode}`)
+        if (!active) return
+        // MH4: Agora error codes 134/135 = camera/microphone permission denied on iOS
+        const isPermissionError = errCode === 134 || errCode === 135 || errCode === 17
+        if (isPermissionError) {
+          setError('Camera or microphone access is required for video calls.')
+          Alert.alert(
+            'Permission required',
+            'Camera and microphone access is required. Please enable it in Settings → Queue.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') },
+            ]
+          )
+        } else {
+          setError(`Call error ${errCode}`)
+        }
       })
 
       await engine.current.enableVideo()

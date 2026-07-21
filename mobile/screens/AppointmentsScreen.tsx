@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getPatientAppointments } from '../lib/api'
 import type { AppointmentWithRelations } from '../lib/api'
+import { fmtDate, fmt12 } from '../lib/format'
 
 const FILTERS = ['upcoming', 'pending review', 'completed', 'cancelled'] as const
 
@@ -198,8 +199,8 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                       </Text>
                     </View>
                     <View style={s.cardBodyRight}>
-                      <Text style={[s.dateText, { color: t.textPrimary }]}>{a.appointment_date}</Text>
-                      <Text style={[s.timeText,  { color: t.textMuted   }]}>{a.start_time}</Text>
+                      <Text style={[s.dateText, { color: t.textPrimary }]}>{fmtDate(a.appointment_date)}</Text>
+                      <Text style={[s.timeText,  { color: t.textMuted   }]}>{fmt12(a.start_time)}</Text>
                     </View>
                   </View>
 

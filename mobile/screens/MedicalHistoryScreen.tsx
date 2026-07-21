@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, SafeAreaView, ActivityIndicator, Alert,
@@ -41,6 +41,15 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   const [bloodGroup, setBloodGroup] = useState(user?.blood_group ?? '')
   const [gender,     setGender]     = useState(user?.gender ?? '')
   const [dob,        setDob]        = useState(user?.date_of_birth ?? '')
+  // MC3: "Other conditions" free-text
+  const [otherConditions, setOtherConditions] = useState('')
+
+  // ML3: Re-sync form fields when user context refreshes (e.g. after saving)
+  useEffect(() => {
+    setBloodGroup(user?.blood_group ?? '')
+    setGender(user?.gender ?? '')
+    setDob(user?.date_of_birth ?? '')
+  }, [user?.blood_group, user?.gender, user?.date_of_birth])
 
   const load = useCallback(async () => {
     if (!user) return
@@ -171,7 +180,8 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 </View>
                 <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 12 }]}>Other conditions</Text>
                 <TextInput
-                  value={notes.medications.startsWith('COND:') ? '' : ''}
+                  value={otherConditions}
+                  onChangeText={setOtherConditions}
                   placeholder="Type any other conditions…"
                   placeholderTextColor={t.textMuted}
                   style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}

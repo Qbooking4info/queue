@@ -4,10 +4,13 @@ import {
   StyleSheet, SafeAreaView, Alert, Clipboard, ActivityIndicator,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
 import { Avatar } from '../components/ui/Avatar'
 import { Stars } from '../components/ui/Stars'
-import { cancelAppointment } from '../lib/api'
+import { cancelAppointment, getHospitalById } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
+import { supabase } from '../lib/supabase'
+import { fmtDate, fmt12 } from '../lib/format'
 
 interface Props { navigation: any; route: any }
 
@@ -33,10 +36,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function AppointmentDetailScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
+  const { user }     = useAuth()
   const raw = route?.params?.appointment ?? DEFAULT_APPT
-  const [cancelled,   setCancelled]   = useState(false)
-  const [cancelling,  setCancelling]  = useState(false)
-  const [copied,      setCopied]      = useState(false)
+  const [cancelled,          setCancelled]          = useState(false)
+  const [cancelling,         setCancelling]         = useState(false)
+  const [copied,             setCopied]             = useState(false)
+  const [refundPct,          setRefundPct]          = useState(100)
+  const [rescheduleLoading,  setRescheduleLoading]  = useState(false)
 
   const approvalStatus  = (raw as any).approval_status ?? 'auto_approved'
   const bookingMode     = (raw as any).booking_mode ?? 'doctor'
@@ -68,7 +74,13 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     time:           raw.start_time ?? raw.time,
     status:         raw.status,
     type:           raw.type,
-    payment:        raw.payment ?? '—',
+    payment:        (() => {
+      // MM2: raw.payment field doesn't exist — derive from hospital/doctor fee
+      const fee = raw.type === 'virtual'
+        ? (raw.doctor?.virtual_fee ?? raw.doctor?.consultation_fee ?? null)
+        : (raw.hospital?.opd_fee ?? null)
+      return fee != null ? `₦${Number(fee).toLocaleString()}` : '—'
+    })(),
     rating:         doctorRating,
     queue_position: raw.queue_position,
     estimated_wait: raw.estimated_wait,
@@ -132,6 +144,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             const result = await cancelAppointment(raw.id, 'Patient requested cancellation', datetime)
             setCancelling(false)
             if (result.success) {
+              setRefundPct(result.refundPct)
               setCancelled(true)
             } else {
               Alert.alert('Cancel failed', result.error ?? 'Could not cancel appointment. Please try again.')
@@ -142,10 +155,16 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     )
   }
 
-  const handleReschedule = () => {
+  const handleReschedule = async () => {
     if (!raw.hospital) return
+    setRescheduleLoading(true)
+    // MH6: fetch full hospital object (raw.hospital may be partial)
+    const hospitalId = String(raw.hospital?.id ?? raw.hospital)
+    const fullHospital = await getHospitalById(hospitalId)
+    setRescheduleLoading(false)
+    const displayH = fullHospital ? toDisplayHospital(fullHospital) : toDisplayHospital(raw.hospital)
     navigation.navigate('BookingFlow', {
-      hospital:    toDisplayHospital(raw.hospital),
+      hospital:    displayH,
       bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
       reschedule: {
         originalId: raw.id,
@@ -197,7 +216,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {[
               { label: 'Patient',  value: appt.patientName ?? 'You' },
               { label: 'Hospital', value: appt.hospital },
-              { label: 'Date',     value: `${appt.date}  ·  ${appt.time}` },
+              { label: 'Date',     value: `${fmtDate(appt.date)}  ·  ${fmt12(appt.time)}` },
               appt.doctor ? { label: 'Doctor', value: appt.doctor } : null,
             ].filter(Boolean).map(row => row && (
               <View key={row.label} style={st.passRow}>
@@ -320,8 +339,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Date / time chips */}
           <View style={st.chipsRow}>
             {[
-              { icon: '📅', val: appt.date },
-              { icon: '⏰', val: appt.time },
+              { icon: '📅', val: fmtDate(appt.date) },
+              { icon: '⏰', val: fmt12(appt.time) },
               { icon: '📍', val: appt.hospital },
             ].map(c => (
               <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
@@ -387,8 +406,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         <View style={st.pad}>
           {/* Appointment details */}
           <Section title="Appointment details">
-            <InfoRow label="Date"      value={appt.date} />
-            <InfoRow label="Time"      value={appt.time} />
+            <InfoRow label="Date"      value={fmtDate(appt.date)} />
+            <InfoRow label="Time"      value={fmt12(appt.time)} />
             <InfoRow label="Type"      value={isVirtual ? 'Virtual consultation' : 'In-person visit'} />
             {appt.spec && <InfoRow label="Specialty" value={appt.spec} />}
             <InfoRow label="Hospital"  value={appt.hospital} />
@@ -420,9 +439,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                   {appt.rating > 0 && <Stars rating={appt.rating} />}
                 </View>
               </View>
-              <InfoRow label="Experience"    value="12 years" />
-              <InfoRow label="Consultations" value="1,240+ completed" />
-              <InfoRow label="Languages"     value="English, Yoruba, Igbo" />
+              <InfoRow label="Experience"    value={doctorObj?.years_experience ? `${doctorObj.years_experience} years` : '—'} />
+              <InfoRow label="Consultations" value={doctorObj?.review_count ? `${doctorObj.review_count}+ consultations` : '—'} />
+              <InfoRow label="Languages"     value="—" />
             </Section>
           ) : isInPerson ? (
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -472,9 +491,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Actions */}
           {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
-              <TouchableOpacity onPress={handleReschedule}
-                style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-                <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>🗓  Reschedule</Text>
+              <TouchableOpacity onPress={handleReschedule} disabled={rescheduleLoading}
+                style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
+                {rescheduleLoading
+                  ? <ActivityIndicator size="small" color={t.textPrimary} />
+                  : <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>🗓  Reschedule</Text>
+                }
               </TouchableOpacity>
               <TouchableOpacity onPress={handleCancel} disabled={cancelling}
                 style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', opacity: cancelling ? 0.5 : 1 }]}>
@@ -499,7 +521,29 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Completed — rate & rebook */}
           {appt.status === 'completed' && appt.doctor && (
             <View style={st.actions}>
-              <TouchableOpacity style={[st.rescheduleBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg, flex: 1 }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  // MM10: Rate Doctor flow
+                  Alert.alert(
+                    `Rate Dr. ${appt.doctor!.split(' ').pop()}`,
+                    'How would you rate this consultation?',
+                    [1, 2, 3, 4, 5].map(stars => ({
+                      text: '⭐'.repeat(stars),
+                      onPress: async () => {
+                        if (!user || !doctorObj?.id) return
+                        await (supabase as any).from('reviews').insert({
+                          appointment_id: raw.id,
+                          patient_id:     user.id,
+                          doctor_id:      doctorObj.id,
+                          rating:         stars,
+                          body:           '',
+                        })
+                        Alert.alert('Thank you!', 'Your rating has been submitted.')
+                      },
+                    }))
+                  )
+                }}
+                style={[st.rescheduleBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg, flex: 1 }]}>
                 <Text style={[st.rescheduleTxt, { color: t.accent }]}>
                   ⭐  Rate Dr. {appt.doctor.split(' ').pop()}
                 </Text>
@@ -511,7 +555,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {cancelled && (
             <View style={[st.refundNote, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.2)' }]}>
               <Text style={[st.refundText, { color: '#FF5C5C' }]}>
-                ✓  Appointment cancelled. Refund of {appt.payment} will arrive in 2–3 business days.
+                ✓  Appointment cancelled. {refundPct === 100 ? 'Full refund' : `${refundPct}% refund`} will arrive in 2–3 business days.
               </Text>
             </View>
           )}

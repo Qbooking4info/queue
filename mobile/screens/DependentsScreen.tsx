@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, ActivityIndicator, Modal, Pressable,
+  StyleSheet, SafeAreaView, ActivityIndicator, Modal, Pressable, Alert,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
@@ -149,7 +149,17 @@ export function DependentsScreen({ navigation }: Props) {
             </TouchableOpacity>
 
             {editing && (
-              <TouchableOpacity onPress={() => { setModalOpen(false); handleDelete(editing.id) }}
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Remove dependent?',
+                    `Remove ${editing.full_name} from your account?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Remove', style: 'destructive', onPress: () => { setModalOpen(false); handleDelete(editing.id) } },
+                    ]
+                  )
+                }}
                 style={[s.deleteBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.07)' }]}>
                 <Text style={s.deleteBtnText}>Remove dependent</Text>
               </TouchableOpacity>

@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
-import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital } from '../lib/api'
+import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
@@ -62,6 +62,9 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const [symptom,           setSymptom]          = useState('')
   const [customSymptom,     setCustomSymptom]    = useState('')
   const [forDependent,      setForDependent]     = useState(false)
+  // MH7: track which dependent to book for
+  const [dependentsList,    setDependentsList]   = useState<any[]>([])
+  const [selectedDependentId, setSelectedDependentId] = useState<string | null>(null)
   const [hospitals,         setHospitals]        = useState<DisplayHospital[]>([])
   const [loadingHospitals,  setLoadingHospitals] = useState(false)
   const [selectedHospital,  setSelectedHospital] = useState<DisplayHospital | null>(null)
@@ -92,6 +95,14 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   }, [])
 
   useEffect(() => { loadHospitals() }, [loadHospitals])
+
+  // MH7: load dependents when user selects "A dependent"
+  useEffect(() => {
+    if (forDependent && user && dependentsList.length === 0) {
+      getDependents(user.id).then(setDependentsList)
+    }
+    if (!forDependent) setSelectedDependentId(null)
+  }, [forDependent, user])
 
   // Best-effort: if this is a multi-clinic hospital and it has a designated Emergency
   // Department, route the booking straight there. If not, it still falls through as a
@@ -125,14 +136,16 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     const reason    = `EMERGENCY · ${symptom || customSymptom}`
 
     const result = await createHospitalAppointment({
-      patientId:  user.id,
-      hospitalId: String(selectedHospital.id),
-      date:       today,
+      patientId:   user.id,
+      hospitalId:  String(selectedHospital.id),
+      date:        today,
       startTime,
-      type:       'in-person',
+      type:        'in-person',
       reason,
-      urgency:    u.id,
-      clinicId:   erClinicId,
+      urgency:     u.id,
+      clinicId:    erClinicId,
+      // MH7: pass selected dependent ID if booking on behalf of a dependent
+      dependentId: forDependent && selectedDependentId ? selectedDependentId : undefined,
     })
 
     if (result) {
@@ -237,6 +250,29 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))}
           </View>
+          {/* MH7: dependent selector */}
+          {forDependent && dependentsList.length > 0 && (
+            <View style={{ marginTop: 10 }}>
+              {dependentsList.map(d => (
+                <TouchableOpacity key={d.id} onPress={() => setSelectedDependentId(d.id)}
+                  style={[s.forBtn, {
+                    flexDirection: 'row', justifyContent: 'flex-start', gap: 10, marginBottom: 8,
+                    borderColor:     selectedDependentId === d.id ? t.accent : t.cardBorder,
+                    backgroundColor: selectedDependentId === d.id ? t.accentBg : t.cardBg,
+                  }]}>
+                  <Text style={{ fontSize: 16 }}>👤</Text>
+                  <Text style={[s.forBtnText, { color: selectedDependentId === d.id ? t.accent : t.textMuted }]}>
+                    {d.full_name} {d.relationship ? `(${d.relationship})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {forDependent && dependentsList.length === 0 && (
+            <Text style={[s.noteInline, { color: t.textMuted, marginTop: 8 }]}>
+              No dependents added yet. Add a dependent in Profile → Dependents.
+            </Text>
+          )}
           <View style={{ height: 20 }} />
         </ScrollView>
       )}

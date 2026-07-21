@@ -96,7 +96,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
           <View style={[st.queueDivider, { backgroundColor: `${urgencyColor}30` }]} />
           <View style={st.queueStat}>
             <Text style={[st.queueNum, { color: '#fff' }]}>₦{total?.toLocaleString()}</Text>
-            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Paid</Text>
+            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Amount due</Text>
           </View>
         </View>
 

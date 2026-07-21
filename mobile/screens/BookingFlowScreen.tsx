@@ -279,6 +279,16 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     if (!user || !hospital) return
     setSubmitError(''); setSubmitting(true)
 
+    // MM8: Re-validate slot availability at submit time to prevent race conditions
+    if (hospital.daily_booking_limit && urgency !== 'emergency') {
+      const freshCount = await getDailyBookingCount(String(hospital.id), selectedDate, selectedClinic?.id)
+      if (freshCount >= hospital.daily_booking_limit) {
+        setSubmitError('This time slot is now full. Please choose a different time.')
+        setSubmitting(false)
+        return
+      }
+    }
+
     let result: { id: string; bookingRef: string; approvalStatus: string } | null = null
 
     // Specialist clinic forces manual approval regardless of hospital setting — except for

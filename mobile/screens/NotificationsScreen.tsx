@@ -42,11 +42,12 @@ function relativeTime(iso: string): string {
 }
 
 function groupLabel(iso: string): 'Today' | 'Yesterday' | 'Earlier' {
-  const d    = new Date(iso)
-  const now  = new Date()
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diff === 0) return 'Today'
-  if (diff === 1) return 'Yesterday'
+  const d   = new Date(iso)
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) return 'Today'
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
   return 'Earlier'
 }
 
