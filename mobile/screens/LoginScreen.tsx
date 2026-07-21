@@ -2,10 +2,11 @@ import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 interface Props { navigation: any }
 
@@ -16,6 +17,12 @@ export function LoginScreen({ navigation }: Props) {
   const [pass,  setPass]    = useState('')
   const [error, setError]   = useState('')
   const [busy,  setBusy]    = useState(false)
+
+  async function handleForgotPassword() {
+    if (!email.trim()) { Alert.alert('Enter your email address first, then tap Forgot password.'); return }
+    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase())
+    Alert.alert('Check your email', 'If an account exists for that address, a password reset link has been sent.')
+  }
 
   async function handleLogin() {
     if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
@@ -82,7 +89,7 @@ export function LoginScreen({ navigation }: Props) {
                 : <Text style={s.btnText}>Sign in</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.forgotRow}>
+            <TouchableOpacity onPress={handleForgotPassword} style={s.forgotRow}>
               <Text style={[s.forgotText, { color: t.accent }]}>Forgot password?</Text>
             </TouchableOpacity>
           </View>

@@ -201,6 +201,7 @@ export async function createAppointment(payload: {
   clinicId?:           string
   dependentId?:        string
   approvalMode?:       string    // 'auto' | 'manual' — from hospital settings
+  paymentMethod?:      string
 }): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
   const bookingRef     = `QUE-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
@@ -226,6 +227,7 @@ export async function createAppointment(payload: {
       booking_mode:         'doctor',
       booking_ref:          bookingRef,
       refund_pct:           100,
+      payment_method:       payload.paymentMethod ?? 'card',
     })
     .select('id, booking_ref')
     .single()
@@ -251,6 +253,7 @@ export async function createHospitalAppointment(payload: {
   approvalMode?:       string
   opdFee?:             number
   type?:               'in-person' | 'virtual'
+  paymentMethod?:      string
 }): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
   const bookingRef     = `OPD-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
@@ -277,6 +280,7 @@ export async function createHospitalAppointment(payload: {
       booking_mode:         'hospital',
       booking_ref:          bookingRef,
       refund_pct:           100,
+      payment_method:       payload.paymentMethod ?? 'card',
     })
     .select('id, booking_ref')
     .single()

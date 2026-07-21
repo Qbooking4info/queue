@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 
-export function SplashScreen({ onNext }: { onNext: () => void }) {
+export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; onSignIn: () => void }) {
   const { theme: t } = useTheme()
   const [vis, setVis] = useState(false)
   useEffect(() => { setTimeout(() => setVis(true), 100) }, [])
@@ -34,11 +34,11 @@ export function SplashScreen({ onNext }: { onNext: () => void }) {
 
       {/* CTAs */}
       <View style={[styles.ctaGroup, { opacity: vis ? 1 : 0 }]}>
-        <TouchableOpacity onPress={onNext} activeOpacity={0.85}
+        <TouchableOpacity onPress={onGetStarted} activeOpacity={0.85}
           style={[styles.btnPrimary, { backgroundColor: t.accent }]}>
           <Text style={[styles.btnPrimaryText]}>Get started</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onNext} activeOpacity={0.7} style={styles.btnSecondary}>
+        <TouchableOpacity onPress={onSignIn} activeOpacity={0.7} style={styles.btnSecondary}>
           <Text style={[styles.btnSecondaryText, { color: 'rgba(255,255,255,0.6)' }]}>Sign in</Text>
         </TouchableOpacity>
       </View>

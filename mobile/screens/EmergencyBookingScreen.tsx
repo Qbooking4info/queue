@@ -136,16 +136,16 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     const reason    = `EMERGENCY · ${symptom || customSymptom}`
 
     const result = await createHospitalAppointment({
-      patientId:   user.id,
-      hospitalId:  String(selectedHospital.id),
-      date:        today,
+      patientId:     user.id,
+      hospitalId:    String(selectedHospital.id),
+      date:          today,
       startTime,
-      type:        'in-person',
+      type:          'in-person',
       reason,
-      urgency:     u.id,
-      clinicId:    erClinicId,
-      // MH7: pass selected dependent ID if booking on behalf of a dependent
-      dependentId: forDependent && selectedDependentId ? selectedDependentId : undefined,
+      urgency:       u.id,
+      clinicId:      erClinicId,
+      dependentId:   forDependent && selectedDependentId ? selectedDependentId : undefined,
+      paymentMethod: paymentMethod,
     })
 
     if (result) {

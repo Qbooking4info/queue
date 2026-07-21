@@ -313,6 +313,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         reason,
         type:         bookingType === 'virtual' ? 'virtual' : 'in-person',
         approvalMode: clinicApprovalMode,
+        paymentMethod: payMethod,
       })
     } else if (bookingType === 'physical' || !preferredDoc) {
       result = await createHospitalAppointment({
@@ -326,6 +327,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         approvalMode:       clinicApprovalMode,
         clinicId:           selectedClinic?.id,
         symptomDescription: referralNote || undefined,
+        paymentMethod:      payMethod,
       })
     } else {
       // Virtual with preferred doctor — queue-based, no DB slot needed
@@ -340,6 +342,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         reason,
         urgency,
         approvalMode: hospital.approval_mode ?? 'auto',
+        paymentMethod: payMethod,
       })
     }
 

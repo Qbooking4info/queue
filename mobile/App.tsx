@@ -122,9 +122,9 @@ function AppStack() {
   )
 }
 
-function AuthStack() {
+function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="Login"    component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
@@ -132,7 +132,8 @@ function AuthStack() {
 }
 
 function AppNavigator() {
-  const [splashDone, setSplashDone] = useState(false)
+  const [splashDone,    setSplashDone]    = useState(false)
+  const [initialRoute,  setInitialRoute]  = useState<'Login' | 'Register'>('Login')
   const { session, loading, user, doctorProfile } = useAuth()
   const { theme: t }                              = useTheme()
   usePushNotifications(user?.id)
@@ -140,7 +141,10 @@ function AppNavigator() {
   if (!splashDone) {
     return (
       <SafeAreaProvider>
-        <SplashScreen onNext={() => setSplashDone(true)} />
+        <SplashScreen
+          onGetStarted={() => { setInitialRoute('Register'); setSplashDone(true) }}
+          onSignIn={() => { setInitialRoute('Login'); setSplashDone(true) }}
+        />
       </SafeAreaProvider>
     )
   }
@@ -160,7 +164,7 @@ function AppNavigator() {
       <NavigationContainer>
         {session
           ? (doctorProfile ? <SpecialistStack /> : <AppStack />)
-          : <AuthStack />
+          : <AuthStack initialRoute={initialRoute} />
         }
       </NavigationContainer>
     </SafeAreaProvider>
