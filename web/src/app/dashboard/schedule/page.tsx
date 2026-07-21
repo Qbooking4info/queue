@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
@@ -57,6 +58,8 @@ type SelectedCell =
 export default function SchedulePage() {
   const { theme: C } = useTheme()
   const { hospital, role, doctorId } = useAdmin()
+  const searchParams = useSearchParams()
+  const urlDoctorId  = searchParams.get('doctorId')
   const [schedule, setSchedule] = useState<Record<string, ScheduleSlot[]>>({})
   const [hours, setHours] = useState<DayHours[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,7 +86,8 @@ export default function SchedulePage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const scopedDoctorId = role === 'doctor' && doctorId ? doctorId : undefined
+    // Doctors always see only their own schedule; admins can be scoped via ?doctorId= URL param
+    const scopedDoctorId = role === 'doctor' && doctorId ? doctorId : (urlDoctorId ?? undefined)
     const weekStartISO = fmtLocalDate(monday)
 
     const [sched, resolvedHours] = await Promise.all([
@@ -96,7 +100,7 @@ export default function SchedulePage() {
     setSchedule(sched)
     setHours(resolvedHours)
     setLoading(false)
-  }, [hospital?.id, role, doctorId, bounds.from, clinicId])
+  }, [hospital?.id, role, doctorId, urlDoctorId, bounds.from, clinicId])
 
   useEffect(() => { load() }, [load])
 

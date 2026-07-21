@@ -41,7 +41,7 @@ export function PrescriptionsScreen({ navigation }: Props) {
         {(['prescriptions', 'labs'] as const).map(tb => (
           <TouchableOpacity key={tb} onPress={() => setTab(tb)} style={s.tabItem}>
             <Text style={[s.tabText, { color: tab === tb ? t.accent : t.textMuted, fontWeight: tab === tb ? '700' : '400' }]}>
-              {tb === 'prescriptions' ? '💊 Prescriptions' : '🔬 Lab Results'}
+              {tb === 'prescriptions' ? '💊 Prescriptions' : '🩺 Diagnoses'}
             </Text>
             <View style={[s.tabUnderline, { backgroundColor: tab === tb ? t.accent : 'transparent' }]} />
           </TouchableOpacity>
@@ -91,9 +91,9 @@ export function PrescriptionsScreen({ navigation }: Props) {
 
           {tab === 'labs' && (
             <>
-              <Text style={[s.sectionSub, { color: t.textMuted }]}>Lab results and diagnostic reports</Text>
+              <Text style={[s.sectionSub, { color: t.textMuted }]}>Diagnoses from completed consultations</Text>
               {appts.filter(a => a.diagnosis).length === 0 ? (
-                <EmptyState icon="🔬" title="No lab results on file" sub="Lab results ordered by your doctors will appear here once your appointment notes are recorded." />
+                <EmptyState icon="🩺" title="No diagnoses on file" sub="Diagnoses recorded by your doctors during completed consultations will appear here." />
               ) : (
                 appts.filter(a => a.diagnosis).map(a => (
                   <View key={a.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

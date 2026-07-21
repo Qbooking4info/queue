@@ -142,11 +142,6 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
           <div style={{ fontSize: 18, fontWeight: 800, color: col.text }}>{clinic.doctorCount}</div>
           <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>Doctors</div>
         </div>
-        <div style={{ flex: 1, background: C.bgAlt, border: `1px solid ${C.border}`,
-          borderRadius: 10, padding: '8px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: C.textSub }}>—</div>
-          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>Staff</div>
-        </div>
       </div>
 
       {/* Actions */}

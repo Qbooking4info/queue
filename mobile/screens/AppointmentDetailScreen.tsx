@@ -37,7 +37,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function AppointmentDetailScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const { user }     = useAuth()
-  const raw = route?.params?.appointment ?? DEFAULT_APPT
+  const rawParam = route?.params?.appointment
+  if (!rawParam) {
+    // No appointment data passed — go back rather than show fake placeholder data
+    navigation?.goBack?.()
+    return null
+  }
+  const raw = rawParam
   const [cancelled,          setCancelled]          = useState(false)
   const [cancelling,         setCancelling]         = useState(false)
   const [copied,             setCopied]             = useState(false)
@@ -91,6 +97,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     vitals_blood_sugar:  (raw as any).vitals_blood_sugar  ?? null,
     vitals_bmi:          (raw as any).vitals_bmi          ?? null,
     urgency:             (raw as any).urgency ?? 'routine',
+    paymentMethod:       (raw as any).payment_method ?? null,
   }
 
   const hasVitals = appt.vitals_weight_kg != null || appt.vitals_height_cm != null
@@ -441,7 +448,6 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               </View>
               <InfoRow label="Experience"    value={doctorObj?.years_experience ? `${doctorObj.years_experience} years` : '—'} />
               <InfoRow label="Consultations" value={doctorObj?.review_count ? `${doctorObj.review_count}+ consultations` : '—'} />
-              <InfoRow label="Languages"     value="—" />
             </Section>
           ) : isInPerson ? (
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -482,10 +488,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
           {/* Payment */}
           <Section title="Payment">
-            <InfoRow label="Consultation fee" value={appt.payment} />
-            <InfoRow label="Platform fee"     value="₦500" />
-            <InfoRow label="Total paid"       value={appt.payment} accent />
-            <InfoRow label="Payment method"   value="—" />
+            <InfoRow label="Consultation fee" value={appt.payment} accent />
+            {appt.paymentMethod && <InfoRow label="Payment method" value={appt.paymentMethod} />}
           </Section>
 
           {/* Actions */}

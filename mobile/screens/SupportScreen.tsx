@@ -4,6 +4,8 @@ import {
   StyleSheet, SafeAreaView, Linking, Alert,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth }  from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 interface Props { navigation: any }
 
@@ -20,12 +22,21 @@ const FAQS = [
 
 export function SupportScreen({ navigation }: Props) {
   const { theme: t }      = useTheme()
+  const { user }          = useAuth()
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [query, setQuery]    = useState('')
   const [sent, setSent]      = useState(false)
+  const [sending, setSending] = useState(false)
 
-  function handleSend() {
+  async function handleSend() {
     if (!query.trim()) return
+    setSending(true)
+    await supabase.from('support_tickets').insert({
+      user_id: user?.id ?? null,
+      email:   user?.email ?? null,
+      message: query.trim(),
+    })
+    setSending(false)
     Alert.alert('Message received', "Your message has been received. We'll get back to you within 24 hours.")
     setSent(true)
     setQuery('')
@@ -97,9 +108,9 @@ export function SupportScreen({ navigation }: Props) {
                 multiline numberOfLines={4}
                 style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
               />
-              <TouchableOpacity onPress={handleSend}
-                style={[s.sendBtn, { backgroundColor: t.accent, opacity: query.trim() ? 1 : 0.4 }]}>
-                <Text style={s.sendBtnText}>Send message</Text>
+              <TouchableOpacity onPress={handleSend} disabled={sending}
+                style={[s.sendBtn, { backgroundColor: t.accent, opacity: query.trim() && !sending ? 1 : 0.4 }]}>
+                <Text style={s.sendBtnText}>{sending ? 'Sending…' : 'Send message'}</Text>
               </TouchableOpacity>
             </>
           )}
