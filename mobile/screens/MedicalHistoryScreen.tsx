@@ -41,7 +41,6 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   const [bloodGroup, setBloodGroup] = useState(user?.blood_group ?? '')
   const [gender,     setGender]     = useState(user?.gender ?? '')
   const [dob,        setDob]        = useState(user?.date_of_birth ?? '')
-  // MC3: "Other conditions" free-text
   const [otherConditions, setOtherConditions] = useState('')
 
   // ML3: Re-sync form fields when user context refreshes (e.g. after saving)
@@ -60,6 +59,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
     ])
     setAppts(completed)
     setNotes(history)
+    setOtherConditions(history.otherConditions ?? '')
     setLoading(false)
   }, [user])
 
@@ -182,6 +182,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <TextInput
                   value={otherConditions}
                   onChangeText={setOtherConditions}
+                  onEndEditing={() => saveNotes({ ...notes, otherConditions })}
                   placeholder="Type any other conditions…"
                   placeholderTextColor={t.textMuted}
                   style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}

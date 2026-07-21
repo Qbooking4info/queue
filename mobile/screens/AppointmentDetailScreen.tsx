@@ -485,7 +485,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <InfoRow label="Consultation fee" value={appt.payment} />
             <InfoRow label="Platform fee"     value="₦500" />
             <InfoRow label="Total paid"       value={appt.payment} accent />
-            <InfoRow label="Payment method"   value="Card ending in 4522" />
+            <InfoRow label="Payment method"   value="—" />
           </Section>
 
           {/* Actions */}

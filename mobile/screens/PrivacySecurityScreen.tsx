@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, ActivityIndicator,
+  StyleSheet, SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase }  from '../lib/supabase'
+import { deleteAccount } from '../lib/api'
+
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 interface Props { navigation: any }
 
@@ -43,6 +46,24 @@ export function PrivacySecurityScreen({ navigation }: Props) {
     setSaving(false)
     if (error) { setPwError(error.message) }
     else { setPwSuccess(true); setCurrentPw(''); setNewPw(''); setConfirmPw('') }
+  }
+
+  async function handleDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and cancels all pending appointments. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          const { data: { session } } = await supabase.auth.getSession()
+          const jwt = session?.access_token
+          if (!jwt) return
+          const ok = await deleteAccount(API_URL, jwt)
+          if (ok) { await signOut() }
+          else { Alert.alert('Error', 'Could not delete account. Please contact support.') }
+        }},
+      ],
+    )
   }
 
   return (
@@ -110,7 +131,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           <Text style={{ fontSize: 16 }}>🚪</Text>
           <Text style={[s.dangerBtnText, { color: '#FF5C5C' }]}>Sign out of all devices</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
+        <TouchableOpacity onPress={handleDeleteAccount} style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
           <Text style={{ fontSize: 16 }}>🗑️</Text>
           <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
         </TouchableOpacity>

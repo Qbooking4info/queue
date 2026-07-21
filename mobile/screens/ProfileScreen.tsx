@@ -103,6 +103,7 @@ export function ProfileScreen({ navigation }: Props) {
         {[
           { icon: '🩺', label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => navigation?.navigate('MedicalHistory') },
           { icon: '📋', label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => navigation?.navigate('Prescriptions') },
+          { icon: '🏥', label: 'Insurance',                   sub: 'Manage your health insurance details',     onPress: () => navigation?.navigate('Insurance') },
           { icon: '👨‍👩‍👧', label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => navigation?.navigate('Dependents') },
           { icon: '🔔', label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => navigation?.navigate('Notifications') },
           { icon: '🔒', label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => navigation?.navigate('PrivacySecurity') },

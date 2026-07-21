@@ -417,24 +417,26 @@ export interface MedicalHistory {
   medications: string
   surgeries: string
   familyHistory: string
+  otherConditions: string
 }
 
-const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
+const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '' }
 
 export async function getMedicalHistory(patientId: string): Promise<MedicalHistory> {
   const { data, error } = await supabase
     .from('patient_medical_history')
-    .select('conditions, allergies, medications, surgeries, family_history')
+    .select('conditions, allergies, medications, surgeries, family_history, other_conditions')
     .eq('patient_id', patientId)
     .maybeSingle()
   if (error) { console.warn('getMedicalHistory error:', error.message); return EMPTY_MEDICAL_HISTORY }
   if (!data) return EMPTY_MEDICAL_HISTORY
   return {
-    conditions: data.conditions ?? [],
-    allergies: data.allergies ?? [],
-    medications: data.medications ?? '',
-    surgeries: data.surgeries ?? '',
-    familyHistory: data.family_history ?? '',
+    conditions: (data as any).conditions ?? [],
+    allergies: (data as any).allergies ?? [],
+    medications: (data as any).medications ?? '',
+    surgeries: (data as any).surgeries ?? '',
+    familyHistory: (data as any).family_history ?? '',
+    otherConditions: (data as any).other_conditions ?? '',
   }
 }
 
@@ -446,10 +448,23 @@ export async function updateMedicalHistory(patientId: string, notes: MedicalHist
     medications: notes.medications || null,
     surgeries: notes.surgeries || null,
     family_history: notes.familyHistory || null,
+    other_conditions: notes.otherConditions || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'patient_id' })
   if (error) { console.warn('updateMedicalHistory error:', error.message); return false }
   return true
+}
+
+export async function deleteAccount(apiUrl: string, jwt: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiUrl}/api/account`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${jwt}` },
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 // ── Dependents ────────────────────────────────────────────────────────────────
