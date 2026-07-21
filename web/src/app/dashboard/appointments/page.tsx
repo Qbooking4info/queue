@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
@@ -593,6 +594,22 @@ export default function AppointmentsPage() {
   }, [hospital?.id, bounds, isDoctor, userDoctorId, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
+
+  // Realtime: refresh whenever a new appointment lands for this hospital
+  useEffect(() => {
+    if (!hospital?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`appointments:hospital:${hospital.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'appointments',
+        filter: `hospital_id=eq.${hospital.id}`,
+      }, () => { load() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [hospital?.id, load])
 
   async function handleApprove(appt: AdminAppointment) {
     setPendingActionId(appt.id)
