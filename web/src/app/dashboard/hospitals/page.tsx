@@ -26,7 +26,7 @@ function StatChip({ label, value, color }: { label: string; value: number | stri
   )
 }
 
-function HospitalRow({ h, C, onManage }: { h: HospitalStat; C: any; onManage: () => void }) {
+function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; onManage: () => void; canManage: boolean }) {
   return (
     <div style={{ padding: '18px 22px', borderRadius: 14, background: C.card, border: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
@@ -50,13 +50,23 @@ function HospitalRow({ h, C, onManage }: { h: HospitalStat; C: any; onManage: ()
         <StatChip label="Active Doctors" value={h.active_doctors} color="#EF9F27" />
       </div>
 
-      <button onClick={onManage} style={{
-        width: '100%', padding: '9px 16px', borderRadius: 10, border: 'none',
-        background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-        fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-      }}>
-        Manage Hospital →
-      </button>
+      {canManage ? (
+        <button onClick={onManage} style={{
+          width: '100%', padding: '9px 16px', borderRadius: 10, border: 'none',
+          background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+          fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+        }}>
+          Manage Hospital →
+        </button>
+      ) : (
+        <button disabled title="You don't have access to this hospital." style={{
+          width: '100%', padding: '9px 16px', borderRadius: 10, border: `1px solid ${C.border}`,
+          background: C.bgAlt, color: C.textMuted,
+          fontSize: 13, fontWeight: 700, cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.6,
+        }}>
+          Manage Hospital — No Access
+        </button>
+      )}
     </div>
   )
 }
@@ -140,6 +150,7 @@ export default function HospitalsPage() {
             return (
               <HospitalRow
                 key={h.id} h={h} C={C}
+                canManage={!!adminH}
                 onManage={() => adminH ? handleManage(adminH) : undefined}
               />
             )

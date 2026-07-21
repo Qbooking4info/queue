@@ -5,6 +5,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { getHospitalSettings, updateHospitalSettings, getHospitalHours, updateHospitalHours } from '@/lib/admin-api'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
+import { createClient } from '@/lib/supabase/client'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -71,7 +72,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!hospital?.id) return
-    Promise.all([getHospitalSettings(hospital.id), getHospitalHours(hospital.id)]).then(([s, h]) => {
+    const db = createClient()
+    Promise.all([
+      getHospitalSettings(hospital.id),
+      getHospitalHours(hospital.id),
+      db.from('hospitals').select('sms_reminders, email_reminders').eq('id', hospital.id).single(),
+    ]).then(([s, h, { data: reminderData }]) => {
       if (s) {
         setVirtual(s.accepts_virtual ?? false)
         setEmergency(s.emergency_hours ?? false)
@@ -81,6 +87,10 @@ export default function SettingsPage() {
         setOpdFee(String(s.opd_fee ?? 0))
         if (s.latitude  != null) setLat(String(s.latitude))
         if (s.longitude != null) setLng(String(s.longitude))
+      }
+      if (reminderData) {
+        setSmsReminder((reminderData as any).sms_reminders ?? true)
+        setEmailReminder((reminderData as any).email_reminders ?? true)
       }
       setHours(h)
       setLoading(false)
@@ -109,6 +119,7 @@ export default function SettingsPage() {
     setSaving(true); setSaveErr('')
     const parsedLat = lat ? parseFloat(lat) : null
     const parsedLng = lng ? parseFloat(lng) : null
+    const db = createClient()
     const [{ error }, { error: hoursError }] = await Promise.all([
       updateHospitalSettings(hospital.id, {
         accepts_virtual:     virtual,
@@ -118,9 +129,13 @@ export default function SettingsPage() {
         daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
         opd_fee:             parseInt(opdFee) || 0,
         ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
-      }),
+        sms_reminders:   smsReminder,
+        email_reminders: emailReminder,
+      } as any),
       updateHospitalHours(hospital.id, hours),
     ])
+    // Also persist reminder flags via browser client (handles columns if they exist)
+    await db.from('hospitals').update({ sms_reminders: smsReminder, email_reminders: emailReminder } as any).eq('id', hospital.id)
     setSaving(false)
     if (error || hoursError) { setSaveErr(error ?? hoursError ?? 'Failed to save'); return }
     setSaved(true)
@@ -366,10 +381,11 @@ export default function SettingsPage() {
                   <div style={{ fontSize: 11, color: C.accent }}>Trial active</div>
                 </div>
               </div>
-              <button style={{ width: '100%', padding: '9px', borderRadius: 10,
+              <button disabled style={{ width: '100%', padding: '9px', borderRadius: 10,
                 border: `1px solid ${C.border}`, background: C.card,
-                color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>
-                Manage Billing
+                color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: 'not-allowed',
+                marginTop: 10, opacity: 0.5 }}>
+                Manage Billing — Coming Soon
               </button>
             </SectionCard>
 

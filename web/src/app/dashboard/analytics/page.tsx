@@ -87,6 +87,16 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Sample data notice */}
+      <div style={{ background: 'rgba(239,159,39,0.12)', border: '1px solid rgba(239,159,39,0.3)',
+        borderRadius: 12, padding: '12px 16px', marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+        <div style={{ fontSize: 13, color: '#EF9F27', fontWeight: 600 }}>
+          Sample data — Real analytics coming soon. The monthly booking and revenue figures on this page are illustrative only.
+        </div>
+      </div>
+
       {/* Date filter */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
         padding: '12px 16px', marginBottom: 20 }}>

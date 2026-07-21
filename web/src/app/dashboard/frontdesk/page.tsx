@@ -15,6 +15,19 @@ const STATUS_COLOR: Record<string, string> = {
   no_show:     'text-red-400 bg-red-500/10 border-red-500/20',
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  pending:     'Pending',
+  confirmed:   'Confirmed',
+  checked_in:  'Checked In',
+  in_progress: 'In Progress',
+  completed:   'Completed',
+  cancelled:   'Cancelled',
+  no_show:     'No Show',
+}
+function statusLabel(s: string): string {
+  return STATUS_LABEL[s] ?? s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
 const QUEUE_STATUSES = ['pending', 'confirmed', 'checked_in', 'in_progress']
 
 export default async function FrontDeskPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
@@ -29,7 +42,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   const [{ data: appointments }, { count: pending }, { count: checkedIn }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, queue_position, users(full_name, phone), doctors(full_name, title)')
+      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, users(full_name, phone), doctors(full_name, title)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('appointment_date', selectedDate)
       .in('status', QUEUE_STATUSES)
@@ -110,14 +123,14 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                           <div className="text-xs text-[#4A6058] mt-0.5">📞 {patient.phone}</div>
                         )}
                       </div>
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full border capitalize shrink-0 ${statusClass}`}>
-                        {a.status.replace(/_/g, ' ')}
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusClass}`}>
+                        {statusLabel(a.status)}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-3 flex justify-end">
-                  <FrontDeskActions appointmentId={a.id} currentStatus={a.status} bookingRef={a.booking_ref} />
+                  <FrontDeskActions appointmentId={a.id} currentStatus={a.status} approvalStatus={(a as any).approval_status ?? null} bookingRef={a.booking_ref} />
                 </div>
               </div>
             )

@@ -116,7 +116,8 @@ export default function DoctorsPage() {
 
                 {!isFrontDesk && (
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={{ flex: 1, padding: '9px', borderRadius: 10,
+                    <button onClick={() => router.push(`/dashboard/schedule?doctorId=${d.id}`)}
+                      style={{ flex: 1, padding: '9px', borderRadius: 10,
                       border: `1px solid ${C.border}`, background: C.card,
                       color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                       View Schedule

@@ -176,8 +176,9 @@ function AddSpecialtyModal({
   onClose: () => void
   C: any
 }) {
-  const [search,  setSearch]  = useState('')
-  const [saving,  setSaving]  = useState<string | null>(null)
+  const [search,     setSearch]     = useState('')
+  const [saving,     setSaving]     = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState('')
 
   const filtered = allSpecialties.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) && !registered.has(s.id)
@@ -188,6 +189,8 @@ function AddSpecialtyModal({
     await addHospitalSpecialty(hospitalId, s.id)
     setSaving(null)
     onSave()
+    setSuccessMsg(`${s.name} added successfully`)
+    setTimeout(() => { onClose() }, 1200)
   }
 
   return (
@@ -205,6 +208,13 @@ function AddSpecialtyModal({
         <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
           Select specialties your hospital offers
         </div>
+
+        {successMsg && (
+          <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)',
+            borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#4ade80', marginBottom: 12 }}>
+            ✓ {successMsg}
+          </div>
+        )}
 
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search specialties…"
@@ -269,6 +279,7 @@ export default function ServicesPage() {
   const [deleteConfirm,   setDeleteConfirm]   = useState<HospitalService | null>(null)
   const [showAddSpecialty,setShowAddSpecialty]= useState(false)
   const [deletingSpec,    setDeletingSpec]    = useState<string | null>(null)
+  const [removeSpecConfirm, setRemoveSpecConfirm] = useState<SpecialtyRow | null>(null)
 
   const load = useCallback(async () => {
     if (!hospital?.id) return
@@ -308,6 +319,7 @@ export default function ServicesPage() {
 
   async function handleRemoveSpecialty(spec: SpecialtyRow) {
     setDeletingSpec(spec.id)
+    setRemoveSpecConfirm(null)
     await removeHospitalSpecialty(hospital!.id, spec.id)
     setSpecialties(prev => prev.filter(x => x.id !== spec.id))
     setDeletingSpec(null)
@@ -500,7 +512,7 @@ export default function ServicesPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleRemoveSpecialty(s)}
+                    onClick={() => setRemoveSpecConfirm(s)}
                     disabled={deletingSpec === s.id}
                     style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer',
                       border: '1px solid rgba(220,60,60,0.25)', background: 'rgba(220,60,60,0.06)',
@@ -528,6 +540,40 @@ export default function ServicesPage() {
         />
       )}
 
+      {/* Remove Specialty Confirmation */}
+      {removeSpecConfirm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setRemoveSpecConfirm(null) }}>
+          <div style={{ width: '100%', maxWidth: 380, background: C.card,
+            border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '28px 28px' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 8 }}>
+              Remove Specialty
+            </div>
+            <div style={{ fontSize: 13, color: C.textSub, marginBottom: 20 }}>
+              Remove <strong style={{ color: C.text }}>{removeSpecConfirm.name}</strong> from your hospital?
+              Existing appointments using this specialty will not be affected.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setRemoveSpecConfirm(null)}
+                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={() => handleRemoveSpecialty(removeSpecConfirm)}
+                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+                  background: 'rgba(220,60,60,0.12)', border: '1px solid rgba(220,60,60,0.3)',
+                  color: '#f07070', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Specialty Modal */}
       {showAddSpecialty && hospital && (
         <AddSpecialtyModal
@@ -536,7 +582,7 @@ export default function ServicesPage() {
           registered={registeredIds}
           C={C}
           onClose={() => setShowAddSpecialty(false)}
-          onSave={() => { load() }}
+          onSave={() => { load(); /* modal closes itself after 1.2s via setTimeout */ }}
         />
       )}
 

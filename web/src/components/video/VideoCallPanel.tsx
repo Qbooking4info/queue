@@ -31,6 +31,7 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [callData, setCallData] = useState<CallData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [endCallError, setEndCallError] = useState<string | null>(null)
 
   const client = useMemo(
     () => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }),
@@ -62,12 +63,20 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
 
   async function endCall() {
     try {
-      await fetch('/api/virtual/end', {
+      const res = await fetch('/api/virtual/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appointmentId }),
       })
-    } catch { /* non-fatal — session cleanup best-effort */ }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setEndCallError(data.error ?? 'Failed to end call — please try again')
+        return
+      }
+    } catch {
+      setEndCallError('Network error — check your connection')
+      return
+    }
     setPhase('ended')
     setCallData(null)
   }
@@ -128,6 +137,7 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
         channelName={callData.channelName}
         uid={callData.uid}
         patientName={patientName}
+        endCallError={endCallError}
         onEnd={endCall}
       />
     </AgoraRTCProvider>
@@ -142,10 +152,11 @@ interface OverlayProps {
   channelName: string
   uid: number
   patientName: string
+  endCallError: string | null
   onEnd: () => void
 }
 
-function CallOverlay({ appId, token, channelName, uid, patientName, onEnd }: OverlayProps) {
+function CallOverlay({ appId, token, channelName, uid, patientName, endCallError, onEnd }: OverlayProps) {
   const [micEnabled, setMicEnabled]     = useState(true)
   const [cameraEnabled, setCameraEnabled] = useState(true)
   const [elapsed, setElapsed]           = useState(0)
@@ -157,11 +168,14 @@ function CallOverlay({ appId, token, channelName, uid, patientName, onEnd }: Ove
   usePublish([localMicrophoneTrack, localCameraTrack])
 
   const remoteUsers = useRemoteUsers()
+  const connected = remoteUsers.length > 0
 
+  // WH1: timer only starts when a remote patient has joined
   useEffect(() => {
+    if (!connected) { setElapsed(0); return }
     const t = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [connected])
 
   function fmt(s: number) {
     const m = Math.floor(s / 60)
@@ -177,8 +191,6 @@ function CallOverlay({ appId, token, channelName, uid, patientName, onEnd }: Ove
     localCameraTrack?.setEnabled(!cameraEnabled)
     setCameraEnabled(v => !v)
   }
-
-  const connected = remoteUsers.length > 0
 
   return (
     <div style={{
@@ -238,9 +250,17 @@ function CallOverlay({ appId, token, channelName, uid, patientName, onEnd }: Ove
 
       {/* Controls */}
       <div style={{
-        padding: '20px 0 36px', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', gap: 20, background: 'rgba(0,0,0,0.5)',
+        padding: '20px 0 36px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: 12, background: 'rgba(0,0,0,0.5)',
       }}>
+        {endCallError && (
+          <div style={{ fontSize: 12, color: '#f07070', background: 'rgba(220,60,60,0.15)',
+            border: '1px solid rgba(220,60,60,0.3)', borderRadius: 8, padding: '6px 14px',
+            maxWidth: 320, textAlign: 'center' }}>
+            {endCallError}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <button
           onClick={toggleMic}
           style={{

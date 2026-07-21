@@ -71,6 +71,7 @@ export default function OverviewPage() {
   const [loading,     setLoading]     = useState(true)
   const [avail,       setAvail]       = useState<DoctorAvailabilityStatus>(doctorAvailability ?? 'on_duty')
   const [savingAvail, setSavingAvail] = useState(false)
+  const [availError,  setAvailError]  = useState('')
   const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
 
   useEffect(() => { if (doctorAvailability) setAvail(doctorAvailability) }, [doctorAvailability])
@@ -103,10 +104,18 @@ export default function OverviewPage() {
 
   async function handleAvailabilityChange(status: DoctorAvailabilityStatus) {
     if (!doctorId) return
+    const prev = avail
     setSavingAvail(true)
-    setAvail(status)
-    await setDoctorAvailability(doctorId, status)
-    setSavingAvail(false)
+    setAvailError('')
+    try {
+      await setDoctorAvailability(doctorId, status)
+      setAvail(status)
+    } catch {
+      setAvail(prev)
+      setAvailError('Failed to update availability — please try again')
+    } finally {
+      setSavingAvail(false)
+    }
   }
 
   const today = new Date()
@@ -161,6 +170,7 @@ export default function OverviewPage() {
             })}
           </div>
           {savingAvail && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 8 }}>Saving…</div>}
+          {availError && <div style={{ fontSize: 11, color: '#f07070', marginTop: 8 }}>⚠️ {availError}</div>}
         </div>
 
         {/* Doctor stats */}
@@ -346,8 +356,8 @@ export default function OverviewPage() {
           value={ctxLoading ? '…' : stats.activeDoctors}
           sub="On duty today" colorKey="purple" />
         <StatCard icon="⭐" label="Avg Rating"
-          value={ctxLoading ? '…' : stats.avgRating.toFixed(1)}
-          sub={`Based on ${stats.reviewCount} reviews`} colorKey="amber" />
+          value={ctxLoading ? '…' : (stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—')}
+          sub={stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'No reviews yet'} colorKey="amber" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>

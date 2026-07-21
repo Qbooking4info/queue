@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
-import { checkInAppointment, startConsultation, endConsultation, getQueueForToday } from '@/lib/admin-api'
+import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
@@ -45,8 +45,9 @@ export default function QueuePage() {
     setLoading(true)
     let data: AdminAppointment[]
     if (role === 'doctor' && doctorId) {
-      // Already scoped to today (scheduled or checked-in) via getDoctorTodayAppointments in AdminContext
-      data = todayAppointments
+      // Fetch fresh from API so actions always show the latest state
+      const today = new Date().toISOString().split('T')[0]
+      data = await getDoctorAppointments(doctorId, today, today)
     } else if ((role === 'clinic_admin' || role === 'front_desk') && clinicId) {
       data = await getQueueForToday(hospital.id, clinicId)
     } else {
@@ -54,7 +55,7 @@ export default function QueuePage() {
     }
     setAppts(data)
     setLoading(false)
-  }, [hospital?.id, role, doctorId, clinicId, todayAppointments])
+  }, [hospital?.id, role, doctorId, clinicId])
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
 
