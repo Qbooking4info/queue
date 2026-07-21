@@ -7,18 +7,9 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getCompletedAppointments } from '../lib/api'
+import { fmtDate } from '../lib/format'
 
 interface Props { navigation: any }
-
-const MOCK_PRESCRIPTIONS = [
-  { id: 'rx1', doctor: 'Dr. Amaka Osei', specialty: 'Cardiology', date: '2026-05-22', drug: 'Lisinopril 10mg', instructions: 'Once daily in the morning. Do not stop suddenly.', duration: '90 days', refills: 2 },
-  { id: 'rx2', doctor: 'Dr. Fatima Aliyu', specialty: 'Pediatrics', date: '2026-05-06', drug: 'Amoxicillin 250mg/5ml', instructions: 'Three times daily with food for 7 days.', duration: '7 days', refills: 0 },
-]
-
-const MOCK_LABS = [
-  { id: 'lab1', doctor: 'Dr. Bola Adeyemi', specialty: 'Cardiology', date: '2026-05-22', test: 'Full Blood Count (FBC)', status: 'Reviewed', result: 'Within normal range. Haemoglobin 13.2 g/dL, WBC 6.4 ×10³/μL.' },
-  { id: 'lab2', doctor: 'Dr. Bola Adeyemi', specialty: 'Cardiology', date: '2026-05-22', test: 'Lipid Panel', status: 'Reviewed', result: 'LDL slightly elevated at 130 mg/dL. Recommend dietary changes.' },
-]
 
 export function PrescriptionsScreen({ navigation }: Props) {
   const { theme: t }    = useTheme()
@@ -65,34 +56,33 @@ export function PrescriptionsScreen({ navigation }: Props) {
           {tab === 'prescriptions' && (
             <>
               <Text style={[s.sectionSub, { color: t.textMuted }]}>Medications prescribed by your doctors</Text>
-              {MOCK_PRESCRIPTIONS.length === 0 ? (
-                <EmptyState icon="💊" title="No prescriptions yet" sub="Prescriptions from your consultations will appear here." />
+              {appts.filter(a => a.doctor_notes).length === 0 ? (
+                <EmptyState icon="💊" title="No prescriptions on file" sub="Prescriptions from your completed consultations will appear here." />
               ) : (
-                MOCK_PRESCRIPTIONS.map(rx => (
-                  <View key={rx.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                appts.filter(a => a.doctor_notes).map(a => (
+                  <View key={a.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                     <View style={s.cardHeader}>
                       <View style={[s.rxIcon, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
                         <Text style={{ fontSize: 20 }}>💊</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.cardTitle, { color: t.textPrimary }]}>{rx.drug}</Text>
-                        <Text style={[s.cardSub, { color: t.textMuted }]}>{rx.doctor} · {rx.specialty}</Text>
+                        <Text style={[s.cardTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
+                        <Text style={[s.cardSub, { color: t.textMuted }]}>
+                          {a.doctor?.specialty?.name ?? 'Specialist'} · {a.hospital?.name ?? ''}
+                        </Text>
                       </View>
-                      <Text style={[s.cardDate, { color: t.textMuted }]}>{rx.date}</Text>
+                      <Text style={[s.cardDate, { color: t.textMuted }]}>{fmtDate(a.appointment_date)}</Text>
                     </View>
-                    {[
-                      { label: 'Instructions', value: rx.instructions },
-                      { label: 'Duration',     value: rx.duration },
-                      { label: 'Refills',      value: `${rx.refills} remaining` },
-                    ].map(row => (
-                      <View key={row.label} style={[s.infoRow, { borderTopColor: t.cardBorder }]}>
-                        <Text style={[s.infoLabel, { color: t.textMuted }]}>{row.label}</Text>
-                        <Text style={[s.infoValue, { color: t.textPrimary }]}>{row.value}</Text>
+                    <View style={[s.infoRow, { borderTopColor: t.cardBorder }]}>
+                      <Text style={[s.infoLabel, { color: t.textMuted }]}>Doctor's notes</Text>
+                      <Text style={[s.infoValue, { color: t.textPrimary }]}>{a.doctor_notes}</Text>
+                    </View>
+                    {a.diagnosis && (
+                      <View style={[s.infoRow, { borderTopColor: t.cardBorder }]}>
+                        <Text style={[s.infoLabel, { color: t.textMuted }]}>Diagnosis</Text>
+                        <Text style={[s.infoValue, { color: t.textPrimary }]}>{a.diagnosis}</Text>
                       </View>
-                    ))}
-                    <TouchableOpacity style={[s.downloadBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                      <Text style={[s.downloadBtnText, { color: t.accent }]}>📄  Download PDF</Text>
-                    </TouchableOpacity>
+                    )}
                   </View>
                 ))
               )}
@@ -102,46 +92,49 @@ export function PrescriptionsScreen({ navigation }: Props) {
           {tab === 'labs' && (
             <>
               <Text style={[s.sectionSub, { color: t.textMuted }]}>Lab results and diagnostic reports</Text>
-              {MOCK_LABS.length === 0 ? (
-                <EmptyState icon="🔬" title="No lab results yet" sub="Lab results ordered by your doctors will appear here." />
+              {appts.filter(a => a.diagnosis).length === 0 ? (
+                <EmptyState icon="🔬" title="No lab results on file" sub="Lab results ordered by your doctors will appear here once your appointment notes are recorded." />
               ) : (
-                MOCK_LABS.map(lab => (
-                  <View key={lab.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                appts.filter(a => a.diagnosis).map(a => (
+                  <View key={a.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                     <View style={s.cardHeader}>
                       <View style={[s.rxIcon, { backgroundColor: 'rgba(56,189,248,0.15)', borderColor: 'rgba(56,189,248,0.3)' }]}>
                         <Text style={{ fontSize: 20 }}>🔬</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.cardTitle, { color: t.textPrimary }]}>{lab.test}</Text>
-                        <Text style={[s.cardSub, { color: t.textMuted }]}>{lab.doctor} · {lab.date}</Text>
+                        <Text style={[s.cardTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
+                        <Text style={[s.cardSub, { color: t.textMuted }]}>{fmtDate(a.appointment_date)}</Text>
                       </View>
                       <View style={[s.statusBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                        <Text style={[s.statusText, { color: t.accent }]}>{lab.status}</Text>
+                        <Text style={[s.statusText, { color: t.accent }]}>Reviewed</Text>
                       </View>
                     </View>
                     <View style={[s.infoRow, { borderTopColor: t.cardBorder }]}>
-                      <Text style={[s.infoLabel, { color: t.textMuted }]}>Result</Text>
-                      <Text style={[s.infoValue, { color: t.textPrimary, flex: 1, textAlign: 'right' }]}>{lab.result}</Text>
+                      <Text style={[s.infoLabel, { color: t.textMuted }]}>Diagnosis</Text>
+                      <Text style={[s.infoValue, { color: t.textPrimary, flex: 1, textAlign: 'right' }]}>{a.diagnosis}</Text>
                     </View>
-                    <TouchableOpacity style={[s.downloadBtn, { borderColor: 'rgba(56,189,248,0.3)', backgroundColor: 'rgba(56,189,248,0.08)' }]}>
-                      <Text style={[s.downloadBtnText, { color: '#38BDF8' }]}>📄  Download report</Text>
-                    </TouchableOpacity>
+                    {a.doctor_notes && (
+                      <View style={[s.infoRow, { borderTopColor: t.cardBorder }]}>
+                        <Text style={[s.infoLabel, { color: t.textMuted }]}>Notes</Text>
+                        <Text style={[s.infoValue, { color: t.textPrimary, flex: 1, textAlign: 'right' }]}>{a.doctor_notes}</Text>
+                      </View>
+                    )}
                   </View>
                 ))
               )}
             </>
           )}
 
-          {/* Appointments with no prescription */}
-          {tab === 'prescriptions' && appts.length > 0 && (
+          {/* Consultations without notes */}
+          {tab === 'prescriptions' && appts.filter(a => !a.doctor_notes).length > 0 && (
             <>
               <Text style={[s.sectionTitle, { color: t.textMuted }]}>Recent consultations</Text>
-              {appts.slice(0, 5).map(a => (
+              {appts.filter(a => !a.doctor_notes).slice(0, 5).map(a => (
                 <View key={a.id} style={[s.simpleRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                   <Text style={{ fontSize: 14 }}>🩺</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.simpleTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
-                    <Text style={[s.simpleSub, { color: t.textMuted }]}>{a.appointment_date} · {a.hospital?.name ?? ''}</Text>
+                    <Text style={[s.simpleSub, { color: t.textMuted }]}>{fmtDate(a.appointment_date)} · {a.hospital?.name ?? ''}</Text>
                   </View>
                   <Text style={[s.simpleStatus, { color: t.textMuted }]}>No Rx</Text>
                 </View>
@@ -188,8 +181,6 @@ const s = StyleSheet.create({
   infoValue:      { fontSize: 12, textAlign: 'right', flex: 1 },
   statusBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, borderWidth: 1 },
   statusText:     { fontSize: 10, fontWeight: '700' },
-  downloadBtn:    { margin: 12, borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
-  downloadBtnText:{ fontSize: 12, fontWeight: '600' },
   simpleRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12, marginBottom: 7, borderWidth: 1 },
   simpleTitle:    { fontSize: 13, fontWeight: '600' },
   simpleSub:      { fontSize: 11, marginTop: 1 },

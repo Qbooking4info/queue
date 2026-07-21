@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView,
+  StyleSheet, SafeAreaView, Linking, Alert,
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -26,8 +26,16 @@ export function SupportScreen({ navigation }: Props) {
 
   function handleSend() {
     if (!query.trim()) return
+    Alert.alert('Message received', "Your message has been received. We'll get back to you within 24 hours.")
     setSent(true)
     setQuery('')
+  }
+
+  function handleContact(label: string) {
+    if (label === 'Call us')   { Linking.openURL('tel:+2347007838383'); return }
+    if (label === 'Email us')  { Linking.openURL('mailto:support@queueapp.ng'); return }
+    if (label === 'WhatsApp')  { Linking.openURL('https://wa.me/2347007838383'); return }
+    if (label === 'Live chat') { Alert.alert('Coming soon', 'Live chat is not yet available. Use WhatsApp or email for faster support.'); return }
   }
 
   const CONTACT_OPTIONS = [
@@ -60,7 +68,7 @@ export function SupportScreen({ navigation }: Props) {
         <Text style={[s.sectionTitle, { color: t.textMuted }]}>Contact us</Text>
         <View style={s.contactGrid}>
           {CONTACT_OPTIONS.map(opt => (
-            <TouchableOpacity key={opt.label} style={[s.contactCard, { backgroundColor: opt.bg, borderColor: opt.border }]}>
+            <TouchableOpacity key={opt.label} onPress={() => handleContact(opt.label)} style={[s.contactCard, { backgroundColor: opt.bg, borderColor: opt.border }]}>
               <Text style={{ fontSize: 24, marginBottom: 6 }}>{opt.icon}</Text>
               <Text style={[s.contactLabel, { color: opt.color }]}>{opt.label}</Text>
               <Text style={[s.contactSub, { color: t.textMuted }]} numberOfLines={1}>{opt.sub}</Text>

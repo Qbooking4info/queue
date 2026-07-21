@@ -62,11 +62,12 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [refreshing,  setRefreshing]  = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const today = new Date().toISOString().split('T')[0]
-
   async function load(silent = false) {
     if (!doctorProfile) return
     if (!silent) setLoading(true)
+
+    // ML7: compute today inside load() so it never goes stale across midnight
+    const today = new Date().toISOString().split('T')[0]
 
     let query = (supabase as any)
       .from('appointments')
@@ -83,7 +84,8 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     const { data } = await query
     setAppts((data as ApptRow[]) ?? [])
-    if (!silent) setLoading(false)
+    // MM11: always clear loading, not only when !silent
+    setLoading(false)
   }
 
   useFocusEffect(useCallback(() => { load() }, [tab, doctorProfile]))

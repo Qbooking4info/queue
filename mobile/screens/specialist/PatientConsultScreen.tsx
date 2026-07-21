@@ -158,7 +158,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const patient    = appt.patient
   const isVirtual  = appt.type === 'virtual'
   const canStart   = ['pending','confirmed','checked_in'].includes(appt.status) && !isVirtual
-  const canComplete = ['in_progress','checked_in','confirmed','pending'].includes(appt.status)
+  const canComplete = appt.status === 'in_progress'
   const isDone      = appt.status === 'completed'
   const bmi = calcBMI(weight, height)
 

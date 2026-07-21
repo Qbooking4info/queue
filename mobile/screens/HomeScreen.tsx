@@ -6,9 +6,11 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { useLocation, distanceKm } from '../contexts/LocationContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
 import { specialties } from '../data'
 import { getHospitals, getNextAppointment } from '../lib/api'
+import { supabase } from '../lib/supabase'
 import { toDisplayHospital } from '../lib/adapters'
 import type { AppointmentWithRelations } from '../lib/api'
 import type { Theme } from '../contexts/ThemeContext'
@@ -52,9 +54,9 @@ function getDayMessage(): string {
   return messages[day] ?? WELLNESS_TIPS[Math.floor(Math.random() * WELLNESS_TIPS.length)]
 }
 
-// Sort hospitals by proximity (rating as proxy — higher rating = more established/closer equivalent)
+// MM7: Sort hospitals by real distance ascending (distanceKm field, set during load)
 function sortByProximity(list: DisplayHospital[]): DisplayHospital[] {
-  return [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+  return [...list].sort((a, b) => ((a as any).distanceKm ?? Infinity) - ((b as any).distanceKm ?? Infinity))
 }
 
 // Filter hospitals that offer a given specialty
@@ -114,11 +116,14 @@ interface Props { navigation: any }
 export function HomeScreen({ navigation }: Props) {
   const { theme: t }              = useTheme()
   const { user }                  = useAuth()
+  const { coords }                = useLocation()
   const [showAll, setShowAll]     = useState(false)
   const [hospitals, setHospitals] = useState<DisplayHospital[]>([])
   const [nextAppt, setNextAppt]   = useState<AppointmentWithRelations | null>(null)
   const [loading, setLoading]     = useState(true)
   const [activeSpecialty, setActiveSpecialty] = useState<string | null>(null)
+  // MM3: track unread notifications count
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const { salutation, emoji } = getGreeting()
   const dayMessage            = getDayMessage()
@@ -133,10 +138,29 @@ export function HomeScreen({ navigation }: Props) {
       getHospitals(),
       user ? getNextAppointment(user.id) : Promise.resolve(null),
     ])
-    setHospitals(raw.map(toDisplayHospital))
+    // MM7: attach real distanceKm to each hospital display object
+    const mapped = raw.map(h => {
+      const dh = toDisplayHospital(h) as any
+      if (coords && h.latitude != null && h.longitude != null) {
+        dh.distanceKm = distanceKm(coords, { latitude: h.latitude, longitude: h.longitude })
+      }
+      return dh as DisplayHospital
+    })
+    setHospitals(mapped)
     setNextAppt(appt)
+
+    // MM3: fetch unread notifications count
+    if (user) {
+      const { count } = await (supabase as any)
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+      setUnreadCount(count ?? 0)
+    }
+
     setLoading(false)
-  }, [user])
+  }, [user, coords])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
@@ -207,7 +231,7 @@ export function HomeScreen({ navigation }: Props) {
           <TouchableOpacity onPress={() => navigation.navigate('Notifications')}
             style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
             <Text style={{ fontSize: 18 }}>🔔</Text>
-            <View style={[s.notifDot, { backgroundColor: t.accent }]} />
+            {unreadCount > 0 && <View style={[s.notifDot, { backgroundColor: t.accent }]} />}
           </TouchableOpacity>
         </View>
 

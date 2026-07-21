@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { User } from '../types/database'
@@ -29,13 +29,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
   const [loading,       setLoading]       = useState(true)
 
+  // MM5: Prevent double-fetch when both getSession and INITIAL_SESSION fire at startup
+  const initialLoadDone = useRef(false)
+
+  // MH1: Try user_id first (reliable under RLS), fall back to auth_user_id
   async function fetchDoctorProfile(authUid: string, userId: string) {
+    const { data: byUserId } = await (supabase as any)
+      .from('doctors')
+      .select('id, hospital_id, full_name, specialty_id')
+      .eq('is_active', true)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (byUserId) {
+      setDoctorProfile({
+        doctorId:    byUserId.id,
+        hospitalId:  byUserId.hospital_id,
+        fullName:    byUserId.full_name,
+        specialtyId: byUserId.specialty_id ?? null,
+      })
+      return
+    }
+
+    // Fallback: try auth_user_id
     const { data } = await (supabase as any)
       .from('doctors')
       .select('id, hospital_id, full_name, specialty_id')
       .eq('is_active', true)
-      .or(`auth_user_id.eq.${authUid},user_id.eq.${userId}`)
+      .eq('auth_user_id', authUid)
       .maybeSingle()
+
     setDoctorProfile(data
       ? { doctorId: data.id, hospitalId: data.hospital_id, fullName: data.full_name, specialtyId: data.specialty_id ?? null }
       : null
@@ -57,13 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // MM5: getSession is the authoritative startup load; mark done so INITIAL_SESSION is skipped
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) fetchProfile(session.user.id).finally(() => setLoading(false))
-      else setLoading(false)
+      if (session) {
+        fetchProfile(session.user.id).finally(() => {
+          setLoading(false)
+          initialLoadDone.current = true
+        })
+      } else {
+        setLoading(false)
+        initialLoadDone.current = true
+      }
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // MM5: Skip INITIAL_SESSION if getSession already handled startup
+      if (event === 'INITIAL_SESSION' && initialLoadDone.current) return
+
       setSession(session)
       if (session) fetchProfile(session.user.id)
       else { setUser(null); setDoctorProfile(null) }
@@ -95,9 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // ML1: Clear doctorProfile first to prevent brief inconsistency (session null but doctorProfile set)
+    setDoctorProfile(null)
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
+    // MH8: Do NOT call navigation.goBack() — navigator reacts to session becoming null automatically
   }
 
   return (

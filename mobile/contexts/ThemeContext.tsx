@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const forest = {
   id: 'forest',
@@ -53,14 +54,35 @@ const clinical = {
 export type Theme = typeof forest
 export const themes = { forest, clinical } as const
 
+const THEME_STORAGE_KEY = 'queue:theme'
+
 interface ThemeCtx { theme: Theme; themeId: string; toggleTheme: () => void }
 
 const Ctx = createContext<ThemeCtx>({ theme: forest, themeId: 'forest', toggleTheme: () => {} })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeId, setThemeId] = useState<'forest' | 'clinical'>('forest')
+
+  // MM6: Load persisted theme preference on startup
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_STORAGE_KEY).then(saved => {
+      if (saved === 'forest' || saved === 'clinical') {
+        setThemeId(saved)
+      }
+    }).catch(() => {/* ignore storage errors */})
+  }, [])
+
+  function toggleTheme() {
+    setThemeId(prev => {
+      const next: 'forest' | 'clinical' = prev === 'forest' ? 'clinical' : 'forest'
+      // MM6: Persist new theme preference
+      AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(() => {/* ignore storage errors */})
+      return next
+    })
+  }
+
   return (
-    <Ctx.Provider value={{ theme: themes[themeId], themeId, toggleTheme: () => setThemeId(id => id === 'forest' ? 'clinical' : 'forest') }}>
+    <Ctx.Provider value={{ theme: themes[themeId], themeId, toggleTheme }}>
       {children}
     </Ctx.Provider>
   )
