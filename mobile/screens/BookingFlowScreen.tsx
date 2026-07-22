@@ -349,7 +349,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
     setSubmitting(false)
 
-    if (result) {
+    const bookingError = (result as any)?.error
+    if (result?.id && !bookingError) {
       const isPending = result.approvalStatus === 'pending_approval'
       const isReschedule = !!rescheduleCtx
       await addNotification({
@@ -369,8 +370,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         bookingRef: result.bookingRef, approvalStatus: result.approvalStatus,
       })
     } else {
-      const errMsg = (result as any)?.error
-      setSubmitError(errMsg ? `Booking failed: ${errMsg}` : 'Booking failed. Please try again.')
+      setSubmitError(bookingError ? `Booking failed: ${bookingError}` : 'Booking failed. Please try again.')
     }
   }
 
