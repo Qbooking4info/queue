@@ -5,12 +5,29 @@
   },
   "build": {
     "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig",
+        "EXPO_PUBLIC_AGORA_APP_ID": "10f16da9fd644cb0a9c4450a7205f868",
+        "EXPO_PUBLIC_API_URL": "https://queue-web-omega.vercel.app"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "simulator": false,
+        "distribution": "internal"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig",
+        "EXPO_PUBLIC_AGORA_APP_ID": "10f16da9fd644cb0a9c4450a7205f868",
+        "EXPO_PUBLIC_API_URL": "https://queue-web-omega.vercel.app"
+      },
       "android": {
         "buildType": "app-bundle"
       }
