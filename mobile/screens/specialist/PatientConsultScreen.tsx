@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
+import { haptics }  from '../../lib/haptics'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -23,7 +24,6 @@ interface ApptFull {
   queue_position:   number | null
   patient_id:       string
   patient:          PatientRow | null
-  // vitals (added via migration — cast via any)
   vitals_weight_kg?:    number | null
   vitals_height_cm?:    number | null
   vitals_bp_systolic?:  number | null
@@ -31,6 +31,9 @@ interface ApptFull {
   vitals_blood_sugar?:  number | null
   vitals_bmi?:          number | null
 }
+
+const NOTES_MAX = 1000
+const DIAG_MAX  = 500
 
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
@@ -52,6 +55,25 @@ function fmt12(time: string): string {
   return `${h % 12 || 12}:${mStr} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
+function InProgressPulse() {
+  const pulse = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,    duration: 700, useNativeDriver: true }),
+      ])
+    )
+    anim.start()
+    return () => anim.stop()
+  }, [])
+
+  return (
+    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF8C42' }} />
+  )
+}
+
 export function PatientConsultScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const { appointmentId } = route.params
@@ -60,13 +82,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [saving,  setSaving]  = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
 
-  // Vitals state
   const [weight, setWeight]   = useState('')
   const [height, setHeight]   = useState('')
   const [bpSys,  setBpSys]    = useState('')
   const [bpDia,  setBpDia]    = useState('')
   const [bSugar, setBSugar]   = useState('')
-  // Notes
   const [notes,  setNotes]    = useState('')
   const [diag,   setDiag]     = useState('')
 
@@ -114,10 +134,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
     setSaving(false)
     if (!error) {
+      haptics.success()
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       fetchAppt()
     } else {
+      haptics.error()
       Alert.alert('Save failed', error.message)
     }
   }
@@ -131,8 +153,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
     setStatusUpdating(false)
     if (!error) {
+      if (newStatus === 'completed') haptics.success()
       setAppt(prev => prev ? { ...prev, status: newStatus } : prev)
     } else {
+      haptics.error()
       Alert.alert('Update failed', error.message)
     }
   }
@@ -160,6 +184,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const canStart   = ['pending','confirmed','checked_in'].includes(appt.status) && !isVirtual
   const canComplete = appt.status === 'in_progress'
   const isDone      = appt.status === 'completed'
+  const isInProgress = appt.status === 'in_progress'
   const bmi = calcBMI(weight, height)
 
   const urgencyBg  = appt.urgency === 'emergency' ? 'rgba(255,92,92,0.12)'
@@ -178,11 +203,18 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>
             {patient?.full_name ?? 'Patient'}
           </Text>
-          <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
-            <Text style={[st.statusText, { color: urgencyCol }]}>
-              {appt.urgency ?? 'routine'}
-            </Text>
-          </View>
+          {isInProgress ? (
+            <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+              <InProgressPulse />
+              <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
+            </View>
+          ) : (
+            <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
+              <Text style={[st.statusText, { color: urgencyCol }]}>
+                {appt.urgency ?? 'routine'}
+              </Text>
+            </View>
+          )}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -238,17 +270,20 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 {isVirtual ? (
                   <TouchableOpacity
                     style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)' }]}
-                    onPress={() => navigation.navigate('DoctorVideoCall', {
-                      appointmentId: appt.id,
-                      patientName: patient?.full_name ?? 'Patient',
-                    })}
+                    onPress={() => {
+                      haptics.heavy()
+                      navigation.navigate('DoctorVideoCall', {
+                        appointmentId: appt.id,
+                        patientName: patient?.full_name ?? 'Patient',
+                      })
+                    }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '700', color: '#85B7EB' }}>📹  Start Video Call</Text>
                   </TouchableOpacity>
                 ) : canStart ? (
                   <TouchableOpacity
                     style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder }]}
-                    onPress={() => updateStatus('in_progress')}
+                    onPress={() => { haptics.heavy(); updateStatus('in_progress') }}
                     disabled={statusUpdating}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>
@@ -308,35 +343,47 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
             {/* Clinical Notes */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>
-                CLINICAL NOTES
-              </Text>
+              <View style={st.sectionHeader}>
+                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
+                  CLINICAL NOTES
+                </Text>
+                <Text style={{ fontSize: 10, color: t.textMuted }}>
+                  {notes.length}/{NOTES_MAX}
+                </Text>
+              </View>
               <TextInput
                 value={notes}
-                onChangeText={setNotes}
+                onChangeText={v => setNotes(v.slice(0, NOTES_MAX))}
                 placeholder="Enter clinical observations, findings, treatment plan…"
                 placeholderTextColor={t.textMuted}
                 multiline
                 numberOfLines={5}
                 style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
                 textAlignVertical="top"
+                maxLength={NOTES_MAX}
               />
             </View>
 
             {/* Diagnosis */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>
-                DIAGNOSIS
-              </Text>
+              <View style={st.sectionHeader}>
+                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
+                  DIAGNOSIS
+                </Text>
+                <Text style={{ fontSize: 10, color: t.textMuted }}>
+                  {diag.length}/{DIAG_MAX}
+                </Text>
+              </View>
               <TextInput
                 value={diag}
-                onChangeText={setDiag}
+                onChangeText={v => setDiag(v.slice(0, DIAG_MAX))}
                 placeholder="ICD-10 code or diagnosis description…"
                 placeholderTextColor={t.textMuted}
                 multiline
                 numberOfLines={3}
                 style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
                 textAlignVertical="top"
+                maxLength={DIAG_MAX}
               />
             </View>
 
@@ -379,36 +426,37 @@ function VitalInput({
 }
 
 const st = StyleSheet.create({
-  safe:         { flex: 1 },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  backBtn:      { padding: 4 },
-  backArrow:    { fontSize: 22 },
-  headerTitle:  { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  statusBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
-  statusText:   { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
-  heroCard:     { marginHorizontal: 16, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
-  patientRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatarLg:     { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:   { fontSize: 18, fontWeight: '800' },
-  heroName:     { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  heroSub:      { fontSize: 12, marginTop: 2, lineHeight: 17 },
-  typeChip:     { fontSize: 11, fontWeight: '700' },
-  reasonBox:    { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  reasonLabel:  { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
-  reasonText:   { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
-  pad:          { paddingHorizontal: 16, marginBottom: 0 },
-  actionBtn:    { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
-  doneBanner:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
-  doneTxt:      { fontSize: 14, fontWeight: '700' },
-  section:      { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionTitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  vitalsGrid:   { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
-  vitalBox:     { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },
-  vitalLabel:   { fontSize: 10, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
-  vitalValue:   { fontSize: 18, fontWeight: '800' },
-  vitalInput:   { fontSize: 18, fontWeight: '700', padding: 0 },
-  notesInput:   { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
-  saveBtn:      { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
-  saveTxt:      { fontSize: 15, fontWeight: '800', color: '#fff' },
+  safe:          { flex: 1 },
+  center:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  backBtn:       { padding: 4 },
+  backArrow:     { fontSize: 22 },
+  headerTitle:   { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  statusBadge:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
+  statusText:    { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
+  heroCard:      { marginHorizontal: 16, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
+  patientRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  avatarLg:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  avatarText:    { fontSize: 18, fontWeight: '800' },
+  heroName:      { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroSub:       { fontSize: 12, marginTop: 2, lineHeight: 17 },
+  typeChip:      { fontSize: 11, fontWeight: '700' },
+  reasonBox:     { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
+  reasonLabel:   { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
+  reasonText:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
+  pad:           { paddingHorizontal: 16, marginBottom: 0 },
+  actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
+  doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
+  doneTxt:       { fontSize: 14, fontWeight: '700' },
+  section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  vitalsGrid:    { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
+  vitalBox:      { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },
+  vitalLabel:    { fontSize: 10, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
+  vitalValue:    { fontSize: 18, fontWeight: '800' },
+  vitalInput:    { fontSize: 18, fontWeight: '700', padding: 0 },
+  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
+  saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
+  saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
 })

@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { haptics }  from '../../lib/haptics'
 
 interface Props { navigation?: any }
 
@@ -107,7 +108,6 @@ export function SpecialistProfileScreen({ navigation }: Props) {
             <Text style={[st.email, { color: t.textMuted }]}>{user.email}</Text>
           )}
 
-          {/* Rating row */}
           {(doctor?.avg_rating ?? 0) > 0 && (
             <View style={st.ratingRow}>
               {'★★★★★'.split('').map((s, i) => (
@@ -133,6 +133,19 @@ export function SpecialistProfileScreen({ navigation }: Props) {
             </View>
           ))}
         </View>
+
+        {/* Today's schedule quick link */}
+        {navigation && (
+          <TouchableOpacity
+            style={[st.scheduleBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}
+            onPress={() => {
+              haptics.tap()
+              navigation.navigate('Queue')
+            }}
+          >
+            <Text style={[st.scheduleBtnText, { color: t.accent }]}>📅  View Today's Schedule</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Practice info */}
         <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
@@ -177,7 +190,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.actionBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }]}
-                onPress={handleSignOut}
+                onPress={() => { haptics.tap(); handleSignOut() }}
                 disabled={signingOut}
               >
                 {signingOut
@@ -210,29 +223,31 @@ function Row({ label, value, theme: t, accent }: { label: string; value: string;
 }
 
 const st = StyleSheet.create({
-  safe:         { flex: 1 },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title:        { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:  { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:       { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:   { fontSize: 26, fontWeight: '800' },
-  docName:      { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  specialty:    { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:         { fontSize: 12, marginTop: 3, textAlign: 'center' },
-  email:        { fontSize: 11, marginTop: 6 },
-  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingNum:    { fontSize: 12, marginLeft: 4 },
-  statsRow:     { flexDirection: 'row', gap: 8 },
-  statBox:      { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  statNum:      { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  statLabel:    { fontSize: 10, fontWeight: '600', marginTop: 3 },
-  section:      { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  rowLabel:     { fontSize: 13 },
-  rowValue:     { fontSize: 13, fontWeight: '600' },
-  bio:          { padding: 14, fontSize: 13, lineHeight: 20 },
-  actionBtn:    { padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
-  signOutBtn:   { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.06)' },
-  signOutTxt:   { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
+  safe:            { flex: 1 },
+  center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  title:           { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
+  profileCard:     { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
+  avatar:          { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
+  avatarText:      { fontSize: 26, fontWeight: '800' },
+  docName:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  specialty:       { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  qual:            { fontSize: 12, marginTop: 3, textAlign: 'center' },
+  email:           { fontSize: 11, marginTop: 6 },
+  ratingRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
+  ratingNum:       { fontSize: 12, marginLeft: 4 },
+  statsRow:        { flexDirection: 'row', gap: 8 },
+  statBox:         { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
+  statNum:         { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  statLabel:       { fontSize: 10, fontWeight: '600', marginTop: 3 },
+  scheduleBtn:     { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
+  scheduleBtnText: { fontSize: 14, fontWeight: '700' },
+  section:         { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  sectionTitle:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  row:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
+  rowLabel:        { fontSize: 13 },
+  rowValue:        { fontSize: 13, fontWeight: '600' },
+  bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
+  actionBtn:       { padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
+  signOutBtn:      { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.06)' },
+  signOutTxt:      { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
 })
