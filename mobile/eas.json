@@ -13,8 +13,7 @@
         "EXPO_PUBLIC_API_URL": "https://queue-web-omega.vercel.app"
       },
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleArm64Release"
+        "buildType": "apk"
       },
       "ios": {
         "simulator": false,
