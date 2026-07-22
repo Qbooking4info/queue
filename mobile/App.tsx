@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text, View, ActivityIndicator } from 'react-native'
 
 import { ThemeProvider, useTheme }     from './contexts/ThemeContext'
@@ -53,11 +53,13 @@ function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; col
 
 function MainTabs() {
   const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  const tabBarHeight = 52 + insets.bottom
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
         tabBarActiveTintColor: t.accent,
         tabBarInactiveTintColor: t.textMuted,
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
@@ -76,11 +78,13 @@ function MainTabs() {
 
 function SpecialistTabs() {
   const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  const tabBarHeight = 52 + insets.bottom
   return (
     <DocTab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
         tabBarActiveTintColor:   t.accent,
         tabBarInactiveTintColor: t.textMuted,
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
@@ -95,11 +99,13 @@ function SpecialistTabs() {
 
 function FrontDeskTabs() {
   const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  const tabBarHeight = 52 + insets.bottom
   return (
     <FDTab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
         tabBarActiveTintColor:   t.accent,
         tabBarInactiveTintColor: t.textMuted,
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },

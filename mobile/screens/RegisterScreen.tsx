@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
-} from 'react-native'
+  StyleSheet, KeyboardAvoidingView,
+  Platform, ScrollView, ActivityIndicator } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 

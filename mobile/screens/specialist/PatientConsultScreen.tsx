@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated,
-} from 'react-native'
+  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'

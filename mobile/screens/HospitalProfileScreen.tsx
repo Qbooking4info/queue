@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Alert } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'

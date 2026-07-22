@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { dark as t, spacing, font, radius } from '../lib/theme'
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLocation, distanceKm, formatDistance } from '../contexts/LocationContext'

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Alert, Clipboard, ActivityIndicator,
-} from 'react-native'
+  StyleSheet, Alert, Clipboard, ActivityIndicator } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'

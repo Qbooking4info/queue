@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Animated, Linking, Alert,
-} from 'react-native'
+  StyleSheet, Animated, Linking, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../contexts/ThemeContext'
 
 interface Props { navigation: any; route: any }
