@@ -4,6 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
+import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
@@ -97,7 +98,7 @@ export default function QueuePage() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
+        <div style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -0.5 }}>
           Live Queue
         </div>
         <div style={{ fontSize: 13, color: C.textMuted, marginTop: 4 }}>
@@ -157,10 +158,24 @@ export default function QueuePage() {
 
       {/* Queue list */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: C.textMuted }}>Loading queue…</div>
+        <div>
+          {[64, 56, 64, 56, 64].map((h, i) => (
+            <SkeletonRow key={i} height={h} mb={10} />
+          ))}
+        </div>
       ) : shown.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: C.textMuted }}>
-          {filter === 'active' ? 'No active patients in queue' : 'No appointments'}
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>
+            {filter === 'active' ? '🟢' : '📋'}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+            {filter === 'active' ? 'Queue is clear' : 'No appointments'}
+          </div>
+          <div style={{ fontSize: 13 }}>
+            {filter === 'active'
+              ? 'No active patients in queue right now.'
+              : 'No appointments for today in this view.'}
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

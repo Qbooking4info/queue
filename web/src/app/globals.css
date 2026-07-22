@@ -12,6 +12,27 @@
   --border-med: rgba(255,255,255,0.12);
   --text-sub: #7A9089;
   --text-muted: #4A6058;
+  /* Skeleton shimmer — dark (default) */
+  --skeleton-a: rgba(255,255,255,0.05);
+  --skeleton-b: rgba(255,255,255,0.10);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Skeleton shimmer — light */
+    --skeleton-a: rgba(0,0,0,0.06);
+    --skeleton-b: rgba(0,0,0,0.12);
+  }
+}
+
+:root[data-theme="light"] {
+  --skeleton-a: rgba(0,0,0,0.06);
+  --skeleton-b: rgba(0,0,0,0.12);
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @theme inline {

@@ -5,9 +5,11 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
 import { VitalsModal } from '@/components/dashboard/VitalsModal'
+import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
+import { T, SPACE } from '@/lib/typography'
 import {
   getAppointments, getClinicAppointments, getDoctorAppointments,
   assignDoctorToAppointment, markNoShow,
@@ -674,32 +676,38 @@ export default function AppointmentsPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACE.lg }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Appointments</div>
-          <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
+          <div style={{ ...T.display, color: C.text }}>Appointments</div>
+          <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }}>
             {appts.length} record{appts.length !== 1 ? 's' : ''}
             {!isDoctor && ' · all clinics'}
             {!isDoctor && pendingApproval > 0 && (
               <span style={{ marginLeft: 10, background: 'rgba(239,159,39,0.15)',
                 border: '1px solid rgba(239,159,39,0.3)', color: '#EF9F27',
-                fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
+                ...T.caption, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
                 {pendingApproval} pending approval
               </span>
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: SPACE.sm }}>
           {!isDoctor && (
             <button onClick={() => setShowWalkIn(true)}
               style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
-                borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
+                transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
               + Walk-in Booking
             </button>
           )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-              border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
+              transition: 'opacity 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
             ↻ Refresh
           </button>
         </div>
@@ -755,20 +763,28 @@ export default function AppointmentsPage() {
           <thead>
             <tr style={{ background: C.bgAlt }}>
               {['Date','Time','ID','Patient','Clinic','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
-                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700,
-                  color: C.textMuted, letterSpacing: '.06em', textTransform: 'uppercase',
+                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', ...T.label,
+                  color: C.textMuted,
                   borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
-                Loading appointments…
+              <tr><td colSpan={10} style={{ padding: 0 }}>
+                <div style={{ padding: '24px 20px' }}>
+                  {[56, 48, 56, 48, 56, 48].map((h, i) => (
+                    <SkeletonRow key={i} height={h} mb={8} />
+                  ))}
+                </div>
               </td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: C.textMuted, fontSize: 13 }}>
-                No appointments match your filters.
+              <tr><td colSpan={10}>
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
+                  <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                  <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments found</div>
+                  <div style={{ ...T.body, color: C.textMuted }}>Try adjusting your filters or date range.</div>
+                </div>
               </td></tr>
             ) : filtered.map((a, i) => {
               const urg = urgencyColor(a.urgency, C)
@@ -866,7 +882,7 @@ export default function AppointmentsPage() {
                   <td style={{ padding: '11px 14px' }}>
                     {(() => {
                       const isPending = pendingActionId === a.id
-                      const btnBase: React.CSSProperties = { fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1 }
+                      const btnBase: React.CSSProperties = { fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1, transition: 'opacity 0.15s' }
                       return (
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                         {/* Detail */}

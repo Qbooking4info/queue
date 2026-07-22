@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
+import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
 import { Badge } from '@/components/dashboard/Badge'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
@@ -168,7 +169,7 @@ export default function SchedulePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Schedule</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -0.5 }}>Schedule</div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
             Week of {monday.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
@@ -191,7 +192,11 @@ export default function SchedulePage() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: C.textMuted, fontSize: 13 }}>Loading schedule…</div>
+        <div style={{ padding: '8px 0' }}>
+          {[56, 48, 56, 48, 56, 48, 56].map((h, i) => (
+            <SkeletonRow key={i} height={h} mb={8} />
+          ))}
+        </div>
       ) : !hasOpenDays ? (
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.borderMed}`, borderRadius: 20, color: C.textMuted }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚪</div>
@@ -292,8 +297,10 @@ export default function SchedulePage() {
       )}
 
       {!loading && hasOpenDays && Object.values(schedule).every(d => d.length === 0) && (
-        <div style={{ textAlign: 'center', padding: '60px', color: C.textMuted, fontSize: 13 }}>
-          No appointments scheduled this week.
+        <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted, marginTop: 16 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>No appointments this week</div>
+          <div style={{ fontSize: 13 }}>The schedule is clear. Appointments booked will appear here.</div>
         </div>
       )}
 

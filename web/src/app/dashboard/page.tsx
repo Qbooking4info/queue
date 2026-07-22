@@ -7,11 +7,13 @@ import { Badge } from '@/components/dashboard/Badge'
 import { ViewPatientModal } from '@/components/dashboard/ViewPatientModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
+import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import {
   getAppointments, getClinicAppointments, getRangeStats, getClinicRangeStats,
   setDoctorAvailability, getDoctorAvgConsultDuration,
 } from '@/lib/admin-api'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
+import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -29,11 +31,20 @@ const AVAIL_CONFIG: Record<DoctorAvailabilityStatus, { label: string; color: str
 }
 
 function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C: any }) {
+  const [hovered, setHovered] = useState(false)
   return (
-    <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`,
-      display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: `${SPACE.md}px 20px`,
+        borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: SPACE.md,
+        background: hovered ? (C.rowAlt ?? 'rgba(255,255,255,0.03)') : 'transparent',
+        transition: 'background 0.15s',
+      }}>
       <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 52 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted }}>{a.start_time}</div>
+        <div style={{ ...T.caption, fontWeight: 700, color: C.textMuted }}>{a.start_time}</div>
         {range !== 'today' && (
           <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>
             {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -46,9 +57,9 @@ function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C:
         {a.doctor_name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: C.text,
+        <div style={{ ...T.body, fontWeight: 600, color: C.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.patient_name}</div>
-        <div style={{ fontSize: 11, color: C.textSub }}>
+        <div style={{ ...T.caption, color: C.textSub }}>
           {a.doctor_name} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
         </div>
       </div>
@@ -149,34 +160,42 @@ export default function OverviewPage() {
   }
 
   const Header = () => (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
+    <div style={{ marginBottom: SPACE.xl }}>
+      <div style={{ ...T.display, color: C.text }}>
         Good {greeting}, {greetingName()} 👋
       </div>
-      <div style={{ fontSize: 14, color: C.textSub, marginTop: 4 }} suppressHydrationWarning>
+      <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }} suppressHydrationWarning>
         {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {timeStr}
       </div>
     </div>
   )
 
+  // ── Loading skeleton for list panels ─────────────────────────────────────────
+  const ListSkeleton = () => (
+    <div style={{ padding: '16px 20px' }}>
+      {[56, 48, 56, 48, 56].map((h, i) => (
+        <SkeletonRow key={i} height={h} mb={8} />
+      ))}
+    </div>
+  )
+
   // ── Doctor dashboard ──────────────────────────────────────────────────────────
   if (role === 'doctor') {
-    const cfg = AVAIL_CONFIG[avail]
     return (
       <div>
         <Header />
 
         {/* Availability toggle */}
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.textSub, marginBottom: 12 }}>My Availability Status</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: SPACE.xl, marginBottom: SPACE.xl }}>
+          <div style={{ ...T.label, color: C.textSub, marginBottom: SPACE.md }}>My Availability Status</div>
+          <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
             {(Object.keys(AVAIL_CONFIG) as DoctorAvailabilityStatus[]).map(s => {
               const c = AVAIL_CONFIG[s]
               const active = avail === s
               return (
                 <button key={s} onClick={() => handleAvailabilityChange(s)} disabled={savingAvail}
                   style={{ padding: '9px 20px', borderRadius: 10, cursor: savingAvail ? 'not-allowed' : 'pointer',
-                    fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'inherit', ...T.body, fontWeight: 700,
                     background: active ? c.bg : C.bgAlt,
                     color: active ? c.color : C.textMuted,
                     border: `1px solid ${active ? c.border : C.border}`,
@@ -186,12 +205,12 @@ export default function OverviewPage() {
               )
             })}
           </div>
-          {savingAvail && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 8 }}>Saving…</div>}
-          {availError && <div style={{ fontSize: 11, color: '#f07070', marginTop: 8 }}>⚠️ {availError}</div>}
+          {savingAvail && <div style={{ ...T.caption, color: C.textMuted, marginTop: SPACE.sm }}>Saving…</div>}
+          {availError && <div style={{ ...T.caption, color: '#f07070', marginTop: SPACE.sm }}>⚠️ {availError}</div>}
         </div>
 
         {/* Doctor stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: SPACE.xl }}>
           <StatCard icon="📅" label="Today's Appointments"
             value={ctxLoading ? '…' : stats.todayTotal}
             sub={`${stats.todayCompleted} completed`} colorKey="accent" />
@@ -214,43 +233,52 @@ export default function OverviewPage() {
 
         {/* Today's queue */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`,
+          <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Today's Appointments</div>
-            <Link href="/dashboard/appointments" style={{ fontSize: 12, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
+            <div style={{ ...T.subheading, color: C.text }}>Today's Appointments</div>
+            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
               View all →
             </Link>
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {ctxLoading ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+              <ListSkeleton />
             ) : todayAppointments.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>No appointments today</div>
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
+                <div style={{ fontSize: 40, marginBottom: SPACE.md }}>🗓️</div>
+                <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments today</div>
+                <div style={{ ...T.body, color: C.textMuted }}>Your schedule is clear for today.</div>
+              </div>
             ) : todayAppointments.map((a, i) => (
-              <div key={a.id} style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`,
-                display: 'flex', alignItems: 'center', gap: 12,
+              <div key={a.id} style={{ padding: `${SPACE.md}px 20px`, borderBottom: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', gap: SPACE.md,
                 background: a.urgency === 'emergency' ? C.redLight : i % 2 === 1 ? C.rowAlt : C.card,
-                borderLeft: a.urgency === 'emergency' ? `3px solid ${C.red}` : 'none' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, minWidth: 42 }}>{a.start_time}</div>
+                borderLeft: a.urgency === 'emergency' ? `3px solid ${C.red}` : 'none',
+                transition: 'background 0.15s',
+              }}>
+                <div style={{ ...T.caption, fontWeight: 700, color: C.textMuted, minWidth: 42 }}>{a.start_time}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.xs }}>
+                    <div style={{ ...T.body, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
                     {a.urgency === 'emergency' && (
-                      <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 7px', borderRadius: 99,
+                      <span style={{ ...T.label, padding: '1px 7px', borderRadius: 99,
                         background: C.red, color: '#fff', whiteSpace: 'nowrap' }}>
                         🚨 EMERGENCY
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: C.textSub }}>
+                  <div style={{ ...T.caption, color: C.textSub }}>
                     {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}{a.reason ? ` · ${a.reason}` : ''}
                   </div>
                 </div>
                 {a.patient_id && (
                   <button onClick={() => setViewingPatient({ id: a.patient_id!, name: a.patient_name })}
-                    style={{ fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 8,
+                    style={{ ...T.caption, fontWeight: 700, padding: '5px 11px', borderRadius: 8,
                       background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`,
-                      cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                      cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                      transition: 'opacity 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                     View Patient
                   </button>
                 )}
@@ -276,7 +304,7 @@ export default function OverviewPage() {
     return (
       <div>
         <Header />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: SPACE.xl }}>
           <StatCard icon="📅" label="Today's Appointments"
             value={loading ? '…' : rangeStats.total}
             sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
@@ -290,21 +318,25 @@ export default function OverviewPage() {
             sub="Currently on duty" colorKey="purple" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: SPACE.lg }}>
           {/* Appointments */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`,
+            <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Appointments</div>
-              <Link href="/dashboard/appointments" style={{ fontSize: 12, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
+              <div style={{ ...T.subheading, color: C.text }}>Appointments</div>
+              <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
                 View all →
               </Link>
             </div>
             <div style={{ maxHeight: 420, overflowY: 'auto' }}>
               {loading ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+                <ListSkeleton />
               ) : appts.length === 0 ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>No appointments</div>
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
+                  <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                  <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments yet</div>
+                  <div style={{ ...T.body, color: C.textMuted }}>Appointments booked via the mobile app will appear here in real time.</div>
+                </div>
               ) : appts.slice(0, 10).map((a, i) => (
                 <div key={a.id} style={{ background: i % 2 === 1 ? C.rowAlt : C.card }}>
                   <ApptRow a={a} range={range} C={C} />
@@ -315,29 +347,31 @@ export default function OverviewPage() {
 
           {/* Doctor availability — view only */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
-              fontSize: 14, fontWeight: 700, color: C.text }}>Doctor Availability</div>
+            <div style={{ padding: `14px 18px`, borderBottom: `1px solid ${C.border}`,
+              ...T.subheading, color: C.text }}>Doctor Availability</div>
             {ctxLoading ? (
-              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>Loading…</div>
+              <div style={{ padding: `${SPACE.lg}px 18px` }}>
+                {[36, 36, 36].map((h, i) => <SkeletonRow key={i} height={h} mb={8} />)}
+              </div>
             ) : doctors.length === 0 ? (
-              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>No doctors assigned</div>
+              <div style={{ padding: `${SPACE.lg}px 18px`, ...T.caption, color: C.textMuted }}>No doctors assigned</div>
             ) : doctors.map(d => {
               const status = ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus
               const cfg = AVAIL_CONFIG[status]
               return (
                 <div key={d.id} style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
-                  display: 'flex', alignItems: 'center', gap: 10 }}>
+                  display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: d.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 10, fontWeight: 700, color: '#a0e8c0', flexShrink: 0 }}>
                     {d.avatar}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
+                    <div style={{ ...T.caption, fontWeight: 600, color: C.text,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.full_name}</div>
                     <div style={{ fontSize: 10, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                  <span style={{ ...T.label, padding: '2px 8px', borderRadius: 99,
                     background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
                     {cfg.label}
                   </span>
@@ -356,11 +390,11 @@ export default function OverviewPage() {
       <Header />
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
-        padding: '12px 16px', marginBottom: 20 }}>
+        padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg }}>
         <DateFilter value={range} onChange={(k, b) => { setRange(k); setBounds(b) }} label="Showing" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: SPACE.xl }}>
         <StatCard icon="📅" label="Total Appointments"
           value={loading ? '…' : rangeStats.total}
           sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
@@ -377,32 +411,36 @@ export default function OverviewPage() {
           sub={stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'No reviews yet'} colorKey="amber" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: SPACE.lg }}>
         {/* Appointments */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`,
+          <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Appointments</div>
-              {!loading && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>{appts.length} records</div>}
+              <div style={{ ...T.subheading, color: C.text }}>Appointments</div>
+              {!loading && <div style={{ ...T.caption, color: C.textMuted, marginTop: 1 }}>{appts.length} records</div>}
             </div>
-            <Link href="/dashboard/appointments" style={{ fontSize: 12, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
+            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
               View all →
             </Link>
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+              <ListSkeleton />
             ) : appts.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>No appointments for this period</div>
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
+                <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments for this period</div>
+                <div style={{ ...T.body, color: C.textMuted }}>Appointments booked via the mobile app will appear here in real time.</div>
+              </div>
             ) : appts.slice(0, 10).map((a, i) => (
               <div key={a.id} style={{ background: i % 2 === 1 ? C.rowAlt : C.card }}>
                 <ApptRow a={a} range={range} C={C} />
               </div>
             ))}
             {appts.length > 10 && (
-              <div style={{ padding: '12px 20px', textAlign: 'center' }}>
-                <Link href="/dashboard/appointments" style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+              <div style={{ padding: `${SPACE.md}px 20px`, textAlign: 'center' }}>
+                <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
                   +{appts.length - 10} more — View all →
                 </Link>
               </div>
@@ -413,31 +451,33 @@ export default function OverviewPage() {
         {/* Right column: doctors + quick actions (admins only) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
-              fontSize: 14, fontWeight: 700, color: C.text }}>
+            <div style={{ padding: `14px 18px`, borderBottom: `1px solid ${C.border}`,
+              ...T.subheading, color: C.text }}>
               Doctors On Duty
             </div>
             {ctxLoading ? (
-              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>Loading…</div>
+              <div style={{ padding: `${SPACE.lg}px 18px` }}>
+                {[36, 36, 36].map((h, i) => <SkeletonRow key={i} height={h} mb={8} />)}
+              </div>
             ) : doctors.length === 0 ? (
-              <div style={{ padding: '16px 18px', fontSize: 12, color: C.textMuted }}>No doctors yet</div>
+              <div style={{ padding: `${SPACE.lg}px 18px`, ...T.caption, color: C.textMuted }}>No doctors yet</div>
             ) : doctors.slice(0, 5).map(d => {
               const status = ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus
               const cfg = AVAIL_CONFIG[status]
               return (
                 <div key={d.id} style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
-                  display: 'flex', alignItems: 'center', gap: 10 }}>
+                  display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: d.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 10, fontWeight: 700, color: '#a0e8c0', flexShrink: 0 }}>
                     {d.avatar}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text,
+                    <div style={{ ...T.caption, fontWeight: 600, color: C.text,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.full_name}</div>
                     <div style={{ fontSize: 10, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                  <span style={{ ...T.label, padding: '2px 8px', borderRadius: 99,
                     background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
                     {cfg.label}
                   </span>
@@ -448,21 +488,24 @@ export default function OverviewPage() {
 
           {/* Quick Actions — admins only, not front_desk or doctor */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
-              fontSize: 14, fontWeight: 700, color: C.text }}>
+            <div style={{ padding: `14px 18px`, borderBottom: `1px solid ${C.border}`,
+              ...T.subheading, color: C.text }}>
               Quick Actions
             </div>
             {[
-              { href: '/dashboard/doctors/add', icon: '👨‍⚕️', label: 'Register Doctor',   sub: 'Add a new practitioner' },
-              { href: '/dashboard/services',    icon: '🏥',   label: 'Manage Services',  sub: 'Enable specialties & pricing' },
+              { href: '/dashboard/doctors/add', icon: '👨‍⚕️', label: 'Register Doctor',    sub: 'Add a new practitioner' },
+              { href: '/dashboard/services',    icon: '🏥',   label: 'Manage Services',   sub: 'Enable specialties & pricing' },
               { href: '/dashboard/settings',    icon: '⚙️',   label: 'Hospital Settings', sub: 'Update profile and preferences' },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
-                  display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                  display: 'flex', alignItems: 'center', gap: SPACE.sm, textDecoration: 'none',
+                  transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = (C.rowAlt ?? 'rgba(255,255,255,0.03)'))}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <span style={{ fontSize: 18 }}>{item.icon}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{item.label}</div>
+                  <div style={{ ...T.caption, fontWeight: 600, color: C.text }}>{item.label}</div>
                   <div style={{ fontSize: 10, color: C.textMuted }}>{item.sub}</div>
                 </div>
                 <span style={{ color: C.textMuted, fontSize: 14 }}>›</span>
