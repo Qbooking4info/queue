@@ -37,11 +37,15 @@ import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScr
 import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
 import { DoctorVideoCallScreen }   from './screens/specialist/DoctorVideoCallScreen'
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+import { FrontDeskQueueScreen }   from './screens/frontdesk/FrontDeskQueueScreen'
+import { FrontDeskProfileScreen } from './screens/frontdesk/FrontDeskProfileScreen'
 
 const Tab        = createBottomTabNavigator()
 const Stack      = createNativeStackNavigator()
 const DocTab     = createBottomTabNavigator()
 const DocStack   = createNativeStackNavigator()
+const FDTab      = createBottomTabNavigator()
+const FDStack    = createNativeStackNavigator()
 
 function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; color: string }) {
   return <Text style={{ fontSize: 18, color }}>{icon}</Text>
@@ -86,6 +90,33 @@ function SpecialistTabs() {
       <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}
         options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
+  )
+}
+
+function FrontDeskTabs() {
+  const { theme: t } = useTheme()
+  return (
+    <FDTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: 20, height: 72 },
+        tabBarActiveTintColor:   t.accent,
+        tabBarInactiveTintColor: t.textMuted,
+        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      }}>
+      <FDTab.Screen name="FDQueue"   component={FrontDeskQueueScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="◉" {...p} />, tabBarLabel: 'Queue' }} />
+      <FDTab.Screen name="FDProfile" component={FrontDeskProfileScreen}
+        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
+    </FDTab.Navigator>
+  )
+}
+
+function FrontDeskStack() {
+  return (
+    <FDStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <FDStack.Screen name="FrontDeskTabs" component={FrontDeskTabs} />
+    </FDStack.Navigator>
   )
 }
 
@@ -134,7 +165,7 @@ function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
 function AppNavigator() {
   const [splashDone,    setSplashDone]    = useState(false)
   const [initialRoute,  setInitialRoute]  = useState<'Login' | 'Register'>('Login')
-  const { session, loading, user, doctorProfile } = useAuth()
+  const { session, loading, user, doctorProfile, staffProfile } = useAuth()
   const { theme: t }                              = useTheme()
   usePushNotifications(user?.id)
 
@@ -163,7 +194,9 @@ function AppNavigator() {
     <SafeAreaProvider>
       <NavigationContainer>
         {session
-          ? (doctorProfile ? <SpecialistStack /> : <AppStack />)
+          ? doctorProfile ? <SpecialistStack />
+            : staffProfile ? <FrontDeskStack />
+            : <AppStack />
           : <AuthStack initialRoute={initialRoute} />
         }
       </NavigationContainer>
