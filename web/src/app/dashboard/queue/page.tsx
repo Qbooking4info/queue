@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
@@ -58,6 +59,19 @@ export default function QueuePage() {
   }, [hospital?.id, role, doctorId, clinicId])
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
+
+  useEffect(() => {
+    if (!hospital?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`queue:hospital:${hospital.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'appointments',
+        filter: `hospital_id=eq.${hospital.id}`,
+      }, () => { fetchQueue() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [hospital?.id, fetchQueue])
 
   async function advance(id: string, next: string) {
     setUpdating(id)

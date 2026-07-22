@@ -13,6 +13,7 @@ import {
 } from '@/lib/admin-api'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 const DOC_COLORS: Record<string, string> = {}
 const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
@@ -101,6 +102,22 @@ export default function OverviewPage() {
   }, [hospital?.id, bounds, isScopedToClinic, clinicId, role])
 
   useEffect(() => { load() }, [load])
+
+  // Realtime: refresh overview whenever any appointment changes for this hospital
+  useEffect(() => {
+    if (!hospital?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`dashboard:hospital:${hospital.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'appointments',
+        filter: `hospital_id=eq.${hospital.id}`,
+      }, () => { load() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [hospital?.id, load])
 
   async function handleAvailabilityChange(status: DoctorAvailabilityStatus) {
     if (!doctorId) return
