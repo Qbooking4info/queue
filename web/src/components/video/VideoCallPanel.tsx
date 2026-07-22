@@ -295,5 +295,6 @@ function CallOverlay({ appId, token, channelName, uid, patientName, endCallError
         </button>
       </div>
     </div>
+    </div>
   )
 }

@@ -99,6 +99,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
   // ── 2. Init Agora and join channel when session is ready ─────────────────
   useEffect(() => {
     if (!session) return
+    const resolvedSession = session
     let active = true
 
     async function initAndJoin() {
@@ -149,8 +150,8 @@ export function VideoCallScreen({ navigation, route }: Props) {
       engine.current.startPreview()
 
       engine.current.joinChannel(
-        session.guest_token,
-        session.room_name,
+        resolvedSession.guest_token,
+        resolvedSession.room_name,
         2, // patient uid
         {
           clientRoleType:       ClientRoleType.ClientRoleBroadcaster,

@@ -148,7 +148,7 @@ function AppStack() {
       <Stack.Screen name="PrivacySecurity"   component={PrivacySecurityScreen} />
       <Stack.Screen name="Insurance"         component={InsuranceScreen} />
       <Stack.Screen name="Support"           component={SupportScreen} />
-      <Stack.Screen name="VideoCall"         component={VideoCallScreen} options={{ animation: 'fade', gestureEnabled: false }} />
+      <Stack.Screen name="VideoCall"         component={VideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack.Navigator>
   )
 }

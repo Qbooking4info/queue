@@ -25,7 +25,7 @@ const ALLERGY_PROMPTS = [
   'Latex', 'Peanuts', 'Shellfish', 'Pollen', 'Dust', 'Bee stings',
 ]
 
-const DEFAULT_NOTES: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '' }
+const DEFAULT_NOTES: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '' }
 
 export function MedicalHistoryScreen({ navigation }: Props) {
   const { theme: t }          = useTheme()

@@ -3,7 +3,7 @@ import type { Hospital, Doctor, Appointment, TimeSlot } from '../types/database'
 
 // ── Hospitals ────────────────────────────────────────────────────────────────
 
-export type HospitalWithDoctors = Hospital & {
+export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitude?: number | null } & {
   doctors: Doctor[]
   daily_booking_limit?: number | null
   approval_mode?: string | null
@@ -333,7 +333,8 @@ export async function rescheduleAppointment(payload: {
   reason:       string
   type?:        'in-person' | 'virtual'
   clinicId?:    string
-  approvalMode?: string
+  approvalMode?:  string
+  paymentMethod?: string
 }): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
   const bookingRef     = `RSC-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
@@ -355,6 +356,7 @@ export async function rescheduleAppointment(payload: {
       booking_ref:       bookingRef,
       rescheduled_from:  payload.originalId,
       refund_pct:        100,
+      payment_method:    payload.paymentMethod ?? 'card',
     })
     .select('id, booking_ref')
     .single()
