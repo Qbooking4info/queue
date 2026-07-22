@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Clipboard } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { haptics } from '../lib/haptics'
 
 interface Props { navigation?: any }
 
@@ -101,13 +102,13 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Menu */}
         {[
-          { icon: '🩺', label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => navigation?.navigate('MedicalHistory') },
-          { icon: '📋', label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => navigation?.navigate('Prescriptions') },
-          { icon: '🏥', label: 'Insurance',                   sub: 'Manage your health insurance details',     onPress: () => navigation?.navigate('Insurance') },
-          { icon: '👨‍👩‍👧', label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => navigation?.navigate('Dependents') },
-          { icon: '🔔', label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => navigation?.navigate('Notifications') },
-          { icon: '🔒', label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => navigation?.navigate('PrivacySecurity') },
-          { icon: '💬', label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => navigation?.navigate('Support') },
+          { icon: '🩺', label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => { haptics.tap(); navigation?.navigate('MedicalHistory') } },
+          { icon: '📋', label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => { haptics.tap(); navigation?.navigate('Prescriptions') } },
+          { icon: '🏥', label: 'Insurance',                   sub: 'Manage your health insurance details',     onPress: () => { haptics.tap(); navigation?.navigate('Insurance') } },
+          { icon: '👨‍👩‍👧', label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => { haptics.tap(); navigation?.navigate('Dependents') } },
+          { icon: '🔔', label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => { haptics.tap(); navigation?.navigate('Notifications') } },
+          { icon: '🔒', label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => { haptics.tap(); navigation?.navigate('PrivacySecurity') } },
+          { icon: '💬', label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => { haptics.tap(); navigation?.navigate('Support') } },
         ].map(item => (
           <TouchableOpacity key={item.label} onPress={item.onPress}
             style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -122,7 +123,7 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Sign out */}
         {!confirmVisible ? (
-          <TouchableOpacity onPress={() => setConfirmVisible(true)}
+          <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }}
             style={[styles.signOutBtn, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
             <Text style={styles.signOutText}>Sign out</Text>
           </TouchableOpacity>
@@ -134,7 +135,7 @@ export function ProfileScreen({ navigation }: Props) {
                 style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }]}>
                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignOut} disabled={signingOut}
+              <TouchableOpacity onPress={() => { haptics.heavy(); handleSignOut() }} disabled={signingOut}
                 style={[styles.confirmBtn, { backgroundColor: '#7B2020', borderColor: '#A32D2D', opacity: signingOut ? 0.6 : 1 }]}>
                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
                   {signingOut ? 'Signing out…' : 'Yes, sign out'}

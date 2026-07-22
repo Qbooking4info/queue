@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { haptics } from '../lib/haptics'
 import {
   getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
@@ -1068,7 +1069,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
           {/* Type step: no CTA — tapping a card advances */}
           {step !== STEP_TYPE && step < STEP_CONFIRM && (
-            <TouchableOpacity onPress={() => setStep(s => s + 1)} disabled={!canAdvance()}
+            <TouchableOpacity onPress={() => { haptics.tap(); setStep(s => s + 1) }} disabled={!canAdvance()}
               style={[s.ctaBtn, { backgroundColor: canAdvance() ? t.accent : t.inputBg, flex: 1 }]}>
               <Text style={[s.ctaBtnText, { color: canAdvance() ? '#fff' : t.textMuted }]}>
                 Continue →
@@ -1077,7 +1078,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           )}
 
           {step === STEP_CONFIRM && (
-            <TouchableOpacity onPress={handleConfirm} disabled={submitting}
+            <TouchableOpacity onPress={() => { haptics.success(); handleConfirm() }} disabled={submitting}
               style={[s.ctaBtn, { backgroundColor: t.accent, opacity: submitting ? 0.6 : 1, flex: 1 }]}>
               {submitting
                 ? <ActivityIndicator color="#fff" />

@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { haptics } from '../lib/haptics'
 
 interface Props { navigation: any }
 
@@ -31,12 +32,18 @@ export function SupportScreen({ navigation }: Props) {
   async function handleSend() {
     if (!query.trim()) return
     setSending(true)
-    await supabase.from('support_tickets').insert({
+    const { error } = await supabase.from('support_tickets').insert({
       user_id: user?.id ?? null,
       email:   user?.email ?? null,
       message: query.trim(),
     })
     setSending(false)
+    if (error) {
+      haptics.error()
+      Alert.alert('Failed to send', 'Could not send your message. Please try again.')
+      return
+    }
+    haptics.success()
     Alert.alert('Message received', "Your message has been received. We'll get back to you within 24 hours.")
     setSent(true)
     setQuery('')

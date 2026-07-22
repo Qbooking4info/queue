@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLocation, distanceKm, formatDistance } from '../contexts/LocationContext'
@@ -7,6 +7,8 @@ import { HospitalCard } from '../components/hospital/HospitalCard'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 import { getHospitals } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
+import { SkeletonCard } from '../components/ui/Skeleton'
+import { haptics } from '../lib/haptics'
 
 const FILTERS = ['All', 'Virtual', 'Open Now', 'HMO Accepted', 'Emergency']
 
@@ -95,7 +97,7 @@ export function SearchScreen({ navigation }: Props) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, height: 38 }}
             contentContainerStyle={{ gap: 6, paddingHorizontal: 20, alignItems: 'center' }}>
             {FILTERS.map(f => (
-              <TouchableOpacity key={f} onPress={() => setFilter(f)}
+              <TouchableOpacity key={f} onPress={() => { haptics.tap(); setFilter(f) }}
                 style={[styles.filterPill, {
                   backgroundColor: filter === f ? t.accentBg : t.cardBg,
                   borderColor: filter === f ? t.accent : t.cardBorder,
@@ -122,7 +124,11 @@ export function SearchScreen({ navigation }: Props) {
         )}
 
         {loading ? (
-          <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 20 }}>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </ScrollView>
         ) : viewMode === 'map' ? (
           <HospitalsMap
             style={{ flex: 1, borderRadius: 16, marginHorizontal: 20, marginBottom: 16 }}
@@ -146,7 +152,7 @@ export function SearchScreen({ navigation }: Props) {
             )}
             {results.map(h => (
               <HospitalCard key={String(h.id)} hospital={h}
-                onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
+                onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
             ))}
             <View style={{ height: 32 }} />
           </ScrollView>

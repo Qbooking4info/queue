@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, RefreshControl } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getNotifications, markNotificationRead, markAllNotificationsRead, getAppointmentById } from '../lib/api'
+import { SkeletonRow } from '../components/ui/Skeleton'
+import { haptics } from '../lib/haptics'
 
 type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescription' | 'lab' | 'payment' | 'waitlist' | 'review' | 'system'
 
@@ -132,7 +134,12 @@ export function NotificationsScreen({ navigation }: Props) {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+        <View style={{ paddingTop: 8 }}>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -161,7 +168,7 @@ export function NotificationsScreen({ navigation }: Props) {
                   const iconBg = ICON_BG[n.type] ?? '#1A1A1A'
                   const icon   = ICONS[n.type]   ?? '🔔'
                   return (
-                    <TouchableOpacity key={n.id} onPress={() => handleTap(n)} activeOpacity={0.7}
+                    <TouchableOpacity key={n.id} onPress={() => { haptics.tap(); handleTap(n) }} activeOpacity={0.7}
                       style={[st.row, {
                         backgroundColor: n.is_read ? t.canvasBg : t.cardBg,
                         borderBottomColor: t.cardBorder,

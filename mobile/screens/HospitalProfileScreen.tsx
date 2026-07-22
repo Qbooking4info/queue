@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Lin
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
+import { haptics } from '../lib/haptics'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
@@ -24,10 +25,12 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
   const isMultiClinic = hospital.clinic_model === 'multi'
 
   function bookInPerson() {
+    haptics.tap()
     navigation.navigate('BookingFlow', { hospital, bookingType: 'physical' })
   }
 
   function bookVirtual() {
+    haptics.tap()
     navigation.navigate('BookingFlow', { hospital, bookingType: 'virtual' })
   }
 
