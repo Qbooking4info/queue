@@ -11,25 +11,31 @@ import type { AdminAppointment } from '@/lib/admin-api'
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
 
 function statusColor(s: string) {
-  if (s === 'checked_in')  return { bg: 'rgba(59,130,246,0.12)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
-  if (s === 'in_progress') return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
-  if (s === 'completed')   return { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80', border: 'rgba(34,197,94,0.3)' }
+  if (s === 'pending')          return { bg: 'rgba(239,159,39,0.10)', text: '#EF9F27', border: 'rgba(239,159,39,0.25)' }
+  if (s === 'pending_approval') return { bg: 'rgba(167,139,250,0.12)', text: '#A78BFA', border: 'rgba(167,139,250,0.3)' }
+  if (s === 'confirmed')        return { bg: 'rgba(91,158,255,0.10)', text: '#5B9EFF', border: 'rgba(91,158,255,0.25)' }
+  if (s === 'checked_in')       return { bg: 'rgba(59,130,246,0.12)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
+  if (s === 'in_progress')      return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
+  if (s === 'completed')        return { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80', border: 'rgba(34,197,94,0.3)' }
   if (s === 'cancelled' || s === 'no_show') return { bg: 'rgba(220,60,60,0.10)', text: '#f07070', border: 'rgba(220,60,60,0.25)' }
   return { bg: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.55)', border: 'rgba(255,255,255,0.12)' }
 }
 
 function statusLabel(s: string) {
   const map: Record<string, string> = {
-    confirmed: 'Waiting', checked_in: 'Checked In', in_progress: 'In Progress',
+    pending: 'Pending', pending_approval: 'Awaiting Approval',
+    confirmed: 'Confirmed', checked_in: 'Checked In', in_progress: 'In Progress',
     completed: 'Done', no_show: 'No-Show', cancelled: 'Cancelled',
   }
   return map[s] ?? s
 }
 
 function nextAction(status: string): { label: string; next: string } | null {
-  if (status === 'confirmed')   return { label: 'Check In',   next: 'checked_in' }
-  if (status === 'checked_in')  return { label: 'Start',      next: 'in_progress' }
-  if (status === 'in_progress') return { label: 'Complete',   next: 'completed' }
+  if (status === 'pending')          return { label: 'Confirm',  next: 'confirmed' }
+  if (status === 'pending_approval') return { label: 'Approve',  next: 'confirmed' }
+  if (status === 'confirmed')        return { label: 'Check In', next: 'checked_in' }
+  if (status === 'checked_in')       return { label: 'Start',    next: 'in_progress' }
+  if (status === 'in_progress')      return { label: 'Complete', next: 'completed' }
   return null
 }
 
@@ -77,7 +83,9 @@ export default function QueuePage() {
   async function advance(id: string, next: string) {
     setUpdating(id)
     setActionError('')
+    const supabaseClient = createClient()
     const { error } =
+      next === 'confirmed'   ? await (supabaseClient as any).from('appointments').update({ status: 'confirmed', approval_status: 'approved' }).eq('id', id).then((r: any) => ({ error: r.error?.message ?? null })) :
       next === 'checked_in'  ? await checkInAppointment(id) :
       next === 'in_progress' ? await startConsultation(id) :
       next === 'completed'   ? await endConsultation(id) :
@@ -87,11 +95,11 @@ export default function QueuePage() {
     setUpdating(null)
   }
 
-  const active  = appts.filter(a => ['confirmed', 'checked_in', 'in_progress'].includes(a.status))
+  const active  = appts.filter(a => ['pending', 'pending_approval', 'confirmed', 'checked_in', 'in_progress'].includes(a.status))
   const done    = appts.filter(a => ['completed', 'no_show', 'cancelled'].includes(a.status))
   const shown   = filter === 'active' ? active : filter === 'done' ? done : appts
 
-  const waiting    = active.filter(a => a.status === 'confirmed').length
+  const waiting    = active.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
   const inProgress = active.filter(a => a.status === 'in_progress').length
   const completed  = done.filter(a => a.status === 'completed').length
 
