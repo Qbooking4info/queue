@@ -15,7 +15,7 @@ import {
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
-import type { Clinic } from '../lib/api'
+import type { Clinic, BookingResult } from '../lib/api'
 
 interface Props { navigation: any; route: any }
 
@@ -290,7 +290,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       }
     }
 
-    let result: { id: string; bookingRef: string; approvalStatus: string } | null = null
+    let result: BookingResult | null = null
 
     // Specialist clinic forces manual approval regardless of hospital setting — except for
     // emergencies, which must never wait on review even if routed to a non-OPD clinic.
@@ -349,8 +349,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
     setSubmitting(false)
 
-    const bookingError = (result as any)?.error
-    if (result?.id && !bookingError) {
+    if (result?.ok) {
       const isPending = result.approvalStatus === 'pending_approval'
       const isReschedule = !!rescheduleCtx
       await addNotification({
@@ -370,7 +369,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         bookingRef: result.bookingRef, approvalStatus: result.approvalStatus,
       })
     } else {
-      setSubmitError(bookingError ? `Booking failed: ${bookingError}` : 'Booking failed. Please try again.')
+      setSubmitError(result && !result.ok ? `Booking failed: ${result.error}` : 'Booking failed. Please try again.')
     }
   }
 

@@ -66,7 +66,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   const pendingCount = appts.filter(a => (a as any).approval_status === 'pending_approval').length
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={{ flex: 1 }}>
 
         {/* Title */}

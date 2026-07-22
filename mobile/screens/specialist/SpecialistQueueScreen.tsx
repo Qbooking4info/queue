@@ -121,7 +121,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const done   = appts.filter(a => a.status === 'completed')
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={st.header}>
         <View>

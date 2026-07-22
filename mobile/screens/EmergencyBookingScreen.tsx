@@ -148,7 +148,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       paymentMethod: paymentMethod,
     })
 
-    if (result) {
+    if (result.ok) {
       await addNotification({
         userId: user.id,
         type:   'confirmed',
@@ -160,7 +160,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
     setSubmitting(false)
 
-    if (result) {
+    if (result.ok) {
       navigation.navigate('EmergencyConfirmation', {
         urgency:      u.id,
         urgencyLabel: u.label,
@@ -172,7 +172,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         bookingRef:   result.bookingRef,
       })
     } else {
-      setSubmitError('Booking failed. Please try again.')
+      setSubmitError(`Booking failed: ${result.error}`)
     }
   }
 

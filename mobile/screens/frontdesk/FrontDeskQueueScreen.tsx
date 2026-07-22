@@ -139,7 +139,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const pendingCount   = appts.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
         <Text style={[s.headerTitle, { color: t.textPrimary }]}>Queue</Text>

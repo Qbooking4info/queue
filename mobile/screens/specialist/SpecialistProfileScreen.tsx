@@ -81,14 +81,14 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
         <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={[st.title, { color: t.textPrimary }]}>Profile</Text>
 

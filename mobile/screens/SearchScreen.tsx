@@ -74,7 +74,7 @@ export function SearchScreen({ navigation }: Props) {
       : { latitude: 6.5244, longitude: 3.3792 } // Lagos default
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       <View style={[styles.container, { backgroundColor: t.canvasBg }]}>
         <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
 

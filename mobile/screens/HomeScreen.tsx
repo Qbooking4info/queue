@@ -195,7 +195,7 @@ export function HomeScreen({ navigation }: Props) {
     : null
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
 
       {/* All Specialties modal */}
       <Modal visible={showAll} animationType="slide" transparent

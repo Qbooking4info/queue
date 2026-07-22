@@ -34,7 +34,7 @@ export function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 20 }}>
         <Text style={[styles.title, { color: t.textPrimary }]}>Profile</Text>
 
