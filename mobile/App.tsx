@@ -163,12 +163,37 @@ function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
 }
 
 function AppNavigator() {
-  const [splashDone,    setSplashDone]    = useState(false)
-  const [initialRoute,  setInitialRoute]  = useState<'Login' | 'Register'>('Login')
+  const [splashDone,   setSplashDone]   = useState(false)
+  const [initialRoute, setInitialRoute] = useState<'Login' | 'Register'>('Login')
   const { session, loading, user, doctorProfile, staffProfile } = useAuth()
-  const { theme: t }                              = useTheme()
+  const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
+  // Wait for Supabase to restore any existing session before deciding what to show
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.accent} size="large" />
+        </View>
+      </SafeAreaProvider>
+    )
+  }
+
+  // Already authenticated — go straight into the app, skip splash
+  if (session) {
+    return (
+      <SafeAreaProvider>
+        <NavigationContainer>
+          {doctorProfile ? <SpecialistStack />
+            : staffProfile ? <FrontDeskStack />
+            : <AppStack />}
+        </NavigationContainer>
+      </SafeAreaProvider>
+    )
+  }
+
+  // No session — show splash first, then auth screens
   if (!splashDone) {
     return (
       <SafeAreaProvider>
@@ -180,25 +205,10 @@ function AppNavigator() {
     )
   }
 
-  if (loading) {
-    return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} size="large" />
-        </View>
-      </SafeAreaProvider>
-    )
-  }
-
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        {session
-          ? doctorProfile ? <SpecialistStack />
-            : staffProfile ? <FrontDeskStack />
-            : <AppStack />
-          : <AuthStack initialRoute={initialRoute} />
-        }
+        <AuthStack initialRoute={initialRoute} />
       </NavigationContainer>
     </SafeAreaProvider>
   )
