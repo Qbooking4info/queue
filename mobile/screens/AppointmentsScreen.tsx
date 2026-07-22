@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl,
+  StyleSheet, SafeAreaView, RefreshControl,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
@@ -9,6 +9,8 @@ import { useAuth }  from '../contexts/AuthContext'
 import { getPatientAppointments } from '../lib/api'
 import type { AppointmentWithRelations } from '../lib/api'
 import { fmtDate, fmt12 } from '../lib/format'
+import { SkeletonCard } from '../components/ui/Skeleton'
+import { haptics } from '../lib/haptics'
 
 const FILTERS = ['upcoming', 'pending review', 'completed', 'cancelled'] as const
 
@@ -112,7 +114,11 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
         </ScrollView>
 
         {loading ? (
-          <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+          <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : (
           <ScrollView
             style={s.list}
@@ -128,14 +134,19 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
             {filtered.length === 0 && (
               <View style={s.empty}>
                 <Text style={s.emptyIcon}>📅</Text>
-                <Text style={[s.emptyText, { color: t.textMuted }]}>
+                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                   No {filter} appointments
+                </Text>
+                <Text style={[s.emptySubtitle, { color: t.textMuted }]}>
+                  {filter === 'upcoming'
+                    ? 'Book an appointment to get started.'
+                    : `You have no ${filter} appointments.`}
                 </Text>
                 {filter === 'upcoming' && (
                   <TouchableOpacity
-                    onPress={() => navigation?.navigate('BookingFlow', {})}
-                    style={[s.bookNowBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                    <Text style={[s.bookNowText, { color: t.accent }]}>Book an appointment →</Text>
+                    onPress={() => { haptics.tap(); navigation?.navigate('BookingFlow', {}) }}
+                    style={[s.bookNowBtn, { backgroundColor: t.accent }]}>
+                    <Text style={s.bookNowText}>Book an appointment →</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -158,7 +169,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                 <TouchableOpacity
                   key={a.id}
                   activeOpacity={0.75}
-                  onPress={() => navigation?.navigate('AppointmentDetail', { appointment: a })}
+                  onPress={() => { haptics.tap(); navigation?.navigate('AppointmentDetail', { appointment: a }) }}
                   style={[
                     s.card,
                     {
@@ -251,11 +262,12 @@ const s = StyleSheet.create({
   // List
   list:          { paddingHorizontal: 20 },
   // Empty state
-  empty:         { alignItems: 'center', paddingVertical: 56 },
-  emptyIcon:     { fontSize: 32, marginBottom: 10 },
-  emptyText:     { fontSize: 13, marginBottom: 12 },
-  bookNowBtn:    { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
-  bookNowText:   { fontSize: 13, fontWeight: '700' },
+  empty:         { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
+  emptyIcon:     { fontSize: 52, marginBottom: 12 },
+  emptyTitle:    { fontSize: 17, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+  bookNowBtn:    { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
+  bookNowText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
   // Card
   card:          { borderRadius: 16, marginBottom: 10, borderWidth: 1, overflow: 'hidden' },
   refRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },

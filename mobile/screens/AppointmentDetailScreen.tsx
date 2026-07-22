@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { haptics } from '../lib/haptics'
 import { Avatar } from '../components/ui/Avatar'
 import { Stars } from '../components/ui/Stars'
 import { cancelAppointment, getHospitalById } from '../lib/api'
@@ -495,14 +496,14 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Actions */}
           {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
-              <TouchableOpacity onPress={handleReschedule} disabled={rescheduleLoading}
+              <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
                 style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
                 {rescheduleLoading
                   ? <ActivityIndicator size="small" color={t.textPrimary} />
                   : <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>🗓  Reschedule</Text>
                 }
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleCancel} disabled={cancelling}
+              <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
                 style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', opacity: cancelling ? 0.5 : 1 }]}>
                 {cancelling
                   ? <ActivityIndicator size="small" color="#FF5C5C" />
@@ -513,7 +514,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           )}
 
           {isPendingReview && !cancelled && !isRejected && (
-            <TouchableOpacity onPress={handleCancel} disabled={cancelling}
+            <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
               style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', marginBottom: 12, opacity: cancelling ? 0.5 : 1 }]}>
               {cancelling
                 ? <ActivityIndicator size="small" color="#FF5C5C" />

@@ -1,17 +1,19 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Modal, Pressable, Dimensions, ActivityIndicator,
+  StyleSheet, SafeAreaView, Modal, Pressable, Dimensions,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { useLocation, distanceKm } from '../contexts/LocationContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
+import { SkeletonCard } from '../components/ui/Skeleton'
 import { specialties } from '../data'
 import { getHospitals, getNextAppointment } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { toDisplayHospital } from '../lib/adapters'
+import { haptics } from '../lib/haptics'
 import type { AppointmentWithRelations } from '../lib/api'
 import type { Theme } from '../contexts/ThemeContext'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
@@ -84,7 +86,7 @@ function SpecialtyGrid({
           {row.map(sp => {
             const active = activeSpecialty === sp.label
             return (
-              <TouchableOpacity key={sp.label} onPress={() => onSelect(sp.label)}
+              <TouchableOpacity key={sp.label} onPress={() => { haptics.tap(); onSelect(sp.label) }}
                 style={{
                   flex: 1, margin: 4, borderRadius: 14, paddingVertical: 12,
                   paddingHorizontal: 4, alignItems: 'center', gap: 5, borderWidth: active ? 1.5 : 1,
@@ -124,6 +126,8 @@ export function HomeScreen({ navigation }: Props) {
   const [activeSpecialty, setActiveSpecialty] = useState<string | null>(null)
   // MM3: track unread notifications count
   const [unreadCount, setUnreadCount] = useState(0)
+  // Profile completion banner — session-only dismissal
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const { salutation, emoji } = getGreeting()
   const dayMessage            = getDayMessage()
@@ -131,6 +135,11 @@ export function HomeScreen({ navigation }: Props) {
   const general               = specialties.filter(s => !SURGERY_LABELS.includes(s.label))
   const surgery               = specialties.filter(s =>  SURGERY_LABELS.includes(s.label))
   const firstName             = user?.full_name?.split(' ')[0] ?? 'there'
+
+  // Show profile completion banner if any key health field is missing
+  const showProfileBanner = !bannerDismissed && !!user && (
+    !user.blood_group || !user.date_of_birth || !user.phone
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -172,6 +181,7 @@ export function HomeScreen({ navigation }: Props) {
   }, [hospitals, activeSpecialty])
 
   function handleSpecialtyPress(label: string) {
+    haptics.tap()
     setActiveSpecialty(prev => prev === label ? null : label)
     setShowAll(false)
   }
@@ -195,7 +205,7 @@ export function HomeScreen({ navigation }: Props) {
           <View style={[s.handle, { backgroundColor: t.inputBorder }]} />
           <View style={s.sheetHeader}>
             <Text style={[s.sheetTitle, { color: t.textPrimary }]}>All Specialties</Text>
-            <TouchableOpacity onPress={() => setShowAll(false)}
+            <TouchableOpacity onPress={() => { haptics.tap(); setShowAll(false) }}
               style={[s.closeBtn, { backgroundColor: t.inputBg }]}>
               <Text style={{ color: t.textMuted, fontSize: 14, fontWeight: '700' }}>✕</Text>
             </TouchableOpacity>
@@ -228,12 +238,33 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={[s.headline, { color: t.textPrimary }]}>{firstName} 👋</Text>
             <Text style={[s.dayMsg, { color: t.textMuted }]} numberOfLines={1}>{dayMessage}</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Notifications')}
+          <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Notifications') }}
             style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
             <Text style={{ fontSize: 18 }}>🔔</Text>
             {unreadCount > 0 && <View style={[s.notifDot, { backgroundColor: t.accent }]} />}
           </TouchableOpacity>
         </View>
+
+        {/* Profile completion banner */}
+        {showProfileBanner && (
+          <View style={[s.profileBanner, { backgroundColor: '#2A1800', borderColor: 'rgba(239,159,39,0.35)' }]}>
+            <Text style={{ fontSize: 20 }}>🩺</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.profileBannerTitle, { color: '#EF9F27' }]}>Complete your health profile</Text>
+              <Text style={[s.profileBannerSub, { color: 'rgba(239,159,39,0.65)' }]}>
+                Missing info affects emergency triage. Takes 30 seconds.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Profile') }}
+              style={[s.profileBannerBtn, { backgroundColor: '#EF9F27' }]}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { haptics.tap(); setBannerDismissed(true) }}
+              style={s.profileBannerDismiss}>
+              <Text style={{ color: 'rgba(239,159,39,0.5)', fontSize: 14 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Next appointment banner */}
         {nextAppt ? (
@@ -254,13 +285,13 @@ export function HomeScreen({ navigation }: Props) {
                 </View>
               </View>
               <TouchableOpacity style={[s.bannerBtn, { backgroundColor: t.accent }]}
-                onPress={() => navigation.navigate('AppointmentDetail', { appointment: nextAppt })}>
+                onPress={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: nextAppt }) }}>
                 <Text style={s.bannerBtnText}>View</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : !loading && (
-          <TouchableOpacity onPress={() => navigation.navigate('Search')}
+          <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
             style={[s.banner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <Text style={[s.bannerLabel, { color: t.accent }]}>BOOK YOUR FIRST APPOINTMENT</Text>
             <Text style={[s.bannerDoctor, { color: t.textPrimary }]}>Find a hospital near you</Text>
@@ -269,7 +300,7 @@ export function HomeScreen({ navigation }: Props) {
         )}
 
         {/* Search */}
-        <TouchableOpacity onPress={() => navigation.navigate('Search')}
+        <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
           style={[s.searchBar, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
           <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
           <Text style={[s.searchPH, { color: t.textMuted }]}>Search hospitals, doctors, specialties…</Text>
@@ -278,7 +309,7 @@ export function HomeScreen({ navigation }: Props) {
         {/* Book Appointment quick-start */}
         <View style={s.bookRow}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('BookingFlow', {})}
+            onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {}) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={[s.bookIcon, { backgroundColor: t.accentBg }]}>
               <Text style={{ fontSize: 20 }}>🏥</Text>
@@ -290,7 +321,7 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('BookingFlow', { bookingType: 'virtual' })}
+            onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', { bookingType: 'virtual' }) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={[s.bookIcon, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
               <Text style={{ fontSize: 20 }}>💻</Text>
@@ -313,7 +344,7 @@ export function HomeScreen({ navigation }: Props) {
             </Text>
           </View>
           <TouchableOpacity style={s.emergencyBtn}
-            onPress={() => navigation.navigate('EmergencyBooking')}>
+            onPress={() => { haptics.heavy(); navigation.navigate('EmergencyBooking') }}>
             <Text style={s.emergencyBtnText}>Book now</Text>
           </TouchableOpacity>
         </View>
@@ -339,7 +370,7 @@ export function HomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             )
           })}
-          <TouchableOpacity onPress={() => setShowAll(true)}
+          <TouchableOpacity onPress={() => { haptics.tap(); setShowAll(true) }}
             style={[s.chip, s.moreChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
             <Text style={{ fontSize: 18 }}>＋</Text>
             <Text style={[s.chipLabel, { color: t.accent, fontWeight: '700' }]}>More</Text>
@@ -378,27 +409,41 @@ export function HomeScreen({ navigation }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={t.accent} style={{ marginVertical: 20 }} />
+          <View>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : displayedHospitals.length > 0 ? (
           // Show top 3 when unfiltered, all results when filtered
           (activeSpecialty ? displayedHospitals : displayedHospitals.slice(0, 3)).map(h => (
             <HospitalCard key={h.id} hospital={h}
-              onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} />
+              onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
           ))
         ) : activeSpecialty ? (
           <View style={[s.emptyFilter, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
+            <Text style={{ fontSize: 52, marginBottom: 10 }}>🔍</Text>
             <Text style={[s.emptyFilterTitle, { color: t.textPrimary }]}>No hospitals found</Text>
             <Text style={[s.emptyFilterSub, { color: t.textMuted }]}>
               No hospitals near you currently offer {activeSpecialty}.
             </Text>
             <TouchableOpacity onPress={clearFilter}
-              style={[s.clearBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginTop: 10 }]}>
+              style={[s.clearBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10 }]}>
               <Text style={[s.clearBtnText, { color: t.accent }]}>Clear filter</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <Text style={[s.emptyText, { color: t.textMuted }]}>No hospitals found nearby.</Text>
+          <View style={[s.emptyFilter, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 52, marginBottom: 10 }}>🏥</Text>
+            <Text style={[s.emptyFilterTitle, { color: t.textPrimary }]}>No hospitals nearby</Text>
+            <Text style={[s.emptyFilterSub, { color: t.textMuted }]}>
+              Try searching by specialty, hospital name, or doctor.
+            </Text>
+            <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
+              style={[s.clearBtn, { backgroundColor: t.accent, borderColor: t.accent, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10 }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Search hospitals →</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         <View style={{ height: 32 }} />
@@ -416,6 +461,13 @@ const s = StyleSheet.create({
   dayMsg:            { fontSize: 11, marginTop: 3, opacity: 0.8 },
   notifBtn:          { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   notifDot:          { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
+  // Profile completion banner
+  profileBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 16 },
+  profileBannerTitle:{ fontSize: 12, fontWeight: '800' },
+  profileBannerSub:  { fontSize: 10, marginTop: 2, lineHeight: 14 },
+  profileBannerBtn:  { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  profileBannerDismiss: { padding: 4 },
+  // Banners
   banner:            { borderRadius: 20, padding: 14, marginBottom: 18, borderWidth: 1 },
   bannerLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
   bannerRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
@@ -451,10 +503,9 @@ const s = StyleSheet.create({
   clearBtn:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
   clearBtnText:      { fontSize: 11, fontWeight: '700' },
   // Empty state
-  emptyText:         { fontSize: 13, textAlign: 'center', marginVertical: 20 },
   emptyFilter:       { borderRadius: 18, borderWidth: 1, padding: 28, alignItems: 'center', marginVertical: 8 },
-  emptyFilterTitle:  { fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  emptyFilterSub:    { fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  emptyFilterTitle:  { fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  emptyFilterSub:    { fontSize: 13, textAlign: 'center', lineHeight: 18 },
   // Modal
   overlay:           { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet:             { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
