@@ -72,69 +72,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false
   }
 
-  async function fetchStaffProfile(authUid: string, usersRowId: string | null, name: string): Promise<boolean> {
-    // 1. Check hospital_admins by users row id
-    if (usersRowId) {
-      const { data: haRow } = await (supabase as any)
-        .from('hospital_admins')
-        .select('hospital_id, role')
-        .eq('user_id', usersRowId)
-        .eq('is_active', true)
-        .maybeSingle()
+  async function fetchStaffProfile(name: string): Promise<boolean> {
+    // Use a SECURITY DEFINER function to bypass RLS on hospital_admins / clinic_admins.
+    const { data, error } = await (supabase as any).rpc('get_my_staff_profile')
 
-      if (haRow) {
-        const isFrontDesk = haRow.role === 'front_desk'
-        const isAdmin     = haRow.role === 'admin' || haRow.role === 'owner'
-        setStaffProfile({
-          role:       isFrontDesk ? 'front_desk' : isAdmin ? 'hospital_admin' : 'clinic_admin',
-          hospitalId: haRow.hospital_id,
-          clinicId:   null,
-          name,
-        })
-        return true
-      }
-
-      // 2. Check clinic_admins by users row id
-      const { data: caRow } = await (supabase as any)
-        .from('clinic_admins')
-        .select('hospital_id, clinic_id, role')
-        .eq('user_id', usersRowId)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (caRow) {
-        const isFrontDesk = caRow.role === 'front_desk' || caRow.role === 'desk_officer'
-        setStaffProfile({
-          role:       isFrontDesk ? 'front_desk' : 'clinic_admin',
-          hospitalId: caRow.hospital_id,
-          clinicId:   caRow.clinic_id ?? null,
-          name,
-        })
-        return true
-      }
+    if (error || !data || data.length === 0) {
+      setStaffProfile(null)
+      return false
     }
 
-    // 3. Fallback: clinic_admins by auth_user_id (staff with no users row)
-    const { data: caAuthRow } = await (supabase as any)
-      .from('clinic_admins')
-      .select('hospital_id, clinic_id, role')
-      .eq('auth_user_id', authUid)
-      .eq('is_active', true)
-      .maybeSingle()
+    const row = data[0]
+    const role: string = row.staff_role ?? ''
+    const isFrontDesk = role === 'front_desk' || role === 'desk_officer'
+    const isAdmin     = role === 'admin' || role === 'owner'
 
-    if (caAuthRow) {
-      const isFrontDesk = caAuthRow.role === 'front_desk' || caAuthRow.role === 'desk_officer'
-      setStaffProfile({
-        role:       isFrontDesk ? 'front_desk' : 'clinic_admin',
-        hospitalId: caAuthRow.hospital_id,
-        clinicId:   caAuthRow.clinic_id ?? null,
-        name,
-      })
-      return true
-    }
-
-    setStaffProfile(null)
-    return false
+    setStaffProfile({
+      role:       isFrontDesk ? 'front_desk' : isAdmin ? 'hospital_admin' : 'clinic_admin',
+      hospitalId: row.hospital_id,
+      clinicId:   row.clinic_id ?? null,
+      name,
+    })
+    return true
   }
 
   async function fetchProfile(authId: string) {
@@ -149,8 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Always check doctor first — doctor accounts may not have a users row
     const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '')
     if (!isDoctor) {
-      // Check for hospital staff — pass authUid for fallback auth_user_id lookup
-      await fetchStaffProfile(authId, data?.id ?? null, data?.full_name ?? '')
+      await fetchStaffProfile(data?.full_name ?? '')
     }
   }
 
