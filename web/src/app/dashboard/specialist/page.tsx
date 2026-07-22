@@ -2,6 +2,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { fmtLocalDate } from '@/lib/admin-api'
 
 const STATUS_COLOR: Record<string, string> = {
   confirmed:   'text-green-400 bg-green-500/10 border-green-500/20',
@@ -31,7 +32,7 @@ export default async function SpecialistPage() {
       .single(),
   ])
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   const [{ data: todayAppts }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
     db.from('appointments')

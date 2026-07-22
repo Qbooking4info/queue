@@ -2,6 +2,7 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
+import { fmtLocalDate } from '@/lib/admin-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   if (adminRecord.role !== 'front_desk' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
   const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 

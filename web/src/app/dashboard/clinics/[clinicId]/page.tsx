@@ -14,6 +14,7 @@ import {
   setEmergencyClinic, clearEmergencyClinic,
   approveAppointment, rejectAppointment,
   getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
+  fmtLocalDate,
 } from '@/lib/admin-api'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
@@ -974,7 +975,7 @@ export default function ClinicDetailPage() {
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
   const deskOfficers = staff.filter(s => s.role === 'desk_officer' || s.role === 'front_desk')
-  const todayAppts   = appts.filter(a => a.appointment_date === new Date().toISOString().split('T')[0])
+  const todayAppts   = appts.filter(a => a.appointment_date === fmtLocalDate(new Date()))
 
   // analytics — specialty breakdown from aAppts
   const specCounts: Record<string, number> = {}

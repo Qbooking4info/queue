@@ -452,7 +452,7 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
 }
 
 export async function getClinicStats(hospitalId: string, clinicId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
   const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
   const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
   const orFilter = doctorIds.length > 0
@@ -579,7 +579,7 @@ export async function getRangeStats(hospitalId: string, from: string, to: string
 }
 
 export async function getTodayAppointments(hospitalId: string, clinicId?: string): Promise<AdminAppointment[]> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   let query = adminDb
     .from('appointments')
@@ -634,7 +634,7 @@ export interface ScheduleSlot {
 
 // Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
 // silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
-function fmtLocalDate(d: Date): string {
+export function fmtLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -1431,7 +1431,7 @@ export async function deleteService(serviceId: string): Promise<void> {
 }
 
 export async function getHospitalStats(hospitalId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   const [apptRes, completedRes, doctorRes, ratingRes] = await Promise.all([
     adminDb.from('appointments').select('id', { count: 'exact', head: true })

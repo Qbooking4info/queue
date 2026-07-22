@@ -16,6 +16,7 @@ import {
   approveAppointment, rejectAppointment,
   checkInAppointment, startConsultation, endConsultation,
   getDoctors as getDoctorsForHospital,
+  fmtLocalDate,
 } from '@/lib/admin-api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ function WalkInModal({
   const availableDoctors = clinicId
     ? doctors.filter(d => d.is_active && d.clinic_id === clinicId)
     : doctors.filter(d => d.is_active)
-  const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
+  const [date,          setDate]          = useState(fmtLocalDate(new Date()))
   const [time,          setTime]          = useState('09:00')
   const [reason,        setReason]        = useState('')
   const [loading,       setLoading]       = useState(false)
@@ -258,7 +259,7 @@ function WalkInModal({
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Date *</label>
-                  <input type="date" value={date} min={new Date().toISOString().split('T')[0]} onChange={e => setDate(e.target.value)} style={inputStyle} />
+                  <input type="date" value={date} min={fmtLocalDate(new Date())} onChange={e => setDate(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Time *</label>

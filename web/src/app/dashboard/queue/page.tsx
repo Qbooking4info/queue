@@ -5,7 +5,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
-import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment } from '@/lib/admin-api'
+import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment, fmtLocalDate } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
@@ -54,7 +54,7 @@ export default function QueuePage() {
     let data: AdminAppointment[]
     if (role === 'doctor' && doctorId) {
       // Fetch fresh from API so actions always show the latest state
-      const today = new Date().toISOString().split('T')[0]
+      const today = fmtLocalDate(new Date())
       data = await getDoctorAppointments(doctorId, today, today)
     } else if ((role === 'clinic_admin' || role === 'front_desk') && clinicId) {
       data = await getQueueForToday(hospital.id, clinicId)
