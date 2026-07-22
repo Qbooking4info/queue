@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
@@ -56,7 +56,7 @@ type SelectedCell =
   | { kind: 'time'; label: string; items: ScheduleSlot[] }
   | { kind: 'cell'; label: string; items: ScheduleSlot[] }
 
-export default function SchedulePage() {
+function ScheduleContent() {
   const { theme: C } = useTheme()
   const { hospital, role, doctorId } = useAdmin()
   const searchParams = useSearchParams()
@@ -355,5 +355,13 @@ export default function SchedulePage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function SchedulePage() {
+  return (
+    <Suspense>
+      <ScheduleContent />
+    </Suspense>
   )
 }

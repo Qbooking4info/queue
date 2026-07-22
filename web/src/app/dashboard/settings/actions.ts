@@ -15,7 +15,7 @@ export async function updateHospitalProfile(formData: FormData) {
     email:            (formData.get('email') as string).trim() || null,
     whatsapp:         (formData.get('whatsapp') as string).trim() || null,
     description:      (formData.get('description') as string).trim() || null,
-    address:          (formData.get('address') as string).trim() || null,
+    address:          (formData.get('address') as string).trim(),
     accepts_virtual:  allVirtual.includes('true'),
     emergency_hours:  allEmergency.includes('true'),
     updated_at:       new Date().toISOString(),
