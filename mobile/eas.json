@@ -14,7 +14,7 @@
       },
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
+        "gradleCommand": ":app:assembleArm64Release"
       },
       "ios": {
         "simulator": false,
