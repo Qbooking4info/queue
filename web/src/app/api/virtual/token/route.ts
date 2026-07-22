@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
 
   if (sessionErr) return Errors.internal(sessionErr.message)
 
-  // Move appointment to in_progress
+  // Move appointment to in_progress and record start time for duration tracking
   await db.from('appointments')
-    .update({ status: 'in_progress' })
+    .update({ status: 'in_progress', consult_started_at: now })
     .eq('id', appointmentId)
     .in('status', ['pending', 'confirmed', 'checked_in'])
 

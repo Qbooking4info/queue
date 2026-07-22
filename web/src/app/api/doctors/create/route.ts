@@ -22,11 +22,14 @@ export async function POST(req: NextRequest) {
     return Errors.forbidden()
 
   // ── Plan: doctor seat limit check ──────────────────────────────────────────
+  // BH8: check both active and trialing subscriptions so trial hospitals also respect the seat limit
   const { data: sub } = await db
     .from('hospital_subscriptions')
     .select('subscription_plans(max_doctors)')
     .eq('hospital_id', adminRecord.hospital_id)
-    .eq('status', 'active')
+    .in('status', ['active', 'trialing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single() as { data: { subscription_plans: { max_doctors: number | null } | null } | null; error: unknown }
 
   const maxDoctors: number | null = (sub?.subscription_plans as any)?.max_doctors ?? null

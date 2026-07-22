@@ -1,7 +1,8 @@
-import { getServerUser } from '@/lib/supabase/auth-server'
+import { getServerUser, requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getClinicsForHospital } from '@/lib/admin-api'
 import { NextRequest, NextResponse } from 'next/server'
+import { Errors } from '@/lib/api-error'
 
 export async function GET(req: NextRequest) {
   const user = await getServerUser()
@@ -15,14 +16,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getServerUser()
-  if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  // BC4: clinic creation requires hospital_admin or super_admin — front_desk and
+  // clinic_admin must not be able to create clinics for hospitals they don't own.
+  const auth = await requireRole(['hospital_admin', 'super_admin'])
+  if (auth instanceof NextResponse) return auth
+  const { caller } = auth
 
   const db = createAdminClient()
   const { hospitalId, clinicName, subAdminName, subAdminEmail, tempPassword, serviceTags } = await req.json()
 
   if (!hospitalId || !clinicName?.trim()) {
     return NextResponse.json({ error: 'hospitalId and clinicName are required' }, { status: 400 })
+  }
+
+  // Verify the caller owns this hospital (super_admin is exempt — they manage all hospitals)
+  if (caller.role !== 'super_admin' && caller.hospitalId !== hospitalId) {
+    return Errors.forbidden()
   }
 
   // Create the clinic

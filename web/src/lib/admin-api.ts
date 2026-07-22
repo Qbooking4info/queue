@@ -1604,12 +1604,13 @@ export async function getDailyBookingCount(
 export async function getHospitalSettings(hospitalId: string) {
   const { data } = await adminDb
     .from('hospitals')
-    .select('accepts_virtual, emergency_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude')
+    .select('accepts_virtual, emergency_hours, is_24_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude')
     .eq('id', hospitalId)
     .single()
   return data as {
     accepts_virtual: boolean | null
     emergency_hours: boolean | null
+    is_24_hours: boolean | null
     daily_booking_limit: number | null
     approval_mode: string | null
     requires_referral: boolean | null
@@ -1626,6 +1627,7 @@ export async function updateHospitalSettings(hospitalId: string, settings: {
   opd_fee?: number
   accepts_virtual?: boolean
   emergency_hours?: boolean
+  is_24_hours?: boolean
 }): Promise<{ error: string | null }> {
   const { error } = await adminDb.from('hospitals').update(settings as any).eq('id', hospitalId)
   return { error: error?.message ?? null }

@@ -48,6 +48,7 @@ export default function SettingsPage() {
   // Booking policy state
   const [virtual,       setVirtual]       = useState(false)
   const [emergency,     setEmergency]     = useState(false)
+  const [is24Hours,     setIs24Hours]     = useState(false)
   const [approvalMode,  setApprovalMode]  = useState<'auto' | 'manual'>('auto')
   const [requiresRef,   setRequiresRef]   = useState(false)
   const [dailyLimit,    setDailyLimit]    = useState<string>('')
@@ -81,6 +82,7 @@ export default function SettingsPage() {
       if (s) {
         setVirtual(s.accepts_virtual ?? false)
         setEmergency(s.emergency_hours ?? false)
+        setIs24Hours(s.is_24_hours ?? false)
         setApprovalMode((s.approval_mode ?? 'auto') as 'auto' | 'manual')
         setRequiresRef(s.requires_referral ?? false)
         setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
@@ -124,6 +126,7 @@ export default function SettingsPage() {
       updateHospitalSettings(hospital.id, {
         accepts_virtual:     virtual,
         emergency_hours:     emergency,
+        is_24_hours:         is24Hours,
         approval_mode:       approvalMode,
         requires_referral:   requiresRef,
         daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
@@ -274,6 +277,9 @@ export default function SettingsPage() {
               <Toggle value={emergency} onChange={() => setEmergency(v => !v)}
                 label="24/7 Emergency Services"
                 sub="Accept emergency bookings outside normal operating hours" />
+              <Toggle value={is24Hours} onChange={() => setIs24Hours(v => !v)}
+                label="24/7 Service (Always Open)"
+                sub="Hospital operates around the clock — patient booking ignores operating hour restrictions" />
 
               {/* Approval mode */}
               <div style={{ padding: '14px 0', borderBottom: `1px solid ${C.border}` }}>

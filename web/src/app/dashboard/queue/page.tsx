@@ -5,7 +5,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
-import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments } from '@/lib/admin-api'
+import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
@@ -80,17 +80,39 @@ export default function QueuePage() {
     return () => { supabase.removeChannel(channel) }
   }, [hospital?.id, fetchQueue])
 
-  async function advance(id: string, next: string) {
+  async function advance(id: string, next: string, currentStatus: string) {
     setUpdating(id)
     setActionError('')
-    const supabaseClient = createClient()
-    const { error } =
-      next === 'confirmed'   ? await (supabaseClient as any).from('appointments').update({ status: 'confirmed', approval_status: 'approved' }).eq('id', id).then((r: any) => ({ error: r.error?.message ?? null })) :
-      next === 'checked_in'  ? await checkInAppointment(id) :
-      next === 'in_progress' ? await startConsultation(id) :
-      next === 'completed'   ? await endConsultation(id) :
-      { error: null }
-    if (error) setActionError(error)
+    try {
+      let result: { error: string | null } = { error: null }
+      if (next === 'confirmed') {
+        if (currentStatus === 'pending_approval') {
+          // Use approveAppointment so that the patient receives a confirmation notification
+          // and the proper approval_status='approved' guard is respected.
+          await approveAppointment(id)
+        } else {
+          // pending → confirmed: only flip status; do NOT touch approval_status which may
+          // already be 'auto_approved' (changing it to 'approved' would incorrectly imply
+          // a manual review happened when none did).
+          const supabaseClient = createClient()
+          const r = await (supabaseClient as any)
+            .from('appointments')
+            .update({ status: 'confirmed' })
+            .eq('id', id)
+            .in('status', ['pending'])
+          result = { error: r.error?.message ?? null }
+        }
+      } else if (next === 'checked_in') {
+        result = await checkInAppointment(id)
+      } else if (next === 'in_progress') {
+        result = await startConsultation(id)
+      } else if (next === 'completed') {
+        result = await endConsultation(id)
+      }
+      if (result.error) setActionError(result.error)
+    } catch {
+      setActionError('Action failed — please try again')
+    }
     await fetchQueue()
     setUpdating(null)
   }
@@ -237,7 +259,7 @@ export default function QueuePage() {
 
                 {/* Action button */}
                 {action && (role === 'front_desk' || role === 'clinic_admin' || role === 'hospital_admin' || role === 'doctor') && (
-                  <button onClick={() => advance(appt.id, action.next)} disabled={isUpdating}
+                  <button onClick={() => advance(appt.id, action.next, appt.status)} disabled={isUpdating}
                     style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
                       cursor: isUpdating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                       background: C.accentMid, color: C.accent, border: `1px solid ${C.accentBorder}`,
