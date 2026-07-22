@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, RefreshControl,
+  SafeAreaView, RefreshControl,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { haptics }  from '../../lib/haptics'
+import { SkeletonCard } from '../../components/ui/Skeleton'
 
 interface PatientRow { id: string; full_name: string; phone: string | null; gender: string | null }
 interface ApptRow {
@@ -66,7 +68,6 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     if (!doctorProfile) return
     if (!silent) setLoading(true)
 
-    // ML7: compute today inside load() so it never goes stale across midnight
     const today = new Date().toISOString().split('T')[0]
 
     let query = (supabase as any)
@@ -84,7 +85,6 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     const { data } = await query
     setAppts((data as ApptRow[]) ?? [])
-    // MM11: always clear loading, not only when !silent
     setLoading(false)
   }
 
@@ -96,7 +96,6 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     setRefreshing(false)
   }
 
-  // Realtime updates for today's queue
   useEffect(() => {
     if (!doctorProfile || tab !== 'today') return
 
@@ -136,6 +135,17 @@ export function SpecialistQueueScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* Stats bar */}
+      {!loading && tab === 'today' && (
+        <View style={[st.statsBar, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Text style={[st.statsBarText, { color: t.textMuted }]}>
+            Today: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{appts.length}</Text> patients
+            {'  ·  '}
+            Completed: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{done.length}</Text>
+          </Text>
+        </View>
+      )}
+
       {/* Tabs */}
       <View style={[st.tabRow, { borderBottomColor: t.cardBorder }]}>
         {(['today', 'upcoming'] as Tab[]).map(item => (
@@ -152,17 +162,17 @@ export function SpecialistQueueScreen({ navigation }: Props) {
       </View>
 
       {loading ? (
-        <View style={st.center}>
-          <ActivityIndicator color={t.accent} size="large" />
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
         </View>
       ) : appts.length === 0 ? (
         <View style={st.center}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>🩺</Text>
+          <Text style={{ fontSize: 56, marginBottom: 16 }}>🩺</Text>
           <Text style={[st.emptyTitle, { color: t.textPrimary }]}>
-            {tab === 'today' ? 'No appointments today' : 'No upcoming appointments'}
+            {tab === 'today' ? 'No patients scheduled for today' : 'No upcoming appointments'}
           </Text>
           <Text style={[st.emptySub, { color: t.textMuted }]}>
-            {tab === 'today' ? 'Your schedule is clear for today.' : 'Nothing scheduled beyond today.'}
+            {tab === 'today' ? 'Your schedule is clear. Enjoy the calm!' : 'Nothing scheduled beyond today.'}
           </Text>
         </View>
       ) : (
@@ -207,7 +217,10 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
     <TouchableOpacity
       activeOpacity={0.8}
       style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
-      onPress={() => navigation.navigate('PatientConsult', { appointmentId: appt.id })}
+      onPress={() => {
+        haptics.tap()
+        navigation.navigate('PatientConsult', { appointmentId: appt.id })
+      }}
     >
       {/* Avatar */}
       <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
@@ -260,11 +273,13 @@ const st = StyleSheet.create({
   statBadge:   { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
   statNum:     { fontSize: 22, fontWeight: '800', lineHeight: 26 },
   statLabel:   { fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+  statsBar:    { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1 },
+  statsBarText:{ fontSize: 12 },
   tabRow:      { flexDirection: 'row', borderBottomWidth: 1, marginHorizontal: 20 },
   tab:         { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0 },
   tabText:     { fontSize: 13, fontWeight: '700' },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
-  emptyTitle:  { fontSize: 17, fontWeight: '700', marginBottom: 6 },
+  emptyTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
   emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   group:       { paddingHorizontal: 16, marginBottom: 4 },
   groupLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },

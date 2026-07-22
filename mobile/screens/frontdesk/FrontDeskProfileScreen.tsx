@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, ActivityIndicator, Switch,
 } from 'react-native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { haptics }  from '../../lib/haptics'
 
 interface Props { navigation?: any }
 
@@ -19,8 +21,21 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
   const { staffProfile, signOut }          = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut,     setSigningOut]     = useState(false)
+  const [hospitalName,   setHospitalName]   = useState<string | null>(null)
 
   const initials = staffProfile?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+
+  useEffect(() => {
+    if (!staffProfile?.hospitalId) return
+    ;(supabase as any)
+      .from('hospitals')
+      .select('name')
+      .eq('id', staffProfile.hospitalId)
+      .single()
+      .then(({ data }: { data: { name: string } | null }) => {
+        if (data) setHospitalName(data.name)
+      })
+  }, [staffProfile?.hospitalId])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -41,6 +56,9 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
           <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
             <Text style={[s.roleBadgeText, { color: t.accent }]}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? staffProfile?.role ?? 'Staff'}</Text>
           </View>
+          {hospitalName && (
+            <Text style={[s.hospitalName, { color: t.textMuted }]}>🏥 {hospitalName}</Text>
+          )}
         </View>
 
         {/* Info */}
@@ -71,8 +89,11 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
                 onPress={() => setConfirmVisible(false)}>
                 <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }]}
-                onPress={handleSignOut} disabled={signingOut}>
+              <TouchableOpacity
+                style={[s.actionBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }]}
+                onPress={() => { haptics.tap(); handleSignOut() }}
+                disabled={signingOut}
+              >
                 {signingOut
                   ? <ActivityIndicator size="small" color="#FF5C5C" />
                   : <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Sign out</Text>}
@@ -108,6 +129,7 @@ const s = StyleSheet.create({
   name:          { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
   roleBadge:     { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
   roleBadgeText: { fontSize: 12, fontWeight: '700' },
+  hospitalName:  { marginTop: 8, fontSize: 13, fontWeight: '600' },
   section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 },
   sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },

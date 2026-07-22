@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, RefreshControl, Alert,
+  SafeAreaView, ActivityIndicator, RefreshControl, Alert, TextInput,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { haptics }  from '../../lib/haptics'
+import { SkeletonCard } from '../../components/ui/Skeleton'
 
 interface Appt {
   id:               string
@@ -50,6 +52,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false)
   const [actioning,  setActioning]  = useState<string | null>(null)
   const [tab,        setTab]        = useState<'today' | 'all'>('today')
+  const [search,     setSearch]     = useState('')
 
   const hospitalId = staffProfile?.hospitalId
 
@@ -75,7 +78,6 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  // Realtime updates
   useEffect(() => {
     if (!hospitalId) return
     const channel = supabase
@@ -97,8 +99,13 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       .update({ status: 'checked_in' })
       .eq('id', appt.id)
     setActioning(null)
-    if (error) Alert.alert('Error', error.message)
-    else load(true)
+    if (error) {
+      haptics.error()
+      Alert.alert('Error', error.message)
+    } else {
+      haptics.success()
+      load(true)
+    }
   }
 
   async function handleApprove(appt: Appt) {
@@ -109,13 +116,28 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       .eq('id', appt.id)
       .eq('approval_status', 'pending_approval')
     setActioning(null)
-    if (error) Alert.alert('Error', error.message)
-    else load(true)
+    if (error) {
+      haptics.error()
+      Alert.alert('Error', error.message)
+    } else {
+      haptics.success()
+      load(true)
+    }
   }
 
   const today = new Date().toISOString().split('T')[0]
-  const active = appts.filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
-  const done   = appts.filter(a =>  ['completed', 'cancelled', 'no_show'].includes(a.status))
+
+  // Client-side search filter (no API call)
+  const filtered = search.trim()
+    ? appts.filter(a => a.patient?.full_name?.toLowerCase().includes(search.toLowerCase()))
+    : appts
+
+  const active = filtered.filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
+  const done   = filtered.filter(a =>  ['completed', 'cancelled', 'no_show'].includes(a.status))
+
+  // Stats from full (unfiltered) list
+  const checkedInCount = appts.filter(a => a.status === 'checked_in').length
+  const pendingCount   = appts.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
@@ -134,33 +156,82 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* Stats bar */}
+      {!loading && (
+        <View style={[s.statsBar, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Text style={[s.statsText, { color: t.textMuted }]}>
+            Today: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{appts.length}</Text>
+            {'  ·  '}
+            Checked in: <Text style={{ color: '#5B9EFF', fontWeight: '700' }}>{checkedInCount}</Text>
+            {'  ·  '}
+            Pending: <Text style={{ color: '#EF9F27', fontWeight: '700' }}>{pendingCount}</Text>
+          </Text>
+        </View>
+      )}
+
+      {/* Search */}
+      {!loading && appts.length > 0 && (
+        <View style={[s.searchWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
+          <Text style={{ color: t.textMuted, fontSize: 14, marginRight: 6 }}>🔍</Text>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by patient name…"
+            placeholderTextColor={t.textMuted}
+            style={[s.searchInput, { color: t.textPrimary }]}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+        </View>
+      )}
+
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={t.accent} size="large" /></View>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+          {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
-          {appts.length === 0 && (
+          {filtered.length === 0 && (
             <View style={s.empty}>
-              <Text style={{ fontSize: 40 }}>📋</Text>
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No appointments</Text>
-              <Text style={[s.emptySub, { color: t.textMuted }]}>{tab === 'today' ? 'No appointments scheduled for today.' : 'No appointments found.'}</Text>
+              <Text style={{ fontSize: 56, marginBottom: 16 }}>📋</Text>
+              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
+                {search ? 'No patients match your search' : 'No appointments yet'}
+              </Text>
+              <Text style={[s.emptySub, { color: t.textMuted }]}>
+                {search
+                  ? `No results for "${search}". Try a different name.`
+                  : tab === 'today'
+                    ? 'No appointments scheduled for today.\nWalk-in patients can be added from the web dashboard.'
+                    : 'No appointments found.'}
+              </Text>
             </View>
           )}
 
           {active.length > 0 && (
             <>
               <Text style={[s.groupLabel, { color: t.textMuted }]}>Active ({active.length})</Text>
-              {active.map(a => <ApptCard key={a.id} appt={a} theme={t} actioning={actioning} onCheckIn={handleCheckIn} onApprove={handleApprove} today={today} />)}
+              {active.map(a => (
+                <ApptCard
+                  key={a.id} appt={a} theme={t} actioning={actioning}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} today={today}
+                />
+              ))}
             </>
           )}
 
           {done.length > 0 && (
             <>
               <Text style={[s.groupLabel, { color: t.textMuted, marginTop: 16 }]}>Completed / Cancelled ({done.length})</Text>
-              {done.map(a => <ApptCard key={a.id} appt={a} theme={t} actioning={actioning} onCheckIn={handleCheckIn} onApprove={handleApprove} today={today} />)}
+              {done.map(a => (
+                <ApptCard
+                  key={a.id} appt={a} theme={t} actioning={actioning}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} today={today}
+                />
+              ))}
             </>
           )}
         </ScrollView>
@@ -180,7 +251,11 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
   const urgencyColor = appt.urgency === 'emergency' ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
 
   return (
-    <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => haptics.tap()}
+      style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
+    >
       <View style={s.cardTop}>
         <View style={{ flex: 1 }}>
           <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? 'Unknown patient'}</Text>
@@ -223,18 +298,21 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
           )}
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   )
 }
 
 const s = StyleSheet.create({
   safe:         { flex: 1 },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 },
   headerTitle:  { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   tabBar:       { flexDirection: 'row', borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
   tabBtn:       { paddingHorizontal: 14, paddingVertical: 7 },
   tabBtnText:   { fontSize: 12, fontWeight: '700' },
+  statsBar:     { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1 },
+  statsText:    { fontSize: 12 },
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  searchInput:  { flex: 1, fontSize: 14, padding: 0 },
   groupLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   card:         { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
   cardTop:      { flexDirection: 'row', gap: 10, padding: 14 },
@@ -249,6 +327,6 @@ const s = StyleSheet.create({
   actionBtn:    { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
   actionText:   { fontSize: 13, fontWeight: '700' },
   empty:        { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTitle:   { fontSize: 17, fontWeight: '700' },
-  emptySub:     { fontSize: 13, textAlign: 'center' },
+  emptyTitle:   { fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  emptySub:     { fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
 })
