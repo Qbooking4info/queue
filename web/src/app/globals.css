@@ -60,11 +60,22 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
 
 /* ── Dashboard responsive ── */
-/* On mobile, the sidebar is a fixed drawer — remove its space from the layout */
+/* On mobile the sidebar uses position:fixed so it's out of flex flow automatically.
+   Explicitly collapse its flex footprint so the main content fills the full width. */
 @media (max-width: 767px) {
   .q-sidebar {
-    width: 0 !important;
+    width: 220px !important; /* keep drawer width correct when open */
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform .3s cubic-bezier(.4,0,.2,1);
     flex-shrink: 0;
+    /* remove from flex flow */
+    margin-right: -220px;
+  }
+  .q-sidebar.is-open {
+    transform: translateX(0);
   }
 }
 

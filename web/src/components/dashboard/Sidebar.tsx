@@ -114,22 +114,12 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           height: 100vh;
           position: sticky;
           top: 0;
-          transition: transform .3s cubic-bezier(.4,0,.2,1);
-        }
-        @media (max-width: 767px) {
-          .q-sidebar {
-            position: fixed;
-            top: 0; left: 0; bottom: 0;
-            z-index: 50;
-            transform: translateX(-100%);
-          }
-          .q-sidebar.is-open {
-            transform: translateX(0);
-          }
+          overflow-y: auto;
+          transition: transform .3s cubic-bezier(.4,0,.2,1), background .3s;
         }
       `}</style>
     <div className={`q-sidebar${mobileOpen ? ' is-open' : ''}`}
-      style={{ background: C.sidebar, transition: 'background .3s' }}>
+      style={{ background: C.sidebar }}>
 
       {/* Logo */}
       <div style={{ padding: '28px 22px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
