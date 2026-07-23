@@ -128,26 +128,37 @@ export default function QueuePage() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -0.5 }}>
-          Live Queue
-        </div>
+      <style>{`
+        .queue-chips { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+        .queue-filter-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .queue-item { display: flex; align-items: center; gap: 14px; }
+        @media (max-width: 767px) {
+          .queue-chips { grid-template-columns: repeat(2,1fr); gap: 8px; }
+          .queue-filter-row { gap: 6px; }
+          .queue-filter-row button { padding: 6px 12px !important; font-size: 12px !important; }
+          .queue-item { gap: 8px; }
+          .queue-item-meta { display: none; }
+          .queue-item-ref { display: none; }
+        }
+      `}</style>
+      <div style={{ marginBottom: 16 }}>
+        <div className="dash-greeting-title" style={{ color: C.text }}>Live Queue</div>
         <div style={{ fontSize: 13, color: C.textMuted, marginTop: 4 }}>
           {new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
       </div>
 
       {/* Summary chips */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div className="queue-chips">
         {[
           { label: 'Waiting',     value: waiting,    color: 'rgba(255,255,255,0.55)' },
           { label: 'In Progress', value: inProgress, color: '#EF9F27' },
           { label: 'Completed',   value: completed,  color: '#4ade80' },
           { label: 'Total Today', value: appts.length, color: C.accent },
         ].map(chip => (
-          <div key={chip.label} style={{ flex: '1 1 140px', padding: '16px 20px', borderRadius: 14,
+          <div key={chip.label} style={{ padding: 'clamp(12px,2.5vw,16px) clamp(14px,2.5vw,20px)', borderRadius: 14,
             background: C.card, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: chip.color }}>{chip.value}</div>
+            <div className="dash-stat-value" style={{ color: chip.color }}>{chip.value}</div>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{chip.label}</div>
           </div>
         ))}
@@ -164,7 +175,7 @@ export default function QueuePage() {
       )}
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div className="queue-filter-row">
         {[
           { key: 'active', label: `Active (${active.length})` },
           { key: 'done',   label: `Done (${done.length})` },

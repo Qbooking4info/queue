@@ -30,7 +30,18 @@ export default function DoctorsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <style>{`
+        .doctors-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+        .doctor-stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
+        @media (max-width: 767px) {
+          .doctors-grid { grid-template-columns: 1fr; }
+          .doctor-stats-grid { grid-template-columns: repeat(3,1fr); gap: 6px; }
+        }
+        @media (max-width: 400px) {
+          .doctor-stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+      `}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
             {isFrontDesk ? 'Doctor Availability' : 'Doctors & Staff'}
@@ -59,7 +70,7 @@ export default function DoctorsPage() {
           <div style={{ fontSize: 13 }}>Add your first doctor to start accepting bookings</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+        <div className="doctors-grid">
           {doctors.map(d => {
             const avail = AVAIL[d.availability_status] ?? AVAIL.on_duty
             return (
@@ -102,7 +113,7 @@ export default function DoctorsPage() {
                 </div>
 
                 {!isFrontDesk && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                  <div className="doctor-stats-grid">
                     {[
                       { label: 'Consult Fee', value: d.consultation_fee ? `₦${d.consultation_fee.toLocaleString()}` : '—' },
                       { label: 'Experience',  value: d.years_experience ? `${d.years_experience}yr` : '—' },

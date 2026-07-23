@@ -118,7 +118,7 @@ function ServiceModal({
               style={{ ...input, resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted,
                 textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
@@ -332,7 +332,12 @@ export default function ServicesPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <style>{`
+        .services-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+        @media (max-width: 1023px) { .services-grid { grid-template-columns: repeat(2,1fr); } }
+        @media (max-width: 480px)  { .services-grid { grid-template-columns: 1fr; } }
+      `}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
             {isScopedToClinic ? 'Clinic Services' : 'Services & Specialties'}
@@ -389,7 +394,7 @@ export default function ServicesPage() {
               <div style={{ fontSize: 12 }}>Click "+ Add Service" to create your first hospital service</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            <div className="services-grid">
               {services.map(s => {
                 const canEdit = true
                 return (
@@ -495,7 +500,7 @@ export default function ServicesPage() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            <div className="services-grid">
               {specialties.map(s => (
                 <div key={s.id} style={{ background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 14, padding: 18, display: 'flex',

@@ -159,15 +159,23 @@ export default function SettingsPage() {
 
   return (
     <div>
+      <style>{`
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .settings-hours-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        @media (max-width: 767px) {
+          .settings-grid { grid-template-columns: 1fr; }
+          .settings-hours-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Hospital Settings</div>
+        <div className="dash-greeting-title" style={{ color: C.text }}>Hospital Settings</div>
         <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>Manage hospital profile and booking policies</div>
       </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: C.textMuted }}>Loading settings…</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="settings-grid">
 
           {/* Left column: Profile + Location */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -229,7 +237,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Coordinate fields */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div className="settings-hours-grid">
               <div>
                 <label style={labelStyle}>Latitude</label>
                 <input value={lat} onChange={e => setLat(e.target.value)} placeholder="e.g. 6.524379"

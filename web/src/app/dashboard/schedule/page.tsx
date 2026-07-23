@@ -168,9 +168,17 @@ function ScheduleContent() {
 
   return (
     <div>
+      <style>{`
+        .schedule-calendar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 767px) {
+          .schedule-header-actions { flex-direction: column; align-items: stretch !important; }
+          .schedule-header-actions button,
+          .schedule-header-actions select { width: 100%; }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -0.5 }}>Schedule</div>
+          <div className="dash-greeting-title" style={{ color: C.text }}>Schedule</div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
             Week of {monday.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
@@ -214,7 +222,7 @@ function ScheduleContent() {
           </a>
         </div>
       ) : (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div className="schedule-calendar" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, 1fr)`,
             borderBottom: `1px solid ${C.border}` }}>
