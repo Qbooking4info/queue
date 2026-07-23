@@ -111,8 +111,8 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
           {(doctor?.avg_rating ?? 0) > 0 && (
             <View style={st.ratingRow}>
-              {'★★★★★'.split('').map((s, i) => (
-                <Text key={i} style={{ color: i < Math.round(doctor!.avg_rating!) ? '#EF9F27' : t.textMuted, fontSize: 16 }}>{s}</Text>
+              {[0, 1, 2, 3, 4].map(i => (
+                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? '#EF9F27' : t.textMuted} />
               ))}
               <Text style={[st.ratingNum, { color: t.textMuted }]}>
                 {doctor!.avg_rating!.toFixed(1)} ({doctor!.review_count ?? 0} reviews)
@@ -171,9 +171,12 @@ export function SpecialistProfileScreen({ navigation }: Props) {
         <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
           <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
-            <Text style={[st.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? '🌙 Dark theme' : '☀️ Light theme'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={[st.rowLabel, { color: t.textPrimary }]}>
+                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+              </Text>
+            </View>
             <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </View>

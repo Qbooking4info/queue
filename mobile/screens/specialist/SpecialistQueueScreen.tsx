@@ -243,9 +243,12 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
           <Text style={[st.metaText, { color: t.textMuted }]}>
             {showDate ? fmtDate(appt.appointment_date) + ' · ' : ''}{fmt12(appt.start_time)}
           </Text>
-          <Text style={[st.typeDot, { color: isVirtual ? '#5B9EFF' : t.textMuted }]}>
-            {isVirtual ? '💻 Virtual' : '🏥 In-person'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? '#5B9EFF' : t.textMuted} />
+            <Text style={[st.typeDot, { color: isVirtual ? '#5B9EFF' : t.textMuted }]}>
+              {isVirtual ? 'Virtual' : 'In-person'}
+            </Text>
+          </View>
         </View>
         {appt.reason && (
           <Text style={[st.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>

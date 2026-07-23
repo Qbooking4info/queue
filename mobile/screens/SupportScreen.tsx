@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Linking, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -12,7 +13,7 @@ interface Props { navigation: any }
 
 const FAQS = [
   { q: 'How do I book an appointment?', a: 'Go to the Search tab or tap a hospital on the Home screen. Select a doctor, choose a date and time slot, fill in your details and confirm payment.' },
-  { q: 'Can I book for a family member?', a: 'Yes. During the booking flow, choose "A dependent" in the Booking for step. You can add dependents in Profile → Manage dependents.' },
+  { q: 'Can I book for a family member?', a: 'Yes. During the booking flow, choose "A dependent" in the Booking for step. You can add dependents in Profile › Manage dependents.' },
   { q: 'How do I cancel or reschedule?', a: 'Open the appointment in the Bookings tab and tap Reschedule or Cancel. Cancellations made at least 24 hours before receive a full refund.' },
   { q: 'What payment methods are accepted?', a: 'We accept debit/credit cards, bank transfer, USSD, and HMO insurance. You can switch your payment method before confirming.' },
   { q: 'How does the virtual consultation work?', a: 'Choose "Virtual" when selecting consultation type. A video room link will be sent to you 5 minutes before your slot. Join from the Bookings tab.' },
@@ -57,17 +58,17 @@ export function SupportScreen({ navigation }: Props) {
   }
 
   const CONTACT_OPTIONS = [
-    { icon: '💬', label: 'Live chat',  sub: 'Typically replies in minutes',   color: t.accent,   bg: t.accentBg,   border: t.accentBorder },
-    { icon: '📞', label: 'Call us',    sub: '+234 700 QUEUE (78383)',           color: '#38BDF8', bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.3)' },
-    { icon: '📧', label: 'Email us',   sub: 'support@queueapp.ng',             color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' },
-    { icon: '💚', label: 'WhatsApp',   sub: 'Chat on WhatsApp',                color: '#4ADE80', bg: 'rgba(74,222,128,0.1)', border: 'rgba(74,222,128,0.3)' },
+    { icon: 'chatbubbles-outline' as const, label: 'Live chat',  sub: 'Typically replies in minutes',   color: t.accent,   bg: t.accentBg,   border: t.accentBorder },
+    { icon: 'call-outline' as const,        label: 'Call us',    sub: '+234 700 QUEUE (78383)',           color: '#38BDF8', bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.3)' },
+    { icon: 'mail-outline' as const,        label: 'Email us',   sub: 'support@queueapp.ng',             color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' },
+    { icon: 'logo-whatsapp' as const,       label: 'WhatsApp',   sub: 'Chat on WhatsApp',                color: '#4ADE80', bg: 'rgba(74,222,128,0.1)', border: 'rgba(74,222,128,0.3)' },
   ]
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Support & Help</Text>
         <View style={{ width: 28 }} />
@@ -77,7 +78,7 @@ export function SupportScreen({ navigation }: Props) {
 
         {/* Hero */}
         <View style={[s.heroCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={{ fontSize: 32, marginBottom: 8 }}>👋</Text>
+          <Ionicons name="happy-outline" size={32} color={t.accent} style={{ marginBottom: 8 }} />
           <Text style={[s.heroTitle, { color: t.textPrimary }]}>How can we help?</Text>
           <Text style={[s.heroSub, { color: t.textMuted }]}>Our support team is available 8AM–10PM daily.</Text>
         </View>
@@ -87,7 +88,7 @@ export function SupportScreen({ navigation }: Props) {
         <View style={s.contactGrid}>
           {CONTACT_OPTIONS.map(opt => (
             <TouchableOpacity key={opt.label} onPress={() => handleContact(opt.label)} style={[s.contactCard, { backgroundColor: opt.bg, borderColor: opt.border }]}>
-              <Text style={{ fontSize: 24, marginBottom: 6 }}>{opt.icon}</Text>
+              <Ionicons name={opt.icon} size={24} color={opt.color} style={{ marginBottom: 6 }} />
               <Text style={[s.contactLabel, { color: opt.color }]}>{opt.label}</Text>
               <Text style={[s.contactSub, { color: t.textMuted }]} numberOfLines={1}>{opt.sub}</Text>
             </TouchableOpacity>
@@ -99,7 +100,7 @@ export function SupportScreen({ navigation }: Props) {
         <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           {sent ? (
             <View style={{ alignItems: 'center', padding: 12 }}>
-              <Text style={{ fontSize: 28, marginBottom: 8 }}>✅</Text>
+              <Ionicons name="checkmark-circle" size={28} color={t.accent} style={{ marginBottom: 8 }} />
               <Text style={[s.sentTitle, { color: t.textPrimary }]}>Message sent!</Text>
               <Text style={[s.sentSub, { color: t.textMuted }]}>We'll get back to you within 24 hours.</Text>
               <TouchableOpacity onPress={() => setSent(false)} style={[s.sendAgainBtn, { borderColor: t.cardBorder }]}>
@@ -141,7 +142,7 @@ export function SupportScreen({ navigation }: Props) {
         {/* App info */}
         <View style={[s.appInfo, { borderTopColor: t.cardBorder }]}>
           <Text style={[s.appInfoText, { color: t.textMuted }]}>Queue · v1.0.0 · queueapp.ng</Text>
-          <Text style={[s.appInfoText, { color: t.textMuted }]}>Made with ❤️ in Nigeria</Text>
+          <Text style={[s.appInfoText, { color: t.textMuted }]}>Made with love in Nigeria</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

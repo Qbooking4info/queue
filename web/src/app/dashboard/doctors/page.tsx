@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import Link from 'next/link'
+import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 
@@ -88,8 +89,10 @@ export default function DoctorsPage() {
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: C.amber }}>
-                        {'★'.repeat(Math.floor(d.avg_rating ?? 4))}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 1, color: C.amber }}>
+                        {Array.from({ length: Math.floor(d.avg_rating ?? 4) }).map((_, i) => (
+                          <Star key={i} size={12} fill={C.amber} strokeWidth={0} />
+                        ))}
                       </span>
                       <span style={{ fontSize: 11, color: C.textSub }}>
                         {d.avg_rating?.toFixed(1) ?? '—'} ({d.review_count ?? 0} reviews)
@@ -103,7 +106,9 @@ export default function DoctorsPage() {
                     {[
                       { label: 'Consult Fee', value: d.consultation_fee ? `₦${d.consultation_fee.toLocaleString()}` : '—' },
                       { label: 'Experience',  value: d.years_experience ? `${d.years_experience}yr` : '—' },
-                      { label: 'Virtual',     value: d.accepts_virtual ? '✓ Yes' : '✗ No' },
+                      { label: 'Virtual',     value: d.accepts_virtual
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Check size={12} /> Yes</span>
+                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><X size={12} /> No</span> },
                     ].map(s => (
                       <div key={s.label} style={{ background: C.bgAlt, borderRadius: 10, padding: '10px',
                         textAlign: 'center', transition: 'background .3s' }}>

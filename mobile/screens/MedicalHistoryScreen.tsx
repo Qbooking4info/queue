@@ -106,7 +106,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Medical History</Text>
         <View style={{ width: 28 }} />
@@ -321,9 +321,10 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                       </View>
                     )}
                     <View style={[s.apptFooter, { borderTopColor: t.cardBorder }]}>
-                      <View style={[s.apptTypeBadge, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                      <View style={[s.apptTypeBadge, { backgroundColor: t.inputBg, borderColor: t.cardBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Ionicons name={a.type === 'virtual' ? 'videocam-outline' : 'walk-outline'} size={10} color={t.textMuted} />
                         <Text style={[s.apptTypeBadgeText, { color: t.textMuted }]}>
-                          {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'} · {a.booking_ref}
+                          {a.type === 'virtual' ? 'Virtual' : 'In-person'} · {a.booking_ref}
                         </Text>
                       </View>
                     </View>

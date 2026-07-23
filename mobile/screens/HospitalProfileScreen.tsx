@@ -57,7 +57,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: t.canvasBg }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={[styles.backArrow, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={styles.heroRow}>
           <Avatar initials={hospital.avatar} bg={hospital.avatarBg} size={58} />
@@ -93,7 +93,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Stats */}
         <View style={styles.statsGrid}>
           {[
-            { label: 'Rating',   value: `${hospital.rating} ★` },
+            { label: 'Rating',   value: String(hospital.rating) },
             { label: 'Reviews',  value: String(hospital.reviews) },
             { label: 'Wait',     value: hospital.wait },
             { label: 'Distance', value: hospital.distance },
@@ -154,7 +154,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
                 onPress={() => bookInPerson()}
                 style={[styles.serviceChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                 <Text style={[styles.serviceText, { color: t.accent }]}>{s}</Text>
-                <Text style={[styles.serviceBookText, { color: t.accent }]}>→</Text>
+                <Ionicons name="chevron-forward" size={12} color={t.accent} />
               </TouchableOpacity>
             ))}
             <View style={[styles.serviceNote, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
@@ -220,8 +220,9 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             {/* Directions button fallback when no map coords */}
             {(hospital.latitude == null || hospital.longitude == null) && (
               <TouchableOpacity onPress={openDirections}
-                style={[styles.directionsBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, marginTop: 12 }]}>
-                <Text style={[styles.directionsBtnText, { color: t.accent }]}>🗺 Get Directions</Text>
+                style={[styles.directionsBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+                <Ionicons name="navigate-outline" size={15} color={t.accent} />
+                <Text style={[styles.directionsBtnText, { color: t.accent }]}>Get Directions</Text>
               </TouchableOpacity>
             )}
           </>
@@ -255,7 +256,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
                 <Ionicons name="videocam-outline" size={16} color="#fff" />
                 <Text style={styles.ctaBtnPrimaryText}>Book Virtual</Text>
               </View>
-              <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)' }]}>Choose a doctor →</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
+                <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)', marginTop: 0 }]}>Choose a doctor</Text>
+                <Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.75)" />
+              </View>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity

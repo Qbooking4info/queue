@@ -18,7 +18,10 @@ import {
   getDoctors as getDoctorsForHospital,
   fmtLocalDate,
 } from '@/lib/admin-api'
-import { CheckCircle2, ClipboardList } from 'lucide-react'
+import {
+  CheckCircle2, ClipboardList, X, AlertTriangle, Zap, RefreshCw, Search as SearchIcon,
+  Check, Clock, Video, Building2, Footprints, Stethoscope, type LucideIcon,
+} from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -41,6 +44,13 @@ function urgencyColor(u: string | undefined, C: any) {
   if (u === 'emergency') return { bg: C.redLight, text: C.red, border: `${C.red}4D` }
   if (u === 'urgent')    return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
   return null
+}
+function IconLabel({ icon: Icon, children, size = 12 }: { icon: LucideIcon; children: React.ReactNode; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <Icon size={size} /> {children}
+    </span>
+  )
 }
 
 // ── Walk-in Booking Modal ─────────────────────────────────────────────────────
@@ -163,7 +173,7 @@ function WalkInModal({
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
               fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -293,8 +303,9 @@ function WalkInModal({
               </div>
               {error && (
                 <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-                  ⚠️ {error}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={14} /> {error}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -365,7 +376,7 @@ function AssignDoctorModal({
           <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>
-            ✕
+            <X size={14} />
           </button>
         </div>
         {appointment.clinic_id && (
@@ -402,8 +413,9 @@ function AssignDoctorModal({
         </div>
         {error && (
           <div style={{ margin: '0 22px 14px', background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-            borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-            ⚠️ {error}
+            borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={14} /> {error}
           </div>
         )}
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
@@ -508,7 +520,7 @@ function DetailPanel({
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Appointment Detail</div>
           <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
-              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>✕</button>
+              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}><X size={14} /></button>
         </div>
         <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
@@ -516,8 +528,8 @@ function DetailPanel({
             { label: 'Patient',       value: appt.patient_name },
             { label: 'Date / Time',   value: `${appt.appointment_date} · ${appt.start_time}` },
             { label: 'Doctor',        value: appt.doctor_name || (appt.assigned_doctor_name ? `Assigned: ${appt.assigned_doctor_name}` : 'Unassigned') },
-            { label: 'Type',          value: appt.type === 'virtual' ? '💻 Virtual' : '🏥 In-person' },
-            { label: 'Mode',          value: appt.booking_mode === 'walkin' ? '🚶 Walk-in' : appt.booking_mode === 'hospital' ? '🏥 Hospital (OPD)' : '👨‍⚕️ Doctor-specific' },
+            { label: 'Type',          value: appt.type === 'virtual' ? <IconLabel icon={Video}>Virtual</IconLabel> : <IconLabel icon={Building2}>In-person</IconLabel> },
+            { label: 'Mode',          value: appt.booking_mode === 'walkin' ? <IconLabel icon={Footprints}>Walk-in</IconLabel> : appt.booking_mode === 'hospital' ? <IconLabel icon={Building2}>Hospital (OPD)</IconLabel> : <IconLabel icon={Stethoscope}>Doctor-specific</IconLabel> },
             { label: 'Urgency',       value: appt.urgency ?? 'Routine' },
             { label: 'Reason',        value: appt.reason ?? '—' },
             { label: 'Clinic',        value: appt.clinic_name ?? 'Main Hospital' },
@@ -540,14 +552,16 @@ function DetailPanel({
           )}
           {appt.approval_note && (
             <div style={{ background: 'rgba(239,159,39,0.1)', border: '1px solid rgba(239,159,39,0.25)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#EF9F27' }}>
-              📋 {appt.approval_note}
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#EF9F27',
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ClipboardList size={14} /> {appt.approval_note}
             </div>
           )}
           {urg && (
             <div style={{ background: urg.bg, border: `1px solid ${urg.border}`,
-              borderRadius: 10, padding: '8px 14px', fontSize: 12, color: urg.text, fontWeight: 700 }}>
-              {appt.urgency === 'emergency' ? '🚨' : '⚡'} {(appt.urgency ?? 'routine').toUpperCase()} — handle as priority
+              borderRadius: 10, padding: '8px 14px', fontSize: 12, color: urg.text, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              {appt.urgency === 'emergency' ? <AlertTriangle size={13} /> : <Zap size={13} />} {(appt.urgency ?? 'routine').toUpperCase()} — handle as priority
             </div>
           )}
           {appt.no_show_at && appt.reschedule_deadline && (
@@ -718,10 +732,10 @@ export default function AppointmentsPage() {
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-              transition: 'opacity 0.15s' }}
+              transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-            ↻ Refresh
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
@@ -736,14 +750,16 @@ export default function AppointmentsPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200, background: C.card, border: `1px solid ${C.border}`,
           borderRadius: 10, padding: '9px 14px', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ color: C.textMuted }}>🔍</span>
+          <SearchIcon size={14} style={{ color: C.textMuted }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search patient, doctor, booking ID…"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13,
               color: C.text, background: 'none', fontFamily: 'inherit' }} />
           {search && (
             <button onClick={() => setSearch('')}
-              style={{ color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              style={{ color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center' }}>
+              <X size={14} />
+            </button>
           )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -765,7 +781,9 @@ export default function AppointmentsPage() {
           marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{display:'flex',alignItems:'center',gap:4}}><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg>{actionError}</span>
           <button onClick={() => setActionError('')} aria-label="Close"
-            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center' }}>
+            <X size={14} />
+          </button>
         </div>
       )}
 
@@ -851,10 +869,10 @@ export default function AppointmentsPage() {
                       </div>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: needsAssign ? '#EF9F27' : C.text }}>
-                          {needsAssign ? '⚠ Unassigned' : a.assigned_doctor_name ?? a.doctor_name}
+                          {needsAssign ? <IconLabel icon={AlertTriangle} size={11}>Unassigned</IconLabel> : a.assigned_doctor_name ?? a.doctor_name}
                         </div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>
-                          {a.booking_mode === 'walkin' ? '🚶 Walk-in' : a.booking_mode === 'hospital' ? '🏥 OPD' : '👨‍⚕️ Direct'}
+                          {a.booking_mode === 'walkin' ? <IconLabel icon={Footprints} size={10}>Walk-in</IconLabel> : a.booking_mode === 'hospital' ? <IconLabel icon={Building2} size={10}>OPD</IconLabel> : <IconLabel icon={Stethoscope} size={10}>Direct</IconLabel>}
                         </div>
                       </div>
                     </div>
@@ -863,14 +881,14 @@ export default function AppointmentsPage() {
                     <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 600,
                       background: a.type === 'virtual' ? C.blueLight : C.accentLight,
                       color: a.type === 'virtual' ? C.blue : C.accent }}>
-                      {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                      {a.type === 'virtual' ? <IconLabel icon={Video} size={10}>Virtual</IconLabel> : <IconLabel icon={Building2} size={10}>In-person</IconLabel>}
                     </span>
                   </td>
                   <td style={{ padding: '11px 14px' }}>
                     {urg ? (
                       <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 700,
                         background: urg.bg, color: urg.text, border: `1px solid ${urg.border}` }}>
-                        {a.urgency === 'emergency' ? '🚨' : '⚡'} {a.urgency}
+                        {a.urgency === 'emergency' ? <IconLabel icon={AlertTriangle} size={10}>{a.urgency}</IconLabel> : <IconLabel icon={Zap} size={10}>{a.urgency}</IconLabel>}
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, color: C.textMuted }}>Routine</span>
@@ -891,8 +909,9 @@ export default function AppointmentsPage() {
                       </div>
                     )}
                     {a.status === 'completed' && a.consult_duration_secs != null && (
-                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
-                        🕐 {formatDuration(a.consult_duration_secs)}
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub,
+                        display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Clock size={10} /> {formatDuration(a.consult_duration_secs)}
                       </div>
                     )}
                   </td>
@@ -912,8 +931,9 @@ export default function AppointmentsPage() {
                           <button onClick={() => setVitalsAppt(a)}
                             style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
                               background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
-                              color: a.vitals_recorded_at ? C.accent : C.textMuted }}>
-                            {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
+                              color: a.vitals_recorded_at ? C.accent : C.textMuted,
+                              display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            {a.vitals_recorded_at ? <><Check size={10} /> Vitals</> : 'Vitals'}
                           </button>
                         )}
                         {/* Approve / Reject — admins and front desk only */}

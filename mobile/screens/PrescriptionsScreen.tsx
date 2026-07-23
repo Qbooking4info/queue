@@ -32,7 +32,7 @@ export function PrescriptionsScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Prescriptions & Labs</Text>
         <View style={{ width: 28 }} />

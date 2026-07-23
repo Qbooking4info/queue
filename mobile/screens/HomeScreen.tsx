@@ -28,31 +28,31 @@ const SURGERY_LABELS = [
 ]
 const PREVIEW_COUNT = 10
 
-function getGreeting(): { salutation: string; emoji: string } {
+function getGreeting(): { salutation: string; icon: keyof typeof Ionicons.glyphMap } {
   const hour = new Date().getHours()
-  if (hour < 12) return { salutation: 'Good morning',   emoji: '' }
-  if (hour < 16) return { salutation: 'Good afternoon', emoji: '' }
-  return               { salutation: 'Good evening',   emoji: '' }
+  if (hour < 12) return { salutation: 'Good morning',   icon: 'sunny-outline' }
+  if (hour < 16) return { salutation: 'Good afternoon', icon: 'partly-sunny-outline' }
+  return               { salutation: 'Good evening',   icon: 'moon-outline' }
 }
 
 const WELLNESS_TIPS = [
-  'Remember to stay hydrated today 💧',
-  'Your health is your wealth 🌿',
-  'A check-up a day keeps worries away 🩺',
-  'Taking care of yourself is a priority 💚',
-  'Small steps lead to great health 🏃',
+  'Remember to stay hydrated today',
+  'Your health is your wealth',
+  'A check-up a day keeps worries away',
+  'Taking care of yourself is a priority',
+  'Small steps lead to great health',
 ]
 
 function getDayMessage(): string {
   const day = new Date().getDay()
   const messages: Record<number, string> = {
-    0: 'Happy Sunday! Rest and recharge 🛌',
-    1: 'New week, fresh start 💪',
-    2: 'Keep the momentum going 🔥',
-    3: 'Midweek check-in — how are you feeling? 😊',
-    4: 'Almost there, stay strong 🌟',
-    5: 'Happy Friday! Wrap up and unwind 🎉',
-    6: 'Happy Saturday! Make it count 🌈',
+    0: 'Happy Sunday! Rest and recharge',
+    1: 'New week, fresh start',
+    2: 'Keep the momentum going',
+    3: 'Midweek check-in — how are you feeling?',
+    4: 'Almost there, stay strong',
+    5: 'Happy Friday! Wrap up and unwind',
+    6: 'Happy Saturday! Make it count',
   }
   return messages[day] ?? WELLNESS_TIPS[Math.floor(Math.random() * WELLNESS_TIPS.length)]
 }
@@ -130,7 +130,7 @@ export function HomeScreen({ navigation }: Props) {
   // Profile completion banner — session-only dismissal
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
-  const { salutation, emoji } = getGreeting()
+  const { salutation, icon: greetingIcon } = getGreeting()
   const dayMessage            = getDayMessage()
   const preview               = specialties.slice(0, PREVIEW_COUNT)
   const general               = specialties.filter(s => !SURGERY_LABELS.includes(s.label))
@@ -204,13 +204,14 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={[s.sheetTitle, { color: t.textPrimary }]}>All Specialties</Text>
             <TouchableOpacity onPress={() => { haptics.tap(); setShowAll(false) }}
               style={[s.closeBtn, { backgroundColor: t.inputBg }]}>
-              <Text style={{ color: t.textMuted, fontSize: 14, fontWeight: '700' }}>✕</Text>
+              <Ionicons name="close" size={16} color={t.textMuted} />
             </TouchableOpacity>
           </View>
           {activeSpecialty && (
             <TouchableOpacity onPress={clearFilter}
-              style={[s.clearModalBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginHorizontal: 16, marginBottom: 8 }]}>
-              <Text style={[s.clearModalText, { color: t.accent }]}>✕  Clear filter: {activeSpecialty}</Text>
+              style={[s.clearModalBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginHorizontal: 16, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+              <Ionicons name="close" size={13} color={t.accent} />
+              <Text style={[s.clearModalText, { color: t.accent }]}>Clear filter: {activeSpecialty}</Text>
             </TouchableOpacity>
           )}
           <ScrollView showsVerticalScrollIndicator={false}
@@ -234,7 +235,10 @@ export function HomeScreen({ navigation }: Props) {
         {/* Header */}
         <View style={s.header}>
           <View style={{ flex: 1 }}>
-            <Text style={[s.greeting, { color: t.textMuted }]}>{salutation} {emoji}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={[s.greeting, { color: t.textMuted }]}>{salutation}</Text>
+              <Ionicons name={greetingIcon} size={13} color={t.textMuted} />
+            </View>
             <Text style={[s.headline, { color: t.textPrimary }]}>{firstName}</Text>
             <Text style={[s.dayMsg, { color: t.textMuted }]} numberOfLines={1}>{dayMessage}</Text>
           </View>
@@ -256,12 +260,13 @@ export function HomeScreen({ navigation }: Props) {
               </Text>
             </View>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Profile') }}
-              style={[s.profileBannerBtn, { backgroundColor: '#EF9F27' }]}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete →</Text>
+              style={[s.profileBannerBtn, { backgroundColor: '#EF9F27', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete</Text>
+              <Ionicons name="arrow-forward" size={12} color="#000" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { haptics.tap(); setBannerDismissed(true) }}
               style={s.profileBannerDismiss}>
-              <Text style={{ color: 'rgba(239,159,39,0.5)', fontSize: 14 }}>✕</Text>
+              <Ionicons name="close" size={14} color="rgba(239,159,39,0.5)" />
             </TouchableOpacity>
           </View>
         )}
@@ -295,7 +300,7 @@ export function HomeScreen({ navigation }: Props) {
             style={[s.banner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <Text style={[s.bannerLabel, { color: t.accent }]}>BOOK YOUR FIRST APPOINTMENT</Text>
             <Text style={[s.bannerDoctor, { color: t.textPrimary }]}>Find a hospital near you</Text>
-            <Text style={[s.bannerSub, { color: t.textMuted }]}>Search by specialty, hospital or doctor →</Text>
+            <Text style={[s.bannerSub, { color: t.textMuted }]}>Search by specialty, hospital or doctor</Text>
           </TouchableOpacity>
         )}
 
@@ -389,8 +394,9 @@ export function HomeScreen({ navigation }: Props) {
               </Text>
             </View>
             <TouchableOpacity onPress={clearFilter}
-              style={[s.clearBtn, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Text style={[s.clearBtnText, { color: t.accent }]}>✕ Clear</Text>
+              style={[s.clearBtn, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <Ionicons name="close" size={11} color={t.accent} />
+              <Text style={[s.clearBtnText, { color: t.accent }]}>Clear</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -401,8 +407,10 @@ export function HomeScreen({ navigation }: Props) {
             {activeSpecialty ? `${activeSpecialty} hospitals` : 'Nearby hospitals'}
           </Text>
           {!activeSpecialty && (
-            <TouchableOpacity onPress={() => navigation.navigate('Search')}>
-              <Text style={[s.seeAll, { color: t.accent }]}>See all →</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Search')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Text style={[s.seeAll, { color: t.accent }]}>See all</Text>
+              <Ionicons name="chevron-forward" size={13} color={t.accent} />
             </TouchableOpacity>
           )}
         </View>
@@ -439,8 +447,9 @@ export function HomeScreen({ navigation }: Props) {
               Try searching by specialty, hospital name, or doctor.
             </Text>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
-              style={[s.clearBtn, { backgroundColor: t.accent, borderColor: t.accent, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10 }]}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Search hospitals →</Text>
+              style={[s.clearBtn, { backgroundColor: t.accent, borderColor: t.accent, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Search hospitals</Text>
+              <Ionicons name="arrow-forward" size={14} color="#fff" />
             </TouchableOpacity>
           </View>
         )}

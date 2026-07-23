@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   CalendarDays, CheckCircle2, Users, Star, Clock, Stethoscope,
   Tag, Settings, Video, Building2, Calendar, ClipboardList,
-  AlertCircle, AlertTriangle,
+  AlertCircle, AlertTriangle, ArrowRight,
 } from 'lucide-react'
 
 const DOC_COLORS: Record<string, string> = {}
@@ -170,7 +170,7 @@ export default function OverviewPage() {
   const Header = () => (
     <div style={{ marginBottom: SPACE.xl }}>
       <div style={{ ...T.display, color: C.text }}>
-        Good {greeting}, {greetingName()} 👋
+        Good {greeting}, {greetingName()}
       </div>
       <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }} suppressHydrationWarning>
         {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {timeStr}
@@ -248,8 +248,8 @@ export default function OverviewPage() {
           <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ ...T.subheading, color: C.text }}>Today's Appointments</div>
-            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
-              View all →
+            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              View all <ArrowRight size={12} />
             </Link>
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
@@ -340,8 +340,8 @@ export default function OverviewPage() {
             <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ ...T.subheading, color: C.text }}>Appointments</div>
-              <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
-                View all →
+              <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                View all <ArrowRight size={12} />
               </Link>
             </div>
             <div style={{ maxHeight: 420, overflowY: 'auto' }}>
@@ -436,8 +436,8 @@ export default function OverviewPage() {
               <div style={{ ...T.subheading, color: C.text }}>Appointments</div>
               {!loading && <div style={{ ...T.caption, color: C.textMuted, marginTop: 1 }}>{appts.length} records</div>}
             </div>
-            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600 }}>
-              View all →
+            <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              View all <ArrowRight size={12} />
             </Link>
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
@@ -456,8 +456,8 @@ export default function OverviewPage() {
             ))}
             {appts.length > 10 && (
               <div style={{ padding: `${SPACE.md}px 20px`, textAlign: 'center' }}>
-                <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
-                  +{appts.length - 10} more — View all →
+                <Link href="/dashboard/appointments" style={{ ...T.caption, color: C.accent, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  +{appts.length - 10} more — View all <ArrowRight size={12} />
                 </Link>
               </div>
             )}

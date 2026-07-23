@@ -146,8 +146,9 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                 {filter === 'upcoming' && (
                   <TouchableOpacity
                     onPress={() => { haptics.tap(); navigation?.navigate('BookingFlow', {}) }}
-                    style={[s.bookNowBtn, { backgroundColor: t.accent }]}>
-                    <Text style={s.bookNowText}>Book an appointment →</Text>
+                    style={[s.bookNowBtn, { backgroundColor: t.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <Text style={s.bookNowText}>Book an appointment</Text>
+                    <Ionicons name="arrow-forward" size={16} color={s.bookNowText.color as string} />
                   </TouchableOpacity>
                 )}
               </View>

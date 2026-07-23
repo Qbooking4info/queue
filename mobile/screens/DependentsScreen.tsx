@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, Modal, Pressable, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -82,14 +83,17 @@ export function DependentsScreen({ navigation }: Props) {
     load()
   }
 
-  const RELATION_ICONS: Record<string, string> = { spouse: '💑', child: '👶', parent: '👨‍👩‍👦', sibling: '🤝', other: '👤', Spouse: '💑', Child: '👶', Parent: '👨‍👩‍👦', Sibling: '🤝', Other: '👤' }
+  const RELATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+    spouse: 'heart-outline', child: 'happy-outline', parent: 'people-outline', sibling: 'body-outline', other: 'person-outline',
+    Spouse: 'heart-outline', Child: 'happy-outline', Parent: 'people-outline', Sibling: 'body-outline', Other: 'person-outline',
+  }
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Dependents</Text>
         <TouchableOpacity onPress={openAdd}
@@ -117,9 +121,10 @@ export function DependentsScreen({ navigation }: Props) {
             <View style={s.pillRow}>
               {RELATIONSHIPS.map(r => (
                 <TouchableOpacity key={r.value} onPress={() => setForm(f => ({ ...f, relationship: r.value }))}
-                  style={[s.pill, { borderColor: form.relationship === r.value ? t.accent : t.cardBorder, backgroundColor: form.relationship === r.value ? t.accentBg : t.inputBg }]}>
+                  style={[s.pill, { flexDirection: 'row', alignItems: 'center', gap: 4, borderColor: form.relationship === r.value ? t.accent : t.cardBorder, backgroundColor: form.relationship === r.value ? t.accentBg : t.inputBg }]}>
+                  <Ionicons name={RELATION_ICONS[r.label] ?? 'person-outline'} size={12} color={form.relationship === r.value ? t.accent : t.textMuted} />
                   <Text style={[s.pillText, { color: form.relationship === r.value ? t.accent : t.textMuted, fontWeight: form.relationship === r.value ? '700' : '400' }]}>
-                    {RELATION_ICONS[r.label] ?? '👤'} {r.label}
+                    {r.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -176,7 +181,7 @@ export function DependentsScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {dependents.length === 0 ? (
             <View style={[s.emptyCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>👨‍👩‍👧</Text>
+              <Ionicons name="people-outline" size={40} color={t.textMuted} style={{ marginBottom: 12, opacity: 0.4 }} />
               <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No dependents yet</Text>
               <Text style={[s.emptySub, { color: t.textMuted }]}>
                 Add family members so you can book appointments on their behalf.
@@ -193,7 +198,7 @@ export function DependentsScreen({ navigation }: Props) {
                 <TouchableOpacity key={d.id} onPress={() => openEdit(d)} activeOpacity={0.75}
                   style={[s.depCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                   <View style={[s.depAvatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                    <Text style={{ fontSize: 22 }}>{RELATION_ICONS[d.relationship ?? ''] ?? '👤'}</Text>
+                    <Ionicons name={RELATION_ICONS[d.relationship ?? ''] ?? 'person-outline'} size={22} color={t.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.depName, { color: t.textPrimary }]}>{d.full_name}</Text>

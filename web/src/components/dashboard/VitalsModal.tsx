@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { updateAppointmentVitals } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
@@ -125,8 +126,9 @@ export function VitalsModal({ appointment, onClose, onSaved, recordedByAuthId }:
 
           {error && (
             <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-              ⚠️ {error}
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={14} /> {error}
             </div>
           )}
 

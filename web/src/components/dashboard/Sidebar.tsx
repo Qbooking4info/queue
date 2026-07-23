@@ -7,7 +7,7 @@ import type { UserRole } from '@/lib/admin-api'
 import {
   LayoutDashboard, CalendarDays, ListOrdered, CalendarRange,
   Stethoscope, Users, Settings, BarChart2, Tag, Building2,
-  Hospital, Monitor, LogOut, type LucideIcon,
+  Hospital, Monitor, LogOut, ArrowLeft, type LucideIcon,
 } from 'lucide-react'
 
 type NavItem = { href: string; icon: LucideIcon; label: string }
@@ -151,9 +151,9 @@ export function Sidebar() {
         </div>
         {isSuperWithHospital && (
           <Link href="/dashboard/hospitals"
-            style={{ display: 'block', marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)',
+            style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)',
               textDecoration: 'none', fontWeight: 500 }}>
-            ← All Hospitals
+            <ArrowLeft size={11} /> All Hospitals
           </Link>
         )}
       </div>

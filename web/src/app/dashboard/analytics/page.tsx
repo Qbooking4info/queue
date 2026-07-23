@@ -8,7 +8,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { getRangeStats, getAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
-import { CalendarDays, CheckCircle2, XCircle, Star } from 'lucide-react'
+import { CalendarDays, CheckCircle2, XCircle, Star, AlertTriangle, Building2, Video } from 'lucide-react'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun']
 const BOOKINGS = [210, 248, 290, 312, 387, 421]
@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
       <div style={{ background: 'rgba(239,159,39,0.12)', border: '1px solid rgba(239,159,39,0.3)',
         borderRadius: 12, padding: '12px 16px', marginBottom: 16,
         display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+        <AlertTriangle size={18} style={{ flexShrink: 0, color: '#EF9F27' }} />
         <div style={{ fontSize: 13, color: '#EF9F27', fontWeight: 600 }}>
           Sample data — Real analytics coming soon. The monthly booking and revenue figures on this page are illustrative only.
         </div>
@@ -164,11 +164,11 @@ export default function AnalyticsPage() {
             <>
               <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
                 {[
-                  { label: 'In-person', count: types.inperson, color: C.accent, icon: '🏥' },
-                  { label: 'Virtual',   count: types.virtual,  color: C.blue,   icon: '💻' },
+                  { label: 'In-person', count: types.inperson, color: C.accent, icon: <Building2 size={20} /> },
+                  { label: 'Virtual',   count: types.virtual,  color: C.blue,   icon: <Video size={20} /> },
                 ].map(t => (
                   <div key={t.label} style={{ flex: 1, background: C.bgAlt, borderRadius: 12, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 20, marginBottom: 6 }}>{t.icon}</div>
+                    <div style={{ marginBottom: 6, color: t.color }}>{t.icon}</div>
                     <div style={{ fontSize: 22, fontWeight: 800, color: t.color }}>{t.count}</div>
                     <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{t.label}</div>
                     <div style={{ fontSize: 11, color: C.textMuted }}>

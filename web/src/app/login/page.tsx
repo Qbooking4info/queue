@@ -2,6 +2,7 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { CalendarDays, Stethoscope, BarChart3, Bell, Check, Eye, EyeOff, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 function LoginContent() {
@@ -75,14 +76,14 @@ function LoginContent() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 48 }}>
             {[
-              { icon: '📅', text: 'Real-time queue management' },
-              { icon: '👨‍⚕️', text: 'Doctor schedule & availability' },
-              { icon: '📊', text: 'Analytics & revenue insights' },
-              { icon: '🔔', text: 'Instant booking notifications' },
+              { icon: <CalendarDays size={16} />, text: 'Real-time queue management' },
+              { icon: <Stethoscope size={16} />,  text: 'Doctor schedule & availability' },
+              { icon: <BarChart3 size={16} />,    text: 'Analytics & revenue insights' },
+              { icon: <Bell size={16} />,         text: 'Instant booking notifications' },
             ].map(f => (
               <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,232,122,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00E87A', flexShrink: 0 }}>
                   {f.icon}
                 </div>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{f.text}</span>
@@ -105,8 +106,9 @@ function LoginContent() {
           {justRegistered && (
             <div style={{ marginBottom: 24, padding: '14px 16px', background: '#E6F9EF',
               border: '1px solid rgba(0,160,80,0.3)', borderRadius: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0A7A40', marginBottom: 3 }}>
-                ✓ Hospital registered successfully!
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0A7A40', marginBottom: 3,
+                display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Check size={14} /> Hospital registered successfully!
               </div>
               <div style={{ fontSize: 12, color: '#1A6040', lineHeight: 1.6 }}>
                 Your hospital is pending verification. Sign in below to access your dashboard while we review your details.
@@ -146,17 +148,19 @@ function LoginContent() {
                   onFocus={() => setPassFocus(true)} onBlur={() => setPassFocus(false)}
                   style={{ ...inputStyle(passFocus), paddingRight: 44 }} />
                 <button type="button" onClick={() => setShowPass(v => !v)}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#6A8FAA' }}>
-                  {showPass ? '🙈' : '👁'}
+                    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6A8FAA' }}>
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
             {error && (
               <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
-                padding: '10px 14px', fontSize: 13, color: '#E03E3E' }}>
-                ⚠️ {error}
+                padding: '10px 14px', fontSize: 13, color: '#E03E3E',
+                display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={14} /> {error}
               </div>
             )}
 
@@ -164,8 +168,9 @@ function LoginContent() {
               style={{ width: '100%', background: '#1A7FC1', color: '#FFFFFF', border: 'none',
                 borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                fontFamily: 'inherit', marginTop: 4, transition: 'opacity .15s' }}>
-              {loading ? 'Signing in…' : 'Sign in to dashboard →'}
+                fontFamily: 'inherit', marginTop: 4, transition: 'opacity .15s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {loading ? 'Signing in…' : <>Sign in to dashboard <ArrowRight size={15} /></>}
             </button>
           </form>
 

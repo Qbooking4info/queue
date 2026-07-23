@@ -1,6 +1,7 @@
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Settings, Stethoscope, Headset } from 'lucide-react'
 import { removeStaff } from './actions'
 import CredentialsBadge from './CredentialsBadge'
 import FrontDeskSetup from './FrontDeskSetup'
@@ -94,12 +95,12 @@ export default async function StaffPage() {
       {/* Role guide */}
       <div className="mt-8 grid grid-cols-3 gap-3">
         {[
-          { role: 'Admin',      icon: '⚙️',  desc: 'Full access — manage settings, doctors, staff, and all appointments' },
-          { role: 'Specialist', icon: '👨‍⚕️', desc: 'View own schedule, add diagnosis and notes to patient appointments' },
-          { role: 'Front Desk', icon: null, desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
+          { role: 'Admin',      icon: <Settings size={20} />,    desc: 'Full access — manage settings, doctors, staff, and all appointments' },
+          { role: 'Specialist', icon: <Stethoscope size={20} />, desc: 'View own schedule, add diagnosis and notes to patient appointments' },
+          { role: 'Front Desk', icon: <Headset size={20} />,     desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
         ].map(r => (
           <div key={r.role} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
-            <div className="text-xl mb-2">{r.icon}</div>
+            <div className="mb-2 text-[#7A9089]">{r.icon}</div>
             <div className="font-semibold text-sm mb-1">{r.role}</div>
             <div className="text-xs text-[#4A6058] leading-relaxed">{r.desc}</div>
           </div>

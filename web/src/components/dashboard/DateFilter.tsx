@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Calendar, ChevronUp, ChevronDown } from 'lucide-react'
 
 export type DateRangeKey =
   | 'today' | 'tomorrow'
@@ -203,15 +204,15 @@ export function DateFilter({ value, onChange, label }: Props) {
           color: C.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
           transition: 'border-color .15s',
         }}>
-        <span style={{ color: C.accent, fontSize: 14 }}>📅</span>
+        <Calendar size={14} color={C.accent} />
         <span>{label_text}</span>
         {date_text && (
           <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 400 }}>
             · {date_text}
           </span>
         )}
-        <span style={{ color: C.textMuted, fontSize: 10, marginLeft: 2 }}>
-          {open ? '▲' : '▼'}
+        <span style={{ color: C.textMuted, marginLeft: 2, display: 'flex' }}>
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </span>
       </button>
 

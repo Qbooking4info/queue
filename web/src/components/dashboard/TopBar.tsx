@@ -1,11 +1,12 @@
 'use client'
 import { useState } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Search, Bell, XCircle, Star, Wallet, ClipboardList } from 'lucide-react'
 
 const MOCK_NOTIFICATIONS = [
   { type: 'new',     msg: 'New booking received — check Appointments',    time: 'Just now'  },
   { type: 'cancel',  msg: 'An appointment was cancelled by a patient',    time: '2 hrs ago' },
-  { type: 'review',  msg: 'New 5★ patient review posted',                 time: '4 hrs ago' },
+  { type: 'review',  msg: 'New 5-star patient review posted',             time: '4 hrs ago' },
   { type: 'payment', msg: 'Monthly payout processed to your bank',        time: 'Yesterday' },
 ]
 
@@ -34,7 +35,7 @@ export function TopBar() {
             transition: 'left .25s cubic-bezier(.34,1.56,.64,1)' }} />
         </div>
         <span style={{ fontSize: 12, fontWeight: 600, color: C.accent, whiteSpace: 'nowrap' }}>
-          {isForest ? '🌿 Forest' : '🏥 Clinical'}
+          {isForest ? 'Forest' : 'Clinical'}
         </span>
       </button>
 
@@ -44,7 +45,7 @@ export function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8,
         background: C.bgAlt, border: `1px solid ${C.border}`,
         borderRadius: 10, padding: '7px 14px', width: 240, transition: 'background .3s' }}>
-        <span style={{ fontSize: 13, color: C.textMuted }}>🔍</span>
+        <Search size={13} color={C.textMuted} />
         <input placeholder="Quick search…"
           style={{ border: 'none', outline: 'none', background: 'none',
             fontSize: 13, color: C.text, fontFamily: 'inherit', width: '100%' }} />
@@ -56,8 +57,8 @@ export function TopBar() {
           style={{ width: 38, height: 38, borderRadius: 10, background: C.bgAlt,
             border: `1px solid ${C.border}`, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, position: 'relative', transition: 'background .3s' }}>
-          🔔
+            color: C.textMuted, position: 'relative', transition: 'background .3s' }}>
+          <Bell size={16} />
           <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8,
             borderRadius: '50%', background: C.accent, border: `2px solid ${C.card}` }} />
         </button>
@@ -76,8 +77,9 @@ export function TopBar() {
                 <div key={i} style={{ padding: '10px 16px',
                   borderBottom: i < MOCK_NOTIFICATIONS.length - 1 ? `1px solid ${C.border}` : 'none',
                   display: 'flex', gap: 10 }}>
-                  <span style={{ fontSize: 16, flexShrink: 0 }}>
-                    {n.type === 'cancel' ? '🚫' : n.type === 'review' ? '⭐' : n.type === 'payment' ? '💰' : '📋'}
+                  <span style={{ flexShrink: 0, display: 'flex', color:
+                    n.type === 'cancel' ? C.red : n.type === 'review' ? C.amber : n.type === 'payment' ? C.accent : C.blue }}>
+                    {n.type === 'cancel' ? <XCircle size={16} /> : n.type === 'review' ? <Star size={16} /> : n.type === 'payment' ? <Wallet size={16} /> : <ClipboardList size={16} />}
                   </span>
                   <div>
                     <div style={{ fontSize: 12, color: C.text, lineHeight: 1.4 }}>{n.msg}</div>

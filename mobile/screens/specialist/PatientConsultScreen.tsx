@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
@@ -198,7 +199,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
         {/* Header */}
         <View style={st.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-            <Text style={[st.backArrow, { color: t.textMuted }]}>←</Text>
+            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
           </TouchableOpacity>
           <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>
             {patient?.full_name ?? 'Patient'}
@@ -240,9 +241,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 )}
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={[st.typeChip, { color: isVirtual ? '#85B7EB' : t.accent }]}>
-                  {isVirtual ? '💻 Virtual' : '🏥 In-person'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? '#85B7EB' : t.accent} />
+                  <Text style={[st.typeChip, { color: isVirtual ? '#85B7EB' : t.accent }]}>
+                    {isVirtual ? 'Virtual' : 'In-person'}
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
                   {fmt12(appt.start_time)}
                 </Text>
@@ -269,7 +273,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 {isVirtual ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)' }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => {
                       haptics.heavy()
                       navigation.navigate('DoctorVideoCall', {
@@ -278,23 +282,29 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                       })
                     }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#85B7EB' }}>📹  Start Video Call</Text>
+                    <Ionicons name="videocam-outline" size={16} color="#85B7EB" />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#85B7EB' }}>Start Video Call</Text>
                   </TouchableOpacity>
                 ) : canStart ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => { haptics.heavy(); updateStatus('in_progress') }}
                     disabled={statusUpdating}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>
-                      {statusUpdating ? '…' : '▶  Start Consultation'}
-                    </Text>
+                    {statusUpdating ? (
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                    ) : (
+                      <>
+                        <Ionicons name="play" size={14} color={t.accent} />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 ) : null}
 
                 {canComplete && (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => Alert.alert(
                       'Complete consultation?',
                       'Mark this appointment as completed?',
@@ -305,9 +315,14 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     )}
                     disabled={statusUpdating}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>
-                      {statusUpdating ? '…' : '✓  Complete'}
-                    </Text>
+                    {statusUpdating ? (
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark" size={14} color={t.accent} />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Complete</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -316,7 +331,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
           {isDone && (
             <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Text style={{ fontSize: 20 }}>✅</Text>
+              <Ionicons name="checkmark-circle" size={20} color={t.accent} />
               <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
             </View>
           )}
@@ -395,7 +410,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
             >
               {saving
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={st.saveTxt}>{saved ? '✓  Saved' : 'Save Vitals & Notes'}</Text>
+                : saved
+                  ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                      <Text style={st.saveTxt}>Saved</Text>
+                    </View>
+                  : <Text style={st.saveTxt}>Save Vitals & Notes</Text>
               }
             </TouchableOpacity>
           </View>

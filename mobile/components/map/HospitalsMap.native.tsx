@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import MapView, { Marker, Callout } from 'react-native-maps'
+import { Ionicons } from '@expo/vector-icons'
 import type { HospitalsMapProps } from './HospitalsMap.types'
 
 export function HospitalsMap({
@@ -26,7 +27,10 @@ export function HospitalsMap({
               <View style={s.callout}>
                 <Text style={s.calloutName}>{m.title}</Text>
                 {m.subtitle && <Text style={s.calloutSub}>{m.subtitle}</Text>}
-                <Text style={s.calloutLink}>Tap to view →</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 }}>
+                  <Text style={[s.calloutLink, { marginTop: 0 }]}>Tap to view</Text>
+                  <Ionicons name="arrow-forward" size={11} color="#00A651" />
+                </View>
               </View>
             </Callout>
           )}

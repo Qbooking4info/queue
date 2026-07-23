@@ -263,7 +263,7 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
           <Text style={[s.meta, { color: t.textMuted }]}>
             {appt.appointment_date !== today ? `${appt.appointment_date} · ` : ''}{fmt12(appt.start_time)}
             {appt.doctor ? ` · Dr. ${appt.doctor.full_name}` : ''}
-            {` · ${appt.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}`}
+            {' · '}<Ionicons name={appt.type === 'virtual' ? 'videocam-outline' : 'business-outline'} size={10} color={t.textMuted} />{appt.type === 'virtual' ? ' Virtual' : ' In-person'}
           </Text>
           {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
         </View>
@@ -286,14 +286,20 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
             <TouchableOpacity onPress={() => onApprove(appt)} disabled={!!actioning}
               style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
               {isLoading ? <ActivityIndicator size="small" color="#00C265" />
-                : <Text style={[s.actionText, { color: '#00C265' }]}>✓ Approve</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="checkmark" size={13} color="#00C265" />
+                    <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
+                  </View>}
             </TouchableOpacity>
           )}
           {canCheckIn && (
             <TouchableOpacity onPress={() => onCheckIn(appt)} disabled={!!actioning}
               style={[s.actionBtn, { backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)', flex: 1 }]}>
               {isLoading ? <ActivityIndicator size="small" color="#5B9EFF" />
-                : <Text style={[s.actionText, { color: '#5B9EFF' }]}>Check In →</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[s.actionText, { color: '#5B9EFF' }]}>Check In</Text>
+                    <Ionicons name="arrow-forward" size={13} color="#5B9EFF" />
+                  </View>}
             </TouchableOpacity>
           )}
         </View>

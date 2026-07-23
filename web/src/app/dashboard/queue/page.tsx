@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { X, RefreshCw, CheckCircle2, ClipboardList, AlertTriangle, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
@@ -91,7 +92,7 @@ export default function QueuePage() {
           // and the proper approval_status='approved' guard is respected.
           await approveAppointment(id)
         } else {
-          // pending → confirmed: only flip status; do NOT touch approval_status which may
+          // pending -> confirmed: only flip status; do NOT touch approval_status which may
           // already be 'auto_approved' (changing it to 'approved' would incorrectly imply
           // a manual review happened when none did).
           const supabaseClient = createClient()
@@ -158,7 +159,7 @@ export default function QueuePage() {
           marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{display:'flex',alignItems:'center',gap:4}}><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg>{actionError}</span>
           <button onClick={() => setActionError('')}
-            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
         </div>
       )}
 
@@ -181,8 +182,9 @@ export default function QueuePage() {
         <button onClick={() => { fetchQueue(); reload() }}
           style={{ marginLeft: 'auto', padding: '7px 18px', borderRadius: 99, fontSize: 13,
             fontWeight: 600, cursor: 'pointer', border: `1px solid ${C.border}`,
-            background: 'transparent', color: C.textMuted, fontFamily: 'inherit' }}>
-          ↻ Refresh
+            background: 'transparent', color: C.textMuted, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
@@ -195,8 +197,8 @@ export default function QueuePage() {
         </div>
       ) : shown.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>
-            {filter === 'active' ? '🟢' : '📋'}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+            {filter === 'active' ? <CheckCircle2 size={36} /> : <ClipboardList size={36} />}
           </div>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>
             {filter === 'active' ? 'Queue is clear' : 'No appointments'}
@@ -236,17 +238,23 @@ export default function QueuePage() {
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{appt.patient_name}</div>
                     {isEmergency && (
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
-                        background: C.red, color: '#fff', whiteSpace: 'nowrap' }}>
-                        🚨 EMERGENCY
+                        background: C.red, color: '#fff', whiteSpace: 'nowrap',
+                        display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <AlertTriangle size={10} /> EMERGENCY
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-                    {appt.start_time} · Dr. {appt.doctor_name}
-                    {appt.booking_ref ? ` · #${appt.booking_ref}` : ''}
-                    {appt.status === 'checked_in' && appt.estimated_wait != null ? ` · ~${appt.estimated_wait}m wait` : ''}
-                    {appt.status === 'completed' && appt.consult_duration_secs != null
-                      ? ` · 🕐 ${Math.round(appt.consult_duration_secs / 60)} min` : ''}
+                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <span>
+                      {appt.start_time} · Dr. {appt.doctor_name}
+                      {appt.booking_ref ? ` · #${appt.booking_ref}` : ''}
+                      {appt.status === 'checked_in' && appt.estimated_wait != null ? ` · ~${appt.estimated_wait}m wait` : ''}
+                    </span>
+                    {appt.status === 'completed' && appt.consult_duration_secs != null && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        · <Clock size={11} /> {Math.round(appt.consult_duration_secs / 60)} min
+                      </span>
+                    )}
                   </div>
                 </div>
 

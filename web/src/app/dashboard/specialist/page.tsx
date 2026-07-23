@@ -2,6 +2,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Building2, Monitor } from 'lucide-react'
 import { fmtLocalDate } from '@/lib/admin-api'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -71,8 +72,8 @@ export default async function SpecialistPage() {
             {specialty?.name ?? 'Specialist'} · {new Date(today + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
           {hospital && (
-            <p className="text-xs text-[#4A6058] mt-1">
-              🏥 {hospital.name}{hospital.city ? ` · ${hospital.city}` : ''}
+            <p className="text-xs text-[#4A6058] mt-1 flex items-center gap-1">
+              <Building2 size={11} /> {hospital.name}{hospital.city ? ` · ${hospital.city}` : ''}
             </p>
           )}
         </div>
@@ -111,7 +112,10 @@ export default async function SpecialistPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
                       <div className="text-xs text-[#7A9089] mt-0.5">
-                        {a.start_time?.slice(0, 5)} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                        {a.start_time?.slice(0, 5)} ·{' '}
+                        <span className="inline-flex items-center gap-1 align-middle">
+                          {a.type === 'virtual' ? <><Monitor size={11} /> Virtual</> : <><Building2 size={11} /> In-person</>}
+                        </span>
                         {patient?.gender ? ` · ${patient.gender}` : ''}
                       </div>
                     </div>

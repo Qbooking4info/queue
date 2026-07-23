@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { X, Check } from 'lucide-react'
 import { CLINIC_SERVICE_GROUPS } from '@/lib/clinic-services'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -56,7 +57,9 @@ export function ServiceTagPicker({ selected, onChange }: Props) {
               {tag}
               <span
                 onClick={e => { e.stopPropagation(); toggle(tag) }}
-                style={{ cursor: 'pointer', opacity: 0.6, fontSize: 10 }}>✕</span>
+                style={{ cursor: 'pointer', opacity: 0.6, display: 'flex' }}>
+                <X size={10} />
+              </span>
             </span>
           ))
         )}
@@ -119,7 +122,7 @@ export function ServiceTagPicker({ selected, onChange }: Props) {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all .1s',
                       }}>
-                        {checked && <span style={{ fontSize: 9, color: C.id === 'forest' ? '#061208' : '#fff', fontWeight: 900 }}>✓</span>}
+                        {checked && <Check size={11} color={C.id === 'forest' ? '#061208' : '#fff'} strokeWidth={3} />}
                       </div>
                       <span style={{ fontSize: 13, color: checked ? C.accent : C.text }}>{service}</span>
                     </div>

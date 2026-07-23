@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 
 interface Props { navigation: any; route: any }
@@ -51,9 +52,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
             backgroundColor: isPending ? 'rgba(239,159,39,0.14)' : t.accentBgMid,
             borderColor:     isPending ? 'rgba(239,159,39,0.35)' : t.accentBorder,
           }]}>
-            <Text style={[st.checkIcon, { color: accentColor }]}>
-              {isPending ? '📋' : '✓'}
-            </Text>
+            <Ionicons name={isPending ? 'document-text-outline' : 'checkmark-circle'} size={38} color={accentColor} />
           </View>
           <Text style={st.headline}>
             {isPending ? 'Booking submitted!' : 'Booking confirmed!'}
@@ -68,7 +67,10 @@ export function ConfirmationScreen({ navigation, route }: Props) {
         {/* Pending approval notice */}
         {isPending && (
           <Animated.View style={[st.pendingBanner, { opacity }]}>
-            <Text style={st.pendingTitle}>⏳ Awaiting hospital approval</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+              <Ionicons name="hourglass-outline" size={14} color="#EF9F27" />
+              <Text style={[st.pendingTitle, { marginBottom: 0 }]}>Awaiting hospital approval</Text>
+            </View>
             <Text style={st.pendingText}>
               Your payment will only be charged once the hospital approves your booking.
               If rejected, you'll receive a full refund.
@@ -95,28 +97,28 @@ export function ConfirmationScreen({ navigation, route }: Props) {
 
           {[
             {
-              icon: isVirtual ? '💻' : '🏥',
+              icon: isVirtual ? 'videocam-outline' as const : 'walk-outline' as const,
               label: 'Visit type',
               value: isVirtual ? 'Virtual consultation' : 'Physical visit',
             },
             {
-              icon: '👨‍⚕️',
+              icon: 'person-outline' as const,
               label: 'Doctor',
               value: doctorName
                 ?? (isVirtual ? 'Hospital will assign' : 'Assigned when you arrive'),
             },
             {
-              icon: '🏥',
+              icon: 'business-outline' as const,
               label: 'Hospital',
               value: hospital?.name ?? '—',
             },
             {
-              icon: '📅',
+              icon: 'calendar-outline' as const,
               label: 'Date',
               value: selectedDate ?? '—',
             },
             {
-              icon: '⚡',
+              icon: 'flash-outline' as const,
               label: 'Urgency',
               value: urgency
                 ? urgency.charAt(0).toUpperCase() + urgency.slice(1)
@@ -125,7 +127,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
           ].map(row => (
             <View key={row.label} style={st.cardRow}>
               <View style={st.cardRowLeft}>
-                <Text style={st.cardRowIcon}>{row.icon}</Text>
+                <Ionicons name={row.icon} size={14} color="rgba(255,255,255,0.5)" />
                 <Text style={st.cardLabel}>{row.label}</Text>
               </View>
               <Text style={st.cardValue} numberOfLines={2}>{row.value}</Text>

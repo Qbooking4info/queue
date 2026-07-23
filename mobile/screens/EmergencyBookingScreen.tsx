@@ -18,7 +18,7 @@ const STEPS = ['Triage', 'Hospital', 'Payment']
 // tier to pick. A separate "urgent" tier was removed because patients confused it with
 // emergency and expected the same queue-jump priority, which it never actually granted.
 const EMERGENCY_TIER = {
-  id: 'emergency' as const, label: '🚨 Emergency',
+  id: 'emergency' as const, label: 'Emergency',
   multiplier: 2.0, badge: '2× fee', color: '#FF5C5C',
 }
 
@@ -40,10 +40,10 @@ const SYMPTOMS = [
 ]
 
 const PAYMENT_OPTIONS = [
-  { id: 'card',     icon: '💳', label: 'Debit / Credit Card',  sub: 'Visa, Mastercard, Verve' },
-  { id: 'transfer', icon: '🏦', label: 'Bank Transfer',         sub: 'Direct bank payment' },
-  { id: 'ussd',     icon: '📱', label: 'USSD',                  sub: '*737#, *966#, *000#' },
-  { id: 'hmo',      icon: '🏥', label: 'HMO Insurance',         sub: 'NHIS, AXA Mansard, Hygeia' },
+  { id: 'card',     icon: 'card-outline' as const,             label: 'Debit / Credit Card',  sub: 'Visa, Mastercard, Verve' },
+  { id: 'transfer', icon: 'business-outline' as const,         label: 'Bank Transfer',         sub: 'Direct bank payment' },
+  { id: 'ussd',     icon: 'keypad-outline' as const,            label: 'USSD',                  sub: '*737#, *966#, *000#' },
+  { id: 'hmo',      icon: 'shield-checkmark-outline' as const, label: 'HMO Insurance',         sub: 'NHIS, AXA Mansard, Hygeia' },
 ]
 
 function arrivalToTime(arrival: string): string {
@@ -153,7 +153,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       await addNotification({
         userId: user.id,
         type:   'confirmed',
-        title:  '🚨 Emergency Booking Confirmed',
+        title:  'Emergency Booking Confirmed',
         body:   `${result.bookingRef} · ${selectedHospital.name}\nArrival: ${arrival} · A doctor will be assigned on arrival`,
         data:   { appointment_id: result.id, booking_ref: result.bookingRef },
       })
@@ -182,7 +182,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} style={s.backBtn}>
-          <Text style={[s.backArrow, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={s.headerTitleRow}>
@@ -244,7 +244,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   borderColor:     forDependent === dep ? t.accent : t.cardBorder,
                   backgroundColor: forDependent === dep ? t.accentBg : t.cardBg,
                 }]}>
-                <Text style={{ fontSize: 18, marginBottom: 4 }}>{dep ? '👨‍👩‍👧' : '🙋'}</Text>
+                <Ionicons name={dep ? 'people-outline' : 'person-outline'} size={18} color={forDependent === dep ? t.accent : t.textMuted} style={{ marginBottom: 4 }} />
                 <Text style={[s.forBtnText, { color: forDependent === dep ? t.accent : t.textMuted }]}>
                   {dep ? 'A dependent' : 'Myself'}
                 </Text>
@@ -271,7 +271,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           )}
           {forDependent && dependentsList.length === 0 && (
             <Text style={[s.noteInline, { color: t.textMuted, marginTop: 8 }]}>
-              No dependents added yet. Add a dependent in Profile → Dependents.
+              No dependents added yet. Add a dependent in Profile › Dependents.
             </Text>
           )}
           <View style={{ height: 20 }} />
@@ -308,24 +308,24 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                       <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                      {h.verified && <Text style={{ fontSize: 11, color: '#00E87A' }}>✓</Text>}
+                      {h.verified && <Ionicons name="checkmark-circle" size={13} color="#00E87A" />}
                     </View>
                     <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
                   </View>
                   {selectedHospital?.id === h.id && (
                     <View style={[s.selectedCheck, { backgroundColor: '#FF5C5C' }]}>
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓</Text>
+                      <Ionicons name="checkmark" size={12} color="#fff" />
                     </View>
                   )}
                 </View>
                 <View style={s.hospitalMeta}>
                   {[
-                    { icon: '🚨', label: 'Emergency', color: '#FF5C5C' },
-                    { icon: '⏱', label: h.wait,      color: t.textSecondary },
-                    { icon: '📍', label: h.distance,  color: t.textSecondary },
+                    { icon: 'alert-circle-outline' as const, label: 'Emergency', color: '#FF5C5C' },
+                    { icon: 'time-outline' as const,         label: h.wait,      color: t.textSecondary },
+                    { icon: 'location-outline' as const,     label: h.distance,  color: t.textSecondary },
                   ].map(m => (
                     <View key={m.label} style={[s.metaChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                      <Text style={{ fontSize: 11 }}>{m.icon}</Text>
+                      <Ionicons name={m.icon} size={11} color={m.color} />
                       <Text style={[s.metaText, { color: m.color, fontWeight: m.color === '#FF5C5C' ? '700' : '400' }]}>{m.label}</Text>
                     </View>
                   ))}
@@ -337,9 +337,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           {/* Arrival time */}
           {selectedHospital && (
             <>
-              <Text style={[s.noteInline, { color: t.textMuted }]}>
-                🩺 A doctor will be assigned by the hospital's front desk when you arrive.
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                <Ionicons name="medical-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
+                <Text style={[s.noteInline, { color: t.textMuted, marginTop: 0, flex: 1 }]}>
+                  A doctor will be assigned by the hospital's front desk when you arrive.
+                </Text>
+              </View>
               <Text style={[s.label, { color: t.textMuted }]}>When can you arrive?</Text>
               <View style={s.slotRow}>
                 {ARRIVAL_OPTIONS.map(opt => (
@@ -372,7 +375,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               { label: 'Arrival',        value: arrival ?? '—' },
               { label: 'Urgency',        value: u.label },
               { label: 'Condition',      value: symptom || customSymptom || '—' },
-              { label: 'Queue priority', value: '🔝 Top of queue' },
+              { label: 'Queue priority', value: 'Top of queue' },
             ].map(row => (
               <View key={row.label} style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
                 <Text style={[s.summaryLabel, { color: t.textMuted }]}>{row.label}</Text>
@@ -412,21 +415,22 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   backgroundColor: active ? 'rgba(255,92,92,0.08)' : t.cardBg,
                   borderColor:     active ? 'rgba(255,92,92,0.4)'  : t.cardBorder,
                 }]}>
-                <Text style={{ fontSize: 20 }}>{p.icon}</Text>
+                <Ionicons name={p.icon} size={20} color={active ? '#FF5C5C' : t.textSecondary} />
                 <View style={{ flex: 1 }}>
                   <Text style={[s.payLabel, { color: active ? '#FF5C5C' : t.textPrimary }]}>{p.label}</Text>
                   <Text style={[s.paySub,   { color: t.textMuted }]}>{p.sub}</Text>
                 </View>
                 <View style={[s.payRadio, { borderColor: active ? '#FF5C5C' : t.cardBorder, backgroundColor: active ? '#FF5C5C' : 'transparent' }]}>
-                  {active && <Text style={{ color: '#fff', fontSize: 9, fontWeight: '900' }}>✓</Text>}
+                  {active && <Ionicons name="checkmark" size={11} color="#fff" />}
                 </View>
               </TouchableOpacity>
             )
           })}
 
-          <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)' }]}>
-            <Text style={[s.noteText, { color: '#FFB547' }]}>
-              ⚡ Emergency bookings are placed at the top of the queue immediately after payment.
+          <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
+            <Ionicons name="flash-outline" size={14} color="#FFB547" style={{ marginTop: 1 }} />
+            <Text style={[s.noteText, { color: '#FFB547', flex: 1 }]}>
+              Emergency bookings are placed at the top of the queue immediately after payment.
             </Text>
           </View>
           <View style={{ height: 20 }} />
@@ -440,14 +444,16 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       <View style={[s.cta, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
         {step > 0 && (
           <TouchableOpacity onPress={() => setStep(p => p - 1)}
-            style={[s.backStepBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-            <Text style={[s.backStepText, { color: t.textPrimary }]}>← Back</Text>
+            style={[s.backStepBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+            <Ionicons name="arrow-back" size={14} color={t.textPrimary} />
+            <Text style={[s.backStepText, { color: t.textPrimary }]}>Back</Text>
           </TouchableOpacity>
         )}
         {step < 2 ? (
           <TouchableOpacity onPress={() => setStep(p => p + 1)} disabled={!canProceed()}
-            style={[s.nextBtn, { backgroundColor: canProceed() ? '#FF5C5C' : t.inputBg, flex: 1 }]}>
-            <Text style={[s.nextBtnText, { color: canProceed() ? '#fff' : t.textMuted }]}>Continue →</Text>
+            style={[s.nextBtn, { backgroundColor: canProceed() ? '#FF5C5C' : t.inputBg, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+            <Text style={[s.nextBtnText, { color: canProceed() ? '#fff' : t.textMuted }]}>Continue</Text>
+            <Ionicons name="arrow-forward" size={16} color={canProceed() ? '#fff' : t.textMuted} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={handleConfirm} disabled={submitting}

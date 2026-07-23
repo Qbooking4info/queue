@@ -89,7 +89,7 @@ export function SearchScreen({ navigation }: Props) {
           />
           {!!q && (
             <TouchableOpacity onPress={() => setQ('')}>
-              <Text style={{ color: t.textMuted, fontSize: 16 }}>✕</Text>
+              <Ionicons name="close" size={16} color={t.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -116,7 +116,7 @@ export function SearchScreen({ navigation }: Props) {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode('map')}
               style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: t.accentBg }]}>
-              <Text style={{ fontSize: 13, color: viewMode === 'map' ? t.accent : t.textMuted }}>🗺</Text>
+              <Ionicons name="map-outline" size={15} color={viewMode === 'map' ? t.accent : t.textMuted} />
             </TouchableOpacity>
           </View>
         </View>

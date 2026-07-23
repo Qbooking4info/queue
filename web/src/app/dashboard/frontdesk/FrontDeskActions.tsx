@@ -1,11 +1,12 @@
 'use client'
 import { useState, useTransition } from 'react'
+import { Check, X, LogIn, Play } from 'lucide-react'
 import { updateAppointmentStatus, rejectPendingApprovalAppointment } from '../appointments/actions'
 
-const NEXT: Record<string, { label: string; status: string; color: string }[]> = {
-  pending:    [{ label: '✓ Confirm',   status: 'confirmed',  color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: '✕ Cancel', status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  confirmed:  [{ label: '⬤ Check In', status: 'checked_in', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' },  { label: '✕ Cancel', status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  checked_in: [{ label: '▶ Start',    status: 'in_progress', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }],
+const NEXT: Record<string, { label: React.ReactNode; status: string; color: string }[]> = {
+  pending:    [{ label: <span className="inline-flex items-center gap-1"><Check size={12} /> Confirm</span>,   status: 'confirmed',  color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
+  confirmed:  [{ label: <span className="inline-flex items-center gap-1"><LogIn size={12} /> Check In</span>, status: 'checked_in', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' },  { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
+  checked_in: [{ label: <span className="inline-flex items-center gap-1"><Play size={12} /> Start</span>,    status: 'in_progress', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }],
 }
 
 export function FrontDeskActions({ appointmentId, currentStatus, approvalStatus, bookingRef }: {

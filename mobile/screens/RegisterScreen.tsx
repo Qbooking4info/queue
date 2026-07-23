@@ -4,6 +4,7 @@ import {
   StyleSheet, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 
@@ -38,8 +39,9 @@ export function RegisterScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Back */}
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-            <Text style={[s.backText, { color: t.accent }]}>← Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, { flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+            <Ionicons name="arrow-back" size={14} color={t.accent} />
+            <Text style={[s.backText, { color: t.accent }]}>Back</Text>
           </TouchableOpacity>
 
           <Text style={[s.title,  { color: t.textPrimary }]}>Create account</Text>

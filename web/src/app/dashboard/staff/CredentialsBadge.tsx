@@ -1,5 +1,6 @@
 'use client'
 import { useActionState, useState } from 'react'
+import { Check } from 'lucide-react'
 import { resetStaffPassword } from './actions'
 
 interface Props {
@@ -40,7 +41,7 @@ export default function CredentialsBadge({ userId, email }: Props) {
         </div>
         <button onClick={() => copy(email, 'email')}
           className="text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
-          {copied === 'email' ? '✓' : 'Copy'}
+          {copied === 'email' ? <Check size={11} className="inline" /> : 'Copy'}
         </button>
       </div>
 
@@ -53,7 +54,7 @@ export default function CredentialsBadge({ userId, email }: Props) {
           </div>
           <button onClick={() => copy(creds.password, 'password')}
             className="text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
-            {copied === 'password' ? '✓' : 'Copy'}
+            {copied === 'password' ? <Check size={11} className="inline" /> : 'Copy'}
           </button>
         </div>
       )}

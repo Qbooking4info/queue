@@ -1,5 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
+import { Video, AlertTriangle, Check } from 'lucide-react'
 import { updateHospitalProfile, upsertOperatingHours } from './actions'
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -84,14 +85,14 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
           </div>
           <div className="flex gap-4">
             {[
-              { name: 'accepts_virtual', label: '💻 Virtual Consultations', value: hospital.accepts_virtual },
-              { name: 'emergency_hours', label: '🚨 24/7 Emergency',        value: hospital.emergency_hours },
+              { name: 'accepts_virtual', icon: <Video size={14} />,         label: 'Virtual Consultations', value: hospital.accepts_virtual },
+              { name: 'emergency_hours', icon: <AlertTriangle size={14} />, label: '24/7 Emergency',        value: hospital.emergency_hours },
             ].map(f => (
               <label key={f.name} className="flex items-center gap-2 cursor-pointer">
                 <input type="hidden" name={f.name} value="false" />
                 <input type="checkbox" name={f.name} value="true" defaultChecked={!!f.value}
                   className="accent-green-500 w-4 h-4" />
-                <span className="text-sm">{f.label}</span>
+                <span className="inline-flex items-center gap-1.5 text-sm">{f.icon} {f.label}</span>
               </label>
             ))}
           </div>
@@ -100,7 +101,7 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
               className="px-5 py-2 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50">
               {pending ? 'Saving…' : 'Save Changes'}
             </button>
-            {saved && <span className="text-sm text-green-400">✓ Saved</span>}
+            {saved && <span className="inline-flex items-center gap-1 text-sm text-green-400"><Check size={14} /> Saved</span>}
             {saveErr && <span className="text-sm text-red-400">{saveErr}</span>}
           </div>
         </form>

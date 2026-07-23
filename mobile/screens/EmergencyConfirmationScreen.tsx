@@ -127,14 +127,15 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
           <Text style={[st.instructTitle, { color: urgencyColor }]}>What to do now</Text>
           {[
             slot === 'Now (walk-in)'
-              ? '🏃  Head to the hospital immediately — show this booking at the front desk'
-              : `⏰  Arrive at ${hospital?.name} by your selected time`,
-            '🪪  Bring a valid ID and this booking confirmation',
-            '📋  You are flagged as priority — front desk has been notified',
-            '📞  Hospital contact will be shared via SMS shortly',
+              ? { icon: 'walk-outline' as const, text: 'Head to the hospital immediately — show this booking at the front desk' }
+              : { icon: 'time-outline' as const, text: `Arrive at ${hospital?.name} by your selected time` },
+            { icon: 'card-outline' as const,          text: 'Bring a valid ID and this booking confirmation' },
+            { icon: 'document-text-outline' as const, text: 'You are flagged as priority — front desk has been notified' },
+            { icon: 'call-outline' as const,          text: 'Hospital contact will be shared via SMS shortly' },
           ].map(tip => (
-            <View key={tip} style={[st.instructRow, { borderBottomColor: `${urgencyColor}20` }]}>
-              <Text style={[st.instructText, { color: 'rgba(255,255,255,0.75)' }]}>{tip}</Text>
+            <View key={tip.text} style={[st.instructRow, { borderBottomColor: `${urgencyColor}20`, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
+              <Ionicons name={tip.icon} size={14} color="rgba(255,255,255,0.55)" style={{ marginTop: 1 }} />
+              <Text style={[st.instructText, { color: 'rgba(255,255,255,0.75)', flex: 1 }]}>{tip.text}</Text>
             </View>
           ))}
         </View>
@@ -145,7 +146,10 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="call-outline" size={16} color={urgencyColor} /><Text style={[st.callBtnText, { color: urgencyColor }]}>Call hospital</Text></View>
           </TouchableOpacity>
           <TouchableOpacity onPress={getDirections} style={[st.callBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-            <Text style={[st.callBtnText, { color: 'rgba(255,255,255,0.6)' }]}>🗺  Get directions</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="map-outline" size={16} color="rgba(255,255,255,0.6)" />
+              <Text style={[st.callBtnText, { color: 'rgba(255,255,255,0.6)' }]}>Get directions</Text>
+            </View>
           </TouchableOpacity>
         </View>
 

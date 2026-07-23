@@ -136,7 +136,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
           setError('Camera or microphone access is required for video calls.')
           Alert.alert(
             'Permission required',
-            'Camera and microphone access is required. Please enable it in Settings → Queue.',
+            'Camera and microphone access is required. Please enable it in Settings › Queue.',
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') },
@@ -246,9 +246,15 @@ export function VideoCallScreen({ navigation, route }: Props) {
       {/* Header */}
       <View style={st.header}>
         <Text style={st.headerName}>Dr. {doctorName}</Text>
-        <Text style={[st.headerStatus, { color: joined && remoteUid != null ? '#4ade80' : '#7A9089' }]}>
-          {joined && remoteUid != null ? `🟢 Connected · ${fmt(elapsed)}` : '⏳ Connecting…'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+          {joined && remoteUid != null
+            ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' }} />
+            : <Ionicons name="hourglass-outline" size={11} color="#7A9089" />
+          }
+          <Text style={[st.headerStatus, { color: joined && remoteUid != null ? '#4ade80' : '#7A9089', marginTop: 0 }]}>
+            {joined && remoteUid != null ? `Connected · ${fmt(elapsed)}` : 'Connecting…'}
+          </Text>
+        </View>
       </View>
 
       {/* Controls */}
@@ -257,18 +263,18 @@ export function VideoCallScreen({ navigation, route }: Props) {
           onPress={toggleMic}
           style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}
         >
-          <Text style={st.ctrlIcon}>{micEnabled ? '🎤' : '🔇'}</Text>
+          <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handleEndCall} style={st.endBtn}>
-          <Text style={st.ctrlIcon}>📵</Text>
+          <Ionicons name="call" size={26} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={toggleCamera}
           style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}
         >
-          <Text style={st.ctrlIcon}>{camEnabled ? '📹' : '📷'}</Text>
+          <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>

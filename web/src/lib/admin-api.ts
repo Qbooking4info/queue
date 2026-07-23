@@ -1230,7 +1230,7 @@ export async function checkInAppointment(id: string): Promise<{ error: string | 
     }
   }
 
-  // BH6: enforce SOP — only 'confirmed' appointments may be checked in (pending→confirmed→checked_in)
+  // BH6: enforce SOP — only 'confirmed' appointments may be checked in (pending->confirmed->checked_in)
   const { error } = await (adminDb as any).from('appointments').update({
     status: 'checked_in',
     check_in_date: checkInDate,
@@ -1587,7 +1587,7 @@ export async function approveAppointment(appointmentId: string, note?: string): 
     ? `Your booking (${ref}) at ${hospitalName} — ${clinicName} on ${dateStr} has been confirmed.`
     : `Your booking (${ref}) at ${hospitalName} on ${dateStr} has been confirmed.`
 
-  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved ✅', notifBody)
+  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved', notifBody)
 }
 
 export async function rejectAppointment(appointmentId: string, note: string): Promise<void> {
@@ -1615,7 +1615,7 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
 
   await notifyPatient(
     appointmentId, 'cancelled',
-    'Booking Not Approved ❌',
+    'Booking Not Approved',
     `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. A full refund has been issued.`,
   )
 }

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { RefreshCw, DoorClosed, ArrowRight } from 'lucide-react'
 import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
@@ -11,7 +12,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-// Display order Mon→Sun
+// Display order Mon->Sun
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 const DOC_PALETTE = [
@@ -185,8 +186,9 @@ function ScheduleContent() {
           )}
           <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} />
           <button onClick={load} style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-            border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            ↻ Refresh
+            border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={13} /> Refresh
           </button>
         </div>
       </div>
@@ -199,7 +201,7 @@ function ScheduleContent() {
         </div>
       ) : !hasOpenDays ? (
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.borderMed}`, borderRadius: 20, color: C.textMuted }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚪</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><DoorClosed size={36} /></div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>No open days configured</div>
           <div style={{ fontSize: 13, marginBottom: 16 }}>
             Set operating hours to see the schedule grid.
@@ -207,8 +209,8 @@ function ScheduleContent() {
           <a href="/dashboard/clinics"
             style={{ fontSize: 13, fontWeight: 700, color: C.accent, textDecoration: 'none',
               background: C.accentLight, border: `1px solid ${C.accentBorder}`,
-              borderRadius: 10, padding: '9px 18px', display: 'inline-block' }}>
-            Set up clinic hours in Clinics → Manage Hours
+              borderRadius: 10, padding: '9px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Set up clinic hours in Clinics <ArrowRight size={13} /> Manage Hours
           </a>
         </div>
       ) : (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { ArrowLeft } from 'lucide-react'
 
 export default function SpecialistError({
   error,
@@ -44,9 +45,10 @@ export default function SpecialistError({
             padding: '10px 22px', borderRadius: 10, border: '1px solid rgba(148,163,184,0.3)',
             background: 'transparent', color: '#94a3b8', fontSize: 13, fontWeight: 700,
             cursor: 'pointer', textDecoration: 'none', fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
           }}
         >
-          ← Back to Dashboard
+          <ArrowLeft size={13} /> Back to Dashboard
         </a>
       </div>
     </div>

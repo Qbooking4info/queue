@@ -73,9 +73,12 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[s.row, { borderBottomColor: t.cardBorder }]}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? '🌙 Dark theme' : '☀️ Light theme'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={[s.rowLabel, { color: t.textPrimary }]}>
+                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+              </Text>
+            </View>
             <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>

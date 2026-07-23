@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import type { HospitalsMapProps } from './HospitalsMap.types'
 
 // react-native-maps is a native-only module (it imports RN internals like
@@ -8,7 +9,10 @@ import type { HospitalsMapProps } from './HospitalsMap.types'
 export function HospitalsMap({ markers, style, onMarkerPress }: HospitalsMapProps) {
   return (
     <View style={[s.wrap, style]}>
-      <Text style={s.notice}>🗺️ Map view isn't available in the browser — showing a list instead.</Text>
+      <View style={{ alignItems: 'center', marginBottom: 12 }}>
+        <Ionicons name="map-outline" size={16} color="#666" style={{ marginBottom: 4 }} />
+        <Text style={[s.notice, { marginBottom: 0 }]}>Map view isn't available in the browser — showing a list instead.</Text>
+      </View>
       {markers.map(m => (
         <TouchableOpacity
           key={m.id}

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { ArrowLeft } from 'lucide-react'
 import { getAllSpecialties } from '@/lib/admin-api'
 import type { SpecialtyRow } from '@/lib/admin-api'
 
@@ -88,8 +89,9 @@ export default function AddDoctorPage() {
       <div style={{ marginBottom: 24 }}>
         <button onClick={() => router.back()}
           style={{ background: 'none', border: 'none', color: C.textSub, fontSize: 13,
-            cursor: 'pointer', padding: 0, marginBottom: 12 }}>
-          ← Back to Doctors
+            cursor: 'pointer', padding: 0, marginBottom: 12,
+            display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <ArrowLeft size={13} /> Back to Doctors
         </button>
         <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Add Doctor</div>
         <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>Register a new practitioner at {hospital?.name}</div>
@@ -121,7 +123,7 @@ export default function AddDoctorPage() {
             <select value={form.specialty_id} onChange={set('specialty_id')} style={input}>
               <option value="">Select specialty…</option>
               {specialties.map(s => (
-                <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.name}</option>
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>

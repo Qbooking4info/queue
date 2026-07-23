@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { saveAppointmentNotes } from '../actions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import { VideoCallPanel } from '@/components/video/VideoCallPanel'
 import { SubmitNotesButton } from '../SubmitNotesButton'
 
@@ -34,7 +35,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   return (
     <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/specialist" className="text-[#4A6058] hover:text-white transition-colors text-sm">← Schedule</Link>
+        <Link href="/dashboard/specialist" className="text-[#4A6058] hover:text-white transition-colors text-sm inline-flex items-center gap-1"><ArrowLeft size={14} /> Schedule</Link>
         <span className="text-[#4A6058]">/</span>
         <span className="text-sm font-mono text-[#7A9089]">{appt.booking_ref}</span>
       </div>

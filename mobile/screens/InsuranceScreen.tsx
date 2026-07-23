@@ -58,7 +58,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
     if (error) {
       Alert.alert('Save Failed', error.message)
     } else {
-      Alert.alert('Saved ✓', 'Your insurance details have been saved.')
+      Alert.alert('Saved', 'Your insurance details have been saved.')
     }
   }
 
@@ -66,7 +66,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={{ color: t.accent, fontSize: 16 }}>←</Text>
+          <Ionicons name="arrow-back" size={18} color={t.accent} />
         </TouchableOpacity>
         <Text style={styles.title}>Insurance Details</Text>
       </View>

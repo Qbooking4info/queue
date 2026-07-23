@@ -1,5 +1,6 @@
 'use client'
 import { useActionState, useState } from 'react'
+import { Check } from 'lucide-react'
 import { setupFrontDeskLogin } from './actions'
 
 export default function FrontDeskSetup() {
@@ -33,8 +34,8 @@ export default function FrontDeskSetup() {
                 <div className="text-xs font-mono text-white truncate">{r.value}</div>
               </div>
               <button onClick={() => copy(r.value, r.field)}
-                className="text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
-                {copied === r.field ? '✓' : 'Copy'}
+                className="inline-flex items-center text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
+                {copied === r.field ? <Check size={11} /> : 'Copy'}
               </button>
             </div>
           ))}

@@ -28,10 +28,10 @@ const ICON_BG: Record<string, string> = {
   prescription:'#1E1040', lab:'#101A3A', payment:'#0D280D', waitlist:'#2A2010',
   review:'#2A1A00', system:'#1A1A1A',
 }
-const ICONS: Record<string, string> = {
-  reminder:'📅', confirmed:'✅', cancelled:'❌', virtual:'💻',
-  prescription:'💊', lab:'🔬', payment:'💳', waitlist:'🔔',
-  review:'⭐', system:'🏥',
+const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  reminder:'alarm-outline', confirmed:'checkmark-circle-outline', cancelled:'close-circle-outline', virtual:'videocam-outline',
+  prescription:'medkit-outline', lab:'flask-outline', payment:'card-outline', waitlist:'hourglass-outline',
+  review:'star-outline', system:'business-outline',
 }
 
 function relativeTime(iso: string): string {
@@ -119,7 +119,7 @@ export function NotificationsScreen({ navigation }: Props) {
     <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <View style={st.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-          <Text style={[st.backArrow, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[st.title, { color: t.textPrimary }]}>Notifications</Text>
@@ -168,7 +168,7 @@ export function NotificationsScreen({ navigation }: Props) {
                 {groupItems.map(n => {
                   const accent = ACCENT[n.type] ?? '#94A3B8'
                   const iconBg = ICON_BG[n.type] ?? '#1A1A1A'
-                  const icon   = ICONS[n.type]   ?? '🔔'
+                  const icon   = ICONS[n.type]   ?? 'notifications-outline'
                   return (
                     <TouchableOpacity key={n.id} onPress={() => { haptics.tap(); handleTap(n) }} activeOpacity={0.7}
                       style={[st.row, {
@@ -177,7 +177,7 @@ export function NotificationsScreen({ navigation }: Props) {
                       }]}>
                       {!n.is_read && <View style={[st.unreadDot, { backgroundColor: t.accent }]} />}
                       <View style={[st.iconWrap, { backgroundColor: iconBg, borderColor: `${accent}30` }]}>
-                        <Text style={st.iconEmoji}>{icon}</Text>
+                        <Ionicons name={icon} size={20} color={accent} />
                       </View>
                       <View style={st.content}>
                         <View style={st.contentTop}>

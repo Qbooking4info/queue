@@ -218,7 +218,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         <RtcSurfaceView canvas={{ uid: remoteUid }} style={StyleSheet.absoluteFill} />
       ) : (
         <View style={st.center}>
-          <Text style={{ fontSize: 52 }}>🧑‍💼</Text>
+          <Ionicons name="person-circle-outline" size={52} color="#4A6058" />
           <Text style={st.waitingText}>Waiting for {patientName} to join…</Text>
         </View>
       )}
@@ -234,23 +234,26 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       {/* Header */}
       <View style={st.header}>
         <Text style={st.headerName}>{patientName}</Text>
-        <Text style={[st.headerStatus, { color: remoteUid != null ? '#4ade80' : '#7A9089' }]}>
-          {remoteUid != null ? `🟢 Connected · ${fmt(elapsed)}` : '⏳ Waiting for patient…'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Ionicons name={remoteUid != null ? 'ellipse' : 'time-outline'} size={remoteUid != null ? 8 : 12} color={remoteUid != null ? '#4ade80' : '#7A9089'} />
+          <Text style={[st.headerStatus, { color: remoteUid != null ? '#4ade80' : '#7A9089' }]}>
+            {remoteUid != null ? `Connected · ${fmt(elapsed)}` : 'Waiting for patient…'}
+          </Text>
+        </View>
       </View>
 
       {/* Controls */}
       <View style={st.controls}>
         <TouchableOpacity onPress={toggleMic} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
-          <Text style={st.ctrlIcon}>{micEnabled ? '🎤' : '🔇'}</Text>
+          <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handleEndSession} style={st.endBtn}>
-          <Text style={st.ctrlIcon}>📵</Text>
+          <Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={toggleCamera} style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}>
-          <Text style={st.ctrlIcon}>{camEnabled ? '📹' : '📷'}</Text>
+          <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>

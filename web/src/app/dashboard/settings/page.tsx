@@ -6,6 +6,7 @@ import { getHospitalSettings, updateHospitalSettings, getHospitalHours, updateHo
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import { createClient } from '@/lib/supabase/client'
+import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -181,8 +182,12 @@ export default function SettingsPage() {
               { label: 'Contact Email',    value: hospital?.email ?? '—' },
               { label: 'Phone',            value: hospital?.phone ?? '—' },
               { label: 'City / State',     value: hospital ? `${hospital.city}, ${hospital.state}` : '—' },
-              { label: 'Verified',         value: hospital?.is_verified ? '✓ Verified' : '⏳ Pending verification' },
-              { label: 'Clinic Model',     value: hospital?.clinic_model === 'multi' ? '🏢 Multi-clinic' : '🏥 Single clinic' },
+              { label: 'Verified',         value: hospital?.is_verified
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={12} /> Verified</span>
+                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> Pending verification</span> },
+              { label: 'Clinic Model',     value: hospital?.clinic_model === 'multi'
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Building size={12} /> Multi-clinic</span>
+                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Building2 size={12} /> Single clinic</span> },
             ].map(f => (
               <div key={f.label} style={{ marginBottom: 12 }}>
                 <div style={{ ...labelStyle }}>{f.label}</div>
@@ -254,8 +259,9 @@ export default function SettingsPage() {
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
                 target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
-                ↗ Verify on Google Maps
+                style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <ExternalLink size={12} /> Verify on Google Maps
               </a>
             ) : (
               <div style={{ fontSize: 11, color: C.textMuted }}>
@@ -294,8 +300,9 @@ export default function SettingsPage() {
                         fontFamily: 'inherit', textAlign: 'left',
                         border: `1px solid ${approvalMode === m ? C.accent : C.border}`,
                         background: approvalMode === m ? C.accentLight : C.bgAlt }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: approvalMode === m ? C.accent : C.text }}>
-                        {m === 'auto' ? '⚡ Auto-Approve' : '📋 Manual Review'}
+                      <div style={{ fontSize: 13, fontWeight: 700, color: approvalMode === m ? C.accent : C.text,
+                        display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {m === 'auto' ? <><Zap size={13} /> Auto-Approve</> : <><ClipboardList size={13} /> Manual Review</>}
                       </div>
                       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
                         {m === 'auto'
@@ -354,10 +361,10 @@ export default function SettingsPage() {
                     Platform Cancellation Policy
                   </div>
                   <div style={{ fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>
-                    • Cancelled &gt;24hrs before appointment → <strong style={{ color: C.text }}>100% refund</strong><br />
-                    • Cancelled ≤24hrs before appointment → <strong style={{ color: C.text }}>50% refund</strong><br />
+                    • Cancelled &gt;24hrs before appointment <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>100% refund</strong><br />
+                    • Cancelled ≤24hrs before appointment <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>50% refund</strong><br />
                     • No-show: patient has <strong style={{ color: C.text }}>48 hours</strong> to reschedule free of charge<br />
-                    • Rejected bookings → <strong style={{ color: C.text }}>100% refund</strong> always
+                    • Rejected bookings <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>100% refund</strong> always
                   </div>
                 </div>
               </div>
@@ -398,8 +405,9 @@ export default function SettingsPage() {
             {/* Save */}
             {saveErr && (
               <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-                ⚠️ {saveErr}
+                borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+                display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={14} /> {saveErr}
               </div>
             )}
             <button onClick={handleSave} disabled={saving}
@@ -409,7 +417,7 @@ export default function SettingsPage() {
                 border: saved ? `1px solid ${C.accentBorder}` : 'none',
                 fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+              {saving ? 'Saving…' : saved ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={14} /> Saved</span> : 'Save Changes'}
             </button>
           </div>
         </div>

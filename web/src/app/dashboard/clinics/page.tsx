@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { AlertTriangle, ArrowRight, X, RefreshCw, Check } from 'lucide-react'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
 import { toggleClinicActive, deleteClinic } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
@@ -73,8 +74,9 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
             {clinic.is_emergency && (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
                 background: 'rgba(220,60,60,0.12)', color: '#f07070',
-                border: '1px solid rgba(220,60,60,0.3)' }}>
-                🚨 Emergency Dept
+                border: '1px solid rgba(220,60,60,0.3)',
+                display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <AlertTriangle size={10} /> Emergency Dept
               </span>
             )}
           </div>
@@ -150,8 +152,9 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
           background: col.bg, color: col.text,
           border: `1px solid ${col.bg.replace('0.14', '0.3')}`,
           fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-          transition: 'opacity .15s' }}>
-        Manage Clinic →
+          transition: 'opacity .15s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        Manage Clinic <ArrowRight size={14} />
       </button>
 
       {/* Admin controls — hospital super admin only */}
@@ -256,8 +259,8 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
           <button onClick={onClose} aria-label="Close"
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -324,8 +327,8 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                       <button type="button" onClick={() => setPassword(generatePassword())}
                         style={{ background: C.bgAlt, border: `1px solid ${C.border}`,
                           borderRadius: 6, padding: '3px 8px', fontSize: 11,
-                          color: C.textSub, cursor: 'pointer' }}>
-                        ↻
+                          color: C.textSub, cursor: 'pointer', display: 'flex' }}>
+                        <RefreshCw size={11} />
                       </button>
                     </div>
                   </div>
@@ -337,8 +340,9 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
 
               {error && (
                 <div style={{ background: C.redLight, border: `1px solid ${C.red}33`,
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.red }}>
-                  ⚠️ {error}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.red,
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={13} /> {error}
                 </div>
               )}
 
@@ -396,8 +400,9 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                       background: copied ? C.accentLight : C.bgAlt,
                       border: `1px solid ${copied ? C.accentBorder : C.borderMed}`,
                       color: copied ? C.accent : C.textSub,
-                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                    {copied ? '✓ Copied!' : 'Copy Credentials'}
+                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    {copied ? <><Check size={14} /> Copied!</> : 'Copy Credentials'}
                   </button>
                 )}
                 <button onClick={() => { onCreated(); onClose() }}
@@ -574,8 +579,9 @@ export default function ClinicsPage() {
             </div>
             {deleteError && (
               <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f07070', marginBottom: 14, textAlign: 'center' }}>
-                ⚠️ {deleteError}
+                borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f07070', marginBottom: 14, textAlign: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <AlertTriangle size={12} /> {deleteError}
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
