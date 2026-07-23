@@ -33,11 +33,14 @@ export default function ResetPasswordPage() {
     if (password !== confirm) { setError('Passwords do not match.'); return }
 
     setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password })
-    setLoading(false)
-
-    if (error) { setError(error.message); return }
-    router.push('/dashboard')
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) { setError(error.message); setLoading(false); return }
+      router.push('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   if (!ready) {

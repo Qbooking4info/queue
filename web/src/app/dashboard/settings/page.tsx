@@ -120,30 +120,35 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!hospital?.id) return
     setSaving(true); setSaveErr('')
-    const parsedLat = lat ? parseFloat(lat) : null
-    const parsedLng = lng ? parseFloat(lng) : null
-    const db = createClient()
-    const [{ error }, { error: hoursError }] = await Promise.all([
-      updateHospitalSettings(hospital.id, {
-        accepts_virtual:     virtual,
-        emergency_hours:     emergency,
-        is_24_hours:         is24Hours,
-        approval_mode:       approvalMode,
-        requires_referral:   requiresRef,
-        daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
-        opd_fee:             parseInt(opdFee) || 0,
-        ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
-        sms_reminders:   smsReminder,
-        email_reminders: emailReminder,
-      } as any),
-      updateHospitalHours(hospital.id, hours),
-    ])
-    // Also persist reminder flags via browser client (handles columns if they exist)
-    await db.from('hospitals').update({ sms_reminders: smsReminder, email_reminders: emailReminder } as any).eq('id', hospital.id)
-    setSaving(false)
-    if (error || hoursError) { setSaveErr(error ?? hoursError ?? 'Failed to save'); return }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    try {
+      const parsedLat = lat ? parseFloat(lat) : null
+      const parsedLng = lng ? parseFloat(lng) : null
+      const db = createClient()
+      const [{ error }, { error: hoursError }] = await Promise.all([
+        updateHospitalSettings(hospital.id, {
+          accepts_virtual:     virtual,
+          emergency_hours:     emergency,
+          is_24_hours:         is24Hours,
+          approval_mode:       approvalMode,
+          requires_referral:   requiresRef,
+          daily_booking_limit: dailyLimit ? parseInt(dailyLimit) : null,
+          opd_fee:             parseInt(opdFee) || 0,
+          ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
+          sms_reminders:   smsReminder,
+          email_reminders: emailReminder,
+        } as any),
+        updateHospitalHours(hospital.id, hours),
+      ])
+      // Also persist reminder flags via browser client (handles columns if they exist)
+      await db.from('hospitals').update({ sms_reminders: smsReminder, email_reminders: emailReminder } as any).eq('id', hospital.id)
+      setSaving(false)
+      if (error || hoursError) { setSaveErr(error ?? hoursError ?? 'Failed to save'); return }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setSaveErr(err instanceof Error ? err.message : 'Failed to save')
+      setSaving(false)
+    }
   }
 
   const inputStyle: React.CSSProperties = {

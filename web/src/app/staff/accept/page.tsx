@@ -75,21 +75,26 @@ export default function AcceptInvitePage() {
     if (password !== confirm) { setError('Passwords do not match.'); return }
 
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Session expired. Please use the invite link again.'); setLoading(false); return }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Session expired. Please use the invite link again.'); setLoading(false); return }
 
-    const { error: upsertErr } = await supabase.from('users').upsert({
-      auth_id:   user.id,
-      full_name: fullName.trim(),
-      email:     user.email ?? email,
-    }, { onConflict: 'auth_id' })
+      const { error: upsertErr } = await supabase.from('users').upsert({
+        auth_id:   user.id,
+        full_name: fullName.trim(),
+        email:     user.email ?? email,
+      }, { onConflict: 'auth_id' })
 
-    if (upsertErr) { setError(upsertErr.message); setLoading(false); return }
+      if (upsertErr) { setError(upsertErr.message); setLoading(false); return }
 
-    const { error: pwErr } = await supabase.auth.updateUser({ password })
-    if (pwErr) { setError(pwErr.message); setLoading(false); return }
+      const { error: pwErr } = await supabase.auth.updateUser({ password })
+      if (pwErr) { setError(pwErr.message); setLoading(false); return }
 
-    router.push('/dashboard')
+      router.push('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   if (checking) {

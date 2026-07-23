@@ -27,55 +27,60 @@ export default function StaffRegisterPage() {
 
     setLoading(true)
 
-    // Create auth account
-    const { data: authData, error: signUpErr } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: { data: { full_name: fullName.trim() } },
-    })
+    try {
+      // Create auth account
+      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: { data: { full_name: fullName.trim() } },
+      })
 
-    if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
-    if (!authData.user) { setError('Account creation failed. Please try again.'); setLoading(false); return }
+      if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
+      if (!authData.user) { setError('Account creation failed. Please try again.'); setLoading(false); return }
 
-    // If email confirmation is required, signUp returns a session-less user.
-    // Sign in first so we have a session for the RLS-protected insert.
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    })
+      // If email confirmation is required, signUp returns a session-less user.
+      // Sign in first so we have a session for the RLS-protected insert.
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
 
-    if (signInErr) {
-      // Email confirmation is likely required — tell the user to confirm first.
-      setError('Please check your email and confirm your address, then sign in.')
-      setLoading(false)
-      return
-    }
-
-    // Create users table record (requires an active session for RLS)
-    const { error: profileErr } = await supabase.from('users').insert({
-      auth_id:   authData.user.id,
-      full_name: fullName.trim(),
-      email:     email.trim().toLowerCase(),
-    })
-
-    if (profileErr) { setError(profileErr.message); setLoading(false); return }
-
-    // Check if admin has already pre-assigned a role
-    const { data: profile } = await supabase
-      .from('users').select('id').eq('auth_id', authData.user.id).single()
-
-    if (profile) {
-      const { data: adminRecord } = await supabase
-        .from('hospital_admins').select('role').eq('user_id', profile.id).single()
-
-      if (adminRecord) {
-        router.push('/dashboard')
+      if (signInErr) {
+        // Email confirmation is likely required — tell the user to confirm first.
+        setError('Please check your email and confirm your address, then sign in.')
+        setLoading(false)
         return
       }
-    }
 
-    setDone(true)
-    setLoading(false)
+      // Create users table record (requires an active session for RLS)
+      const { error: profileErr } = await supabase.from('users').insert({
+        auth_id:   authData.user.id,
+        full_name: fullName.trim(),
+        email:     email.trim().toLowerCase(),
+      })
+
+      if (profileErr) { setError(profileErr.message); setLoading(false); return }
+
+      // Check if admin has already pre-assigned a role
+      const { data: profile } = await supabase
+        .from('users').select('id').eq('auth_id', authData.user.id).single()
+
+      if (profile) {
+        const { data: adminRecord } = await supabase
+          .from('hospital_admins').select('role').eq('user_id', profile.id).single()
+
+        if (adminRecord) {
+          router.push('/dashboard')
+          return
+        }
+      }
+
+      setDone(true)
+      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   if (done) {
