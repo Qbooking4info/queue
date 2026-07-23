@@ -169,7 +169,7 @@ export default function OverviewPage() {
 
   const Header = () => (
     <div style={{ marginBottom: SPACE.xl }}>
-      <div style={{ ...T.display, color: C.text }}>
+      <div className="dash-greeting-title" style={{ color: C.text }}>
         Good {greeting}, {greetingName()}
       </div>
       <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }} suppressHydrationWarning>
@@ -222,7 +222,7 @@ export default function OverviewPage() {
         </div>
 
         {/* Doctor stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: SPACE.xl }}>
+        <div className="dash-stat-grid-5" style={{ marginBottom: SPACE.xl }}>
           <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
             value={ctxLoading ? '…' : stats.todayTotal}
             sub={`${stats.todayCompleted} completed`} colorKey="accent" />
@@ -320,7 +320,7 @@ export default function OverviewPage() {
     return (
       <div>
         <Header />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: SPACE.xl }}>
+        <div className="dash-stat-grid-3" style={{ marginBottom: SPACE.xl }}>
           <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
             value={loading ? '…' : rangeStats.total}
             sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
@@ -334,7 +334,7 @@ export default function OverviewPage() {
             sub="Currently on duty" colorKey="purple" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: SPACE.lg }}>
+        <div className="dash-two-col">
           {/* Appointments */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
             <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,
@@ -410,7 +410,7 @@ export default function OverviewPage() {
         <DateFilter value={range} onChange={(k, b) => { setRange(k); setBounds(b) }} label="Showing" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: SPACE.xl }}>
+      <div className="dash-stat-grid-4" style={{ marginBottom: SPACE.xl }}>
         <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total}
           sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
@@ -427,7 +427,7 @@ export default function OverviewPage() {
           sub={stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'No reviews yet'} colorKey="amber" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: SPACE.lg }}>
+      <div className="dash-two-col">
         {/* Appointments */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
           <div style={{ padding: `${SPACE.lg}px 20px`, borderBottom: `1px solid ${C.border}`,

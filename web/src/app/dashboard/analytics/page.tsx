@@ -105,7 +105,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 22 }}>
+      <div className="dash-stat-grid-4" style={{ marginBottom: 22 }}>
         <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total.toLocaleString()}
           sub="Selected period" colorKey="accent" />
@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Breakdown + charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="dash-half-grid" style={{ marginBottom: 16 }}>
         {/* Specialty breakdown — live from selected period */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>
@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Historical bar charts (static placeholder data) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="dash-half-grid" style={{ marginBottom: 16 }}>
         {[
           { title: 'Monthly Bookings (YTD)',  sub: 'Total appointments per month',
             data: BOOKINGS, max: maxB, fmt: (v: number) => `${v}`,  col: C.accent,  colDim: C.accentMid },
