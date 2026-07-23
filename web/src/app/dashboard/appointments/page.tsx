@@ -708,17 +708,39 @@ export default function AppointmentsPage() {
         .appt-filter-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
         .appt-filter-chips::-webkit-scrollbar { display: none; }
         .appt-filter-chips { -ms-overflow-style: none; scrollbar-width: none; }
-        /* hide non-essential columns on phones */
+
+        /* Desktop: show table, hide cards */
+        .appt-table-wrap { display: block; }
+        .appt-cards { display: none; }
+
+        /* Mobile: hide table, show cards */
         @media (max-width: 767px) {
           .appt-header { flex-wrap: wrap; }
           .appt-header-btns button { padding: 8px 12px !important; font-size: 12px !important; }
-          .appt-col-id, .appt-col-clinic, .appt-col-type, .appt-col-urgency { display: none; }
-          .appt-col-doctor th, .appt-col-doctor td { display: none; }
+          .appt-table-wrap { display: none; }
+          .appt-cards { display: flex; flex-direction: column; gap: 8px; }
         }
-        /* hide clinic + urgency on tablet */
+
+        /* Tablet: hide less important columns */
         @media (min-width: 768px) and (max-width: 1023px) {
-          .appt-col-clinic, .appt-col-urgency { display: none; }
+          .appt-col-id, .appt-col-clinic, .appt-col-urgency { display: none; }
         }
+
+        /* Card styles */
+        .appt-card {
+          border-radius: 12px;
+          border-width: 1px;
+          border-style: solid;
+          padding: 10px 12px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 4px 8px;
+          align-items: start;
+        }
+        .appt-card-row1 { display: flex; align-items: center; gap: 6px; grid-column: 1; }
+        .appt-card-status { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+        .appt-card-row2 { grid-column: 1; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .appt-card-actions { grid-column: 1 / 3; display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; padding-top: 6px; border-top-width: 1px; border-top-style: solid; }
       `}</style>
 
       {/* Header */}
@@ -807,8 +829,8 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+      {/* ── Desktop / Tablet Table ── */}
+      <div className="appt-table-wrap" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -1028,6 +1050,137 @@ export default function AppointmentsPage() {
           </tbody>
         </table>
         </div>
+      </div>
+
+      {/* ── Mobile Card List ── */}
+      <div className="appt-cards">
+        {loading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: C.textMuted }}>
+            <ClipboardList size={36} style={{ opacity: 0.3, display: 'block', margin: '0 auto 10px' }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>No appointments found</div>
+            <div style={{ fontSize: 13 }}>Try adjusting your filters or date range.</div>
+          </div>
+        ) : filtered.map(a => {
+          const urg = urgencyColor(a.urgency, C)
+          const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
+          const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
+          const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
+          const needsApproval = a.approval_status === 'pending_approval'
+          const isEmergency   = a.urgency === 'emergency'
+          const isPending     = pendingActionId === a.id
+          const btnBase: React.CSSProperties = {
+            fontSize: 11, padding: '4px 10px', borderRadius: 7, fontWeight: 600,
+            cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1,
+            whiteSpace: 'nowrap' as const,
+          }
+          const docName = a.assigned_doctor_name ?? a.doctor_name
+          const isVirtual = a.type === 'virtual'
+          return (
+            <div key={a.id}
+              className="appt-card"
+              style={{
+                background: isEmergency ? C.redLight : C.card,
+                borderColor: isEmergency ? C.red : needsApproval ? 'rgba(239,159,39,0.4)' : C.border,
+                borderLeftWidth: isEmergency ? 3 : 1,
+              }}>
+              {/* Row 1: time · date · type icon */}
+              <div className="appt-card-row1">
+                <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{a.start_time}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>·</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>
+                  {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+                </span>
+                {isEmergency && (
+                  <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 99,
+                    background: C.red, color: '#fff', marginLeft: 2 }}>EMERG</span>
+                )}
+              </div>
+
+              {/* Status — right side spanning rows 1-2 */}
+              <div className="appt-card-status">
+                <Badge status={a.status} />
+                {needsApproval && (
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#EF9F27', marginTop: 3, textAlign: 'right' }}>REVIEW</div>
+                )}
+              </div>
+
+              {/* Row 2: patient · doctor */}
+              <div className="appt-card-row2">
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{a.patient_name}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>·</span>
+                {isVirtual
+                  ? <Video size={11} color={C.blue} />
+                  : <Building2 size={11} color={C.textMuted} />}
+                <span style={{ fontSize: 11, color: C.textSub }}>
+                  {needsAssign ? <span style={{ color: '#EF9F27' }}>Unassigned</span> : docName}
+                </span>
+              </div>
+
+              {/* Actions row */}
+              <div className="appt-card-actions" style={{ borderTopColor: C.border }}>
+                <button onClick={() => setDetailAppt(a)}
+                  style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                  Detail
+                </button>
+                {!['cancelled'].includes(a.status) && (
+                  <button onClick={() => setVitalsAppt(a)}
+                    style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
+                      background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
+                      color: a.vitals_recorded_at ? C.accent : C.textMuted,
+                      display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    {a.vitals_recorded_at ? <><Check size={10} />Vitals</> : 'Vitals'}
+                  </button>
+                )}
+                {!isDoctor && needsApproval && (
+                  <>
+                    <button onClick={() => handleApprove(a)} disabled={isPending}
+                      style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                      {isPending ? '…' : 'Approve'}
+                    </button>
+                    <button onClick={() => setRejectAppt(a)} disabled={isPending}
+                      style={{ ...btnBase, border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)', color: '#f07070' }}>
+                      Reject
+                    </button>
+                  </>
+                )}
+                {canAssignDoctor && (
+                  <button onClick={() => setAssignAppt(a)} disabled={isPending}
+                    style={{ ...btnBase, border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
+                      background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
+                      color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                    {hasDoctor ? 'Reassign' : 'Assign Dr.'}
+                  </button>
+                )}
+                {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
+                  <button onClick={() => handleCheckIn(a)} disabled={isPending}
+                    style={{ ...btnBase, border: `1px solid ${C.accentBorder}`, background: C.accentLight, color: C.accent }}>
+                    {isPending ? '…' : 'Check In'}
+                  </button>
+                )}
+                {a.status === 'checked_in' && (
+                  <button onClick={() => handleStartConsult(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)', color: '#55A7EB' }}>
+                    {isPending ? '…' : '▶ Start'}
+                  </button>
+                )}
+                {a.status === 'in_progress' && (
+                  <button onClick={() => handleEndConsult(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                    {isPending ? '…' : '■ End'}
+                  </button>
+                )}
+                {['confirmed','checked_in'].includes(a.status) && (
+                  <button onClick={() => handleNoShow(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.08)', color: '#55A7EB' }}>
+                    {isPending ? '…' : 'No-Show'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Modals */}
