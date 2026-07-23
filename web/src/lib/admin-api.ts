@@ -1456,12 +1456,28 @@ export async function getHospitalStats(hospitalId: string) {
 
 // ── Appointment actions (new booking system) ──────────────────────────────────
 
-export async function assignDoctorToAppointment(appointmentId: string, doctorId: string): Promise<void> {
-  await adminDb.from('appointments').update({
+export async function assignDoctorToAppointment(appointmentId: string, doctorId: string): Promise<{ error: string | null }> {
+  const [{ data: appt, error: apptErr }, { data: doctor, error: docErr }] = await Promise.all([
+    (adminDb as any).from('appointments').select('hospital_id, clinic_id, status').eq('id', appointmentId).single(),
+    (adminDb as any).from('doctors').select('hospital_id, clinic_id, is_active').eq('id', doctorId).single(),
+  ])
+  if (apptErr || !appt) return { error: apptErr?.message ?? 'Appointment not found' }
+  if (docErr || !doctor) return { error: docErr?.message ?? 'Doctor not found' }
+  // Only pre-check-in — queue_position is computed per-doctor at check-in time, so
+  // reassigning after that would leave a stale queue slot relative to the new doctor.
+  if (!['pending', 'confirmed'].includes(appt.status)) {
+    return { error: 'Doctor can only be assigned or reassigned before check-in' }
+  }
+  if (doctor.hospital_id !== appt.hospital_id) return { error: 'Doctor does not belong to this hospital' }
+  if (appt.clinic_id && doctor.clinic_id !== appt.clinic_id) return { error: "Doctor is not registered to this appointment's clinic" }
+  if (!doctor.is_active) return { error: 'Doctor is not active' }
+
+  const { error } = await adminDb.from('appointments').update({
     assigned_doctor_id: doctorId,
     doctor_id: doctorId,
     updated_at: new Date().toISOString(),
-  } as any).eq('id', appointmentId)
+  } as any).eq('id', appointmentId).in('status', ['pending', 'confirmed'])
+  return { error: error?.message ?? null }
 }
 
 export async function markNoShow(appointmentId: string): Promise<void> {

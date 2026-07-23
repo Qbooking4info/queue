@@ -332,6 +332,7 @@ function AssignDoctorModal({
   const isReassign = !!currentDoctorId
   const [selected, setSelected] = useState(currentDoctorId)
   const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
 
   // Only show doctors from the appointment's clinic (if one is assigned)
   const eligibleDoctors = appointment.clinic_id
@@ -341,8 +342,10 @@ function AssignDoctorModal({
   async function handleAssign() {
     if (!selected) return
     setSaving(true)
-    await assignDoctorToAppointment(appointment.id, selected)
+    setError(null)
+    const { error } = await assignDoctorToAppointment(appointment.id, selected)
     setSaving(false)
+    if (error) { setError(error); return }
     onDone(selected)
   }
 
@@ -397,6 +400,12 @@ function AssignDoctorModal({
             </button>
           ))}
         </div>
+        {error && (
+          <div style={{ margin: '0 22px 14px', background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+            borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
+            ⚠️ {error}
+          </div>
+        )}
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
           <button onClick={onClose}
             style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
