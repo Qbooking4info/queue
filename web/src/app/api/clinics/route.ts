@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 
 export async function GET(req: NextRequest) {
-  const user = await getServerUser()
+  const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const hospitalId = new URL(req.url).searchParams.get('hospitalId')

@@ -30,7 +30,7 @@ const RATE_LIMIT_MS = 1100
 export async function GET(req: NextRequest) {
   // getServerUser (any authenticated user) allows the onboarding flow to geocode
   // before a hospital record (and therefore a role) exists.
-  const user = await getServerUser()
+  const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
 
   const q = new URL(req.url).searchParams.get('q')?.trim()
