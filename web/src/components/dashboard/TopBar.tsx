@@ -1,15 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAdmin } from '@/contexts/AdminContext'
+import { getRecentActivity, type AdminNotification } from '@/lib/admin-api'
 import { Search, Bell, XCircle, Star, Wallet, ClipboardList, Menu } from 'lucide-react'
-
-const MOCK_NOTIFICATIONS = [
-  { type: 'new',     msg: 'New booking received — check Appointments',    time: 'Just now',  href: '/dashboard/appointments' },
-  { type: 'cancel',  msg: 'An appointment was cancelled by a patient',    time: '2 hrs ago', href: '/dashboard/appointments' },
-  { type: 'review',  msg: 'New 5-star patient review posted',             time: '4 hrs ago', href: '/dashboard/analytics' },
-  { type: 'payment', msg: 'Monthly payout processed to your bank',        time: 'Yesterday', href: '/dashboard/analytics' },
-]
 
 const TOPBAR_STYLES = `
   .q-hamburger { display: none !important; }
@@ -33,8 +28,15 @@ interface TopBarProps {
 export function TopBar({ onMenuToggle }: TopBarProps) {
   const router = useRouter()
   const { theme: C, themeId, toggleTheme } = useTheme()
+  const { hospital } = useAdmin()
   const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const isForest = themeId === 'forest'
+
+  useEffect(() => {
+    if (!hospital?.id) return
+    getRecentActivity(hospital.id).then(setNotifications).catch(() => setNotifications([]))
+  }, [hospital?.id])
 
   return (
     <>
@@ -93,8 +95,10 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: C.textMuted, position: 'relative', transition: 'background .3s' }}>
             <Bell size={16} />
-            <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8,
-              borderRadius: '50%', background: C.accent, border: `2px solid ${C.card}` }} />
+            {notifications.length > 0 && (
+              <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8,
+                borderRadius: '50%', background: C.accent, border: `2px solid ${C.card}` }} />
+            )}
           </button>
 
           {notifOpen && (
@@ -107,11 +111,16 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
                 zIndex: 100, overflow: 'hidden', transition: 'background .3s' }}>
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   fontSize: 13, fontWeight: 700, color: C.text }}>Notifications</div>
-                {MOCK_NOTIFICATIONS.map((n, i) => (
-                  <div key={i}
+                {notifications.length === 0 && (
+                  <div style={{ padding: '20px 16px', fontSize: 12, color: C.textMuted, textAlign: 'center' }}>
+                    No recent activity
+                  </div>
+                )}
+                {notifications.map((n, i) => (
+                  <div key={n.id}
                     onClick={() => { setNotifOpen(false); router.push(n.href) }}
                     style={{ padding: '10px 16px', cursor: 'pointer',
-                    borderBottom: i < MOCK_NOTIFICATIONS.length - 1 ? `1px solid ${C.border}` : 'none',
+                    borderBottom: i < notifications.length - 1 ? `1px solid ${C.border}` : 'none',
                     display: 'flex', gap: 10 }}>
                     <span style={{ flexShrink: 0, display: 'flex', color:
                       n.type === 'cancel' ? C.red : n.type === 'review' ? C.amber : n.type === 'payment' ? C.accent : C.blue }}>

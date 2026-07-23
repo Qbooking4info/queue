@@ -133,6 +133,14 @@ function nameToInitials(name: string) {
   return name.split(' ').filter(Boolean).slice(-2).map(w => w[0].toUpperCase()).join('')
 }
 
+// Some accounts have an incomplete profile where full_name was backfilled with the user's
+// email at signup — showing that verbatim as a "name" in the admin UI reads as spam/fake data.
+const EMAIL_RE = /\S+@\S+\.\S+/
+function safePatientName(name: string | null | undefined, fallback: string): string {
+  if (!name || EMAIL_RE.test(name)) return fallback
+  return name
+}
+
 function calcAge(dob: string | null): number | null {
   if (!dob) return null
   return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
@@ -247,6 +255,106 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
   }
 
   return null
+}
+
+// ── Notifications (top bar activity feed) ──────────────────────────────────────
+
+export interface AdminNotification {
+  id: string
+  type: 'new' | 'cancel' | 'review' | 'payment'
+  msg: string
+  time: string
+  href: string
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days} days ago`
+}
+
+// Recent hospital-scoped activity across appointments, reviews and payouts, merged and
+// sorted newest-first for the dashboard notification bell. Not a persisted notifications
+// table — derived live from the source tables so there's nothing to mark as read/unread yet.
+export async function getRecentActivity(hospitalId: string, limit = 10): Promise<AdminNotification[]> {
+  // Only surface activity from the last 7 days — otherwise a booking from months ago gets
+  // relabeled as "New booking received" just because it's the most recent row in the table.
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [{ data: newAppts }, { data: cancelledAppts }, { data: reviews }, { data: payouts }] = await Promise.all([
+    (adminDb as any).from('appointments')
+      .select('id, created_at, patient:users!appointments_patient_id_fkey(full_name)')
+      .eq('hospital_id', hospitalId)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('appointments')
+      .select('id, cancelled_at, patient:users!appointments_patient_id_fkey(full_name)')
+      .eq('hospital_id', hospitalId)
+      .eq('status', 'cancelled')
+      .gte('cancelled_at', cutoff)
+      .order('cancelled_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('reviews')
+      .select('id, rating, created_at, doctor:doctors(full_name)')
+      .eq('hospital_id', hospitalId)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('payouts')
+      .select('id, amount, paid_at, status')
+      .eq('hospital_id', hospitalId)
+      .eq('status', 'paid')
+      .gte('paid_at', cutoff)
+      .order('paid_at', { ascending: false })
+      .limit(limit),
+  ])
+
+  const items: (AdminNotification & { sortAt: string })[] = []
+
+  for (const a of (newAppts ?? []) as any[]) {
+    if (!a.created_at) continue
+    items.push({
+      id: `appt-new-${a.id}`, type: 'new', href: `/dashboard/appointments`,
+      msg: `New booking received from ${safePatientName(a.patient?.full_name, 'a patient')}`,
+      time: timeAgo(a.created_at), sortAt: a.created_at,
+    })
+  }
+  for (const a of (cancelledAppts ?? []) as any[]) {
+    if (!a.cancelled_at) continue
+    items.push({
+      id: `appt-cancel-${a.id}`, type: 'cancel', href: `/dashboard/appointments`,
+      msg: `Appointment cancelled by ${safePatientName(a.patient?.full_name, 'a patient')}`,
+      time: timeAgo(a.cancelled_at), sortAt: a.cancelled_at,
+    })
+  }
+  for (const r of (reviews ?? []) as any[]) {
+    if (!r.created_at) continue
+    items.push({
+      id: `review-${r.id}`, type: 'review', href: `/dashboard/doctors`,
+      msg: `New ${r.rating}-star review posted${r.doctor?.full_name ? ` for Dr. ${r.doctor.full_name}` : ''}`,
+      time: timeAgo(r.created_at), sortAt: r.created_at,
+    })
+  }
+  for (const p of (payouts ?? []) as any[]) {
+    if (!p.paid_at) continue
+    items.push({
+      id: `payout-${p.id}`, type: 'payment', href: `/dashboard/analytics`,
+      msg: `Payout of ${p.amount ? `₦${Number(p.amount).toLocaleString()}` : 'funds'} processed to your bank`,
+      time: timeAgo(p.paid_at), sortAt: p.paid_at,
+    })
+  }
+
+  return items
+    .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime())
+    .slice(0, limit)
+    .map(({ sortAt: _sortAt, ...rest }) => rest)
 }
 
 export async function getHospitalIdForUser(authId: string): Promise<string | null> {
@@ -407,7 +515,7 @@ export async function getDoctorTodayAppointments(doctorId: string): Promise<Admi
     consult_duration_secs: a.consult_duration_secs ?? null,
     check_in_date: a.check_in_date ?? null,
     patient_id: a.patient?.id ?? null,
-    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
     doctor_name: docName,
@@ -458,7 +566,7 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
       consult_duration_secs: a.consult_duration_secs ?? null,
       check_in_date: a.check_in_date ?? null,
       patient_id: a.patient?.id ?? null,
-      patient_name: a.patient?.full_name ?? 'Unknown',
+      patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
       patient_age: calcAge(a.patient?.date_of_birth ?? null),
       patient_gender: a.patient?.gender ?? null,
       doctor_name: a.doctor?.full_name ?? 'Unknown',
@@ -532,7 +640,7 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
     const isWalkin = a.booking_mode === 'walkin'
     const patientName = isWalkin
       ? (a.walkin_patient_name ?? 'Walk-in Patient')
-      : (a.patient?.full_name ?? 'Unknown')
+      : (safePatientName(a.patient?.full_name, 'Unknown'))
     const v = vitalsMap.get(a.id)
     return {
       id: a.id,
@@ -630,7 +738,7 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
     reason: a.reason,
     clinic_id: a.clinic_id ?? null,
     patient_id: a.patient?.id ?? null,
-    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
     doctor_name: a.doctor?.full_name ?? 'Unknown',
@@ -699,7 +807,7 @@ export async function getWeekAppointments(
       date: a.appointment_date,
       time: (a.start_time ?? '').slice(0, 5),
       doc: a.doctor?.full_name ?? 'Doctor',
-      patient: a.patient?.full_name ?? 'Patient',
+      patient: safePatientName(a.patient?.full_name, 'Patient'),
       type: a.type,
       status: a.status,
     })
@@ -928,7 +1036,7 @@ export async function getClinicAppointments(
 
   return (data as any[]).map(a => {
     const isWalkin = a.booking_mode === 'walkin'
-    const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown')
+    const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (safePatientName(a.patient?.full_name, 'Unknown'))
     const v = vitalsMap.get(a.id)
     return {
       id: a.id, booking_ref: a.booking_ref,
@@ -1131,7 +1239,7 @@ function mapQueueRow(a: any): AdminAppointment {
     consult_duration_secs: a.consult_duration_secs ?? null,
     check_in_date: a.check_in_date ?? null,
     patient_id: isWalkin ? null : (a.patient?.id ?? null),
-    patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown'),
+    patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (safePatientName(a.patient?.full_name, 'Unknown')),
     patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
     doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
