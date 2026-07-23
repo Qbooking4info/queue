@@ -183,8 +183,8 @@ function LoginContent() {
             border: '1px solid rgba(26,127,193,0.25)', borderRadius: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#1A7FC1', marginBottom: 4 }}>DEMO CREDENTIALS</div>
             <div style={{ fontSize: 12, color: '#2A5070' }}>
-              Email: <strong>demo@queueapp.ng</strong><br />
-              Password: <strong>Queue@2025!</strong>
+              Email: <strong>admin-demo@queueapp.ng</strong><br />
+              Password: <strong>QueueAdmin@2025!</strong>
             </div>
           </div>
         </div>
