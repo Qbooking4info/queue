@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -57,7 +58,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
             <Text style={[s.roleBadgeText, { color: t.accent }]}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? staffProfile?.role ?? 'Staff'}</Text>
           </View>
           {hospitalName && (
-            <Text style={[s.hospitalName, { color: t.textMuted }]}>🏥 {hospitalName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="business-outline" size={12} color={t.textMuted} /><Text style={[s.hospitalName, { color: t.textMuted }]}>{hospitalName}</Text></View>
           )}
         </View>
 

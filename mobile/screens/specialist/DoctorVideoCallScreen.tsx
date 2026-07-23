@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Platform, PermissionsAndroid, Alert, ActivityIndicator,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -182,7 +183,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       <View style={st.container}>
         <StatusBar barStyle="light-content" backgroundColor="#050d09" />
         <View style={st.center}>
-          <Text style={{ fontSize: 40, marginBottom: 16 }}>⚠️</Text>
+          <Ionicons name="alert-circle-outline" size={40} color="#EF9F27" style={{ marginBottom: 16 }} />
           <Text style={[st.errorTitle]}>Could not start call</Text>
           <Text style={[st.errorSub]}>{error}</Text>
           <TouchableOpacity onPress={() => navigation.goBack()} style={st.backCallBtn}>

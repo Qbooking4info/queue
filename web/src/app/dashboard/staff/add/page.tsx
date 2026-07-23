@@ -29,7 +29,7 @@ export default function AddStaffPage() {
           </p>
         </div>
         <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl p-3">
-          <span className="text-lg shrink-0">🖥️</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <p className="text-xs text-amber-400 leading-relaxed">
             <span className="font-semibold">Front Desk login was auto-created at signup</span> — find the credentials on the{' '}
             <Link href="/dashboard/staff" className="underline underline-offset-2">Staff page</Link>.

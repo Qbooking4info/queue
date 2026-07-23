@@ -50,10 +50,10 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
             <div className="font-bold text-base">{patient?.full_name ?? '—'}</div>
             {age && <div className="text-sm text-[#7A9089] mt-0.5">{age} yrs · {patient?.gender ?? '—'}</div>}
             <div className="mt-3 flex flex-col gap-1.5 text-xs text-[#7A9089]">
-              {patient?.phone && <div>📞 {patient.phone}</div>}
-              {patient?.email && <div>✉️ {patient.email}</div>}
-              {patient?.blood_group && <div>🩸 {patient.blood_group}</div>}
-              {patient?.address && <div>📍 {patient.address}</div>}
+              {patient?.phone && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18a2 2 0 012-2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 6.91a16 16 0 006.18 6.18l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14z"/></svg>{patient.phone}</div>}
+              {patient?.email && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>{patient.email}</div>}
+              {patient?.blood_group && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L6 8a6 6 0 009 8 6 6 0 009-8l-6-6z"/></svg>{patient.blood_group}</div>}
+              {patient?.address && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>{patient.address}</div>}
             </div>
           </div>
 

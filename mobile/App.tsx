@@ -1,10 +1,12 @@
 import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
+import React from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Text, View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 
 import { ThemeProvider, useTheme }     from './contexts/ThemeContext'
 import { AuthProvider, useAuth }       from './contexts/AuthContext'
@@ -47,8 +49,8 @@ const DocStack   = createNativeStackNavigator()
 const FDTab      = createBottomTabNavigator()
 const FDStack    = createNativeStackNavigator()
 
-function TabIcon({ icon, focused, color }: { icon: string; focused: boolean; color: string }) {
-  return <Text style={{ fontSize: 18, color }}>{icon}</Text>
+function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
+  return <Ionicons name={name} size={22} color={color} />
 }
 
 function MainTabs() {
@@ -65,13 +67,13 @@ function MainTabs() {
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
       <Tab.Screen name="Home" component={HomeScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="⊞" {...p} />, tabBarLabel: 'Home' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />, tabBarLabel: 'Home' }} />
       <Tab.Screen name="Search" component={SearchScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="⊕" {...p} />, tabBarLabel: 'Search' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />, tabBarLabel: 'Search' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="◆" {...p} />, tabBarLabel: 'Bookings' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Bookings' }} />
       <Tab.Screen name="Profile" component={ProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
 }
@@ -90,9 +92,9 @@ function SpecialistTabs() {
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
       <DocTab.Screen name="Queue" component={SpecialistQueueScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="◉" {...p} />, tabBarLabel: 'Queue' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
       <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
   )
 }
@@ -111,9 +113,9 @@ function FrontDeskTabs() {
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
       <FDTab.Screen name="FDQueue"   component={FrontDeskQueueScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="◉" {...p} />, tabBarLabel: 'Queue' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
       <FDTab.Screen name="FDProfile" component={FrontDeskProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon icon="●" {...p} />, tabBarLabel: 'Profile' }} />
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
     </FDTab.Navigator>
   )
 }

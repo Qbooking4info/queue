@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -199,7 +200,7 @@ export function NotificationsScreen({ navigation }: Props) {
 
           {items.length === 0 && (
             <View style={st.empty}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>🔔</Text>
+              <Ionicons name="notifications-outline" size={44} color={t.textMuted} style={{ marginBottom: 12, opacity: 0.4 }} />
               <Text style={[st.emptyTitle, { color: t.textPrimary }]}>All caught up</Text>
               <Text style={[st.emptySub, { color: t.textMuted }]}>No notifications yet. We'll let you know when something needs your attention.</Text>
             </View>

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
@@ -171,7 +172,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       {/* Search */}
       {!loading && appts.length > 0 && (
         <View style={[s.searchWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Text style={{ color: t.textMuted, fontSize: 14, marginRight: 6 }}>🔍</Text>
+          <Ionicons name="search-outline" size={14} color={t.textMuted} style={{ marginRight: 6 }} />
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -196,7 +197,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
         >
           {filtered.length === 0 && (
             <View style={s.empty}>
-              <Text style={{ fontSize: 56, marginBottom: 16 }}>📋</Text>
+              <Ionicons name="clipboard-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
               <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                 {search ? 'No patients match your search' : 'No appointments yet'}
               </Text>

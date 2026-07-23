@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   StatusBar, Platform, PermissionsAndroid, Alert, Linking,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -224,7 +225,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
         />
       ) : (
         <View style={st.waitingContainer}>
-          <Text style={st.waitingIcon}>👨‍⚕️</Text>
+          <Ionicons name="medical-outline" size={48} color="rgba(255,255,255,0.3)" />
           <Text style={st.waitingText}>
             {session ? 'Waiting for doctor…' : 'Waiting for doctor to start the call…'}
           </Text>

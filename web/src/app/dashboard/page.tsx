@@ -16,6 +16,11 @@ import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api
 import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  CalendarDays, CheckCircle2, Users, Star, Clock, Stethoscope,
+  Tag, Settings, Video, Building2, Calendar, ClipboardList,
+  AlertCircle, AlertTriangle,
+} from 'lucide-react'
 
 const DOC_COLORS: Record<string, string> = {}
 const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
@@ -59,8 +64,11 @@ function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C:
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ ...T.body, fontWeight: 600, color: C.text,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.patient_name}</div>
-        <div style={{ ...T.caption, color: C.textSub }}>
-          {a.doctor_name} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+        <div style={{ ...T.caption, color: C.textSub, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {a.doctor_name} ·
+          {a.type === 'virtual'
+            ? <><Video size={11} style={{ display: 'inline', marginLeft: 3, marginRight: 2 }} />Virtual</>
+            : <><Building2 size={11} style={{ display: 'inline', marginLeft: 3, marginRight: 2 }} />In-person</>}
         </div>
       </div>
       <Badge status={a.status} />
@@ -200,32 +208,36 @@ export default function OverviewPage() {
                     color: active ? c.color : C.textMuted,
                     border: `1px solid ${active ? c.border : C.border}`,
                     opacity: savingAvail ? 0.7 : 1, transition: 'all .15s' }}>
-                  {s === 'on_duty' ? '🟢 ' : s === 'on_break' ? '🟡 ' : '⚫ '}{c.label}
+                  {c.label}
                 </button>
               )
             })}
           </div>
           {savingAvail && <div style={{ ...T.caption, color: C.textMuted, marginTop: SPACE.sm }}>Saving…</div>}
-          {availError && <div style={{ ...T.caption, color: '#f07070', marginTop: SPACE.sm }}>⚠️ {availError}</div>}
+          {availError && (
+            <div style={{ ...T.caption, color: '#f07070', marginTop: SPACE.sm, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <AlertTriangle size={12} /> {availError}
+            </div>
+          )}
         </div>
 
         {/* Doctor stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: SPACE.xl }}>
-          <StatCard icon="📅" label="Today's Appointments"
+          <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
             value={ctxLoading ? '…' : stats.todayTotal}
             sub={`${stats.todayCompleted} completed`} colorKey="accent" />
-          <StatCard icon="✔" label="Completed Today"
+          <StatCard icon={<CheckCircle2 size={18} />} label="Completed Today"
             value={ctxLoading ? '…' : stats.todayCompleted}
             sub={stats.todayTotal > 0 ? `${Math.round(stats.todayCompleted / stats.todayTotal * 100)}% done` : 'None yet'}
             colorKey="blue" />
-          <StatCard icon="👥" label="Total Patients Seen"
+          <StatCard icon={<Users size={18} />} label="Total Patients Seen"
             value={ctxLoading ? '…' : stats.totalBookings}
             sub="All time" colorKey="purple" />
-          <StatCard icon="⭐" label="Avg Rating"
+          <StatCard icon={<Star size={18} />} label="Avg Rating"
             value={ctxLoading ? '…' : (stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—')}
             sub={stats.reviewCount > 0 ? `${stats.reviewCount} reviews` : 'No reviews yet'}
             colorKey="amber" />
-          <StatCard icon="🕐" label="Avg Consultation Time"
+          <StatCard icon={<Clock size={18} />} label="Avg Consultation Time"
             value={avgConsultSecs == null ? '—' : `${Math.round(avgConsultSecs / 60)}m`}
             sub={avgConsultSecs == null ? 'No data yet' : 'Per patient'}
             colorKey="blue" />
@@ -245,7 +257,7 @@ export default function OverviewPage() {
               <ListSkeleton />
             ) : todayAppointments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-                <div style={{ fontSize: 40, marginBottom: SPACE.md }}>🗓️</div>
+                <Calendar size={40} style={{ marginBottom: SPACE.md, opacity: 0.3, display: 'block', margin: `0 auto ${SPACE.md}px` }} />
                 <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments today</div>
                 <div style={{ ...T.body, color: C.textMuted }}>Your schedule is clear for today.</div>
               </div>
@@ -262,13 +274,17 @@ export default function OverviewPage() {
                     <div style={{ ...T.body, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
                     {a.urgency === 'emergency' && (
                       <span style={{ ...T.label, padding: '1px 7px', borderRadius: 99,
-                        background: C.red, color: '#fff', whiteSpace: 'nowrap' }}>
-                        🚨 EMERGENCY
+                        background: C.red, color: '#fff', whiteSpace: 'nowrap',
+                        display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <AlertCircle size={10} />EMERGENCY
                       </span>
                     )}
                   </div>
-                  <div style={{ ...T.caption, color: C.textSub }}>
-                    {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}{a.reason ? ` · ${a.reason}` : ''}
+                  <div style={{ ...T.caption, color: C.textSub, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    {a.type === 'virtual'
+                      ? <><Video size={11} />Virtual</>
+                      : <><Building2 size={11} />In-person</>}
+                    {a.reason ? ` · ${a.reason}` : ''}
                   </div>
                 </div>
                 {a.patient_id && (
@@ -305,15 +321,15 @@ export default function OverviewPage() {
       <div>
         <Header />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: SPACE.xl }}>
-          <StatCard icon="📅" label="Today's Appointments"
+          <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
             value={loading ? '…' : rangeStats.total}
             sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
             colorKey="accent" />
-          <StatCard icon="✔" label="Completed"
+          <StatCard icon={<CheckCircle2 size={18} />} label="Completed"
             value={loading ? '…' : rangeStats.completed}
             sub={rangeStats.total > 0 ? `${Math.round(rangeStats.completed / rangeStats.total * 100)}% done` : '—'}
             colorKey="blue" />
-          <StatCard icon="👨‍⚕️" label="Doctors Available"
+          <StatCard icon={<Stethoscope size={18} />} label="Doctors Available"
             value={ctxLoading ? '…' : doctors.filter(d => ((d as any).availability_status ?? 'on_duty') === 'on_duty').length}
             sub="Currently on duty" colorKey="purple" />
         </div>
@@ -333,7 +349,7 @@ export default function OverviewPage() {
                 <ListSkeleton />
               ) : appts.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-                  <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                  <ClipboardList size={40} style={{ opacity: 0.3, display: 'block', margin: `0 auto ${SPACE.md}px` }} />
                   <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments yet</div>
                   <div style={{ ...T.body, color: C.textMuted }}>Appointments booked via the mobile app will appear here in real time.</div>
                 </div>
@@ -395,18 +411,18 @@ export default function OverviewPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: SPACE.xl }}>
-        <StatCard icon="📅" label="Total Appointments"
+        <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total}
           sub={`${rangeStats.completed} completed · ${rangeStats.pending} pending`}
           colorKey="accent" />
-        <StatCard icon="✔" label="Completed"
+        <StatCard icon={<CheckCircle2 size={18} />} label="Completed"
           value={loading ? '…' : rangeStats.completed}
           sub={rangeStats.total > 0 ? `${Math.round(rangeStats.completed / rangeStats.total * 100)}% done` : 'No appointments'}
           colorKey="blue" />
-        <StatCard icon="👨‍⚕️" label="Active Doctors"
+        <StatCard icon={<Stethoscope size={18} />} label="Active Doctors"
           value={ctxLoading ? '…' : stats.activeDoctors}
           sub="On duty today" colorKey="purple" />
-        <StatCard icon="⭐" label="Avg Rating"
+        <StatCard icon={<Star size={18} />} label="Avg Rating"
           value={ctxLoading ? '…' : (stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—')}
           sub={stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'No reviews yet'} colorKey="amber" />
       </div>
@@ -429,7 +445,7 @@ export default function OverviewPage() {
               <ListSkeleton />
             ) : appts.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-                <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                <ClipboardList size={40} style={{ opacity: 0.3, display: 'block', margin: `0 auto ${SPACE.md}px` }} />
                 <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments for this period</div>
                 <div style={{ ...T.body, color: C.textMuted }}>Appointments booked via the mobile app will appear here in real time.</div>
               </div>
@@ -493,9 +509,9 @@ export default function OverviewPage() {
               Quick Actions
             </div>
             {[
-              { href: '/dashboard/doctors/add', icon: '👨‍⚕️', label: 'Register Doctor',    sub: 'Add a new practitioner' },
-              { href: '/dashboard/services',    icon: '🏥',   label: 'Manage Services',   sub: 'Enable specialties & pricing' },
-              { href: '/dashboard/settings',    icon: '⚙️',   label: 'Hospital Settings', sub: 'Update profile and preferences' },
+              { href: '/dashboard/doctors/add', Icon: Stethoscope, label: 'Register Doctor',    sub: 'Add a new practitioner' },
+              { href: '/dashboard/services',    Icon: Tag,          label: 'Manage Services',   sub: 'Enable specialties & pricing' },
+              { href: '/dashboard/settings',    Icon: Settings,     label: 'Hospital Settings', sub: 'Update profile and preferences' },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
@@ -503,7 +519,10 @@ export default function OverviewPage() {
                   transition: 'background 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.background = (C.rowAlt ?? 'rgba(255,255,255,0.03)'))}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentLight,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.accent, flexShrink: 0 }}>
+                  <item.Icon size={15} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ ...T.caption, fontWeight: 600, color: C.text }}>{item.label}</div>
                   <div style={{ fontSize: 10, color: C.textMuted }}>{item.sub}</div>

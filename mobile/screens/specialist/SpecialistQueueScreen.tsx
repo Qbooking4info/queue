@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
@@ -166,7 +167,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
         </View>
       ) : appts.length === 0 ? (
         <View style={st.center}>
-          <Text style={{ fontSize: 56, marginBottom: 16 }}>🩺</Text>
+          <Ionicons name="medical-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
           <Text style={[st.emptyTitle, { color: t.textPrimary }]}>
             {tab === 'today' ? 'No patients scheduled for today' : 'No upcoming appointments'}
           </Text>

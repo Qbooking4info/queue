@@ -96,7 +96,7 @@ export default async function StaffPage() {
         {[
           { role: 'Admin',      icon: '⚙️',  desc: 'Full access — manage settings, doctors, staff, and all appointments' },
           { role: 'Specialist', icon: '👨‍⚕️', desc: 'View own schedule, add diagnosis and notes to patient appointments' },
-          { role: 'Front Desk', icon: '🖥️',  desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
+          { role: 'Front Desk', icon: null, desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
         ].map(r => (
           <div key={r.role} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
             <div className="text-xl mb-2">{r.icon}</div>

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Linking, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 
 interface Props { navigation: any; route: any }
@@ -67,7 +68,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
         <Animated.View style={[st.iconCircle, { transform: [{ scale: pulseAnim }],
           borderColor: urgencyColor, backgroundColor: `${urgencyColor}18`,
           opacity: show ? 1 : 0 }]}>
-          <Text style={st.iconEmoji}>🚨</Text>
+          <Ionicons name="alert-circle-outline" size={48} color="#FF5C5C" />
         </Animated.View>
 
         <Text style={[st.headline, { opacity: show ? 1 : 0 }]}>
@@ -141,7 +142,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
         {/* Actions */}
         <View style={[st.actions, { opacity: show ? 1 : 0 }]}>
           <TouchableOpacity onPress={callHospital} style={[st.callBtn, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}18` }]}>
-            <Text style={[st.callBtnText, { color: urgencyColor }]}>📞  Call hospital</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="call-outline" size={16} color={urgencyColor} /><Text style={[st.callBtnText, { color: urgencyColor }]}>Call hospital</Text></View>
           </TouchableOpacity>
           <TouchableOpacity onPress={getDirections} style={[st.callBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
             <Text style={[st.callBtnText, { color: 'rgba(255,255,255,0.6)' }]}>🗺  Get directions</Text>

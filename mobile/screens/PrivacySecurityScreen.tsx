@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase }  from '../lib/supabase'
@@ -132,7 +133,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           <Text style={[s.dangerBtnText, { color: '#FF5C5C' }]}>Sign out of all devices</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleDeleteAccount} style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
-          <Text style={{ fontSize: 16 }}>🗑️</Text>
+          <Ionicons name="trash-outline" size={16} color="rgba(255,92,92,0.8)" />
           <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
         </TouchableOpacity>
       </ScrollView>

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, Clipboard, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
@@ -321,7 +322,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={52} />
             ) : (
               <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
-                <Text style={{ fontSize: 20 }}>{isVirtual ? '👨‍⚕️' : '🏥'}</Text>
+                <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
               </View>
             )}
             <View style={{ flex: 1 }}>
@@ -335,24 +336,30 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </View>
             {isVirtual ? (
               <View style={[st.typePill, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: 'rgba(91,158,255,0.3)' }]}>
-                <Text style={[st.typePillText, { color: '#85B7EB' }]}>💻 Virtual</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="videocam-outline" size={11} color="#85B7EB" />
+                  <Text style={[st.typePillText, { color: '#85B7EB' }]}>Virtual</Text>
+                </View>
               </View>
             ) : (
               <View style={[st.typePill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                <Text style={[st.typePillText, { color: t.accent }]}>🏥 In-person</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="walk-outline" size={11} color={t.accent} />
+                  <Text style={[st.typePillText, { color: t.accent }]}>In-person</Text>
+                </View>
               </View>
             )}
           </View>
 
           {/* Date / time chips */}
           <View style={st.chipsRow}>
-            {[
-              { icon: '📅', val: fmtDate(appt.date) },
-              { icon: '⏰', val: fmt12(appt.time) },
-              { icon: '📍', val: appt.hospital },
-            ].map(c => (
+            {([
+              { icon: 'calendar-outline' as const, val: fmtDate(appt.date) },
+              { icon: 'time-outline' as const,     val: fmt12(appt.time) },
+              { icon: 'location-outline' as const, val: appt.hospital },
+            ] as const).map(c => (
               <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
-                <Text style={st.chipIcon}>{c.icon}</Text>
+                <Ionicons name={c.icon} size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 3 }} />
                 <Text style={st.chipText} numberOfLines={1}>{c.val}</Text>
               </View>
             ))}
@@ -362,7 +369,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         {/* Emergency banner */}
         {isEmergency && !cancelled && (
           <View style={[st.joinBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.4)' }]}>
-            <Text style={{ fontSize: 22 }}>🚨</Text>
+            <Ionicons name="alert-circle-outline" size={22} color="#FF5C5C" />
             <View style={{ flex: 1 }}>
               <Text style={[st.joinTitle, { color: '#FF5C5C' }]}>Emergency booking</Text>
               <Text style={[st.joinSub, { color: 'rgba(255,92,92,0.7)' }]}>
@@ -454,7 +461,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
               <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Your doctor</Text>
               <View style={st.noDoctorRow}>
-                <Text style={{ fontSize: 28 }}>🏥</Text>
+                <Ionicons name="business-outline" size={28} color={t.textMuted} style={{ opacity: 0.5 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.noDoctorTitle, { color: t.textPrimary }]}>Doctor assigned at check-in</Text>
                   <Text style={[st.noDoctorSub, { color: t.textMuted }]}>
@@ -470,18 +477,19 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {isUpcoming && !cancelled && (
             <Section title="How to prepare">
               {(isVirtual ? [
-                '📶  Ensure stable internet connection before your session',
-                '🎧  Use headphones for clearer audio',
-                '📋  Have your previous test results ready to share',
-                '💡  Find a quiet, well-lit space for the call',
+                'Ensure stable internet connection before your session',
+                'Use headphones for clearer audio',
+                'Have your previous test results ready to share',
+                'Find a quiet, well-lit space for the call',
               ] : [
-                '🕐  Arrive 10 minutes before your appointment time',
-                '🪪  Bring a valid ID and your HMO card if applicable',
-                '📋  Bring any previous test results or referral letters',
-                '💊  Bring a list of medications you currently take',
+                'Arrive 10 minutes before your appointment time',
+                'Bring a valid ID and your HMO card if applicable',
+                'Bring any previous test results or referral letters',
+                'Bring a list of medications you currently take',
               ]).map(tip => (
-                <View key={tip} style={[st.tipRow, { borderBottomColor: t.cardBorder }]}>
-                  <Text style={[st.tipText, { color: t.textSecondary }]}>{tip}</Text>
+                <View key={tip} style={[st.tipRow, { borderBottomColor: t.cardBorder, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={t.accent} style={{ marginTop: 2 }} />
+                  <Text style={[st.tipText, { color: t.textSecondary, flex: 1 }]}>{tip}</Text>
                 </View>
               ))}
             </Section>
@@ -500,7 +508,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                 style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
                 {rescheduleLoading
                   ? <ActivityIndicator size="small" color={t.textPrimary} />
-                  : <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>🗓  Reschedule</Text>
+                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
+                      <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
+                    </View>
                 }
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
@@ -467,7 +468,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               </Text>
 
               <View style={[s.searchRow, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                <Text style={{ fontSize: 14, color: t.textMuted }}>🔍</Text>
+                <Ionicons name="search-outline" size={14} color={t.textMuted} />
                 <TextInput
                   value={searchText} onChangeText={setSearchText}
                   placeholder="Search hospitals…"
@@ -485,7 +486,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 <ActivityIndicator color={t.accent} style={{ marginTop: 30 }} />
               ) : hospitalList.length === 0 ? (
                 <View style={[s.emptyBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                  <Text style={{ fontSize: 28, marginBottom: 8 }}>🏥</Text>
+                  <Ionicons name="business-outline" size={28} color={t.textMuted} style={{ marginBottom: 8, opacity: 0.4 }} />
                   <Text style={[{ fontSize: 13, color: t.textMuted, textAlign: 'center' }]}>
                     {bookingType === 'virtual'
                       ? 'No hospitals with virtual consultations found.'
@@ -506,18 +507,18 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                         <Text style={[s.hospName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                        {h.verified && <Text style={{ fontSize: 11, color: t.accent }}>✓</Text>}
+                        {h.verified && <Ionicons name="checkmark-circle" size={12} color={t.accent} />}
                       </View>
                       <Text style={[s.hospSpec, { color: t.textMuted }]} numberOfLines={1}>{h.specialty}</Text>
                       <View style={{ flexDirection: 'row', gap: 5, marginTop: 3, flexWrap: 'wrap' }}>
                         {h.virtual && (
                           <View style={[s.miniTag, { backgroundColor: 'rgba(55,138,221,0.1)', borderColor: 'rgba(55,138,221,0.2)' }]}>
-                            <Text style={{ fontSize: 9, color: '#85B7EB' }}>💻 Virtual</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="videocam-outline" size={9} color="#85B7EB" /><Text style={{ fontSize: 9, color: '#85B7EB' }}>Virtual</Text></View>
                           </View>
                         )}
                         {h.approval_mode === 'manual' && (
                           <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.2)' }]}>
-                            <Text style={{ fontSize: 9, color: '#EF9F27' }}>📋 Manual review</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="clipboard-outline" size={9} color="#EF9F27" /><Text style={{ fontSize: 9, color: '#EF9F27' }}>Manual review</Text></View>
                           </View>
                         )}
                         {h.opd_fee != null && h.opd_fee > 0 && bookingType === 'physical' && (
@@ -539,7 +540,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
             <View style={s.stepWrap}>
               {/* Context chip */}
               <View style={[s.contextChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                <Text style={{ fontSize: 16 }}>{bookingType === 'virtual' ? '💻' : '🏥'}</Text>
+                <Text style={{ fontSize: 16 }}>{bookingType === 'virtual' ? <Ionicons name="videocam-outline" size={16} color={t.textMuted} /> : <Ionicons name="walk-outline" size={16} color={t.accent} />}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.contextName, { color: t.textPrimary }]} numberOfLines={1}>
                     {hospital?.name}
@@ -666,7 +667,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                               <Text style={[s.urgLabel, { color: active ? t.accent : t.textPrimary }]}>{clinic.name}</Text>
                               {isEmergency ? (
                                 <View style={[s.miniTag, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FF5C5C' }}>🚨 Emergency</Text>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Ionicons name="alert-circle-outline" size={9} color="#FF5C5C" /><Text style={{ fontSize: 9, fontWeight: '700', color: '#FF5C5C' }}>Emergency</Text></View>
                                 </View>
                               ) : clinic.is_opd ? (
                                 <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
@@ -771,14 +772,14 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ This date is fully booked. Please pick another day.</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color="#EF9F27" style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: '#EF9F27', flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
 
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred arrival window</Text>
                   {opdSlots.length === 0 && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ No available slots for today. Please choose another date.</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color="#EF9F27" style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: '#EF9F27', flex: 1 }}>No available slots for today. Please choose another date.</Text></View>
                     </View>
                   )}
                   <View style={s.slotGrid}>
@@ -911,7 +912,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ This date is fully booked. Please pick another day.</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color="#EF9F27" style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: '#EF9F27', flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
 
@@ -919,7 +920,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred call window</Text>
                   {opdSlots.length === 0 && (
                     <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <Text style={{ fontSize: 12, color: '#EF9F27' }}>⚠️ No available windows for today. Please choose another date.</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color="#EF9F27" style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: '#EF9F27', flex: 1 }}>No available windows for today. Please choose another date.</Text></View>
                     </View>
                   )}
                   <View style={s.slotGrid}>
@@ -956,7 +957,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
               {isManual && (
                 <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginBottom: 14 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EF9F27', marginBottom: 4 }}>📋 Pending hospital review</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color="#EF9F27" /><Text style={{ fontSize: 13, fontWeight: '700', color: '#EF9F27' }}>Pending hospital review</Text></View>
                   <Text style={{ fontSize: 12, color: '#EF9F27', lineHeight: 18 }}>
                     Payment is held until the hospital approves your request. Rejected bookings receive a full refund.
                   </Text>

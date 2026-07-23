@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLocation, distanceKm, formatDistance } from '../contexts/LocationContext'
@@ -79,7 +80,7 @@ export function SearchScreen({ navigation }: Props) {
         <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
 
         <View style={[styles.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
+          <Ionicons name="search-outline" size={15} color={t.textMuted} />
           <TextInput
             value={q} onChangeText={setQ}
             placeholder="Hospital, doctor, specialty…"

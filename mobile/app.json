@@ -11,11 +11,12 @@
       "bundleIdentifier": "com.qbooking.queue",
       "infoPlist": {
         "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
-        "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor."
+        "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.qbooking.queue",
+      "package": "com.qbooking.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,7 +24,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.qbooking.mobile",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -38,7 +38,7 @@
     "extra": {
       "eas": {
         "projectId": "a46342ec-6f59-459a-8885-da9aab8d39e0"
-        },
+      },
       "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig"
     },
@@ -58,7 +58,9 @@
           "locationAlwaysAndWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
           "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-status-bar"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

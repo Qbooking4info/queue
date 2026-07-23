@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, Pressable, Dimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -29,9 +30,9 @@ const PREVIEW_COUNT = 10
 
 function getGreeting(): { salutation: string; emoji: string } {
   const hour = new Date().getHours()
-  if (hour < 12) return { salutation: 'Good morning',   emoji: '☀️' }
-  if (hour < 16) return { salutation: 'Good afternoon', emoji: '🌤️' }
-  return               { salutation: 'Good evening',   emoji: '🌇' }
+  if (hour < 12) return { salutation: 'Good morning',   emoji: '' }
+  if (hour < 16) return { salutation: 'Good afternoon', emoji: '' }
+  return               { salutation: 'Good evening',   emoji: '' }
 }
 
 const WELLNESS_TIPS = [
@@ -93,12 +94,12 @@ function SpecialtyGrid({
                   backgroundColor: active ? t.accentBg : t.inputBg,
                   borderColor:     active ? t.accent   : t.cardBorder,
                 }}>
-                <Text style={{ fontSize: 22 }}>{sp.icon}</Text>
+                <Ionicons name="medical-outline" size={20} color={active ? t.accent : t.textMuted} />
                 <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
                   numberOfLines={2}>{sp.label}</Text>
                 {active && (
                   <View style={{ position: 'absolute', top: 6, right: 6, width: 12, height: 12, borderRadius: 6, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#000', fontSize: 7, fontWeight: '900' }}>✓</Text>
+                    <Ionicons name="checkmark" size={8} color="#000" />
                   </View>
                 )}
               </TouchableOpacity>
@@ -190,10 +191,6 @@ export function HomeScreen({ navigation }: Props) {
     setActiveSpecialty(null)
   }
 
-  const activeIcon = activeSpecialty
-    ? (specialties.find(s => s.label === activeSpecialty)?.icon ?? '🔍')
-    : null
-
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
 
@@ -221,7 +218,10 @@ export function HomeScreen({ navigation }: Props) {
             <SpecialtyGrid items={general} theme={t} activeSpecialty={activeSpecialty} onSelect={handleSpecialtyPress} />
             <View style={[s.dividerRow, { borderTopColor: t.cardBorder }]}>
               <View style={[s.dividerPill, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.dividerText, { color: t.accent }]}>✂️  Surgery Sub-specialties</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="cut-outline" size={13} color={t.accent} />
+                  <Text style={[s.dividerText, { color: t.accent }]}>Surgery Sub-specialties</Text>
+                </View>
               </View>
             </View>
             <SpecialtyGrid items={surgery} theme={t} activeSpecialty={activeSpecialty} onSelect={handleSpecialtyPress} />
@@ -235,12 +235,12 @@ export function HomeScreen({ navigation }: Props) {
         <View style={s.header}>
           <View style={{ flex: 1 }}>
             <Text style={[s.greeting, { color: t.textMuted }]}>{salutation} {emoji}</Text>
-            <Text style={[s.headline, { color: t.textPrimary }]}>{firstName} 👋</Text>
+            <Text style={[s.headline, { color: t.textPrimary }]}>{firstName}</Text>
             <Text style={[s.dayMsg, { color: t.textMuted }]} numberOfLines={1}>{dayMessage}</Text>
           </View>
           <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Notifications') }}
             style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 18 }}>🔔</Text>
+            <Ionicons name="notifications-outline" size={19} color={t.textMuted} />
             {unreadCount > 0 && <View style={[s.notifDot, { backgroundColor: t.accent }]} />}
           </TouchableOpacity>
         </View>
@@ -248,7 +248,7 @@ export function HomeScreen({ navigation }: Props) {
         {/* Profile completion banner */}
         {showProfileBanner && (
           <View style={[s.profileBanner, { backgroundColor: '#2A1800', borderColor: 'rgba(239,159,39,0.35)' }]}>
-            <Text style={{ fontSize: 20 }}>🩺</Text>
+            <Ionicons name="medical-outline" size={20} color="#EF9F27" />
             <View style={{ flex: 1 }}>
               <Text style={[s.profileBannerTitle, { color: '#EF9F27' }]}>Complete your health profile</Text>
               <Text style={[s.profileBannerSub, { color: 'rgba(239,159,39,0.65)' }]}>
@@ -302,7 +302,7 @@ export function HomeScreen({ navigation }: Props) {
         {/* Search */}
         <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
           style={[s.searchBar, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
+          <Ionicons name="search-outline" size={15} color={t.textMuted} />
           <Text style={[s.searchPH, { color: t.textMuted }]}>Search hospitals, doctors, specialties…</Text>
         </TouchableOpacity>
 
@@ -312,7 +312,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {}) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={[s.bookIcon, { backgroundColor: t.accentBg }]}>
-              <Text style={{ fontSize: 20 }}>🏥</Text>
+              <Ionicons name="walk-outline" size={20} color={t.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Physical Visit</Text>
@@ -324,7 +324,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', { bookingType: 'virtual' }) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={[s.bookIcon, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
-              <Text style={{ fontSize: 20 }}>💻</Text>
+              <Ionicons name="videocam-outline" size={20} color="#378ADD" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Virtual Call</Text>
@@ -336,7 +336,7 @@ export function HomeScreen({ navigation }: Props) {
 
         {/* Emergency CTA */}
         <View style={s.emergency}>
-          <Text style={{ fontSize: 22 }}>🚨</Text>
+          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
           <View style={{ flex: 1 }}>
             <Text style={s.emergencyTitle}>Need urgent care?</Text>
             <Text style={[s.emergencySub, { color: 'rgba(255,255,255,0.6)' }]}>
@@ -363,7 +363,6 @@ export function HomeScreen({ navigation }: Props) {
                   borderColor:     active ? t.accent    : t.cardBorder,
                   borderWidth:     active ? 1.5 : 1,
                 }]}>
-                <Text style={{ fontSize: 20 }}>{sp.icon}</Text>
                 <Text style={[s.chipLabel, { color: active ? t.accent : t.textMuted, fontWeight: active ? '700' : '500' }]}>
                   {sp.label}
                 </Text>
@@ -372,7 +371,7 @@ export function HomeScreen({ navigation }: Props) {
           })}
           <TouchableOpacity onPress={() => { haptics.tap(); setShowAll(true) }}
             style={[s.chip, s.moreChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={{ fontSize: 18 }}>＋</Text>
+            <Ionicons name="add-outline" size={18} color={t.accent} />
             <Text style={[s.chipLabel, { color: t.accent, fontWeight: '700' }]}>More</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -380,7 +379,7 @@ export function HomeScreen({ navigation }: Props) {
         {/* Active filter banner */}
         {activeSpecialty && (
           <View style={[s.filterBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={{ fontSize: 16 }}>{activeIcon}</Text>
+            <Ionicons name="funnel-outline" size={16} color={t.accent} />
             <View style={{ flex: 1 }}>
               <Text style={[s.filterBannerTitle, { color: t.accent }]}>
                 {displayedHospitals.length} hospital{displayedHospitals.length !== 1 ? 's' : ''} offering {activeSpecialty}
@@ -422,7 +421,7 @@ export function HomeScreen({ navigation }: Props) {
           ))
         ) : activeSpecialty ? (
           <View style={[s.emptyFilter, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 52, marginBottom: 10 }}>🔍</Text>
+            <Ionicons name="search-outline" size={52} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
             <Text style={[s.emptyFilterTitle, { color: t.textPrimary }]}>No hospitals found</Text>
             <Text style={[s.emptyFilterSub, { color: t.textMuted }]}>
               No hospitals near you currently offer {activeSpecialty}.
@@ -434,7 +433,7 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         ) : (
           <View style={[s.emptyFilter, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 52, marginBottom: 10 }}>🏥</Text>
+            <Ionicons name="business-outline" size={52} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
             <Text style={[s.emptyFilterTitle, { color: t.textPrimary }]}>No hospitals nearby</Text>
             <Text style={[s.emptyFilterSub, { color: t.textMuted }]}>
               Try searching by specialty, hospital name, or doctor.

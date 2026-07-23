@@ -10,6 +10,7 @@ export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitu
   requires_referral?: boolean | null
   opd_fee?: number | null
   clinic_model?: string | null
+  is_24_hours?: boolean | null
   hospital_specialties?: { specialty: { name: string; icon: string | null } | null }[]
   services?: { name: string; is_active: boolean | null }[]
 }
@@ -87,7 +88,8 @@ export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> 
   })
 }
 
-export function isOpenNow(hours: DayHours[]): boolean {
+export function isOpenNow(hours: DayHours[], is24Hours?: boolean | null): boolean {
+  if (is24Hours) return true
   const now = new Date()
   const today = hours.find(h => h.day === now.getDay())
   if (!today || today.closed) return false
@@ -187,6 +189,10 @@ export async function getNextAppointment(
 
 // ── Create appointment (doctor-specific / virtual) ────────────────────────────
 
+export type BookingResult =
+  | { ok: true; id: string; bookingRef: string; approvalStatus: string }
+  | { ok: false; error: string }
+
 export async function createAppointment(payload: {
   patientId:           string
   doctorId:            string
@@ -202,7 +208,7 @@ export async function createAppointment(payload: {
   dependentId?:        string
   approvalMode?:       string    // 'auto' | 'manual' — from hospital settings
   paymentMethod?:      string
-}): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
+}): Promise<BookingResult> {
   const bookingRef     = `QUE-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
   const status         = approvalStatus === 'auto_approved' ? 'confirmed' : 'pending'
@@ -232,8 +238,8 @@ export async function createAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createAppointment]', error.message, error.code); return { error: error.message } as any }
-  return { id: data.id, bookingRef: data.booking_ref, approvalStatus }
+  if (error) { console.warn('[createAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
 // ── Create hospital-level (OPD / in-person) appointment ──────────────────────
@@ -254,7 +260,7 @@ export async function createHospitalAppointment(payload: {
   opdFee?:             number
   type?:               'in-person' | 'virtual'
   paymentMethod?:      string
-}): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
+}): Promise<BookingResult> {
   const bookingRef     = `OPD-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
   const status         = 'pending'
@@ -285,8 +291,8 @@ export async function createHospitalAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createHospitalAppointment]', error.message, error.code); return { error: error.message } as any }
-  return { id: data.id, bookingRef: data.booking_ref, approvalStatus }
+  if (error) { console.warn('[createHospitalAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
 // ── Cancel appointment (with refund policy) ───────────────────────────────────
@@ -335,7 +341,7 @@ export async function rescheduleAppointment(payload: {
   clinicId?:    string
   approvalMode?:  string
   paymentMethod?: string
-}): Promise<{ id: string; bookingRef: string; approvalStatus: string } | null> {
+}): Promise<BookingResult> {
   const bookingRef     = `RSC-${Date.now().toString().slice(-6)}`
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
 
@@ -360,7 +366,10 @@ export async function rescheduleAppointment(payload: {
     })
     .select('id, booking_ref')
     .single()
-  if (error || !data) { console.warn('[rescheduleAppointment] insert failed:', error?.message); return null }
+  if (error || !data) {
+    console.warn('[rescheduleAppointment] insert failed:', error?.message)
+    return { ok: false, error: error?.message ?? 'Insert failed' }
+  }
 
   // Close out the original booking so the patient isn't left holding two active appointments
   // for the same visit — the new row links back to it via rescheduled_from.
@@ -374,7 +383,7 @@ export async function rescheduleAppointment(payload: {
     .eq('id', payload.originalId)
   if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
 
-  return { id: data.id, bookingRef: data.booking_ref, approvalStatus }
+  return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────

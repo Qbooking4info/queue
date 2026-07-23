@@ -298,7 +298,7 @@ function ScheduleContent() {
 
       {!loading && hasOpenDays && Object.values(schedule).every(d => d.length === 0) && (
         <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted, marginTop: 16 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>No appointments this week</div>
           <div style={{ fontSize: 13 }}>The schedule is clear. Appointments booked will appear here.</div>
         </div>

@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getDependents, addDependent, updateDependent, deleteDependent } from '../lib/api'
+import { DateOfBirthSelect } from '../components/ui/DateOfBirthSelect'
 
 interface Props { navigation: any }
 
@@ -125,10 +126,9 @@ export function DependentsScreen({ navigation }: Props) {
             </View>
 
             <Text style={[s.fieldLabel, { color: t.textMuted }]}>Date of birth</Text>
-            <TextInput
-              value={form.date_of_birth} onChangeText={v => setForm(f => ({ ...f, date_of_birth: v }))}
-              placeholder="YYYY-MM-DD" placeholderTextColor={t.textMuted}
-              style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
+            <DateOfBirthSelect
+              value={form.date_of_birth}
+              onChange={v => setForm(f => ({ ...f, date_of_birth: v }))}
             />
 
             <Text style={[s.fieldLabel, { color: t.textMuted }]}>Gender</Text>

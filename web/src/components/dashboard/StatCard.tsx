@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { T } from '@/lib/typography'
 
 interface StatCardProps {
-  icon: string
+  icon: React.ReactNode
   label: string
   value: string | number
   sub?: string
@@ -38,7 +38,7 @@ export function StatCard({ icon, label, value, sub, colorKey = 'accent', trend }
       }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: col + '22',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: col }}>
           {icon}
         </div>
         {trend !== undefined && (

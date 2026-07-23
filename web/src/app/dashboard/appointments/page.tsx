@@ -18,6 +18,7 @@ import {
   getDoctors as getDoctorsForHospital,
   fmtLocalDate,
 } from '@/lib/admin-api'
+import { CheckCircle2, ClipboardList } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ function WalkInModal({
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {done ? (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <CheckCircle2 size={40} style={{ opacity: 0.8, display: 'block', margin: '0 auto 12px', color: '#22c55e' }} />
               <div style={{ fontSize: 17, fontWeight: 800, color: C.text, marginBottom: 6 }}>Booking Created</div>
               <div style={{ fontSize: 14, color: C.textSub, marginBottom: 4 }}>Reference:</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.accent, fontFamily: 'monospace' }}>{done}</div>
@@ -213,7 +214,7 @@ function WalkInModal({
                 {foundPatient && (
                   <div style={{ marginTop: 10, padding: '10px 12px', background: C.accentLight ?? 'rgba(0,200,100,0.08)',
                     borderRadius: 8, border: `1px solid ${C.accentBorder}`, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 16 }}>✅</span>
+                    <CheckCircle2 size={16} color="#22c55e" />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{foundPatient.full_name}</div>
                       <div style={{ fontSize: 11, color: C.textSub }}>
@@ -327,7 +328,9 @@ function AssignDoctorModal({
   appointment, doctors, onClose, onDone,
 }: { appointment: AdminAppointment; doctors: AdminDoctor[]; onClose: () => void; onDone: (doctorId: string) => void }) {
   const { theme: C } = useTheme()
-  const [selected, setSelected] = useState('')
+  const currentDoctorId = appointment.assigned_doctor_id ?? appointment.doctor_id ?? ''
+  const isReassign = !!currentDoctorId
+  const [selected, setSelected] = useState(currentDoctorId)
   const [saving,   setSaving]   = useState(false)
 
   // Only show doctors from the appointment's clinic (if one is assigned)
@@ -354,7 +357,7 @@ function AssignDoctorModal({
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
-            Assign Doctor — {appointment.patient_name}
+            {isReassign ? 'Reassign Doctor' : 'Assign Doctor'} — {appointment.patient_name}
           </div>
           <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
@@ -390,7 +393,7 @@ function AssignDoctorModal({
                 </div>
                 <div style={{ fontSize: 11, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
               </div>
-              {selected === d.id && <span style={{ color: C.accent, fontSize: 16 }}>✓</span>}
+              {selected === d.id && <CheckCircle2 size={15} color={C.accent} />}
             </button>
           ))}
         </div>
@@ -401,14 +404,14 @@ function AssignDoctorModal({
               color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
             Cancel
           </button>
-          <button onClick={handleAssign} disabled={!selected || saving}
+          <button onClick={handleAssign} disabled={!selected || selected === currentDoctorId || saving}
             style={{ flex: 2, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: selected ? C.accent : C.bgAlt,
-              color: selected ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+              background: selected && selected !== currentDoctorId ? C.accent : C.bgAlt,
+              color: selected && selected !== currentDoctorId ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
               border: 'none', fontSize: 13, fontWeight: 700,
-              cursor: !selected || saving ? 'not-allowed' : 'pointer',
+              cursor: !selected || selected === currentDoctorId || saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Assigning…' : 'Assign Doctor'}
+            {saving ? (isReassign ? 'Reassigning…' : 'Assigning…') : (isReassign ? 'Reassign Doctor' : 'Assign Doctor')}
           </button>
         </div>
       </div>
@@ -751,7 +754,7 @@ export default function AppointmentsPage() {
         <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
           borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
           marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>⚠️ {actionError}</span>
+          <span style={{display:'flex',alignItems:'center',gap:4}}><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg>{actionError}</span>
           <button onClick={() => setActionError('')} aria-label="Close"
             style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
         </div>
@@ -782,7 +785,7 @@ export default function AppointmentsPage() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={10}>
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-                  <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                  <ClipboardList size={40} style={{ opacity: 0.3, display: 'block', margin: `0 auto ${SPACE.md}px` }} />
                   <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments found</div>
                   <div style={{ ...T.body, color: C.textMuted }}>Try adjusting your filters or date range.</div>
                 </div>
@@ -790,6 +793,10 @@ export default function AppointmentsPage() {
             ) : filtered.map((a, i) => {
               const urg = urgencyColor(a.urgency, C)
               const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
+              const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
+              // Assign/reassign only before check-in — queue_position is computed per-doctor at
+              // check-in time, so swapping doctors after that would leave a stale queue slot.
+              const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
               const needsApproval = a.approval_status === 'pending_approval'
               const isEmergency = a.urgency === 'emergency'
               return (
@@ -913,11 +920,14 @@ export default function AppointmentsPage() {
                             </button>
                           </>
                         )}
-                        {/* Assign Doctor — admins only */}
-                        {!isDoctor && needsAssign && (
+                        {/* Assign / Reassign Doctor — admins and front desk, before check-in */}
+                        {canAssignDoctor && (
                           <button onClick={() => setAssignAppt(a)} disabled={isPending}
-                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)', color: '#EF9F27' }}>
-                            Assign Dr.
+                            style={{ ...btnBase, fontWeight: 700,
+                              border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
+                              background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
+                              color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                            {hasDoctor ? 'Reassign' : 'Assign Dr.'}
                           </button>
                         )}
                         {/* Check In */}

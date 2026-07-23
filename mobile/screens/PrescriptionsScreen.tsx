@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -40,9 +41,15 @@ export function PrescriptionsScreen({ navigation }: Props) {
       <View style={[s.tabBar, { borderBottomColor: t.cardBorder }]}>
         {(['prescriptions', 'labs'] as const).map(tb => (
           <TouchableOpacity key={tb} onPress={() => setTab(tb)} style={s.tabItem}>
-            <Text style={[s.tabText, { color: tab === tb ? t.accent : t.textMuted, fontWeight: tab === tb ? '700' : '400' }]}>
-              {tb === 'prescriptions' ? '💊 Prescriptions' : '🩺 Diagnoses'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons
+                name={tb === 'prescriptions' ? 'medkit-outline' : 'clipboard-outline'}
+                size={13} color={tab === tb ? t.accent : t.textMuted}
+              />
+              <Text style={[s.tabText, { color: tab === tb ? t.accent : t.textMuted, fontWeight: tab === tb ? '700' : '400' }]}>
+                {tb === 'prescriptions' ? 'Prescriptions' : 'Diagnoses'}
+              </Text>
+            </View>
             <View style={[s.tabUnderline, { backgroundColor: tab === tb ? t.accent : 'transparent' }]} />
           </TouchableOpacity>
         ))}
@@ -57,13 +64,13 @@ export function PrescriptionsScreen({ navigation }: Props) {
             <>
               <Text style={[s.sectionSub, { color: t.textMuted }]}>Medications prescribed by your doctors</Text>
               {appts.filter(a => a.doctor_notes).length === 0 ? (
-                <EmptyState icon="💊" title="No prescriptions on file" sub="Prescriptions from your completed consultations will appear here." />
+                <EmptyState iconName="medkit-outline" title="No prescriptions on file" sub="Prescriptions from your completed consultations will appear here." />
               ) : (
                 appts.filter(a => a.doctor_notes).map(a => (
                   <View key={a.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                     <View style={s.cardHeader}>
                       <View style={[s.rxIcon, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                        <Text style={{ fontSize: 20 }}>💊</Text>
+                        <Ionicons name="medkit-outline" size={20} color={t.accent} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[s.cardTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
@@ -93,13 +100,13 @@ export function PrescriptionsScreen({ navigation }: Props) {
             <>
               <Text style={[s.sectionSub, { color: t.textMuted }]}>Diagnoses from completed consultations</Text>
               {appts.filter(a => a.diagnosis).length === 0 ? (
-                <EmptyState icon="🩺" title="No diagnoses on file" sub="Diagnoses recorded by your doctors during completed consultations will appear here." />
+                <EmptyState iconName="clipboard-outline" title="No diagnoses on file" sub="Diagnoses recorded by your doctors during completed consultations will appear here." />
               ) : (
                 appts.filter(a => a.diagnosis).map(a => (
                   <View key={a.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                     <View style={s.cardHeader}>
                       <View style={[s.rxIcon, { backgroundColor: 'rgba(56,189,248,0.15)', borderColor: 'rgba(56,189,248,0.3)' }]}>
-                        <Text style={{ fontSize: 20 }}>🔬</Text>
+                        <Ionicons name="flask-outline" size={20} color="rgba(56,189,248,0.9)" />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[s.cardTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
@@ -131,7 +138,7 @@ export function PrescriptionsScreen({ navigation }: Props) {
               <Text style={[s.sectionTitle, { color: t.textMuted }]}>Recent consultations</Text>
               {appts.filter(a => !a.doctor_notes).slice(0, 5).map(a => (
                 <View key={a.id} style={[s.simpleRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <Text style={{ fontSize: 14 }}>🩺</Text>
+                  <Ionicons name="medical-outline" size={14} color={t.textMuted} />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.simpleTitle, { color: t.textPrimary }]}>{a.doctor?.full_name ?? 'Doctor'}</Text>
                     <Text style={[s.simpleSub, { color: t.textMuted }]}>{fmtDate(a.appointment_date)} · {a.hospital?.name ?? ''}</Text>
@@ -147,11 +154,11 @@ export function PrescriptionsScreen({ navigation }: Props) {
   )
 }
 
-function EmptyState({ icon, title, sub }: { icon: string; title: string; sub: string }) {
+function EmptyState({ iconName, title, sub }: { iconName: React.ComponentProps<typeof Ionicons>['name']; title: string; sub: string }) {
   const { theme: t } = useTheme()
   return (
     <View style={[es.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      <Text style={{ fontSize: 36, marginBottom: 10 }}>{icon}</Text>
+      <Ionicons name={iconName} size={40} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
       <Text style={[es.title, { color: t.textPrimary }]}>{title}</Text>
       <Text style={[es.sub, { color: t.textMuted }]}>{sub}</Text>
     </View>

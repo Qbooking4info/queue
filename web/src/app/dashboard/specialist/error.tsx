@@ -18,7 +18,7 @@ export default function SpecialistError({
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       minHeight: 320, padding: 40, textAlign: 'center',
     }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8, color: '#f07070' }}>
         Something went wrong
       </h2>

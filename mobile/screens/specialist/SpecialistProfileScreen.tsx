@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -143,7 +144,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
               navigation.navigate('Queue')
             }}
           >
-            <Text style={[st.scheduleBtnText, { color: t.accent }]}>📅  View Today's Schedule</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="calendar-outline" size={14} color={t.accent} /><Text style={[st.scheduleBtnText, { color: t.accent }]}>View Today's Schedule</Text></View>
           </TouchableOpacity>
         )}
 

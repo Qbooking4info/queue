@@ -8,6 +8,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { getRangeStats, getAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
+import { CalendarDays, CheckCircle2, XCircle, Star } from 'lucide-react'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun']
 const BOOKINGS = [210, 248, 290, 312, 387, 421]
@@ -105,16 +106,16 @@ export default function AnalyticsPage() {
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 22 }}>
-        <StatCard icon="📅" label="Total Appointments"
+        <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total.toLocaleString()}
           sub="Selected period" colorKey="accent" />
-        <StatCard icon="✔" label="Completed"
+        <StatCard icon={<CheckCircle2 size={18} />} label="Completed"
           value={loading ? '…' : rangeStats.completed.toLocaleString()}
           sub={loading ? '' : `${showupRate}% show-up rate`} colorKey="blue" />
-        <StatCard icon="✕" label="Cancelled"
+        <StatCard icon={<XCircle size={18} />} label="Cancelled"
           value={loading ? '…' : rangeStats.cancelled.toLocaleString()}
           sub="Selected period" colorKey="purple" />
-        <StatCard icon="⭐" label="Patient Rating"
+        <StatCard icon={<Star size={18} />} label="Patient Rating"
           value={stats.avgRating.toFixed(1)}
           sub={`${stats.reviewCount} reviews`} colorKey="amber" />
       </div>

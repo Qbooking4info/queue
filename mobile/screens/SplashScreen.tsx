@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
+import { Ionicons } from '@expo/vector-icons'
 
 export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; onSignIn: () => void }) {
   const { theme: t } = useTheme()
@@ -12,7 +13,7 @@ export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => v
       {/* Logo */}
       <View style={[styles.logoBox, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder,
         opacity: vis ? 1 : 0, transform: [{ scale: vis ? 1 : 0.6 }] }]}>
-        <Text style={{ fontSize: 40 }}>🏥</Text>
+        <Ionicons name="medical-outline" size={40} color={t.accent} />
       </View>
 
       {/* Brand */}

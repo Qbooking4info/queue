@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -133,7 +134,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 
             {filtered.length === 0 && (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>📅</Text>
+                <Ionicons name="calendar-outline" size={52} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
                 <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                   No {filter} appointments
                 </Text>
@@ -182,11 +183,18 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {/* Ref row — booking ID + status badge */}
                   <View style={[s.refRow, { borderBottomColor: t.cardBorder }]}>
                     <View style={s.refLeft}>
-                      <Text style={s.refIcon}>{isVirtual ? '💻' : '🏥'}</Text>
+                      <Ionicons
+                        name={isVirtual ? 'videocam-outline' : 'walk-outline'}
+                        size={14} color={t.textMuted}
+                        style={{ marginRight: 4 }}
+                      />
                       <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
                       {isEmergency && (
                         <View style={{ backgroundColor: '#FF5C5C', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>🚨 EMERGENCY</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="alert-circle-outline" size={9} color="#fff" />
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>EMERGENCY</Text>
+                          </View>
                         </View>
                       )}
                     </View>

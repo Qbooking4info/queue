@@ -363,7 +363,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
           ) : (
             /* Success state */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 44, marginBottom: 4 }}>🏥</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 4px"}}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{clinicName} created!</div>
               <div style={{ fontSize: 13, color: C.textSub }}>
                 {adminEmail ? 'The sub-admin account has been set up. Share these login credentials:' : 'The clinic has been created successfully.'}
@@ -514,7 +514,7 @@ export default function ClinicsPage() {
       ) : clinics.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 40px',
           border: `2px dashed ${C.borderMed}`, borderRadius: 20 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🏗️</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 16px"}}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
             No clinics set up yet
           </div>
@@ -562,7 +562,7 @@ export default function ClinicsPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
-            <div style={{ fontSize: 36, marginBottom: 14, textAlign: 'center' }}>⚠️</div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 14px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 8 }}>
               Delete &ldquo;{deleteTarget.name}&rdquo;?
             </div>

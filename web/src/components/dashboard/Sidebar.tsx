@@ -4,57 +4,63 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { UserRole } from '@/lib/admin-api'
+import {
+  LayoutDashboard, CalendarDays, ListOrdered, CalendarRange,
+  Stethoscope, Users, Settings, BarChart2, Tag, Building2,
+  Hospital, Monitor, LogOut, type LucideIcon,
+} from 'lucide-react'
 
-const SUPER_ADMIN_HOSPITAL_NAV = [
-  { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
-  { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
-  { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
-  { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
-  { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
-  { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics' },
-  { href: '/dashboard/services',     icon: '🏷️', label: 'Services' },
-  { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings' },
+type NavItem = { href: string; icon: LucideIcon; label: string }
+
+const SUPER_ADMIN_HOSPITAL_NAV: NavItem[] = [
+  { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
+  { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
+  { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+  { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
+  { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
+  { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics'     },
+  { href: '/dashboard/services',     icon: Tag,             label: 'Services'      },
+  { href: '/dashboard/settings',     icon: Settings,        label: 'Settings'      },
 ]
 
-const NAV: Record<UserRole, { href: string; icon: string; label: string }[]> = {
+const NAV: Record<UserRole, NavItem[]> = {
   super_admin: [
-    { href: '/dashboard',           icon: '⊞',  label: 'Platform Overview' },
-    { href: '/dashboard/hospitals', icon: '🏥', label: 'All Hospitals' },
-    { href: '/dashboard/analytics', icon: '📊', label: 'Analytics' },
-    { href: '/dashboard/settings',  icon: '⚙️',  label: 'Platform Settings' },
+    { href: '/dashboard',           icon: LayoutDashboard, label: 'Platform Overview'  },
+    { href: '/dashboard/hospitals', icon: Hospital,        label: 'All Hospitals'       },
+    { href: '/dashboard/analytics', icon: BarChart2,       label: 'Analytics'           },
+    { href: '/dashboard/settings',  icon: Settings,        label: 'Platform Settings'   },
   ],
   hospital_admin: [
-    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
-    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
-    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
-    { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
-    { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
-    { href: '/dashboard/analytics',    icon: '📊', label: 'Analytics' },
-    { href: '/dashboard/services',     icon: '🏷️', label: 'Services' },
-    { href: '/dashboard/settings',     icon: '⚙️',  label: 'Settings' },
+    { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
+    { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
+    { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
+    { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
+    { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics'     },
+    { href: '/dashboard/services',     icon: Tag,             label: 'Services'      },
+    { href: '/dashboard/settings',     icon: Settings,        label: 'Settings'      },
   ],
   clinic_admin: [
-    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
-    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
-    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
-    { href: '/dashboard/schedule',     icon: '📆', label: 'Schedule' },
-    { href: '/dashboard/doctors',      icon: '👨‍⚕️', label: 'Doctors' },
+    { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
+    { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
+    { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
+    { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
   ],
   doctor: [
-    { href: '/dashboard',              icon: '⊞',  label: 'My Dashboard' },
-    { href: '/dashboard/queue',        icon: '🔢', label: "Today's Queue" },
-    { href: '/dashboard/appointments', icon: '📅', label: 'My Appointments' },
-    { href: '/dashboard/schedule',     icon: '📆', label: 'My Schedule' },
+    { href: '/dashboard',              icon: LayoutDashboard, label: 'My Dashboard'      },
+    { href: '/dashboard/queue',        icon: ListOrdered,     label: "Today's Queue"     },
+    { href: '/dashboard/appointments', icon: CalendarDays,    label: 'My Appointments'   },
+    { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'My Schedule'       },
   ],
   front_desk: [
-    { href: '/dashboard',              icon: '⊞',  label: 'Overview' },
-    { href: '/dashboard/queue',        icon: '🔢', label: 'Live Queue' },
-    { href: '/dashboard/appointments', icon: '📅', label: 'Appointments' },
+    { href: '/dashboard',              icon: Monitor,         label: 'Overview'      },
+    { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
   ],
 }
 
-// hospital_admin gets Clinics nav item when hospital is multi-clinic
-const CLINICS_ITEM = { href: '/dashboard/clinics', icon: '🏗️', label: 'Clinics' }
+const CLINICS_ITEM: NavItem = { href: '/dashboard/clinics', icon: Building2, label: 'Clinics' }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin:    'Super Admin',
@@ -72,11 +78,10 @@ export function Sidebar() {
   const currentRole: UserRole = role ?? 'hospital_admin'
   const isSuperWithHospital = currentRole === 'super_admin' && !!hospital
 
-  let navItems: { href: string; icon: string; label: string }[] = isSuperWithHospital
+  let navItems: NavItem[] = isSuperWithHospital
     ? SUPER_ADMIN_HOSPITAL_NAV
     : (NAV[currentRole] ?? NAV.hospital_admin)
 
-  // Insert Clinics after Schedule for multi-clinic hospital admins (and super_admin managing a multi-clinic hospital)
   if ((currentRole === 'hospital_admin' || isSuperWithHospital) && hospital?.clinic_model === 'multi') {
     const schedIdx = navItems.findIndex(i => i.href === '/dashboard/schedule')
     navItems = [
@@ -121,7 +126,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Context chip: hospital name or platform badge */}
+      {/* Hospital context chip */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8,
@@ -144,7 +149,6 @@ export function Sidebar() {
             </div>
           </div>
         </div>
-        {/* Back to All Hospitals link when super_admin is managing a specific hospital */}
         {isSuperWithHospital && (
           <Link href="/dashboard/hospitals"
             style={{ display: 'block', marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)',
@@ -160,6 +164,7 @@ export function Sidebar() {
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
+          const Icon = item.icon
           return (
             <Link key={item.href} href={item.href}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -168,7 +173,7 @@ export function Sidebar() {
                 color: isActive ? C.accent : 'rgba(255,255,255,0.55)',
                 fontSize: 13, fontWeight: isActive ? 700 : 500,
                 marginBottom: 2, transition: 'all .15s', textDecoration: 'none' }}>
-              <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>{item.icon}</span>
+              <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
               {item.label}
               {item.href === '/dashboard/appointments' && stats.todayTotal > 0 && (
                 <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700,
@@ -225,11 +230,7 @@ export function Sidebar() {
             ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.10)'
             ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.55)'
           }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
+          <LogOut size={14} />
           Sign Out
         </button>
       </div>

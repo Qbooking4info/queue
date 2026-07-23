@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   TextInput, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents } from '../lib/api'
@@ -185,7 +186,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={s.headerTitleRow}>
-            <Text style={{ fontSize: 18 }}>🚨</Text>
+            <Ionicons name="alert-circle-outline" size={18} color="#FF5C5C" />
             <Text style={[s.headerTitle, { color: '#FF5C5C' }]}>Emergency Booking</Text>
           </View>
           <Text style={[s.headerSub, { color: t.textMuted }]}>Skip the queue · Immediate attention</Text>
@@ -208,7 +209,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {step === 0 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
           <View style={[s.alertBanner, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.25)' }]}>
-            <Text style={{ fontSize: 20 }}>⚠️</Text>
+            <Ionicons name="alert-circle-outline" size={20} color="#EF9F27" />
             <Text style={[s.alertText, { color: '#FF5C5C' }]}>
               If life-threatening, call <Text style={{ fontWeight: '900' }}>112</Text> immediately.
             </Text>
@@ -260,7 +261,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                     borderColor:     selectedDependentId === d.id ? t.accent : t.cardBorder,
                     backgroundColor: selectedDependentId === d.id ? t.accentBg : t.cardBg,
                   }]}>
-                  <Text style={{ fontSize: 16 }}>👤</Text>
+                  <Ionicons name="person-outline" size={16} color="rgba(255,255,255,0.6)" />
                   <Text style={[s.forBtnText, { color: selectedDependentId === d.id ? t.accent : t.textMuted }]}>
                     {d.full_name} {d.relationship ? `(${d.relationship})` : ''}
                   </Text>
@@ -285,7 +286,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             <ActivityIndicator color="#FF5C5C" style={{ marginTop: 20 }} />
           ) : hospitals.length === 0 ? (
             <View style={[s.noHospitalsBox, { borderColor: 'rgba(255,92,92,0.35)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
-              <Text style={{ fontSize: 28, marginBottom: 8 }}>🚨</Text>
+              <Ionicons name="alert-circle-outline" size={28} color="#FF5C5C" style={{ marginBottom: 8 }} />
               <Text style={[s.noHospitalsTitle, { color: '#FF5C5C' }]}>No hospitals currently available</Text>
               <Text style={[s.noHospitalsText, { color: t.textMuted }]}>
                 Every hospital on Queue is closed right now. If this is life-threatening, call{' '}
@@ -453,7 +454,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             style={[s.nextBtn, { backgroundColor: '#FF5C5C', flex: 1, opacity: submitting ? 0.6 : 1 }]}>
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <Text style={[s.nextBtnText, { color: '#fff' }]}>🚨  Confirm & Pay</Text>}
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>Confirm & Pay</Text></View>}
           </TouchableOpacity>
         )}
       </View>

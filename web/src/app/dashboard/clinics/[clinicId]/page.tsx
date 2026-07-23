@@ -655,7 +655,11 @@ function AddStaffModal({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 44 }}>{role === 'desk_officer' ? '🖥️' : '👤'}</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.7,display:"block",margin:"0 auto"}}>
+                {role === 'desk_officer'
+                  ? <><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></>
+                  : <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}
+              </svg>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>Account created!</div>
               <div style={{ background: C.bgAlt, border: `1px solid ${C.borderMed}`,
                 borderRadius: 12, padding: 16, textAlign: 'left' }}>
@@ -1358,7 +1362,7 @@ export default function ClinicDetailPage() {
           ) : doctors.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 40px',
               border: `2px dashed ${C.borderMed}`, borderRadius: 16 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍⚕️</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
                 No doctors yet
               </div>
@@ -1982,7 +1986,7 @@ export default function ClinicDetailPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px 28px 24px' }}>
-            <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 16 }}>⚠️</div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 10 }}>
               Delete &quot;{clinic.name}&quot;?
             </div>

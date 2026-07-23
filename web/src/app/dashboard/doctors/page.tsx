@@ -53,7 +53,7 @@ export default function DoctorsPage() {
       ) : doctors.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.border}`,
           borderRadius: 20, color: C.textMuted }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍⚕️</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>No doctors yet</div>
           <div style={{ fontSize: 13 }}>Add your first doctor to start accepting bookings</div>
         </div>

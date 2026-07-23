@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Clipboard } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
@@ -74,7 +75,7 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Theme toggle */}
         <View style={[styles.themeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={{ fontSize: 16 }}>{themeId === 'forest' ? '🌿' : '🏥'}</Text>
+          <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={18} color={t.textMuted} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Forest' : 'Clinical'} Theme</Text>
             <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch theme</Text>

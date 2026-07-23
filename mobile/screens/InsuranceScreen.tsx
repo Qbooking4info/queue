@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { dark as t, spacing, font, radius } from '../lib/theme'
 
@@ -76,7 +77,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
         ) : (
           <>
             <View style={styles.infoBox}>
-              <Text style={{ fontSize: 20, marginBottom: 8 }}>🛡️</Text>
+              <Ionicons name="shield-outline" size={20} color="rgba(255,255,255,0.3)" style={{ marginBottom: 8 }} />
               <Text style={styles.infoText}>
                 Add your HMO or insurance details so hospitals can verify your coverage when booking appointments.
               </Text>
