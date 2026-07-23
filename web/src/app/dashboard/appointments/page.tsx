@@ -702,10 +702,29 @@ export default function AppointmentsPage() {
 
   return (
     <div>
+      <style>{`
+        .appt-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .appt-header-btns { display: flex; gap: 8px; flex-shrink: 0; }
+        .appt-filter-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+        .appt-filter-chips::-webkit-scrollbar { display: none; }
+        .appt-filter-chips { -ms-overflow-style: none; scrollbar-width: none; }
+        /* hide non-essential columns on phones */
+        @media (max-width: 767px) {
+          .appt-header { flex-wrap: wrap; }
+          .appt-header-btns button { padding: 8px 12px !important; font-size: 12px !important; }
+          .appt-col-id, .appt-col-clinic, .appt-col-type, .appt-col-urgency { display: none; }
+          .appt-col-doctor th, .appt-col-doctor td { display: none; }
+        }
+        /* hide clinic + urgency on tablet */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .appt-col-clinic, .appt-col-urgency { display: none; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACE.lg }}>
+      <div className="appt-header" style={{ marginBottom: SPACE.lg }}>
         <div>
-          <div style={{ ...T.display, color: C.text }}>Appointments</div>
+          <div className="dash-greeting-title" style={{ color: C.text }}>Appointments</div>
           <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }}>
             {appts.length} record{appts.length !== 1 ? 's' : ''}
             {!isDoctor && ' · all clinics'}
@@ -718,21 +737,21 @@ export default function AppointmentsPage() {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: SPACE.sm }}>
+        <div className="appt-header-btns">
           {!isDoctor && (
             <button onClick={() => setShowWalkIn(true)}
               style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
                 borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-                transition: 'opacity 0.15s' }}
+                transition: 'opacity 0.15s', whiteSpace: 'nowrap' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-              + Walk-in Booking
+              + Walk-in
             </button>
           )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-              transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}
+              transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
             <RefreshCw size={14} /> Refresh
@@ -762,13 +781,14 @@ export default function AppointmentsPage() {
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="appt-filter-chips">
           {STATUS_FILTERS.map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{
-              padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              padding: '7px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
               border: `1px solid ${filter === f ? C.accent : C.border}`,
               background: filter === f ? C.accentLight : C.card,
-              color: filter === f ? C.accent : C.textSub, transition: 'all .15s' }}>
+              color: filter === f ? C.accent : C.textSub, transition: 'all .15s',
+              whiteSpace: 'nowrap', flexShrink: 0 }}>
               {filterLabel(f)}
             </button>
           ))}
@@ -793,10 +813,21 @@ export default function AppointmentsPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bgAlt }}>
-              {['Date','Time','ID','Patient','Clinic','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
-                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', ...T.label,
+              {[
+                { label: 'Date', cls: '' },
+                { label: 'Time', cls: '' },
+                { label: 'ID', cls: 'appt-col-id' },
+                { label: 'Patient', cls: '' },
+                { label: 'Clinic', cls: 'appt-col-clinic' },
+                { label: 'Doctor / Mode', cls: 'appt-col-doctor' },
+                { label: 'Type', cls: 'appt-col-type' },
+                { label: 'Urgency', cls: 'appt-col-urgency' },
+                { label: 'Status', cls: '' },
+                { label: 'Actions', cls: '' },
+              ].map(({ label, cls }) => (
+                <th key={label} className={cls} style={{ padding: '10px 14px', textAlign: 'left', ...T.label,
                   color: C.textMuted,
-                  borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                  borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{label}</th>
               ))}
             </tr>
           </thead>
@@ -831,24 +862,24 @@ export default function AppointmentsPage() {
                   background: isEmergency ? C.redLight : i % 2 === 0 ? C.card : C.rowAlt,
                   boxShadow: isEmergency ? `inset 3px 0 0 ${C.red}` : 'none',
                   outline: needsApproval ? `1px solid rgba(239,159,39,0.2)` : 'none' }}>
-                  <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
                     {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', {
                       weekday: 'short', day: 'numeric', month: 'short',
                       ...(range === 'all_time' ? { year: 'numeric' } : {}),
                     })}
                   </td>
-                  <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
-                  <td style={{ padding: '11px 14px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
+                  <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
+                  <td className="appt-col-id" style={{ padding: '10px 12px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
                     {a.booking_ref}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
                     <div style={{ fontSize: 11, color: C.textSub }}>
                       {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
                       {a.walkin_patient_phone ? ` · ${a.walkin_patient_phone}` : ''}
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-clinic" style={{ padding: '10px 12px' }}>
                     {a.clinic_name ? (
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
                         background: 'rgba(180,156,240,0.12)', color: '#B49CF0',
@@ -859,7 +890,7 @@ export default function AppointmentsPage() {
                       <span style={{ fontSize: 11, color: C.textMuted }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-doctor" style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 6,
                         background: docColor(a.doctor_name),
@@ -877,14 +908,14 @@ export default function AppointmentsPage() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-type" style={{ padding: '10px 12px' }}>
                     <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 600,
                       background: a.type === 'virtual' ? C.blueLight : C.accentLight,
                       color: a.type === 'virtual' ? C.blue : C.accent }}>
                       {a.type === 'virtual' ? <IconLabel icon={Video} size={10}>Virtual</IconLabel> : <IconLabel icon={Building2} size={10}>In-person</IconLabel>}
                     </span>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-urgency" style={{ padding: '10px 12px' }}>
                     {urg ? (
                       <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 700,
                         background: urg.bg, color: urg.text, border: `1px solid ${urg.border}` }}>
@@ -894,7 +925,7 @@ export default function AppointmentsPage() {
                       <span style={{ fontSize: 11, color: C.textMuted }}>Routine</span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     <Badge status={a.status} />
                     {needsApproval && (
                       <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
@@ -915,7 +946,7 @@ export default function AppointmentsPage() {
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     {(() => {
                       const isPending = pendingActionId === a.id
                       const btnBase: React.CSSProperties = { fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1, transition: 'opacity 0.15s' }
