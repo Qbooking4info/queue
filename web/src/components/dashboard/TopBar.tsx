@@ -31,12 +31,30 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
   const { hospital } = useAdmin()
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [lastSeen, setLastSeen] = useState<string | null>(null)
   const isForest = themeId === 'forest'
+
+  const lastSeenKey = hospital?.id ? `q-notif-last-seen-${hospital.id}` : null
 
   useEffect(() => {
     if (!hospital?.id) return
+    setLastSeen(localStorage.getItem(`q-notif-last-seen-${hospital.id}`))
     getRecentActivity(hospital.id).then(setNotifications).catch(() => setNotifications([]))
   }, [hospital?.id])
+
+  const hasUnread = notifications.some(n => !lastSeen || new Date(n.sortAt).getTime() > new Date(lastSeen).getTime())
+
+  function openNotifications() {
+    setNotifOpen(o => {
+      const next = !o
+      if (next && lastSeenKey) {
+        const now = new Date().toISOString()
+        localStorage.setItem(lastSeenKey, now)
+        setLastSeen(now)
+      }
+      return next
+    })
+  }
 
   return (
     <>
@@ -89,13 +107,13 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
 
         {/* Bell */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setNotifOpen(o => !o)}
+          <button onClick={openNotifications}
             style={{ width: 38, height: 38, borderRadius: 10, background: C.bgAlt,
               border: `1px solid ${C.border}`, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: C.textMuted, position: 'relative', transition: 'background .3s' }}>
             <Bell size={16} />
-            {notifications.length > 0 && (
+            {hasUnread && (
               <div style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8,
                 borderRadius: '50%', background: C.accent, border: `2px solid ${C.card}` }} />
             )}

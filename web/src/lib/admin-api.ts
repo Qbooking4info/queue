@@ -265,6 +265,7 @@ export interface AdminNotification {
   msg: string
   time: string
   href: string
+  sortAt: string
 }
 
 function timeAgo(iso: string): string {
@@ -281,7 +282,8 @@ function timeAgo(iso: string): string {
 
 // Recent hospital-scoped activity across appointments, reviews and payouts, merged and
 // sorted newest-first for the dashboard notification bell. Not a persisted notifications
-// table — derived live from the source tables so there's nothing to mark as read/unread yet.
+// table — derived live from the source tables. `sortAt` is kept on each item so the caller
+// can compare against a locally-stored "last seen" timestamp to know which are unread.
 export async function getRecentActivity(hospitalId: string, limit = 10): Promise<AdminNotification[]> {
   // Only surface activity from the last 7 days — otherwise a booking from months ago gets
   // relabeled as "New booking received" just because it's the most recent row in the table.
@@ -316,7 +318,7 @@ export async function getRecentActivity(hospitalId: string, limit = 10): Promise
       .limit(limit),
   ])
 
-  const items: (AdminNotification & { sortAt: string })[] = []
+  const items: AdminNotification[] = []
 
   for (const a of (newAppts ?? []) as any[]) {
     if (!a.created_at) continue
@@ -354,7 +356,6 @@ export async function getRecentActivity(hospitalId: string, limit = 10): Promise
   return items
     .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime())
     .slice(0, limit)
-    .map(({ sortAt: _sortAt, ...rest }) => rest)
 }
 
 export async function getHospitalIdForUser(authId: string): Promise<string | null> {
