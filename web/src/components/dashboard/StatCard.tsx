@@ -22,12 +22,11 @@ export function StatCard({ icon, label, value, sub, colorKey = 'accent', trend }
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="dash-stat-card"
       style={{
         background: C.card,
         border: `1px solid ${C.border}`,
         borderLeft: `4px solid ${col}`,
-        borderRadius: 16,
-        padding: '20px 22px',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -50,7 +49,7 @@ export function StatCard({ icon, label, value, sub, colorKey = 'accent', trend }
           </span>
         )}
       </div>
-      <div style={{ ...T.display, color: C.text, lineHeight: 1 }}>
+      <div className="dash-stat-value" style={{ color: C.text }}>
         {value}
       </div>
       <div style={{ ...T.body, color: C.textSub, fontWeight: 500 }}>{label}</div>

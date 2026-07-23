@@ -46,7 +46,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
         <TopBar onMenuToggle={toggleSidebar} />
-        <main style={{ flex: 1, padding: 'clamp(16px, 4vw, 28px) clamp(16px, 4vw, 32px)',
+        <main style={{ flex: 1, padding: 'clamp(12px, 3vw, 28px) clamp(12px, 3vw, 32px)',
           overflowY: 'auto', background: C.bg, transition: 'background .4s' }}>
           {children}
         </main>

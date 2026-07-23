@@ -1,13 +1,14 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Search, Bell, XCircle, Star, Wallet, ClipboardList, Menu } from 'lucide-react'
 
 const MOCK_NOTIFICATIONS = [
-  { type: 'new',     msg: 'New booking received — check Appointments',    time: 'Just now'  },
-  { type: 'cancel',  msg: 'An appointment was cancelled by a patient',    time: '2 hrs ago' },
-  { type: 'review',  msg: 'New 5-star patient review posted',             time: '4 hrs ago' },
-  { type: 'payment', msg: 'Monthly payout processed to your bank',        time: 'Yesterday' },
+  { type: 'new',     msg: 'New booking received — check Appointments',    time: 'Just now',  href: '/dashboard/appointments' },
+  { type: 'cancel',  msg: 'An appointment was cancelled by a patient',    time: '2 hrs ago', href: '/dashboard/appointments' },
+  { type: 'review',  msg: 'New 5-star patient review posted',             time: '4 hrs ago', href: '/dashboard/analytics' },
+  { type: 'payment', msg: 'Monthly payout processed to your bank',        time: 'Yesterday', href: '/dashboard/analytics' },
 ]
 
 const TOPBAR_STYLES = `
@@ -30,6 +31,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onMenuToggle }: TopBarProps) {
+  const router = useRouter()
   const { theme: C, themeId, toggleTheme } = useTheme()
   const [notifOpen, setNotifOpen] = useState(false)
   const isForest = themeId === 'forest'
@@ -37,8 +39,8 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
   return (
     <>
       <style>{TOPBAR_STYLES}</style>
-      <div style={{ height: 60, borderBottom: `1px solid ${C.border}`, display: 'flex',
-        alignItems: 'center', padding: '0 16px', gap: 12, background: C.card,
+      <div style={{ height: 'clamp(48px, 8vw, 60px)', borderBottom: `1px solid ${C.border}`, display: 'flex',
+        alignItems: 'center', padding: '0 clamp(10px, 3vw, 16px)', gap: 10, background: C.card,
         position: 'sticky', top: 0, zIndex: 10, transition: 'background .3s, border-color .3s' }}>
 
         {/* Hamburger — mobile only */}
@@ -106,7 +108,9 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   fontSize: 13, fontWeight: 700, color: C.text }}>Notifications</div>
                 {MOCK_NOTIFICATIONS.map((n, i) => (
-                  <div key={i} style={{ padding: '10px 16px',
+                  <div key={i}
+                    onClick={() => { setNotifOpen(false); router.push(n.href) }}
+                    style={{ padding: '10px 16px', cursor: 'pointer',
                     borderBottom: i < MOCK_NOTIFICATIONS.length - 1 ? `1px solid ${C.border}` : 'none',
                     display: 'flex', gap: 10 }}>
                     <span style={{ flexShrink: 0, display: 'flex', color:
