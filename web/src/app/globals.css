@@ -58,3 +58,12 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+/* ── Dashboard responsive ── */
+/* On mobile, the sidebar is a fixed drawer — remove its space from the layout */
+@media (max-width: 767px) {
+  .q-sidebar {
+    width: 0 !important;
+    flex-shrink: 0;
+  }
+}

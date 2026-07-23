@@ -10,7 +10,6 @@ import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 
-interface PatientRow { id: string; full_name: string; phone: string | null; gender: string | null }
 interface ApptRow {
   id:               string
   appointment_date: string
@@ -20,7 +19,9 @@ interface ApptRow {
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
-  patient:          PatientRow | null
+  patient_name:     string | null
+  patient_phone:    string | null
+  patient_gender:   string | null
 }
 
 interface Props { navigation: any }
@@ -70,20 +71,12 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    let query = (supabase as any)
-      .from('appointments')
-      .select('id, appointment_date, start_time, type, status, reason, urgency, queue_position, patient:users!appointments_patient_id_fkey(id, full_name, phone, gender)')
-      .eq('doctor_id', doctorProfile.doctorId)
-      .neq('status', 'cancelled')
-      .order('start_time', { ascending: true })
+    const { data } = await (supabase as any).rpc('get_doctor_queue', {
+      p_doctor_id: doctorProfile.doctorId,
+      p_date:      tab === 'today' ? today : null,
+      p_today:     today,
+    })
 
-    if (tab === 'today') {
-      query = query.eq('appointment_date', today)
-    } else {
-      query = query.gt('appointment_date', today).order('appointment_date', { ascending: true })
-    }
-
-    const { data } = await query
     setAppts((data as ApptRow[]) ?? [])
     setLoading(false)
   }
@@ -209,7 +202,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
   const { theme: t } = useTheme()
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
-  const initials = getInitials(appt.patient?.full_name)
+  const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'
   const urgencyColor = appt.urgency === 'emergency' ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
 
@@ -231,7 +224,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Text style={[st.patientName, { color: t.textPrimary }]}>
-            {appt.patient?.full_name ?? 'Unknown patient'}
+            {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {urgencyColor && (
             <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>

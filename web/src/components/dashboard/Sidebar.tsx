@@ -70,7 +70,12 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   front_desk:     'Front Desk',
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const { theme: C } = useTheme()
   const { hospital, stats, signOut, role, user } = useAdmin()
   const pathname = usePathname()
@@ -99,9 +104,32 @@ export function Sidebar() {
     .split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U'
 
   return (
-    <div style={{ width: 220, flexShrink: 0, background: C.sidebar,
-      display: 'flex', flexDirection: 'column', height: '100vh',
-      position: 'sticky', top: 0, transition: 'background .3s' }}>
+    <>
+      <style>{`
+        .q-sidebar {
+          width: 220px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          position: sticky;
+          top: 0;
+          transition: transform .3s cubic-bezier(.4,0,.2,1);
+        }
+        @media (max-width: 767px) {
+          .q-sidebar {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 50;
+            transform: translateX(-100%);
+          }
+          .q-sidebar.is-open {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+    <div className={`q-sidebar${mobileOpen ? ' is-open' : ''}`}
+      style={{ background: C.sidebar, transition: 'background .3s' }}>
 
       {/* Logo */}
       <div style={{ padding: '28px 22px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -235,5 +263,6 @@ export function Sidebar() {
         </button>
       </div>
     </div>
+    </>
   )
 }
