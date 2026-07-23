@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { adminDb } from './admin-client'
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from './server'
 import { createAdminClient } from './admin'
 import { NextResponse } from 'next/server'
 
@@ -16,12 +16,7 @@ export interface CallerInfo {
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
 // Returns the CallerInfo if the caller's role is in `allowed`, otherwise a 401/403 NextResponse.
 export async function requireRole(allowed: CallerRole[]): Promise<{ caller: CallerInfo } | NextResponse> {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } },
-  )
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
