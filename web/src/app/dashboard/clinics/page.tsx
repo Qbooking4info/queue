@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { AlertTriangle, ArrowRight, X, RefreshCw, Check } from 'lucide-react'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
 import { toggleClinicActive, deleteClinic } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
@@ -73,8 +74,9 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
             {clinic.is_emergency && (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
                 background: 'rgba(220,60,60,0.12)', color: '#f07070',
-                border: '1px solid rgba(220,60,60,0.3)' }}>
-                🚨 Emergency Dept
+                border: '1px solid rgba(220,60,60,0.3)',
+                display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <AlertTriangle size={10} /> Emergency Dept
               </span>
             )}
           </div>
@@ -150,8 +152,9 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
           background: col.bg, color: col.text,
           border: `1px solid ${col.bg.replace('0.14', '0.3')}`,
           fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-          transition: 'opacity .15s' }}>
-        Manage Clinic →
+          transition: 'opacity .15s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        Manage Clinic <ArrowRight size={14} />
       </button>
 
       {/* Admin controls — hospital super admin only */}
@@ -256,8 +259,8 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
           <button onClick={onClose} aria-label="Close"
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -324,8 +327,8 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                       <button type="button" onClick={() => setPassword(generatePassword())}
                         style={{ background: C.bgAlt, border: `1px solid ${C.border}`,
                           borderRadius: 6, padding: '3px 8px', fontSize: 11,
-                          color: C.textSub, cursor: 'pointer' }}>
-                        ↻
+                          color: C.textSub, cursor: 'pointer', display: 'flex' }}>
+                        <RefreshCw size={11} />
                       </button>
                     </div>
                   </div>
@@ -337,8 +340,9 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
 
               {error && (
                 <div style={{ background: C.redLight, border: `1px solid ${C.red}33`,
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.red }}>
-                  ⚠️ {error}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.red,
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={13} /> {error}
                 </div>
               )}
 
@@ -363,7 +367,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
           ) : (
             /* Success state */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 44, marginBottom: 4 }}>🏥</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 4px"}}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{clinicName} created!</div>
               <div style={{ fontSize: 13, color: C.textSub }}>
                 {adminEmail ? 'The sub-admin account has been set up. Share these login credentials:' : 'The clinic has been created successfully.'}
@@ -396,8 +400,9 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                       background: copied ? C.accentLight : C.bgAlt,
                       border: `1px solid ${copied ? C.accentBorder : C.borderMed}`,
                       color: copied ? C.accent : C.textSub,
-                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                    {copied ? '✓ Copied!' : 'Copy Credentials'}
+                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    {copied ? <><Check size={14} /> Copied!</> : 'Copy Credentials'}
                   </button>
                 )}
                 <button onClick={() => { onCreated(); onClose() }}
@@ -514,7 +519,7 @@ export default function ClinicsPage() {
       ) : clinics.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 40px',
           border: `2px dashed ${C.borderMed}`, borderRadius: 20 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🏗️</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 16px"}}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
             No clinics set up yet
           </div>
@@ -562,7 +567,7 @@ export default function ClinicsPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
-            <div style={{ fontSize: 36, marginBottom: 14, textAlign: 'center' }}>⚠️</div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 14px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 8 }}>
               Delete &ldquo;{deleteTarget.name}&rdquo;?
             </div>
@@ -574,8 +579,9 @@ export default function ClinicsPage() {
             </div>
             {deleteError && (
               <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f07070', marginBottom: 14, textAlign: 'center' }}>
-                ⚠️ {deleteError}
+                borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f07070', marginBottom: 14, textAlign: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <AlertTriangle size={12} /> {deleteError}
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>

@@ -6,7 +6,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getServerUser()
+    const user = await getServerUser(req)
     if (!user) return Errors.unauthenticated()
 
     // All DB writes use service role — bypasses RLS safely server-side

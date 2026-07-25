@@ -1,7 +1,9 @@
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
+import { PartyPopper, Monitor, Building2, Phone } from 'lucide-react'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
+import { fmtLocalDate } from '@/lib/admin-api'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +38,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   if (adminRecord.role !== 'front_desk' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
   const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 
@@ -103,7 +105,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
       {/* Queue list */}
       {!appointments?.length ? (
         <div className="bg-[#111915] border border-white/7 rounded-2xl p-16 text-center text-[#4A6058]">
-          <div className="text-4xl mb-3">🎉</div>
+          <PartyPopper size={36} className="mx-auto mb-3" />
           <div className="font-medium text-[#7A9089]">Queue is clear for this date</div>
         </div>
       ) : (
@@ -133,10 +135,13 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                           )}
                         </div>
                         <div className="text-xs text-[#7A9089] mt-0.5">
-                          {doctor?.title} {doctor?.full_name} · {a.start_time?.slice(0, 5)} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                          {doctor?.title} {doctor?.full_name} · {a.start_time?.slice(0, 5)} ·{' '}
+                          <span className="inline-flex items-center gap-1 align-middle">
+                            {a.type === 'virtual' ? <><Monitor size={11} /> Virtual</> : <><Building2 size={11} /> In-person</>}
+                          </span>
                         </div>
                         {patient?.phone && (
-                          <div className="text-xs text-[#4A6058] mt-0.5">📞 {patient.phone}</div>
+                          <div className="text-xs text-[#4A6058] mt-0.5 flex items-center gap-1"><Phone size={11} /> {patient.phone}</div>
                         )}
                       </div>
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusClass}`}>

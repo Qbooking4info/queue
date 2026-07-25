@@ -1,6 +1,7 @@
 'use client'
 import { useActionState } from 'react'
 import Link from 'next/link'
+import { ArrowLeft, Stethoscope } from 'lucide-react'
 import { addStaff } from '../actions'
 
 export default function AddStaffPage() {
@@ -9,7 +10,9 @@ export default function AddStaffPage() {
   return (
     <div className="flex-1 p-6 max-w-xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard/staff" className="text-[#4A6058] hover:text-white transition-colors text-sm">← Staff</Link>
+        <Link href="/dashboard/staff" className="inline-flex items-center gap-1 text-[#4A6058] hover:text-white transition-colors text-sm">
+          <ArrowLeft size={14} /> Staff
+        </Link>
         <span className="text-[#4A6058]">/</span>
         <span className="text-sm">Add Admin</span>
       </div>
@@ -22,14 +25,14 @@ export default function AddStaffPage() {
       {/* Auto-generated login notes */}
       <div className="flex flex-col gap-3 mb-8">
         <div className="flex items-start gap-3 bg-blue-500/8 border border-blue-500/20 rounded-xl p-3">
-          <span className="text-lg shrink-0">👨‍⚕️</span>
+          <Stethoscope size={18} className="shrink-0 text-blue-400" />
           <p className="text-xs text-blue-400 leading-relaxed">
             <span className="font-semibold">Specialist logins are auto-created when you add a doctor</span> — go to{' '}
             <Link href="/dashboard/doctors/add" className="underline underline-offset-2">Add Doctor</Link> to register a new specialist under this hospital.
           </p>
         </div>
         <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl p-3">
-          <span className="text-lg shrink-0">🖥️</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <p className="text-xs text-amber-400 leading-relaxed">
             <span className="font-semibold">Front Desk login was auto-created at signup</span> — find the credentials on the{' '}
             <Link href="/dashboard/staff" className="underline underline-offset-2">Staff page</Link>.

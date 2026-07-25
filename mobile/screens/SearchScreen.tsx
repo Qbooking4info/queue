@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLocation, distanceKm, formatDistance } from '../contexts/LocationContext'
@@ -73,12 +75,12 @@ export function SearchScreen({ navigation }: Props) {
       : { latitude: 6.5244, longitude: 3.3792 } // Lagos default
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       <View style={[styles.container, { backgroundColor: t.canvasBg }]}>
         <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
 
         <View style={[styles.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Text style={{ fontSize: 15, color: t.textMuted }}>🔍</Text>
+          <Ionicons name="search-outline" size={15} color={t.textMuted} />
           <TextInput
             value={q} onChangeText={setQ}
             placeholder="Hospital, doctor, specialty…"
@@ -87,7 +89,7 @@ export function SearchScreen({ navigation }: Props) {
           />
           {!!q && (
             <TouchableOpacity onPress={() => setQ('')}>
-              <Text style={{ color: t.textMuted, fontSize: 16 }}>✕</Text>
+              <Ionicons name="close" size={16} color={t.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -114,7 +116,7 @@ export function SearchScreen({ navigation }: Props) {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode('map')}
               style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: t.accentBg }]}>
-              <Text style={{ fontSize: 13, color: viewMode === 'map' ? t.accent : t.textMuted }}>🗺</Text>
+              <Ionicons name="map-outline" size={15} color={viewMode === 'map' ? t.accent : t.textMuted} />
             </TouchableOpacity>
           </View>
         </View>

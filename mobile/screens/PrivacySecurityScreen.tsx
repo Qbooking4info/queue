@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, ActivityIndicator, Alert,
-} from 'react-native'
+  StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase }  from '../lib/supabase'
@@ -70,7 +71,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Privacy & Security</Text>
         <View style={{ width: 28 }} />
@@ -89,8 +90,9 @@ export function PrivacySecurityScreen({ navigation }: Props) {
             <Text style={[s.accountName, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
             <Text style={[s.accountEmail, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
           </View>
-          <View style={[s.verifiedBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.verifiedText, { color: t.accent }]}>✓ Verified</Text>
+          <View style={[s.verifiedBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+            <Ionicons name="checkmark-circle" size={11} color={t.accent} />
+            <Text style={[s.verifiedText, { color: t.accent }]}>Verified</Text>
           </View>
         </View>
 
@@ -128,11 +130,11 @@ export function PrivacySecurityScreen({ navigation }: Props) {
         {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
         <TouchableOpacity onPress={() => signOut()}
           style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
-          <Text style={{ fontSize: 16 }}>🚪</Text>
+          <Ionicons name="log-out-outline" size={16} color="#FF5C5C" />
           <Text style={[s.dangerBtnText, { color: '#FF5C5C' }]}>Sign out of all devices</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleDeleteAccount} style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
-          <Text style={{ fontSize: 16 }}>🗑️</Text>
+          <Ionicons name="trash-outline" size={16} color="rgba(255,92,92,0.8)" />
           <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
         </TouchableOpacity>
       </ScrollView>

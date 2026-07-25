@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
@@ -55,7 +56,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-            <span className="text-2xl">🔐</span>
+            <Lock size={24} className="text-green-400" />
           </div>
           <h1 className="text-2xl font-bold">Set New Password</h1>
           <p className="text-sm text-[#7A9089] mt-1">Choose a strong password for your account</p>

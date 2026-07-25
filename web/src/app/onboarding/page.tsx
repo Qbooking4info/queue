@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import type { Specialty, SubscriptionPlan } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Building2, Stethoscope, Microscope, ScanLine, Clock, Building, X, Check,
+  Video, AlertTriangle,
+} from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,11 +40,11 @@ interface FormData {
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-const HOSPITAL_TYPES: { value: HospitalType; label: string; icon: string; desc: string }[] = [
-  { value: 'hospital',          label: 'General Hospital',    icon: '🏥', desc: 'Full-service multi-specialty care' },
-  { value: 'clinic',            label: 'Clinic',              icon: '🩺', desc: 'Outpatient consultations & GP care' },
-  { value: 'specialist_center', label: 'Specialist Centre',   icon: '🔬', desc: 'Focused specialty practice' },
-  { value: 'diagnostic',        label: 'Diagnostic Centre',   icon: '📡', desc: 'Lab, imaging & diagnostics' },
+const HOSPITAL_TYPES: { value: HospitalType; label: string; icon: React.ReactNode; desc: string }[] = [
+  { value: 'hospital',          label: 'General Hospital',    icon: <Building2 size={20} />,   desc: 'Full-service multi-specialty care' },
+  { value: 'clinic',            label: 'Clinic',              icon: <Stethoscope size={20} />, desc: 'Outpatient consultations & GP care' },
+  { value: 'specialist_center', label: 'Specialist Centre',   icon: <Microscope size={20} />,  desc: 'Focused specialty practice' },
+  { value: 'diagnostic',        label: 'Diagnostic Centre',   icon: <ScanLine size={20} />,    desc: 'Lab, imaging & diagnostics' },
 ]
 
 const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
@@ -90,7 +94,7 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
                 borderColor: data.type === t.value ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
                 background:  data.type === t.value ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
               }}>
-              <span className="text-lg block mb-1">{t.icon}</span>
+              <span className="block mb-1" style={{ color: data.type === t.value ? '#00E87A' : '#7A9089' }}>{t.icon}</span>
               <span className="text-sm font-semibold block" style={{ color: data.type === t.value ? '#00E87A' : '#F0F5F2' }}>{t.label}</span>
               <span className="text-xs text-[#4A6058]">{t.desc}</span>
             </button>
@@ -123,7 +127,7 @@ function StepVerification({ data, onChange }: { data: FormData; onChange: (d: Pa
 
       <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
         <div className="flex items-start gap-3">
-          <span className="text-lg mt-0.5">⏳</span>
+          <Clock size={18} className="mt-0.5 text-amber-400 shrink-0" />
           <div>
             <div className="text-sm font-semibold text-amber-400 mb-0.5">Verification pending</div>
             <div className="text-xs text-[#7A9089] leading-relaxed">
@@ -237,9 +241,10 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
           borderColor: data.clinicModel === 'single' ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
           background:  data.clinicModel === 'single' ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
         }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-          style={{ background: data.clinicModel === 'single' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)' }}>
-          🏥
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: data.clinicModel === 'single' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)',
+            color: data.clinicModel === 'single' ? '#00E87A' : '#7A9089' }}>
+          <Building2 size={20} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -267,9 +272,10 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
           borderColor: data.clinicModel === 'multi' ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
           background:  data.clinicModel === 'multi' ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
         }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-          style={{ background: data.clinicModel === 'multi' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)' }}>
-          🏗️
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: data.clinicModel === 'multi' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)',
+            color: data.clinicModel === 'multi' ? '#00E87A' : '#7A9089' }}>
+          <Building size={20} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -337,8 +343,8 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
                   className="flex-1 bg-transparent text-sm text-white placeholder:text-[#4A6058] outline-none"
                 />
                 <button type="button" onClick={() => removeClinic(clinic.id)}
-                  className="text-[#4A6058] hover:text-red-400 transition-colors text-sm shrink-0">
-                  ✕
+                  className="text-[#4A6058] hover:text-red-400 transition-colors shrink-0 flex items-center">
+                  <X size={14} />
                 </button>
               </div>
             ))}
@@ -385,7 +391,7 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
               }}>
               <span className="text-xl">{s.icon}</span>
               <span className="text-sm font-medium" style={{ color: selected ? '#00E87A' : '#F0F5F2' }}>{s.name}</span>
-              {selected && <span className="ml-auto text-green-400 text-xs">✓</span>}
+              {selected && <Check size={14} className="ml-auto text-green-400" />}
             </button>
           )
         })}
@@ -401,8 +407,8 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
 
 function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   const features = [
-    { key: 'accepts_virtual',  icon: '💻', label: 'Virtual Consultations',  desc: 'Patients can book and attend appointments via video call' },
-    { key: 'emergency_hours',  icon: '🚨', label: '24/7 Emergency Services', desc: 'You provide round-the-clock emergency care' },
+    { key: 'accepts_virtual',  icon: <Video size={24} />,         label: 'Virtual Consultations',  desc: 'Patients can book and attend appointments via video call' },
+    { key: 'emergency_hours',  icon: <AlertTriangle size={24} />, label: '24/7 Emergency Services', desc: 'You provide round-the-clock emergency care' },
   ] as const
   return (
     <div className="flex flex-col gap-6">
@@ -420,7 +426,7 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
                 borderColor: enabled ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
                 background:  enabled ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
               }}>
-              <span className="text-3xl">{f.icon}</span>
+              <span style={{ color: enabled ? '#00E87A' : '#7A9089' }}>{f.icon}</span>
               <div className="flex-1">
                 <div className="text-sm font-semibold" style={{ color: enabled ? '#00E87A' : '#F0F5F2' }}>{f.label}</div>
                 <div className="text-xs text-[#4A6058] mt-0.5">{f.desc}</div>
@@ -500,7 +506,7 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
 
       {clinicModel === 'multi' && (
         <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-2">
-          <span className="text-sm mt-0.5">⚠️</span>
+          <AlertTriangle size={14} className="mt-0.5 text-amber-400 shrink-0" />
           <p className="text-xs text-amber-400">
             You selected <strong>Multiple Clinics</strong>. This feature requires the <strong>Growth plan or higher</strong>.
           </p>
@@ -551,7 +557,7 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
               <ul className="flex flex-col gap-1 mt-3">
                 {features.map(f => (
                   <li key={f} className="flex items-center gap-1.5 text-xs text-[#7A9089]">
-                    <span className="text-green-500">✓</span> {f}
+                    <Check size={12} className="text-green-500" /> {f}
                   </li>
                 ))}
               </ul>

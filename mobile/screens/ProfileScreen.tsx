@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Switch, Clipboard } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Clipboard } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
@@ -33,7 +35,7 @@ export function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 20 }}>
         <Text style={[styles.title, { color: t.textPrimary }]}>Profile</Text>
 
@@ -51,9 +53,14 @@ export function ProfileScreen({ navigation }: Props) {
               style={[styles.patientIdRow, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
               <Text style={[styles.patientIdLabel, { color: t.accent }]}>Patient No.</Text>
               <Text style={[styles.patientIdValue, { color: t.accent }]}>{patientNumber}</Text>
-              <Text style={[styles.patientIdCopy, { color: idCopied ? t.accent : t.textMuted }]}>
-                {idCopied ? '✓ Copied' : '⎘'}
-              </Text>
+              {idCopied ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Ionicons name="checkmark" size={11} color={t.accent} />
+                  <Text style={[styles.patientIdCopy, { color: t.accent }]}>Copied</Text>
+                </View>
+              ) : (
+                <Ionicons name="copy-outline" size={13} color={t.textMuted} />
+              )}
             </TouchableOpacity>
           )}
 
@@ -73,7 +80,7 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Theme toggle */}
         <View style={[styles.themeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={{ fontSize: 16 }}>{themeId === 'forest' ? '🌿' : '🏥'}</Text>
+          <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={18} color={t.textMuted} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Forest' : 'Clinical'} Theme</Text>
             <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch theme</Text>
@@ -102,17 +109,17 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Menu */}
         {[
-          { icon: '🩺', label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => { haptics.tap(); navigation?.navigate('MedicalHistory') } },
-          { icon: '📋', label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => { haptics.tap(); navigation?.navigate('Prescriptions') } },
-          { icon: '🏥', label: 'Insurance',                   sub: 'Manage your health insurance details',     onPress: () => { haptics.tap(); navigation?.navigate('Insurance') } },
-          { icon: '👨‍👩‍👧', label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => { haptics.tap(); navigation?.navigate('Dependents') } },
-          { icon: '🔔', label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => { haptics.tap(); navigation?.navigate('Notifications') } },
-          { icon: '🔒', label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => { haptics.tap(); navigation?.navigate('PrivacySecurity') } },
-          { icon: '💬', label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => { haptics.tap(); navigation?.navigate('Support') } },
+          { icon: 'medical-outline' as const,            label: 'Medical history',             sub: 'Consultations, conditions & allergies',   onPress: () => { haptics.tap(); navigation?.navigate('MedicalHistory') } },
+          { icon: 'document-text-outline' as const,      label: 'Prescriptions & lab results', sub: 'Medications and diagnostic reports',       onPress: () => { haptics.tap(); navigation?.navigate('Prescriptions') } },
+          { icon: 'shield-checkmark-outline' as const,   label: 'Insurance',                   sub: 'Manage your health insurance details',     onPress: () => { haptics.tap(); navigation?.navigate('Insurance') } },
+          { icon: 'people-outline' as const,             label: 'Manage dependents',           sub: 'Book for family members',                  onPress: () => { haptics.tap(); navigation?.navigate('Dependents') } },
+          { icon: 'notifications-outline' as const,      label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => { haptics.tap(); navigation?.navigate('Notifications') } },
+          { icon: 'lock-closed-outline' as const,        label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => { haptics.tap(); navigation?.navigate('PrivacySecurity') } },
+          { icon: 'chatbubbles-outline' as const,        label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => { haptics.tap(); navigation?.navigate('Support') } },
         ].map(item => (
           <TouchableOpacity key={item.label} onPress={item.onPress}
             style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+            <Ionicons name={item.icon} size={18} color={t.textMuted} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.menuLabel, { color: t.textPrimary }]}>{item.label}</Text>
               <Text style={[styles.menuSub, { color: t.textMuted }]}>{item.sub}</Text>

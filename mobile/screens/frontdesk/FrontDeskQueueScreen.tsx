@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, RefreshControl, Alert, TextInput,
-} from 'react-native'
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
@@ -144,7 +144,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const pendingCount   = appts.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
         <Text style={[s.headerTitle, { color: t.textPrimary }]}>Queue</Text>
@@ -176,7 +176,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       {/* Search */}
       {!loading && appts.length > 0 && (
         <View style={[s.searchWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Text style={{ color: t.textMuted, fontSize: 14, marginRight: 6 }}>🔍</Text>
+          <Ionicons name="search-outline" size={14} color={t.textMuted} style={{ marginRight: 6 }} />
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -201,7 +201,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
         >
           {filtered.length === 0 && (
             <View style={s.empty}>
-              <Text style={{ fontSize: 56, marginBottom: 16 }}>📋</Text>
+              <Ionicons name="clipboard-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
               <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                 {search ? 'No patients match your search' : 'No appointments yet'}
               </Text>
@@ -274,7 +274,7 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
           <Text style={[s.meta, { color: t.textMuted }]}>
             {appt.appointment_date !== today ? `${appt.appointment_date} · ` : ''}{fmt12(appt.start_time)}
             {appt.doctor ? ` · Dr. ${appt.doctor.full_name}` : ''}
-            {` · ${appt.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}`}
+            {' · '}<Ionicons name={appt.type === 'virtual' ? 'videocam-outline' : 'business-outline'} size={10} color={t.textMuted} />{appt.type === 'virtual' ? ' Virtual' : ' In-person'}
           </Text>
           {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
         </View>
@@ -301,14 +301,20 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
             <TouchableOpacity onPress={() => onApprove(appt)} disabled={!!actioning}
               style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
               {isLoading ? <ActivityIndicator size="small" color="#00C265" />
-                : <Text style={[s.actionText, { color: '#00C265' }]}>✓ Approve</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="checkmark" size={13} color="#00C265" />
+                    <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
+                  </View>}
             </TouchableOpacity>
           )}
           {canCheckIn && (
             <TouchableOpacity onPress={() => onCheckIn(appt)} disabled={!!actioning}
               style={[s.actionBtn, { backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)', flex: 1 }]}>
               {isLoading ? <ActivityIndicator size="small" color="#5B9EFF" />
-                : <Text style={[s.actionText, { color: '#5B9EFF' }]}>Check In →</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[s.actionText, { color: '#5B9EFF' }]}>Check In</Text>
+                    <Ionicons name="arrow-forward" size={13} color="#5B9EFF" />
+                  </View>}
             </TouchableOpacity>
           )}
         </View>

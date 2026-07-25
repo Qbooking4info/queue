@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { RefreshCw, DoorClosed, ArrowRight } from 'lucide-react'
 import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
@@ -11,7 +12,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-// Display order Mon→Sun
+// Display order Mon->Sun
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 const DOC_PALETTE = [
@@ -167,9 +168,17 @@ function ScheduleContent() {
 
   return (
     <div>
+      <style>{`
+        .schedule-calendar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 767px) {
+          .schedule-header-actions { flex-direction: column; align-items: stretch !important; }
+          .schedule-header-actions button,
+          .schedule-header-actions select { width: 100%; }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -0.5 }}>Schedule</div>
+          <div className="dash-greeting-title" style={{ color: C.text }}>Schedule</div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
             Week of {monday.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
@@ -185,8 +194,9 @@ function ScheduleContent() {
           )}
           <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} />
           <button onClick={load} style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-            border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-            ↻ Refresh
+            border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={13} /> Refresh
           </button>
         </div>
       </div>
@@ -199,7 +209,7 @@ function ScheduleContent() {
         </div>
       ) : !hasOpenDays ? (
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.borderMed}`, borderRadius: 20, color: C.textMuted }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚪</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><DoorClosed size={36} /></div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>No open days configured</div>
           <div style={{ fontSize: 13, marginBottom: 16 }}>
             Set operating hours to see the schedule grid.
@@ -207,12 +217,12 @@ function ScheduleContent() {
           <a href="/dashboard/clinics"
             style={{ fontSize: 13, fontWeight: 700, color: C.accent, textDecoration: 'none',
               background: C.accentLight, border: `1px solid ${C.accentBorder}`,
-              borderRadius: 10, padding: '9px 18px', display: 'inline-block' }}>
-            Set up clinic hours in Clinics → Manage Hours
+              borderRadius: 10, padding: '9px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Set up clinic hours in Clinics <ArrowRight size={13} /> Manage Hours
           </a>
         </div>
       ) : (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div className="schedule-calendar" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, 1fr)`,
             borderBottom: `1px solid ${C.border}` }}>
@@ -298,7 +308,7 @@ function ScheduleContent() {
 
       {!loading && hasOpenDays && Object.values(schedule).every(d => d.length === 0) && (
         <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted, marginTop: 16 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>No appointments this week</div>
           <div style={{ fontSize: 13 }}>The schedule is clear. Appointments booked will appear here.</div>
         </div>

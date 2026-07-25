@@ -6,7 +6,7 @@ import { Errors } from '@/lib/api-error'
 // POST { appointmentId } — doctor ends the call.
 // Sets virtual_sessions.ended_at, calculates duration_secs, marks appointment completed.
 export async function POST(req: NextRequest) {
-  const user = await getServerUser()
+  const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
 
   const { appointmentId } = await req.json()

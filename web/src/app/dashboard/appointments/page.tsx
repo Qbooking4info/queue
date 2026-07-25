@@ -16,7 +16,12 @@ import {
   approveAppointment, rejectAppointment,
   checkInAppointment, startConsultation, endConsultation,
   getDoctors as getDoctorsForHospital,
+  fmtLocalDate,
 } from '@/lib/admin-api'
+import {
+  CheckCircle2, ClipboardList, X, AlertTriangle, Zap, RefreshCw, Search as SearchIcon,
+  Check, Clock, Video, Building2, Footprints, Stethoscope, type LucideIcon,
+} from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +45,13 @@ function urgencyColor(u: string | undefined, C: any) {
   if (u === 'urgent')    return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
   return null
 }
+function IconLabel({ icon: Icon, children, size = 12 }: { icon: LucideIcon; children: React.ReactNode; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <Icon size={size} /> {children}
+    </span>
+  )
+}
 
 // ── Walk-in Booking Modal ─────────────────────────────────────────────────────
 
@@ -60,7 +72,7 @@ function WalkInModal({
   const availableDoctors = clinicId
     ? doctors.filter(d => d.is_active && d.clinic_id === clinicId)
     : doctors.filter(d => d.is_active)
-  const [date,          setDate]          = useState(new Date().toISOString().split('T')[0])
+  const [date,          setDate]          = useState(fmtLocalDate(new Date()))
   const [time,          setTime]          = useState('09:00')
   const [reason,        setReason]        = useState('')
   const [loading,       setLoading]       = useState(false)
@@ -161,14 +173,14 @@ function WalkInModal({
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
               fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+            <X size={16} />
           </button>
         </div>
 
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {done ? (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <CheckCircle2 size={40} style={{ opacity: 0.8, display: 'block', margin: '0 auto 12px', color: '#22c55e' }} />
               <div style={{ fontSize: 17, fontWeight: 800, color: C.text, marginBottom: 6 }}>Booking Created</div>
               <div style={{ fontSize: 14, color: C.textSub, marginBottom: 4 }}>Reference:</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.accent, fontFamily: 'monospace' }}>{done}</div>
@@ -212,7 +224,7 @@ function WalkInModal({
                 {foundPatient && (
                   <div style={{ marginTop: 10, padding: '10px 12px', background: C.accentLight ?? 'rgba(0,200,100,0.08)',
                     borderRadius: 8, border: `1px solid ${C.accentBorder}`, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 16 }}>✅</span>
+                    <CheckCircle2 size={16} color="#22c55e" />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{foundPatient.full_name}</div>
                       <div style={{ fontSize: 11, color: C.textSub }}>
@@ -258,7 +270,7 @@ function WalkInModal({
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Date *</label>
-                  <input type="date" value={date} min={new Date().toISOString().split('T')[0]} onChange={e => setDate(e.target.value)} style={inputStyle} />
+                  <input type="date" value={date} min={fmtLocalDate(new Date())} onChange={e => setDate(e.target.value)} style={inputStyle} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>Time *</label>
@@ -291,8 +303,9 @@ function WalkInModal({
               </div>
               {error && (
                 <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-                  ⚠️ {error}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={14} /> {error}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -326,8 +339,11 @@ function AssignDoctorModal({
   appointment, doctors, onClose, onDone,
 }: { appointment: AdminAppointment; doctors: AdminDoctor[]; onClose: () => void; onDone: (doctorId: string) => void }) {
   const { theme: C } = useTheme()
-  const [selected, setSelected] = useState('')
+  const currentDoctorId = appointment.assigned_doctor_id ?? appointment.doctor_id ?? ''
+  const isReassign = !!currentDoctorId
+  const [selected, setSelected] = useState(currentDoctorId)
   const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
 
   // Only show doctors from the appointment's clinic (if one is assigned)
   const eligibleDoctors = appointment.clinic_id
@@ -337,8 +353,10 @@ function AssignDoctorModal({
   async function handleAssign() {
     if (!selected) return
     setSaving(true)
-    await assignDoctorToAppointment(appointment.id, selected)
+    setError(null)
+    const { error } = await assignDoctorToAppointment(appointment.id, selected)
     setSaving(false)
+    if (error) { setError(error); return }
     onDone(selected)
   }
 
@@ -353,12 +371,12 @@ function AssignDoctorModal({
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
-            Assign Doctor — {appointment.patient_name}
+            {isReassign ? 'Reassign Doctor' : 'Assign Doctor'} — {appointment.patient_name}
           </div>
           <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>
-            ✕
+            <X size={14} />
           </button>
         </div>
         {appointment.clinic_id && (
@@ -389,10 +407,17 @@ function AssignDoctorModal({
                 </div>
                 <div style={{ fontSize: 11, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
               </div>
-              {selected === d.id && <span style={{ color: C.accent, fontSize: 16 }}>✓</span>}
+              {selected === d.id && <CheckCircle2 size={15} color={C.accent} />}
             </button>
           ))}
         </div>
+        {error && (
+          <div style={{ margin: '0 22px 14px', background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
+            borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={14} /> {error}
+          </div>
+        )}
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
           <button onClick={onClose}
             style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
@@ -400,14 +425,14 @@ function AssignDoctorModal({
               color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
             Cancel
           </button>
-          <button onClick={handleAssign} disabled={!selected || saving}
+          <button onClick={handleAssign} disabled={!selected || selected === currentDoctorId || saving}
             style={{ flex: 2, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: selected ? C.accent : C.bgAlt,
-              color: selected ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+              background: selected && selected !== currentDoctorId ? C.accent : C.bgAlt,
+              color: selected && selected !== currentDoctorId ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
               border: 'none', fontSize: 13, fontWeight: 700,
-              cursor: !selected || saving ? 'not-allowed' : 'pointer',
+              cursor: !selected || selected === currentDoctorId || saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Assigning…' : 'Assign Doctor'}
+            {saving ? (isReassign ? 'Reassigning…' : 'Assigning…') : (isReassign ? 'Reassign Doctor' : 'Assign Doctor')}
           </button>
         </div>
       </div>
@@ -495,7 +520,7 @@ function DetailPanel({
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Appointment Detail</div>
           <button onClick={onClose} aria-label="Close"
             style={{ width: 30, height: 30, borderRadius: 7, background: C.bgAlt,
-              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>✕</button>
+              border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer', fontSize: 14 }}><X size={14} /></button>
         </div>
         <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
@@ -503,8 +528,8 @@ function DetailPanel({
             { label: 'Patient',       value: appt.patient_name },
             { label: 'Date / Time',   value: `${appt.appointment_date} · ${appt.start_time}` },
             { label: 'Doctor',        value: appt.doctor_name || (appt.assigned_doctor_name ? `Assigned: ${appt.assigned_doctor_name}` : 'Unassigned') },
-            { label: 'Type',          value: appt.type === 'virtual' ? '💻 Virtual' : '🏥 In-person' },
-            { label: 'Mode',          value: appt.booking_mode === 'walkin' ? '🚶 Walk-in' : appt.booking_mode === 'hospital' ? '🏥 Hospital (OPD)' : '👨‍⚕️ Doctor-specific' },
+            { label: 'Type',          value: appt.type === 'virtual' ? <IconLabel icon={Video}>Virtual</IconLabel> : <IconLabel icon={Building2}>In-person</IconLabel> },
+            { label: 'Mode',          value: appt.booking_mode === 'walkin' ? <IconLabel icon={Footprints}>Walk-in</IconLabel> : appt.booking_mode === 'hospital' ? <IconLabel icon={Building2}>Hospital (OPD)</IconLabel> : <IconLabel icon={Stethoscope}>Doctor-specific</IconLabel> },
             { label: 'Urgency',       value: appt.urgency ?? 'Routine' },
             { label: 'Reason',        value: appt.reason ?? '—' },
             { label: 'Clinic',        value: appt.clinic_name ?? 'Main Hospital' },
@@ -527,14 +552,16 @@ function DetailPanel({
           )}
           {appt.approval_note && (
             <div style={{ background: 'rgba(239,159,39,0.1)', border: '1px solid rgba(239,159,39,0.25)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#EF9F27' }}>
-              📋 {appt.approval_note}
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#EF9F27',
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ClipboardList size={14} /> {appt.approval_note}
             </div>
           )}
           {urg && (
             <div style={{ background: urg.bg, border: `1px solid ${urg.border}`,
-              borderRadius: 10, padding: '8px 14px', fontSize: 12, color: urg.text, fontWeight: 700 }}>
-              {appt.urgency === 'emergency' ? '🚨' : '⚡'} {(appt.urgency ?? 'routine').toUpperCase()} — handle as priority
+              borderRadius: 10, padding: '8px 14px', fontSize: 12, color: urg.text, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              {appt.urgency === 'emergency' ? <AlertTriangle size={13} /> : <Zap size={13} />} {(appt.urgency ?? 'routine').toUpperCase()} — handle as priority
             </div>
           )}
           {appt.no_show_at && appt.reschedule_deadline && (
@@ -675,10 +702,51 @@ export default function AppointmentsPage() {
 
   return (
     <div>
+      <style>{`
+        .appt-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .appt-header-btns { display: flex; gap: 8px; flex-shrink: 0; }
+        .appt-filter-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+        .appt-filter-chips::-webkit-scrollbar { display: none; }
+        .appt-filter-chips { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Desktop: show table, hide cards */
+        .appt-table-wrap { display: block; }
+        .appt-cards { display: none; }
+
+        /* Mobile: hide table, show cards */
+        @media (max-width: 767px) {
+          .appt-header { flex-wrap: wrap; }
+          .appt-header-btns button { padding: 8px 12px !important; font-size: 12px !important; }
+          .appt-table-wrap { display: none; }
+          .appt-cards { display: flex; flex-direction: column; gap: 8px; }
+        }
+
+        /* Tablet: hide less important columns */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .appt-col-id, .appt-col-clinic, .appt-col-urgency { display: none; }
+        }
+
+        /* Card styles */
+        .appt-card {
+          border-radius: 12px;
+          border-width: 1px;
+          border-style: solid;
+          padding: 10px 12px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 4px 8px;
+          align-items: start;
+        }
+        .appt-card-row1 { display: flex; align-items: center; gap: 6px; grid-column: 1; }
+        .appt-card-status { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+        .appt-card-row2 { grid-column: 1; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .appt-card-actions { grid-column: 1 / 3; display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; padding-top: 6px; border-top-width: 1px; border-top-style: solid; }
+      `}</style>
+
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACE.lg }}>
+      <div className="appt-header" style={{ marginBottom: SPACE.lg }}>
         <div>
-          <div style={{ ...T.display, color: C.text }}>Appointments</div>
+          <div className="dash-greeting-title" style={{ color: C.text }}>Appointments</div>
           <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }}>
             {appts.length} record{appts.length !== 1 ? 's' : ''}
             {!isDoctor && ' · all clinics'}
@@ -691,24 +759,24 @@ export default function AppointmentsPage() {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: SPACE.sm }}>
+        <div className="appt-header-btns">
           {!isDoctor && (
             <button onClick={() => setShowWalkIn(true)}
               style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
                 borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-                transition: 'opacity 0.15s' }}
+                transition: 'opacity 0.15s', whiteSpace: 'nowrap' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-              + Walk-in Booking
+              + Walk-in
             </button>
           )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-              transition: 'opacity 0.15s' }}
+              transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-            ↻ Refresh
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
@@ -723,23 +791,26 @@ export default function AppointmentsPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200, background: C.card, border: `1px solid ${C.border}`,
           borderRadius: 10, padding: '9px 14px', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ color: C.textMuted }}>🔍</span>
+          <SearchIcon size={14} style={{ color: C.textMuted }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search patient, doctor, booking ID…"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13,
               color: C.text, background: 'none', fontFamily: 'inherit' }} />
           {search && (
             <button onClick={() => setSearch('')}
-              style={{ color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              style={{ color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center' }}>
+              <X size={14} />
+            </button>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="appt-filter-chips">
           {STATUS_FILTERS.map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{
-              padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              padding: '7px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
               border: `1px solid ${filter === f ? C.accent : C.border}`,
               background: filter === f ? C.accentLight : C.card,
-              color: filter === f ? C.accent : C.textSub, transition: 'all .15s' }}>
+              color: filter === f ? C.accent : C.textSub, transition: 'all .15s',
+              whiteSpace: 'nowrap', flexShrink: 0 }}>
               {filterLabel(f)}
             </button>
           ))}
@@ -750,22 +821,35 @@ export default function AppointmentsPage() {
         <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
           borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
           marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>⚠️ {actionError}</span>
+          <span style={{display:'flex',alignItems:'center',gap:4}}><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg>{actionError}</span>
           <button onClick={() => setActionError('')} aria-label="Close"
-            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14 }}>✕</button>
+            style={{ background: 'none', border: 'none', color: '#f07070', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center' }}>
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+      {/* ── Desktop / Tablet Table ── */}
+      <div className="appt-table-wrap" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: C.bgAlt }}>
-              {['Date','Time','ID','Patient','Clinic','Doctor / Mode','Type','Urgency','Status','Actions'].map(h => (
-                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', ...T.label,
+              {[
+                { label: 'Date', cls: '' },
+                { label: 'Time', cls: '' },
+                { label: 'ID', cls: 'appt-col-id' },
+                { label: 'Patient', cls: '' },
+                { label: 'Clinic', cls: 'appt-col-clinic' },
+                { label: 'Doctor / Mode', cls: 'appt-col-doctor' },
+                { label: 'Type', cls: 'appt-col-type' },
+                { label: 'Urgency', cls: 'appt-col-urgency' },
+                { label: 'Status', cls: '' },
+                { label: 'Actions', cls: '' },
+              ].map(({ label, cls }) => (
+                <th key={label} className={cls} style={{ padding: '10px 14px', textAlign: 'left', ...T.label,
                   color: C.textMuted,
-                  borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                  borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{label}</th>
               ))}
             </tr>
           </thead>
@@ -781,7 +865,7 @@ export default function AppointmentsPage() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={10}>
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: C.textMuted }}>
-                  <div style={{ fontSize: 40, marginBottom: SPACE.md }}>📋</div>
+                  <ClipboardList size={40} style={{ opacity: 0.3, display: 'block', margin: `0 auto ${SPACE.md}px` }} />
                   <div style={{ ...T.subheading, color: C.text, marginBottom: SPACE.xs }}>No appointments found</div>
                   <div style={{ ...T.body, color: C.textMuted }}>Try adjusting your filters or date range.</div>
                 </div>
@@ -789,6 +873,10 @@ export default function AppointmentsPage() {
             ) : filtered.map((a, i) => {
               const urg = urgencyColor(a.urgency, C)
               const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
+              const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
+              // Assign/reassign only before check-in — queue_position is computed per-doctor at
+              // check-in time, so swapping doctors after that would leave a stale queue slot.
+              const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
               const needsApproval = a.approval_status === 'pending_approval'
               const isEmergency = a.urgency === 'emergency'
               return (
@@ -796,24 +884,24 @@ export default function AppointmentsPage() {
                   background: isEmergency ? C.redLight : i % 2 === 0 ? C.card : C.rowAlt,
                   boxShadow: isEmergency ? `inset 3px 0 0 ${C.red}` : 'none',
                   outline: needsApproval ? `1px solid rgba(239,159,39,0.2)` : 'none' }}>
-                  <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
                     {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', {
                       weekday: 'short', day: 'numeric', month: 'short',
                       ...(range === 'all_time' ? { year: 'numeric' } : {}),
                     })}
                   </td>
-                  <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
-                  <td style={{ padding: '11px 14px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
+                  <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.text }}>{a.start_time}</td>
+                  <td className="appt-col-id" style={{ padding: '10px 12px', fontSize: 11, color: C.textMuted, fontFamily: 'monospace' }}>
                     {a.booking_ref}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{a.patient_name}</div>
                     <div style={{ fontSize: 11, color: C.textSub }}>
                       {a.patient_age ? `${a.patient_age}y` : ''}{a.patient_gender ? ` · ${a.patient_gender}` : ''}
                       {a.walkin_patient_phone ? ` · ${a.walkin_patient_phone}` : ''}
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-clinic" style={{ padding: '10px 12px' }}>
                     {a.clinic_name ? (
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
                         background: 'rgba(180,156,240,0.12)', color: '#B49CF0',
@@ -824,7 +912,7 @@ export default function AppointmentsPage() {
                       <span style={{ fontSize: 11, color: C.textMuted }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-doctor" style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 6,
                         background: docColor(a.doctor_name),
@@ -834,32 +922,32 @@ export default function AppointmentsPage() {
                       </div>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: needsAssign ? '#EF9F27' : C.text }}>
-                          {needsAssign ? '⚠ Unassigned' : a.assigned_doctor_name ?? a.doctor_name}
+                          {needsAssign ? <IconLabel icon={AlertTriangle} size={11}>Unassigned</IconLabel> : a.assigned_doctor_name ?? a.doctor_name}
                         </div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>
-                          {a.booking_mode === 'walkin' ? '🚶 Walk-in' : a.booking_mode === 'hospital' ? '🏥 OPD' : '👨‍⚕️ Direct'}
+                          {a.booking_mode === 'walkin' ? <IconLabel icon={Footprints} size={10}>Walk-in</IconLabel> : a.booking_mode === 'hospital' ? <IconLabel icon={Building2} size={10}>OPD</IconLabel> : <IconLabel icon={Stethoscope} size={10}>Direct</IconLabel>}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-type" style={{ padding: '10px 12px' }}>
                     <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 600,
                       background: a.type === 'virtual' ? C.blueLight : C.accentLight,
                       color: a.type === 'virtual' ? C.blue : C.accent }}>
-                      {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                      {a.type === 'virtual' ? <IconLabel icon={Video} size={10}>Virtual</IconLabel> : <IconLabel icon={Building2} size={10}>In-person</IconLabel>}
                     </span>
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td className="appt-col-urgency" style={{ padding: '10px 12px' }}>
                     {urg ? (
                       <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 99, fontWeight: 700,
                         background: urg.bg, color: urg.text, border: `1px solid ${urg.border}` }}>
-                        {a.urgency === 'emergency' ? '🚨' : '⚡'} {a.urgency}
+                        {a.urgency === 'emergency' ? <IconLabel icon={AlertTriangle} size={10}>{a.urgency}</IconLabel> : <IconLabel icon={Zap} size={10}>{a.urgency}</IconLabel>}
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, color: C.textMuted }}>Routine</span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     <Badge status={a.status} />
                     {needsApproval && (
                       <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
@@ -874,12 +962,13 @@ export default function AppointmentsPage() {
                       </div>
                     )}
                     {a.status === 'completed' && a.consult_duration_secs != null && (
-                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub }}>
-                        🕐 {formatDuration(a.consult_duration_secs)}
+                      <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700, color: C.textSub,
+                        display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Clock size={10} /> {formatDuration(a.consult_duration_secs)}
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '11px 14px' }}>
+                  <td style={{ padding: '10px 12px' }}>
                     {(() => {
                       const isPending = pendingActionId === a.id
                       const btnBase: React.CSSProperties = { fontSize: 10, padding: '3px 8px', borderRadius: 6, fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1, transition: 'opacity 0.15s' }
@@ -895,8 +984,9 @@ export default function AppointmentsPage() {
                           <button onClick={() => setVitalsAppt(a)}
                             style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
                               background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
-                              color: a.vitals_recorded_at ? C.accent : C.textMuted }}>
-                            {a.vitals_recorded_at ? '✓ Vitals' : 'Vitals'}
+                              color: a.vitals_recorded_at ? C.accent : C.textMuted,
+                              display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            {a.vitals_recorded_at ? <><Check size={10} /> Vitals</> : 'Vitals'}
                           </button>
                         )}
                         {/* Approve / Reject — admins and front desk only */}
@@ -912,11 +1002,14 @@ export default function AppointmentsPage() {
                             </button>
                           </>
                         )}
-                        {/* Assign Doctor — admins only */}
-                        {!isDoctor && needsAssign && (
+                        {/* Assign / Reassign Doctor — admins and front desk, before check-in */}
+                        {canAssignDoctor && (
                           <button onClick={() => setAssignAppt(a)} disabled={isPending}
-                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(239,159,39,0.3)', background: 'rgba(239,159,39,0.1)', color: '#EF9F27' }}>
-                            Assign Dr.
+                            style={{ ...btnBase, fontWeight: 700,
+                              border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
+                              background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
+                              color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                            {hasDoctor ? 'Reassign' : 'Assign Dr.'}
                           </button>
                         )}
                         {/* Check In */}
@@ -957,6 +1050,137 @@ export default function AppointmentsPage() {
           </tbody>
         </table>
         </div>
+      </div>
+
+      {/* ── Mobile Card List ── */}
+      <div className="appt-cards">
+        {loading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: C.textMuted, fontSize: 13 }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: C.textMuted }}>
+            <ClipboardList size={36} style={{ opacity: 0.3, display: 'block', margin: '0 auto 10px' }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>No appointments found</div>
+            <div style={{ fontSize: 13 }}>Try adjusting your filters or date range.</div>
+          </div>
+        ) : filtered.map(a => {
+          const urg = urgencyColor(a.urgency, C)
+          const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
+          const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
+          const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
+          const needsApproval = a.approval_status === 'pending_approval'
+          const isEmergency   = a.urgency === 'emergency'
+          const isPending     = pendingActionId === a.id
+          const btnBase: React.CSSProperties = {
+            fontSize: 11, padding: '4px 10px', borderRadius: 7, fontWeight: 600,
+            cursor: isPending ? 'not-allowed' : 'pointer', opacity: isPending ? 0.6 : 1,
+            whiteSpace: 'nowrap' as const,
+          }
+          const docName = a.assigned_doctor_name ?? a.doctor_name
+          const isVirtual = a.type === 'virtual'
+          return (
+            <div key={a.id}
+              className="appt-card"
+              style={{
+                background: isEmergency ? C.redLight : C.card,
+                borderColor: isEmergency ? C.red : needsApproval ? 'rgba(239,159,39,0.4)' : C.border,
+                borderLeftWidth: isEmergency ? 3 : 1,
+              }}>
+              {/* Row 1: time · date · type icon */}
+              <div className="appt-card-row1">
+                <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{a.start_time}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>·</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>
+                  {new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+                </span>
+                {isEmergency && (
+                  <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 99,
+                    background: C.red, color: '#fff', marginLeft: 2 }}>EMERG</span>
+                )}
+              </div>
+
+              {/* Status — right side spanning rows 1-2 */}
+              <div className="appt-card-status">
+                <Badge status={a.status} />
+                {needsApproval && (
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#EF9F27', marginTop: 3, textAlign: 'right' }}>REVIEW</div>
+                )}
+              </div>
+
+              {/* Row 2: patient · doctor */}
+              <div className="appt-card-row2">
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{a.patient_name}</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>·</span>
+                {isVirtual
+                  ? <Video size={11} color={C.blue} />
+                  : <Building2 size={11} color={C.textMuted} />}
+                <span style={{ fontSize: 11, color: C.textSub }}>
+                  {needsAssign ? <span style={{ color: '#EF9F27' }}>Unassigned</span> : docName}
+                </span>
+              </div>
+
+              {/* Actions row */}
+              <div className="appt-card-actions" style={{ borderTopColor: C.border }}>
+                <button onClick={() => setDetailAppt(a)}
+                  style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                  Detail
+                </button>
+                {!['cancelled'].includes(a.status) && (
+                  <button onClick={() => setVitalsAppt(a)}
+                    style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
+                      background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
+                      color: a.vitals_recorded_at ? C.accent : C.textMuted,
+                      display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    {a.vitals_recorded_at ? <><Check size={10} />Vitals</> : 'Vitals'}
+                  </button>
+                )}
+                {!isDoctor && needsApproval && (
+                  <>
+                    <button onClick={() => handleApprove(a)} disabled={isPending}
+                      style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                      {isPending ? '…' : 'Approve'}
+                    </button>
+                    <button onClick={() => setRejectAppt(a)} disabled={isPending}
+                      style={{ ...btnBase, border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)', color: '#f07070' }}>
+                      Reject
+                    </button>
+                  </>
+                )}
+                {canAssignDoctor && (
+                  <button onClick={() => setAssignAppt(a)} disabled={isPending}
+                    style={{ ...btnBase, border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
+                      background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
+                      color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                    {hasDoctor ? 'Reassign' : 'Assign Dr.'}
+                  </button>
+                )}
+                {!['cancelled','completed','no_show','checked_in','in_progress'].includes(a.status) && !needsApproval && (
+                  <button onClick={() => handleCheckIn(a)} disabled={isPending}
+                    style={{ ...btnBase, border: `1px solid ${C.accentBorder}`, background: C.accentLight, color: C.accent }}>
+                    {isPending ? '…' : 'Check In'}
+                  </button>
+                )}
+                {a.status === 'checked_in' && (
+                  <button onClick={() => handleStartConsult(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.1)', color: '#55A7EB' }}>
+                    {isPending ? '…' : '▶ Start'}
+                  </button>
+                )}
+                {a.status === 'in_progress' && (
+                  <button onClick={() => handleEndConsult(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                    {isPending ? '…' : '■ End'}
+                  </button>
+                )}
+                {['confirmed','checked_in'].includes(a.status) && (
+                  <button onClick={() => handleNoShow(a)} disabled={isPending}
+                    style={{ ...btnBase, border: '1px solid rgba(85,167,235,0.3)', background: 'rgba(85,167,235,0.08)', color: '#55A7EB' }}>
+                    {isPending ? '…' : 'No-Show'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Modals */}

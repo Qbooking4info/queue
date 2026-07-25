@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { ArrowLeft, CheckCircle2, Calendar, Monitor } from 'lucide-react'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DURATIONS = [15, 20, 30, 45, 60]
@@ -93,7 +94,7 @@ export default function DoctorSchedulePage() {
     <div className="flex-1 p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard/doctors" className="text-[#4A6058] hover:text-white text-sm transition-colors">← Doctors</Link>
+        <Link href="/dashboard/doctors" className="text-[#4A6058] hover:text-white text-sm transition-colors inline-flex items-center gap-1"><ArrowLeft size={14} /> Doctors</Link>
         <span className="text-[#4A6058]">/</span>
         <span className="text-sm text-[#7A9089]">Manage Schedule</span>
       </div>
@@ -212,8 +213,8 @@ export default function DoctorSchedulePage() {
           {result && (
             result.error
               ? <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{result.error}</p>
-              : <p className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2">
-                  ✓ Generated {result.inserted} slots successfully
+              : <p className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <CheckCircle2 size={14} /> Generated {result.inserted} slots successfully
                 </p>
           )}
 
@@ -236,7 +237,7 @@ export default function DoctorSchedulePage() {
             <div className="flex items-center justify-center py-12 text-[#4A6058] text-sm">Loading…</div>
           ) : grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-4xl mb-3">📅</div>
+              <Calendar size={36} className="mb-3 text-[#4A6058]" />
               <div className="text-sm text-[#7A9089] font-medium">No slots generated yet</div>
               <div className="text-xs text-[#4A6058] mt-1">Use the form to create a schedule</div>
             </div>
@@ -266,8 +267,8 @@ export default function DoctorSchedulePage() {
                           <span className="text-xs text-[#4A6058] px-1">·</span>
                           {virtual.map(s => (
                             <span key={s.id}
-                              className={`text-xs px-2 py-0.5 rounded-lg border ${s.booked_count > 0 ? 'text-amber-400 border-amber-500/30 bg-amber-500/8' : 'text-blue-400 border-blue-500/20 bg-blue-500/5'}`}>
-                              💻 {s.start_time.slice(0, 5)}
+                              className={`text-xs px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 ${s.booked_count > 0 ? 'text-amber-400 border-amber-500/30 bg-amber-500/8' : 'text-blue-400 border-blue-500/20 bg-blue-500/5'}`}>
+                              <Monitor size={11} /> {s.start_time.slice(0, 5)}
                             </span>
                           ))}
                         </>

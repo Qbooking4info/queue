@@ -14,6 +14,7 @@ import {
   setEmergencyClinic, clearEmergencyClinic,
   approveAppointment, rejectAppointment,
   getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
+  fmtLocalDate,
 } from '@/lib/admin-api'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
@@ -22,6 +23,11 @@ import { adminDb } from '@/lib/supabase/admin-client'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
+import {
+  X, AlertTriangle, RefreshCw, Check, ArrowLeft, ArrowRight, Pencil,
+  Stethoscope, Users, Calendar, CheckCircle2, XCircle, Star, Monitor,
+  Building2, ClipboardList, Hourglass,
+} from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -105,8 +111,8 @@ function EditClinicModal({
           <button onClick={onClose}
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -144,8 +150,9 @@ function EditClinicModal({
 
           {error && (
             <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-              ⚠️ {error}
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={13} /> {error}
             </div>
           )}
 
@@ -222,8 +229,8 @@ function EditClinicHoursModal({
           <button onClick={onClose}
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -253,8 +260,9 @@ function EditClinicHoursModal({
 
           {error && (
             <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-              ⚠️ {error}
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+              display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={13} /> {error}
             </div>
           )}
 
@@ -367,8 +375,8 @@ function AssignDoctorModal({
           <button onClick={onClose}
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -467,8 +475,9 @@ function AssignDoctorModal({
               </label>
               {newError && (
                 <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-                  ⚠️ {newError}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={13} /> {newError}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -564,8 +573,8 @@ function AddStaffModal({
           <button onClick={onClose}
             style={{ width: 32, height: 32, borderRadius: 8, background: C.bgAlt,
               border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} />
           </button>
         </div>
 
@@ -619,8 +628,8 @@ function AddStaffModal({
                       {showPass ? 'Hide' : 'Show'}
                     </button>
                     <button type="button" onClick={() => setPassword(generatePassword())}
-                      style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer' }}>
-                      ↻
+                      style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer', display: 'flex' }}>
+                      <RefreshCw size={11} />
                     </button>
                   </div>
                 </div>
@@ -628,8 +637,9 @@ function AddStaffModal({
 
               {error && (
                 <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070' }}>
-                  ⚠️ {error}
+                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
+                  display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={13} /> {error}
                 </div>
               )}
 
@@ -654,7 +664,11 @@ function AddStaffModal({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 44 }}>{role === 'desk_officer' ? '🖥️' : '👤'}</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.7,display:"block",margin:"0 auto"}}>
+                {role === 'desk_officer'
+                  ? <><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></>
+                  : <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}
+              </svg>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>Account created!</div>
               <div style={{ background: C.bgAlt, border: `1px solid ${C.borderMed}`,
                 borderRadius: 12, padding: 16, textAlign: 'left' }}>
@@ -677,8 +691,9 @@ function AddStaffModal({
                     background: copied ? col.bg : C.bgAlt,
                     border: `1px solid ${copied ? col.text : C.borderMed}`,
                     color: copied ? col.text : C.textSub,
-                    fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  {copied ? '✓ Copied!' : 'Copy Credentials'}
+                    fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {copied ? <><Check size={14} /> Copied!</> : 'Copy Credentials'}
                 </button>
                 <button onClick={onClose}
                   style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
@@ -974,7 +989,7 @@ export default function ClinicDetailPage() {
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
   const deskOfficers = staff.filter(s => s.role === 'desk_officer' || s.role === 'front_desk')
-  const todayAppts   = appts.filter(a => a.appointment_date === new Date().toISOString().split('T')[0])
+  const todayAppts   = appts.filter(a => a.appointment_date === fmtLocalDate(new Date()))
 
   // analytics — specialty breakdown from aAppts
   const specCounts: Record<string, number> = {}
@@ -1002,7 +1017,7 @@ export default function ClinicDetailPage() {
         style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18,
           background: 'none', border: 'none', cursor: 'pointer',
           color: C.textMuted, fontSize: 13, fontWeight: 600, padding: 0, fontFamily: 'inherit' }}>
-        ← Clinics
+        <ArrowLeft size={13} /> Clinics
       </button>
 
       {/* Clinic header */}
@@ -1030,8 +1045,9 @@ export default function ClinicDetailPage() {
             {clinic?.is_emergency && (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
                 background: 'rgba(220,60,60,0.12)', color: '#f07070',
-                border: '1px solid rgba(220,60,60,0.3)' }}>
-                🚨 Emergency Dept
+                border: '1px solid rgba(220,60,60,0.3)',
+                display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <AlertTriangle size={10} /> Emergency Dept
               </span>
             )}
             {clinic && (
@@ -1039,9 +1055,9 @@ export default function ClinicDetailPage() {
                 title="Edit clinic name & description"
                 style={{ width: 26, height: 26, borderRadius: 7, background: C.bgAlt,
                   border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
-                  fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0 }}>
-                ✏️
+                <Pencil size={12} />
               </button>
             )}
           </div>
@@ -1058,9 +1074,9 @@ export default function ClinicDetailPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { icon: '👨‍⚕️', value: doctors.length, label: 'Doctors' },
-              { icon: '👥', value: staff.length,   label: 'Staff'   },
-              { icon: '📅', value: appts.length,   label: range === 'today' ? 'Today' : 'Period' },
+              { icon: <Stethoscope size={14} />, value: doctors.length, label: 'Doctors' },
+              { icon: <Users size={14} />, value: staff.length,   label: 'Staff'   },
+              { icon: <Calendar size={14} />, value: appts.length,   label: range === 'today' ? 'Today' : 'Period' },
             ].map(s => (
               <div key={s.label} style={{ background: C.bgAlt, border: `1px solid ${C.border}`,
                 borderRadius: 10, padding: '8px 14px', textAlign: 'center', minWidth: 60 }}>
@@ -1129,10 +1145,10 @@ export default function ClinicDetailPage() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             {[
-              { icon: '📅', label: "Today's Appts",  value: loading ? '…' : todayAppts.length.toString(), sub: `${todayAppts.filter(a => a.status === 'completed').length} completed` },
-              { icon: '✔',  label: 'Completed',       value: loading ? '…' : stats.completed.toString(),   sub: 'Total period' },
-              { icon: '👨‍⚕️', label: 'Doctors',         value: loading ? '…' : doctors.length.toString(),   sub: 'Assigned to clinic' },
-              { icon: '👥', label: 'Staff',            value: loading ? '…' : staff.length.toString(),     sub: `${deskOfficers.length} desk · ${subAdmin ? '1' : '0'} admin` },
+              { icon: <Calendar size={18} />, label: "Today's Appts",  value: loading ? '…' : todayAppts.length.toString(), sub: `${todayAppts.filter(a => a.status === 'completed').length} completed` },
+              { icon: <CheckCircle2 size={18} />,  label: 'Completed',       value: loading ? '…' : stats.completed.toString(),   sub: 'Total period' },
+              { icon: <Stethoscope size={18} />, label: 'Doctors',         value: loading ? '…' : doctors.length.toString(),   sub: 'Assigned to clinic' },
+              { icon: <Users size={18} />, label: 'Staff',            value: loading ? '…' : staff.length.toString(),     sub: `${deskOfficers.length} desk · ${subAdmin ? '1' : '0'} admin` },
             ].map(s => (
               <div key={s.label} style={{ background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 14, padding: '16px 20px' }}>
@@ -1152,8 +1168,9 @@ export default function ClinicDetailPage() {
                 <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Today&apos;s Queue</div>
                 <button onClick={() => setTab('appointments')}
                   style={{ fontSize: 12, color: col.text, background: 'none', border: 'none',
-                    cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                  View all →
+                    cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit',
+                    display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  View all <ArrowRight size={12} />
                 </button>
               </div>
               <div style={{ maxHeight: 320, overflowY: 'auto' }}>
@@ -1357,7 +1374,7 @@ export default function ClinicDetailPage() {
           ) : doctors.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 40px',
               border: `2px dashed ${C.borderMed}`, borderRadius: 16 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍⚕️</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 8 }}>
                 No doctors yet
               </div>
@@ -1393,8 +1410,9 @@ export default function ClinicDetailPage() {
                   <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                     {doc.avg_rating && (
                       <span style={{ fontSize: 11, background: C.bgAlt, border: `1px solid ${C.border}`,
-                        borderRadius: 8, padding: '3px 10px', color: C.textSub }}>
-                        ★ {doc.avg_rating.toFixed(1)}
+                        borderRadius: 8, padding: '3px 10px', color: C.textSub,
+                        display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Star size={11} /> {doc.avg_rating.toFixed(1)}
                       </span>
                     )}
                     {doc.consultation_fee && (
@@ -1405,8 +1423,9 @@ export default function ClinicDetailPage() {
                     )}
                     {doc.accepts_virtual && (
                       <span style={{ fontSize: 11, background: C.blueLight, border: 'none',
-                        borderRadius: 8, padding: '3px 10px', color: C.blue }}>
-                        💻 Virtual
+                        borderRadius: 8, padding: '3px 10px', color: C.blue,
+                        display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Monitor size={11} /> Virtual
                       </span>
                     )}
                   </div>
@@ -1586,8 +1605,9 @@ export default function ClinicDetailPage() {
             <button onClick={load}
               style={{ background: col.bg, color: col.text, border: `1px solid ${col.bg.replace('0.14','0.3')}`,
                 borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit' }}>
-              ↻ Refresh
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <RefreshCw size={12} /> Refresh
             </button>
           </div>
 
@@ -1604,7 +1624,7 @@ export default function ClinicDetailPage() {
               <div style={{ background: 'rgba(239,159,39,0.08)', border: '1px solid rgba(239,159,39,0.25)',
                 borderRadius: 12, padding: '10px 16px', marginBottom: 14,
                 display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 16 }}>⏳</span>
+                <Hourglass size={16} color="#EF9F27" />
                 <span style={{ fontSize: 13, color: '#EF9F27', fontWeight: 700 }}>
                   {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting your review
                 </span>
@@ -1661,9 +1681,10 @@ export default function ClinicDetailPage() {
                         </div>
                         {a.symptom_description && (
                           <div style={{ fontSize: 11, color: '#EF9F27', marginTop: 2,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            display: 'flex', alignItems: 'center', gap: 4 }}
                             title={a.symptom_description}>
-                            📋 {a.symptom_description}
+                            <ClipboardList size={11} /> {a.symptom_description}
                           </div>
                         )}
                       </td>
@@ -1807,10 +1828,10 @@ export default function ClinicDetailPage() {
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
             {[
-              { icon: '📅', label: 'Total',        value: aStats.total,                       sub: 'appointments' },
-              { icon: '✔',  label: 'Completed',    value: aStats.completed,                   sub: `${showupRate}% show-up rate` },
-              { icon: '✕',  label: 'Cancelled',    value: aStats.cancelled,                   sub: 'this period' },
-              { icon: '⏳', label: 'Pending',      value: aStats.pending,                     sub: 'upcoming' },
+              { icon: <Calendar size={18} />, label: 'Total',        value: aStats.total,                       sub: 'appointments' },
+              { icon: <CheckCircle2 size={18} />,  label: 'Completed',    value: aStats.completed,                   sub: `${showupRate}% show-up rate` },
+              { icon: <XCircle size={18} />,  label: 'Cancelled',    value: aStats.cancelled,                   sub: 'this period' },
+              { icon: <Hourglass size={18} />, label: 'Pending',      value: aStats.pending,                     sub: 'upcoming' },
             ].map(s => (
               <div key={s.label} style={{ background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 14, padding: '16px 20px' }}>
@@ -1869,12 +1890,12 @@ export default function ClinicDetailPage() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                       {[
-                        { label: 'In-person', icon: '🏥', count: inPerson,  pct: inPct,  color: col.text,  bg: col.bg },
-                        { label: 'Virtual',   icon: '💻', count: virtual,   pct: virtPct, color: '#55A7EB', bg: 'rgba(85,167,235,0.12)' },
+                        { label: 'In-person', icon: <Building2 size={13} />, count: inPerson,  pct: inPct,  color: col.text,  bg: col.bg },
+                        { label: 'Virtual',   icon: <Monitor size={13} />, count: virtual,   pct: virtPct, color: '#55A7EB', bg: 'rgba(85,167,235,0.12)' },
                       ].map(t => (
                         <div key={t.label}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: C.text, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                               {t.icon} {t.label}
                             </span>
                             <span style={{ fontSize: 12, color: C.textSub }}>{t.count} · {t.pct}%</span>
@@ -1981,7 +2002,7 @@ export default function ClinicDetailPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px 28px 24px' }}>
-            <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 16 }}>⚠️</div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 10 }}>
               Delete &quot;{clinic.name}&quot;?
             </div>

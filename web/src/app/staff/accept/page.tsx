@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AcceptInvitePage() {
@@ -104,7 +105,7 @@ export default function AcceptInvitePage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-            <span className="text-2xl">👋</span>
+            <Sparkles size={24} className="text-green-400" />
           </div>
           <h1 className="text-2xl font-bold">Welcome to Queue</h1>
           <p className="text-sm text-[#7A9089] mt-1">
@@ -149,8 +150,8 @@ export default function AcceptInvitePage() {
           </div>
           <button
             type="submit" disabled={loading}
-            className="mt-2 w-full py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
-            {loading ? 'Saving…' : 'Go to Dashboard →'}
+            className="mt-2 w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
+            {loading ? 'Saving…' : <>Go to Dashboard <ArrowRight size={14} /></>}
           </button>
         </form>
       </div>

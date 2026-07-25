@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
+import { ArrowRight, Ban } from 'lucide-react'
 import type { AdminHospital } from '@/lib/admin-api'
 
 interface HospitalStat {
@@ -55,8 +56,9 @@ function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; o
           width: '100%', padding: '9px 16px', borderRadius: 10, border: 'none',
           background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
           fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>
-          Manage Hospital →
+          Manage Hospital <ArrowRight size={14} />
         </button>
       ) : (
         <button disabled title="You don't have access to this hospital." style={{
@@ -93,7 +95,7 @@ export default function HospitalsPage() {
   if (role !== 'super_admin') {
     return (
       <div style={{ textAlign: 'center', padding: 80, color: C.textMuted }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}><Ban size={40} /></div>
         <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>Access Restricted</div>
         <div style={{ fontSize: 13, marginTop: 8 }}>Only platform administrators can view all hospitals.</div>
       </div>

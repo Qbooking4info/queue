@@ -81,5 +81,6 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     opd_fee:             (h as any).opd_fee          ?? null,
     daily_booking_limit: (h as any).daily_booking_limit ?? null,
     requires_referral:   (h as any).requires_referral   ?? null,
+    is_24_hours:         (h as any).is_24_hours          ?? null,
   }
 }

@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, RefreshControl,
-} from 'react-native'
+  StyleSheet, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
@@ -66,7 +67,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   const pendingCount = appts.filter(a => (a as any).approval_status === 'pending_approval').length
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={{ flex: 1 }}>
 
         {/* Title */}
@@ -133,7 +134,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 
             {filtered.length === 0 && (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>📅</Text>
+                <Ionicons name="calendar-outline" size={52} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
                 <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                   No {filter} appointments
                 </Text>
@@ -145,8 +146,9 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                 {filter === 'upcoming' && (
                   <TouchableOpacity
                     onPress={() => { haptics.tap(); navigation?.navigate('BookingFlow', {}) }}
-                    style={[s.bookNowBtn, { backgroundColor: t.accent }]}>
-                    <Text style={s.bookNowText}>Book an appointment →</Text>
+                    style={[s.bookNowBtn, { backgroundColor: t.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <Text style={s.bookNowText}>Book an appointment</Text>
+                    <Ionicons name="arrow-forward" size={16} color={s.bookNowText.color as string} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -182,11 +184,18 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {/* Ref row — booking ID + status badge */}
                   <View style={[s.refRow, { borderBottomColor: t.cardBorder }]}>
                     <View style={s.refLeft}>
-                      <Text style={s.refIcon}>{isVirtual ? '💻' : '🏥'}</Text>
+                      <Ionicons
+                        name={isVirtual ? 'videocam-outline' : 'walk-outline'}
+                        size={14} color={t.textMuted}
+                        style={{ marginRight: 4 }}
+                      />
                       <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
                       {isEmergency && (
                         <View style={{ backgroundColor: '#FF5C5C', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>🚨 EMERGENCY</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="alert-circle-outline" size={9} color="#fff" />
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>EMERGENCY</Text>
+                          </View>
                         </View>
                       )}
                     </View>

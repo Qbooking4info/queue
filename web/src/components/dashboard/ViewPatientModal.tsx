@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { AlertTriangle } from 'lucide-react'
 import { getPatientProfile, getPatientMedicalHistory } from '@/lib/admin-api'
 import type { PatientProfile, PatientMedicalHistory } from '@/lib/admin-api'
 
@@ -83,7 +84,9 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
 
             {/* Allergies — surfaced first, safety-critical */}
             <div>
-              <div style={sectionLabel}>⚠ Allergies</div>
+              <div style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <AlertTriangle size={11} /> Allergies
+              </div>
               {hasAllergies ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {history!.allergies.map(a => (

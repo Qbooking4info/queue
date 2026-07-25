@@ -2,6 +2,8 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Building2, Monitor } from 'lucide-react'
+import { fmtLocalDate } from '@/lib/admin-api'
 
 const STATUS_COLOR: Record<string, string> = {
   confirmed:   'text-green-400 bg-green-500/10 border-green-500/20',
@@ -31,7 +33,7 @@ export default async function SpecialistPage() {
       .single(),
   ])
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   const [{ data: todayApptsRaw }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
     db.from('appointments')
@@ -76,8 +78,8 @@ export default async function SpecialistPage() {
             {specialty?.name ?? 'Specialist'} · {new Date(today + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
           {hospital && (
-            <p className="text-xs text-[#4A6058] mt-1">
-              🏥 {hospital.name}{hospital.city ? ` · ${hospital.city}` : ''}
+            <p className="text-xs text-[#4A6058] mt-1 flex items-center gap-1">
+              <Building2 size={11} /> {hospital.name}{hospital.city ? ` · ${hospital.city}` : ''}
             </p>
           )}
         </div>
@@ -89,7 +91,7 @@ export default async function SpecialistPage() {
 
       {!doctor && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 text-sm text-amber-400">
-          ⚠️ Your account is not linked to a doctor record. Ask your admin to link your profile to a doctor entry.
+          <span className="inline-flex items-center gap-1.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Your account is not linked to a doctor record. Ask your admin to link your profile to a doctor entry.</span>
         </div>
       )}
 
@@ -99,7 +101,7 @@ export default async function SpecialistPage() {
           <h2 className="font-bold mb-3">Today&apos;s Queue ({todayAppts?.length ?? 0})</h2>
           {!todayAppts?.length ? (
             <div className="bg-[#111915] border border-white/7 rounded-2xl p-8 text-center text-[#4A6058]">
-              <div className="text-3xl mb-2">✅</div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.25,display:"block",margin:"0 auto 8px"}}><polyline points="20 6 9 17 4 12"/></svg>
               <div className="text-sm">No appointments scheduled for today</div>
             </div>
           ) : (
@@ -130,7 +132,10 @@ export default async function SpecialistPage() {
                         )}
                       </div>
                       <div className="text-xs text-[#7A9089] mt-0.5">
-                        {a.start_time?.slice(0, 5)} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
+                        {a.start_time?.slice(0, 5)} ·{' '}
+                        <span className="inline-flex items-center gap-1 align-middle">
+                          {a.type === 'virtual' ? <><Monitor size={11} /> Virtual</> : <><Building2 size={11} /> In-person</>}
+                        </span>
                         {patient?.gender ? ` · ${patient.gender}` : ''}
                       </div>
                     </div>

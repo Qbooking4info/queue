@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Check, Stethoscope } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import {
@@ -102,7 +103,7 @@ function ServiceModal({
               style={{ ...input, appearance: 'none' as any }}>
               <option value="">— No specialty —</option>
               {allSpecialties.map(s => (
-                <option key={s.id} value={s.id}>{s.icon ? `${s.icon} ` : ''}{s.name}</option>
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
@@ -117,7 +118,7 @@ function ServiceModal({
               style={{ ...input, resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted,
                 textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
@@ -211,8 +212,9 @@ function AddSpecialtyModal({
 
         {successMsg && (
           <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)',
-            borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#4ade80', marginBottom: 12 }}>
-            ✓ {successMsg}
+            borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#4ade80', marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Check size={14} /> {successMsg}
           </div>
         )}
 
@@ -233,7 +235,7 @@ function AddSpecialtyModal({
               padding: '10px 8px', borderRadius: 10, marginBottom: 2,
               border: `1px solid transparent` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {s.icon && <span style={{ fontSize: 20 }}>{s.icon}</span>}
+                <Stethoscope size={20} color={C.accent} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{s.name}</span>
               </div>
               <button onClick={() => add(s)} disabled={saving === s.id}
@@ -330,7 +332,12 @@ export default function ServicesPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <style>{`
+        .services-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+        @media (max-width: 1023px) { .services-grid { grid-template-columns: repeat(2,1fr); } }
+        @media (max-width: 480px)  { .services-grid { grid-template-columns: 1fr; } }
+      `}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
             {isScopedToClinic ? 'Clinic Services' : 'Services & Specialties'}
@@ -380,14 +387,14 @@ export default function ServicesPage() {
           {services.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px',
               border: `2px dashed ${C.border}`, borderRadius: 16, color: C.textMuted }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🏥</div>
+              <Stethoscope size={36} style={{ marginBottom: 12, opacity: 0.5 }} />
               <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>
                 No services yet
               </div>
               <div style={{ fontSize: 12 }}>Click "+ Add Service" to create your first hospital service</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            <div className="services-grid">
               {services.map(s => {
                 const canEdit = true
                 return (
@@ -484,7 +491,7 @@ export default function ServicesPage() {
           {specialties.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px',
               border: `2px dashed ${C.border}`, borderRadius: 16, color: C.textMuted }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🩺</div>
+              <Stethoscope size={36} style={{ marginBottom: 12, opacity: 0.5 }} />
               <div style={{ fontSize: 14, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>
                 No specialties registered
               </div>
@@ -493,19 +500,13 @@ export default function ServicesPage() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            <div className="services-grid">
               {specialties.map(s => (
                 <div key={s.id} style={{ background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 14, padding: 18, display: 'flex',
                   alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {s.icon ? (
-                      <span style={{ fontSize: 28, lineHeight: 1 }}>{s.icon}</span>
-                    ) : (
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: C.accentLight,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 16, color: C.accent }}>🩺</div>
-                    )}
+                    <Stethoscope size={28} color={C.accent} />
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{s.name}</div>
                       <div style={{ fontSize: 11, color: C.textMuted }}>{s.slug}</div>

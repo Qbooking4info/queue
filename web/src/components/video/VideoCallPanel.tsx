@@ -1,5 +1,9 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react'
+import {
+  CheckCircle2, Monitor, Loader2, Video, VideoOff,
+  User, CameraOff, Mic, MicOff, PhoneOff, Circle,
+} from 'lucide-react'
 import AgoraRTC, {
   AgoraRTCProvider,
   LocalVideoTrack,
@@ -84,7 +88,7 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
   if (phase === 'ended') {
     return (
       <div className="bg-[#111915] border border-white/7 rounded-2xl p-6 text-center">
-        <div className="text-3xl mb-2">✅</div>
+        <CheckCircle2 size={28} className="mx-auto mb-2 text-green-400" />
         <div className="font-bold text-sm">Consultation ended</div>
         <div className="text-xs text-[#7A9089] mt-1">Appointment marked as completed</div>
         <button
@@ -101,8 +105,8 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
     return (
       <div className="bg-[#0A1218] border border-blue-500/20 rounded-2xl p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl">
-            💻
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+            <Monitor size={18} />
           </div>
           <div>
             <div className="font-bold text-sm">Virtual Consultation</div>
@@ -120,9 +124,9 @@ export function VideoCallPanel({ appointmentId, patientName }: Props) {
           className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
         >
           {phase === 'starting' ? (
-            <><span className="animate-spin inline-block">⏳</span> Starting call…</>
+            <><Loader2 size={16} className="animate-spin" /> Starting call…</>
           ) : (
-            <>📹 Start Video Consultation</>
+            <><Video size={16} /> Start Video Consultation</>
           )}
         </button>
       </div>
@@ -203,11 +207,13 @@ function CallOverlay({ appId, token, channelName, uid, patientName, endCallError
         padding: '16px 20px', background: 'rgba(0,0,0,0.5)',
       }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-            💻 {patientName}
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Monitor size={15} /> {patientName}
           </div>
-          <div style={{ fontSize: 12, marginTop: 3, color: connected ? '#4ade80' : '#7A9089' }}>
-            {connected ? `🟢 Connected · ${fmt(elapsed)}` : '⏳ Waiting for patient to join…'}
+          <div style={{ fontSize: 12, marginTop: 3, color: connected ? '#4ade80' : '#7A9089', display: 'flex', alignItems: 'center', gap: 5 }}>
+            {connected
+              ? <><Circle size={8} fill="#4ade80" strokeWidth={0} /> Connected · {fmt(elapsed)}</>
+              : <><Loader2 size={12} className="animate-spin" /> Waiting for patient to join…</>}
           </div>
         </div>
       </div>
@@ -226,7 +232,7 @@ function CallOverlay({ appId, token, channelName, uid, patientName, endCallError
             width: '100%', height: '100%', display: 'flex', alignItems: 'center',
             justifyContent: 'center', flexDirection: 'column', gap: 14, color: '#4A6058',
           }}>
-            <span style={{ fontSize: 56 }}>👤</span>
+            <User size={56} />
             <span style={{ fontSize: 14 }}>Waiting for {patientName} to join…</span>
           </div>
         )}
@@ -240,8 +246,8 @@ function CallOverlay({ appId, token, channelName, uid, patientName, endCallError
           {cameraEnabled
             ? <LocalVideoTrack track={localCameraTrack} play style={{ width: '100%', height: '100%' }} />
             : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A6058', fontSize: 28 }}>
-                📷
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A6058' }}>
+                <CameraOff size={28} />
               </div>
             )
           }
@@ -266,32 +272,35 @@ function CallOverlay({ appId, token, channelName, uid, patientName, endCallError
           style={{
             width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: micEnabled ? 'rgba(255,255,255,0.12)' : 'rgba(239,68,68,0.35)',
-            fontSize: 22, transition: 'background 0.15s',
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s',
           }}
           title={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
         >
-          {micEnabled ? '🎤' : '🔇'}
+          {micEnabled ? <Mic size={22} /> : <MicOff size={22} />}
         </button>
         <button
           onClick={onEnd}
           style={{
             width: 64, height: 64, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: '#dc2626', fontSize: 24, transition: 'background 0.15s',
+            background: '#dc2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s',
           }}
           title="End call"
         >
-          📵
+          <PhoneOff size={24} />
         </button>
         <button
           onClick={toggleCamera}
           style={{
             width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: cameraEnabled ? 'rgba(255,255,255,0.12)' : 'rgba(239,68,68,0.35)',
-            fontSize: 22, transition: 'background 0.15s',
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s',
           }}
           title={cameraEnabled ? 'Turn off camera' : 'Turn on camera'}
         >
-          {cameraEnabled ? '📹' : '📷'}
+          {cameraEnabled ? <Video size={22} /> : <VideoOff size={22} />}
         </button>
       </div>
     </div>

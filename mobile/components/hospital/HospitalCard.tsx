@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { Avatar } from '../ui/Avatar'
 import { Stars } from '../ui/Stars'
@@ -36,6 +37,7 @@ export interface DisplayHospital {
   opd_fee?:            number | null
   daily_booking_limit?: number | null
   requires_referral?:  boolean | null
+  is_24_hours?:        boolean | null
 }
 
 interface Props { hospital: DisplayHospital; onPress: () => void }
@@ -52,7 +54,7 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                {h.verified && <Text style={{ fontSize: 12, color: t.accent }}>✓</Text>}
+                {h.verified && <Ionicons name="checkmark-circle" size={13} color={t.accent} />}
               </View>
               <Text style={[styles.specialty, { color: t.textMuted }]}>{h.specialty}</Text>
             </View>
@@ -62,9 +64,15 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
             <Stars rating={h.rating} />
             <Text style={[styles.meta, { color: t.textMuted }]}>({h.reviews})</Text>
             <Text style={[styles.meta, { color: t.textMuted }]}>·</Text>
-            <Text style={[styles.meta, { color: t.textSecondary }]}>⏱ {h.wait}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="time-outline" size={11} color={t.textSecondary} />
+              <Text style={[styles.meta, { color: t.textSecondary }]}>{h.wait}</Text>
+            </View>
             <Text style={[styles.meta, { color: t.textMuted }]}>·</Text>
-            <Text style={[styles.meta, { color: t.textSecondary }]}>📍 {h.distance}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="location-outline" size={11} color={t.textSecondary} />
+              <Text style={[styles.meta, { color: t.textSecondary }]}>{h.distance}</Text>
+            </View>
           </View>
           <View style={styles.tags}>
             {h.services.slice(0, 3).map(s => (
@@ -73,7 +81,17 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
               </View>
             ))}
             {h.services.length > 3 && <Text style={[styles.tagText, { color: t.textMuted }]}>+{h.services.length - 3}</Text>}
-            {h.virtual && <Text style={[styles.tagText, { color: t.accent, fontWeight: '600' }]}>💻 Virtual</Text>}
+            {h.virtual && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Ionicons name="videocam-outline" size={11} color={t.accent} />
+                <Text style={[styles.tagText, { color: t.accent, fontWeight: '600' }]}>Virtual</Text>
+              </View>
+            )}
+            {h.is_24_hours && (
+              <View style={[styles.tag, { backgroundColor: '#052e16', borderColor: '#16a34a' }]}>
+                <Text style={[styles.tagText, { color: '#4ade80', fontWeight: '700' }]}>24/7</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>

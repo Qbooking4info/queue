@@ -1,13 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, SafeAreaView, ActivityIndicator, Alert,
-} from 'react-native'
+  StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { getCompletedAppointments, updateUserProfile, getMedicalHistory, updateMedicalHistory } from '../lib/api'
 import type { MedicalHistory } from '../lib/api'
+import { DateOfBirthSelect } from '../components/ui/DateOfBirthSelect'
 
 interface Props { navigation: any }
 
@@ -104,7 +106,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[s.back, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[s.title, { color: t.textPrimary }]}>Medical History</Text>
         <View style={{ width: 28 }} />
@@ -154,11 +156,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 </View>
 
                 <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 14 }]}>Date of birth</Text>
-                <TextInput
-                  value={dob} onChangeText={setDob}
-                  placeholder="YYYY-MM-DD" placeholderTextColor={t.textMuted}
-                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                />
+                <DateOfBirthSelect value={dob} onChange={setDob} />
 
                 <TouchableOpacity onPress={saveProfile} disabled={saving}
                   style={[s.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
@@ -246,7 +244,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
               </Text>
               {appts.length === 0 ? (
                 <View style={[s.emptyCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <Text style={{ fontSize: 36, marginBottom: 10 }}>🩺</Text>
+                  <Ionicons name="medical-outline" size={36} color="rgba(255,255,255,0.2)" style={{ marginBottom: 10 }} />
                   <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No consultations yet</Text>
                   <Text style={[s.emptySub, { color: t.textMuted }]}>Completed appointments will appear here with doctor notes and summaries.</Text>
                 </View>
@@ -323,9 +321,10 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                       </View>
                     )}
                     <View style={[s.apptFooter, { borderTopColor: t.cardBorder }]}>
-                      <View style={[s.apptTypeBadge, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+                      <View style={[s.apptTypeBadge, { backgroundColor: t.inputBg, borderColor: t.cardBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Ionicons name={a.type === 'virtual' ? 'videocam-outline' : 'walk-outline'} size={10} color={t.textMuted} />
                         <Text style={[s.apptTypeBadgeText, { color: t.textMuted }]}>
-                          {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'} · {a.booking_ref}
+                          {a.type === 'virtual' ? 'Virtual' : 'In-person'} · {a.booking_ref}
                         </Text>
                       </View>
                     </View>

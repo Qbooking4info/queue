@@ -8,6 +8,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { getRangeStats, getAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
+import { CalendarDays, CheckCircle2, XCircle, Star, AlertTriangle, Building2, Video } from 'lucide-react'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun']
 const BOOKINGS = [210, 248, 290, 312, 387, 421]
@@ -91,7 +92,7 @@ export default function AnalyticsPage() {
       <div style={{ background: 'rgba(239,159,39,0.12)', border: '1px solid rgba(239,159,39,0.3)',
         borderRadius: 12, padding: '12px 16px', marginBottom: 16,
         display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
+        <AlertTriangle size={18} style={{ flexShrink: 0, color: '#EF9F27' }} />
         <div style={{ fontSize: 13, color: '#EF9F27', fontWeight: 600 }}>
           Sample data — Real analytics coming soon. The monthly booking and revenue figures on this page are illustrative only.
         </div>
@@ -104,23 +105,23 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 22 }}>
-        <StatCard icon="📅" label="Total Appointments"
+      <div className="dash-stat-grid-4" style={{ marginBottom: 22 }}>
+        <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total.toLocaleString()}
           sub="Selected period" colorKey="accent" />
-        <StatCard icon="✔" label="Completed"
+        <StatCard icon={<CheckCircle2 size={18} />} label="Completed"
           value={loading ? '…' : rangeStats.completed.toLocaleString()}
           sub={loading ? '' : `${showupRate}% show-up rate`} colorKey="blue" />
-        <StatCard icon="✕" label="Cancelled"
+        <StatCard icon={<XCircle size={18} />} label="Cancelled"
           value={loading ? '…' : rangeStats.cancelled.toLocaleString()}
           sub="Selected period" colorKey="purple" />
-        <StatCard icon="⭐" label="Patient Rating"
+        <StatCard icon={<Star size={18} />} label="Patient Rating"
           value={stats.avgRating.toFixed(1)}
           sub={`${stats.reviewCount} reviews`} colorKey="amber" />
       </div>
 
       {/* Breakdown + charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="dash-half-grid" style={{ marginBottom: 16 }}>
         {/* Specialty breakdown — live from selected period */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>
@@ -163,11 +164,11 @@ export default function AnalyticsPage() {
             <>
               <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
                 {[
-                  { label: 'In-person', count: types.inperson, color: C.accent, icon: '🏥' },
-                  { label: 'Virtual',   count: types.virtual,  color: C.blue,   icon: '💻' },
+                  { label: 'In-person', count: types.inperson, color: C.accent, icon: <Building2 size={20} /> },
+                  { label: 'Virtual',   count: types.virtual,  color: C.blue,   icon: <Video size={20} /> },
                 ].map(t => (
                   <div key={t.label} style={{ flex: 1, background: C.bgAlt, borderRadius: 12, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 20, marginBottom: 6 }}>{t.icon}</div>
+                    <div style={{ marginBottom: 6, color: t.color }}>{t.icon}</div>
                     <div style={{ fontSize: 22, fontWeight: 800, color: t.color }}>{t.count}</div>
                     <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{t.label}</div>
                     <div style={{ fontSize: 11, color: C.textMuted }}>
@@ -188,7 +189,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Historical bar charts (static placeholder data) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="dash-half-grid" style={{ marginBottom: 16 }}>
         {[
           { title: 'Monthly Bookings (YTD)',  sub: 'Total appointments per month',
             data: BOOKINGS, max: maxB, fmt: (v: number) => `${v}`,  col: C.accent,  colDim: C.accentMid },

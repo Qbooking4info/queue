@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Building2 } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -43,7 +44,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/25 mb-4">
-            <span className="text-2xl">🏥</span>
+            <Building2 size={24} className="text-green-400" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Register Your Hospital</h1>
           <p className="text-sm text-[#7A9089] mt-1">Create your Queue account to get started</p>

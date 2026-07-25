@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { adminDb } from './admin-client'
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from './server'
 import { createAdminClient } from './admin'
 import { NextResponse } from 'next/server'
 
@@ -16,12 +16,7 @@ export interface CallerInfo {
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
 // Returns the CallerInfo if the caller's role is in `allowed`, otherwise a 401/403 NextResponse.
 export async function requireRole(allowed: CallerRole[]): Promise<{ caller: CallerInfo } | NextResponse> {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } },
-  )
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -132,7 +127,16 @@ function decodeAndParseSession(raw: string): string | null {
 
 // Extract JWT from the auth cookie without creating a GoTrueClient.
 // Falls back to chunked cookies when the un-chunked cookie is corrupt.
-export async function getServerUser() {
+// Mobile clients have no cookies and send `Authorization: Bearer <jwt>` instead —
+// check that first when a request is passed in.
+export async function getServerUser(req?: Request) {
+  const authHeader = req?.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const { data: { user }, error } = await adminDb.auth.getUser(authHeader.slice(7))
+    if (error || !user) return null
+    return user
+  }
+
   const cookieStore = await cookies()
   const allCookies = cookieStore.getAll()
 

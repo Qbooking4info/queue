@@ -8,7 +8,7 @@ import { RtcTokenBuilder, RtcRole } from 'agora-token'
 // Generates host + guest tokens, upserts virtual_sessions, sets appointment to in_progress.
 // Patient reads guest_token directly from virtual_sessions via Supabase (RLS allows it).
 export async function POST(req: NextRequest) {
-  const user = await getServerUser()
+  const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
 
   const { appointmentId } = await req.json()

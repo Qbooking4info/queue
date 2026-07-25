@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Alert } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '../components/map/HospitalsMap'
 import { useTheme } from '../contexts/ThemeContext'
 import { Avatar } from '../components/ui/Avatar'
@@ -55,14 +57,14 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: t.canvasBg }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={[styles.backArrow, { color: t.textMuted }]}>←</Text>
+          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={styles.heroRow}>
           <Avatar initials={hospital.avatar} bg={hospital.avatarBg} size={58} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={[styles.hospitalName, { color: t.textPrimary }]}>{hospital.name}</Text>
-              {hospital.verified && <Text style={{ fontSize: 13, color: t.accent }}>✓</Text>}
+              {hospital.verified && <Ionicons name="checkmark-circle" size={14} color={t.accent} />}
             </View>
             <Text style={[styles.hospitalSpecialty, { color: t.textMuted }]}>{hospital.specialty}</Text>
             <View style={{ flexDirection: 'row', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
@@ -70,12 +72,18 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
               {hospital.virtual && <StatusBadge type="virtual" />}
               {isMultiClinic && (
                 <View style={[styles.multiChip, { backgroundColor: 'rgba(180,156,240,0.12)', borderColor: 'rgba(180,156,240,0.3)' }]}>
-                  <Text style={[styles.multiChipText, { color: '#B49CF0' }]}>🏢 Multi-clinic</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="business-outline" size={10} color="#B49CF0" />
+                    <Text style={[styles.multiChipText, { color: '#B49CF0' }]}>Multi-clinic</Text>
+                  </View>
                 </View>
               )}
               {(hospital.emergencySlots ?? 0) > 0 && (
                 <View style={styles.emergBadge}>
-                  <Text style={styles.emergBadgeText}>🚨 {hospital.emergencySlots} emergency</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="alert-circle-outline" size={10} color="#791F1F" />
+                    <Text style={styles.emergBadgeText}>{hospital.emergencySlots} Emergency</Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -85,7 +93,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Stats */}
         <View style={styles.statsGrid}>
           {[
-            { label: 'Rating',   value: `${hospital.rating} ★` },
+            { label: 'Rating',   value: String(hospital.rating) },
             { label: 'Reviews',  value: String(hospital.reviews) },
             { label: 'Wait',     value: hospital.wait },
             { label: 'Distance', value: hospital.distance },
@@ -100,7 +108,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Multi-clinic OPD note */}
         {isMultiClinic && (
           <View style={[styles.opdNote, { backgroundColor: 'rgba(85,167,235,0.08)', borderColor: 'rgba(85,167,235,0.2)' }]}>
-            <Text style={[styles.opdNoteIcon]}>💡</Text>
+            <Ionicons name="information-circle-outline" size={16} color="#55A7EB" style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               Not sure which department to book?{' '}
               <Text style={{ fontWeight: '700' }}>Book an OPD (General) visit</Text> — the doctor
@@ -112,7 +120,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Approval mode notice */}
         {hospital.approval_mode === 'manual' && (
           <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
-            <Text style={styles.opdNoteIcon}>📋</Text>
+            <Ionicons name="clipboard-outline" size={16} color="#EF9F27" style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
               requests. You may be asked to describe your symptoms or upload a referral letter.
@@ -146,7 +154,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
                 onPress={() => bookInPerson()}
                 style={[styles.serviceChip, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                 <Text style={[styles.serviceText, { color: t.accent }]}>{s}</Text>
-                <Text style={[styles.serviceBookText, { color: t.accent }]}>→</Text>
+                <Ionicons name="chevron-forward" size={12} color={t.accent} />
               </TouchableOpacity>
             ))}
             <View style={[styles.serviceNote, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
@@ -159,7 +167,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
         {tab === 'hmo' && (hospital.hmo ?? []).map(h => (
           <View key={h} style={[styles.hmoRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 14 }}>🏥</Text>
+            <Ionicons name="medkit-outline" size={16} color={t.textMuted} />
             <Text style={[styles.hmoName, { color: t.textPrimary }]}>{h}</Text>
             <View style={[styles.acceptedBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
               <Text style={[styles.acceptedText, { color: t.accent }]}>Accepted</Text>
@@ -185,7 +193,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
                 />
                 <TouchableOpacity onPress={openDirections}
                   style={[styles.directionsBtn, { backgroundColor: t.accent }]}>
-                  <Text style={styles.directionsBtnText}>🗺 Get Directions</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="navigate-outline" size={15} color="inherit" />
+                  <Text style={styles.directionsBtnText}>Get Directions</Text>
+                </View>
                 </TouchableOpacity>
               </View>
             )}
@@ -209,8 +220,9 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             {/* Directions button fallback when no map coords */}
             {(hospital.latitude == null || hospital.longitude == null) && (
               <TouchableOpacity onPress={openDirections}
-                style={[styles.directionsBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, marginTop: 12 }]}>
-                <Text style={[styles.directionsBtnText, { color: t.accent }]}>🗺 Get Directions</Text>
+                style={[styles.directionsBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+                <Ionicons name="navigate-outline" size={15} color={t.accent} />
+                <Text style={[styles.directionsBtnText, { color: t.accent }]}>Get Directions</Text>
               </TouchableOpacity>
             )}
           </>
@@ -224,7 +236,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
           {/* In-person to hospital (OPD) */}
           <TouchableOpacity style={[styles.ctaBtnSecondary, { borderColor: t.accent, backgroundColor: t.accentBg }]}
             onPress={bookInPerson}>
-            <Text style={[styles.ctaBtnSecondaryText, { color: t.accent }]}>🏥 In-Person Visit</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="walk-outline" size={16} color={t.accent} />
+              <Text style={[styles.ctaBtnSecondaryText, { color: t.accent }]}>In-Person Visit</Text>
+            </View>
             {hospital.opd_fee ? (
               <Text style={[styles.ctaBtnFee, { color: t.accent }]}>₦{hospital.opd_fee.toLocaleString()}</Text>
             ) : (
@@ -237,8 +252,14 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             <TouchableOpacity
               style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
               onPress={bookVirtual}>
-              <Text style={styles.ctaBtnPrimaryText}>💻 Book Virtual</Text>
-              <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)' }]}>Choose a doctor →</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="videocam-outline" size={16} color="#fff" />
+                <Text style={styles.ctaBtnPrimaryText}>Book Virtual</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
+                <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)', marginTop: 0 }]}>Choose a doctor</Text>
+                <Ionicons name="chevron-forward" size={10} color="rgba(255,255,255,0.75)" />
+              </View>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity

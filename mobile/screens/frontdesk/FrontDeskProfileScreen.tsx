@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, ActivityIndicator, Switch,
-} from 'react-native'
+  StyleSheet, ActivityIndicator, Switch } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -43,7 +44,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
 
@@ -57,7 +58,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
             <Text style={[s.roleBadgeText, { color: t.accent }]}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? staffProfile?.role ?? 'Staff'}</Text>
           </View>
           {hospitalName && (
-            <Text style={[s.hospitalName, { color: t.textMuted }]}>🏥 {hospitalName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="business-outline" size={12} color={t.textMuted} /><Text style={[s.hospitalName, { color: t.textMuted }]}>{hospitalName}</Text></View>
           )}
         </View>
 
@@ -72,9 +73,12 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[s.row, { borderBottomColor: t.cardBorder }]}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? '🌙 Dark theme' : '☀️ Light theme'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={[s.rowLabel, { color: t.textPrimary }]}>
+                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+              </Text>
+            </View>
             <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>

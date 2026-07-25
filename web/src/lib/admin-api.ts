@@ -133,6 +133,14 @@ function nameToInitials(name: string) {
   return name.split(' ').filter(Boolean).slice(-2).map(w => w[0].toUpperCase()).join('')
 }
 
+// Some accounts have an incomplete profile where full_name was backfilled with the user's
+// email at signup — showing that verbatim as a "name" in the admin UI reads as spam/fake data.
+const EMAIL_RE = /\S+@\S+\.\S+/
+function safePatientName(name: string | null | undefined, fallback: string): string {
+  if (!name || EMAIL_RE.test(name)) return fallback
+  return name
+}
+
 function calcAge(dob: string | null): number | null {
   if (!dob) return null
   return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
@@ -174,14 +182,22 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
       return { role: 'super_admin', displayName: profile.full_name ?? undefined }
     }
 
-    // Hospital admin
+    // Hospital admin — hospital_admins also holds 'specialist' and 'front_desk' login rows
+    // (created by the doctor/front-desk portal-account flows), so the role column must be
+    // checked rather than treating any row as an admin. 'specialist' falls through to the
+    // doctor lookup below so it resolves to role: 'doctor', not 'hospital_admin'.
     const { data: adminRow } = await (db as any)
       .from('hospital_admins')
-      .select('hospital_id')
+      .select('hospital_id, role')
       .eq('user_id', profile.id)
       .limit(1)
       .single()
-    if (adminRow) return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+    if (adminRow && adminRow.role === 'front_desk') {
+      return { role: 'front_desk', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+    }
+    if (adminRow && adminRow.role !== 'specialist') {
+      return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+    }
 
     // Clinic staff (clinic_admin / front_desk share the clinic_admins table, differentiated by role column)
     const { data: clinicRow } = await (db as any)
@@ -203,7 +219,16 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
     }
   }
 
-  // Doctor (auth_user_id stored directly on doctors row)
+  // Doctor — portal-created accounts link via doctors.user_id; self-registered ones via auth_user_id.
+  if (profile) {
+    const { data: byUserId } = await (db as any)
+      .from('doctors')
+      .select('id, hospital_id, full_name')
+      .eq('user_id', profile.id)
+      .maybeSingle()
+    if (byUserId) return { role: 'doctor', hospitalId: byUserId.hospital_id, doctorId: byUserId.id, displayName: byUserId.full_name }
+  }
+
   const { data: doctorRow } = await (db as any)
     .from('doctors')
     .select('id, hospital_id, full_name')
@@ -230,6 +255,106 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
   }
 
   return null
+}
+
+// ── Notifications (top bar activity feed) ──────────────────────────────────────
+
+export interface AdminNotification {
+  id: string
+  type: 'new' | 'cancel' | 'review' | 'payment'
+  msg: string
+  time: string
+  href: string
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days} days ago`
+}
+
+// Recent hospital-scoped activity across appointments, reviews and payouts, merged and
+// sorted newest-first for the dashboard notification bell. Not a persisted notifications
+// table — derived live from the source tables so there's nothing to mark as read/unread yet.
+export async function getRecentActivity(hospitalId: string, limit = 10): Promise<AdminNotification[]> {
+  // Only surface activity from the last 7 days — otherwise a booking from months ago gets
+  // relabeled as "New booking received" just because it's the most recent row in the table.
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [{ data: newAppts }, { data: cancelledAppts }, { data: reviews }, { data: payouts }] = await Promise.all([
+    (adminDb as any).from('appointments')
+      .select('id, created_at, patient:users!appointments_patient_id_fkey(full_name)')
+      .eq('hospital_id', hospitalId)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('appointments')
+      .select('id, cancelled_at, patient:users!appointments_patient_id_fkey(full_name)')
+      .eq('hospital_id', hospitalId)
+      .eq('status', 'cancelled')
+      .gte('cancelled_at', cutoff)
+      .order('cancelled_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('reviews')
+      .select('id, rating, created_at, doctor:doctors(full_name)')
+      .eq('hospital_id', hospitalId)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    (adminDb as any).from('payouts')
+      .select('id, amount, paid_at, status')
+      .eq('hospital_id', hospitalId)
+      .eq('status', 'paid')
+      .gte('paid_at', cutoff)
+      .order('paid_at', { ascending: false })
+      .limit(limit),
+  ])
+
+  const items: (AdminNotification & { sortAt: string })[] = []
+
+  for (const a of (newAppts ?? []) as any[]) {
+    if (!a.created_at) continue
+    items.push({
+      id: `appt-new-${a.id}`, type: 'new', href: `/dashboard/appointments`,
+      msg: `New booking received from ${safePatientName(a.patient?.full_name, 'a patient')}`,
+      time: timeAgo(a.created_at), sortAt: a.created_at,
+    })
+  }
+  for (const a of (cancelledAppts ?? []) as any[]) {
+    if (!a.cancelled_at) continue
+    items.push({
+      id: `appt-cancel-${a.id}`, type: 'cancel', href: `/dashboard/appointments`,
+      msg: `Appointment cancelled by ${safePatientName(a.patient?.full_name, 'a patient')}`,
+      time: timeAgo(a.cancelled_at), sortAt: a.cancelled_at,
+    })
+  }
+  for (const r of (reviews ?? []) as any[]) {
+    if (!r.created_at) continue
+    items.push({
+      id: `review-${r.id}`, type: 'review', href: `/dashboard/doctors`,
+      msg: `New ${r.rating}-star review posted${r.doctor?.full_name ? ` for Dr. ${r.doctor.full_name}` : ''}`,
+      time: timeAgo(r.created_at), sortAt: r.created_at,
+    })
+  }
+  for (const p of (payouts ?? []) as any[]) {
+    if (!p.paid_at) continue
+    items.push({
+      id: `payout-${p.id}`, type: 'payment', href: `/dashboard/analytics`,
+      msg: `Payout of ${p.amount ? `₦${Number(p.amount).toLocaleString()}` : 'funds'} processed to your bank`,
+      time: timeAgo(p.paid_at), sortAt: p.paid_at,
+    })
+  }
+
+  return items
+    .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime())
+    .slice(0, limit)
+    .map(({ sortAt: _sortAt, ...rest }) => rest)
 }
 
 export async function getHospitalIdForUser(authId: string): Promise<string | null> {
@@ -390,7 +515,7 @@ export async function getDoctorTodayAppointments(doctorId: string): Promise<Admi
     consult_duration_secs: a.consult_duration_secs ?? null,
     check_in_date: a.check_in_date ?? null,
     patient_id: a.patient?.id ?? null,
-    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
     doctor_name: docName,
@@ -441,7 +566,7 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
       consult_duration_secs: a.consult_duration_secs ?? null,
       check_in_date: a.check_in_date ?? null,
       patient_id: a.patient?.id ?? null,
-      patient_name: a.patient?.full_name ?? 'Unknown',
+      patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
       patient_age: calcAge(a.patient?.date_of_birth ?? null),
       patient_gender: a.patient?.gender ?? null,
       doctor_name: a.doctor?.full_name ?? 'Unknown',
@@ -452,7 +577,7 @@ export async function getDoctorAppointments(doctorId: string, from: string, to: 
 }
 
 export async function getClinicStats(hospitalId: string, clinicId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
   const { data: docs } = await adminDb.from('doctors').select('id').eq('clinic_id', clinicId)
   const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
   const orFilter = doctorIds.length > 0
@@ -515,7 +640,7 @@ export async function getAppointments(hospitalId: string, from: string, to: stri
     const isWalkin = a.booking_mode === 'walkin'
     const patientName = isWalkin
       ? (a.walkin_patient_name ?? 'Walk-in Patient')
-      : (a.patient?.full_name ?? 'Unknown')
+      : (safePatientName(a.patient?.full_name, 'Unknown'))
     const v = vitalsMap.get(a.id)
     return {
       id: a.id,
@@ -579,7 +704,7 @@ export async function getRangeStats(hospitalId: string, from: string, to: string
 }
 
 export async function getTodayAppointments(hospitalId: string, clinicId?: string): Promise<AdminAppointment[]> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   let query = adminDb
     .from('appointments')
@@ -613,7 +738,7 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
     reason: a.reason,
     clinic_id: a.clinic_id ?? null,
     patient_id: a.patient?.id ?? null,
-    patient_name: a.patient?.full_name ?? 'Unknown',
+    patient_name: safePatientName(a.patient?.full_name, 'Unknown'),
     patient_age: calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: a.patient?.gender ?? null,
     doctor_name: a.doctor?.full_name ?? 'Unknown',
@@ -635,7 +760,7 @@ export interface ScheduleSlot {
 
 // Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
 // silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
-function fmtLocalDate(d: Date): string {
+export function fmtLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -683,7 +808,7 @@ export async function getWeekAppointments(
       date: a.appointment_date,
       time: (a.start_time ?? '').slice(0, 5),
       doc: a.doctor?.full_name ?? 'Doctor',
-      patient: a.patient?.full_name ?? 'Patient',
+      patient: safePatientName(a.patient?.full_name, 'Patient'),
       type: a.type,
       status: a.status,
       urgency: a.urgency ?? 'routine',
@@ -913,7 +1038,7 @@ export async function getClinicAppointments(
 
   return (data as any[]).map(a => {
     const isWalkin = a.booking_mode === 'walkin'
-    const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown')
+    const patientName = isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (safePatientName(a.patient?.full_name, 'Unknown'))
     const v = vitalsMap.get(a.id)
     return {
       id: a.id, booking_ref: a.booking_ref,
@@ -1116,7 +1241,7 @@ function mapQueueRow(a: any): AdminAppointment {
     consult_duration_secs: a.consult_duration_secs ?? null,
     check_in_date: a.check_in_date ?? null,
     patient_id: isWalkin ? null : (a.patient?.id ?? null),
-    patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (a.patient?.full_name ?? 'Unknown'),
+    patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : (safePatientName(a.patient?.full_name, 'Unknown')),
     patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
     patient_gender: isWalkin ? null : (a.patient?.gender ?? null),
     doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
@@ -1215,7 +1340,7 @@ export async function checkInAppointment(id: string): Promise<{ error: string | 
     }
   }
 
-  // BH6: enforce SOP — only 'confirmed' appointments may be checked in (pending→confirmed→checked_in)
+  // BH6: enforce SOP — only 'confirmed' appointments may be checked in (pending->confirmed->checked_in)
   const { error } = await (adminDb as any).from('appointments').update({
     status: 'checked_in',
     check_in_date: checkInDate,
@@ -1433,7 +1558,7 @@ export async function deleteService(serviceId: string): Promise<void> {
 }
 
 export async function getHospitalStats(hospitalId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = fmtLocalDate(new Date())
 
   const [apptRes, completedRes, doctorRes, ratingRes] = await Promise.all([
     adminDb.from('appointments').select('id', { count: 'exact', head: true })
@@ -1458,12 +1583,28 @@ export async function getHospitalStats(hospitalId: string) {
 
 // ── Appointment actions (new booking system) ──────────────────────────────────
 
-export async function assignDoctorToAppointment(appointmentId: string, doctorId: string): Promise<void> {
-  await adminDb.from('appointments').update({
+export async function assignDoctorToAppointment(appointmentId: string, doctorId: string): Promise<{ error: string | null }> {
+  const [{ data: appt, error: apptErr }, { data: doctor, error: docErr }] = await Promise.all([
+    (adminDb as any).from('appointments').select('hospital_id, clinic_id, status').eq('id', appointmentId).single(),
+    (adminDb as any).from('doctors').select('hospital_id, clinic_id, is_active').eq('id', doctorId).single(),
+  ])
+  if (apptErr || !appt) return { error: apptErr?.message ?? 'Appointment not found' }
+  if (docErr || !doctor) return { error: docErr?.message ?? 'Doctor not found' }
+  // Only pre-check-in — queue_position is computed per-doctor at check-in time, so
+  // reassigning after that would leave a stale queue slot relative to the new doctor.
+  if (!['pending', 'confirmed'].includes(appt.status)) {
+    return { error: 'Doctor can only be assigned or reassigned before check-in' }
+  }
+  if (doctor.hospital_id !== appt.hospital_id) return { error: 'Doctor does not belong to this hospital' }
+  if (appt.clinic_id && doctor.clinic_id !== appt.clinic_id) return { error: "Doctor is not registered to this appointment's clinic" }
+  if (!doctor.is_active) return { error: 'Doctor is not active' }
+
+  const { error } = await adminDb.from('appointments').update({
     assigned_doctor_id: doctorId,
     doctor_id: doctorId,
     updated_at: new Date().toISOString(),
-  } as any).eq('id', appointmentId)
+  } as any).eq('id', appointmentId).in('status', ['pending', 'confirmed'])
+  return { error: error?.message ?? null }
 }
 
 export async function markNoShow(appointmentId: string): Promise<void> {
@@ -1556,7 +1697,7 @@ export async function approveAppointment(appointmentId: string, note?: string): 
     ? `Your booking (${ref}) at ${hospitalName} — ${clinicName} on ${dateStr} has been confirmed.`
     : `Your booking (${ref}) at ${hospitalName} on ${dateStr} has been confirmed.`
 
-  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved ✅', notifBody)
+  await notifyPatient(appointmentId, 'confirmed', 'Booking Approved', notifBody)
 }
 
 export async function rejectAppointment(appointmentId: string, note: string): Promise<void> {
@@ -1584,7 +1725,7 @@ export async function rejectAppointment(appointmentId: string, note: string): Pr
 
   await notifyPatient(
     appointmentId, 'cancelled',
-    'Booking Not Approved ❌',
+    'Booking Not Approved',
     `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. A full refund has been issued.`,
   )
 }

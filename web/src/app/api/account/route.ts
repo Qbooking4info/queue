@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -9,8 +9,8 @@ const adminDb = createClient(
 )
 
 // DELETE /api/account — patient requests own account deletion
-export async function DELETE() {
-  const user = await getServerUser()
+export async function DELETE(req: NextRequest) {
+  const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   // Cancel all pending/confirmed appointments before deleting

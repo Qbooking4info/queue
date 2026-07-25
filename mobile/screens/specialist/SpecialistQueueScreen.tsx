@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, RefreshControl,
-} from 'react-native'
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
@@ -10,7 +10,6 @@ import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 
-interface PatientRow { id: string; full_name: string; phone: string | null; gender: string | null }
 interface ApptRow {
   id:               string
   appointment_date: string
@@ -20,7 +19,9 @@ interface ApptRow {
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
-  patient:          PatientRow | null
+  patient_name:     string | null
+  patient_phone:    string | null
+  patient_gender:   string | null
 }
 
 interface Props { navigation: any }
@@ -70,20 +71,12 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    let query = (supabase as any)
-      .from('appointments')
-      .select('id, appointment_date, start_time, type, status, reason, urgency, queue_position, patient:users!appointments_patient_id_fkey(id, full_name, phone, gender)')
-      .eq('doctor_id', doctorProfile.doctorId)
-      .neq('status', 'cancelled')
-      .order('start_time', { ascending: true })
+    const { data } = await (supabase as any).rpc('get_doctor_queue', {
+      p_doctor_id: doctorProfile.doctorId,
+      p_date:      tab === 'today' ? today : null,
+      p_today:     today,
+    })
 
-    if (tab === 'today') {
-      query = query.eq('appointment_date', today)
-    } else {
-      query = query.gt('appointment_date', today).order('appointment_date', { ascending: true })
-    }
-
-    const { data } = await query
     setAppts((data as ApptRow[]) ?? [])
     setLoading(false)
   }
@@ -126,7 +119,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const done   = appts.filter(a => a.status === 'completed')
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={st.header}>
         <View>
@@ -171,7 +164,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
         </View>
       ) : appts.length === 0 ? (
         <View style={st.center}>
-          <Text style={{ fontSize: 56, marginBottom: 16 }}>🩺</Text>
+          <Ionicons name="medical-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
           <Text style={[st.emptyTitle, { color: t.textPrimary }]}>
             {tab === 'today' ? 'No patients scheduled for today' : 'No upcoming appointments'}
           </Text>
@@ -213,7 +206,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
   const { theme: t } = useTheme()
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
-  const initials = getInitials(appt.patient?.full_name)
+  const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'
   const isEmergency = appt.urgency === 'emergency'
   const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
@@ -243,7 +236,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Text style={[st.patientName, { color: t.textPrimary }]}>
-            {appt.patient?.full_name ?? 'Unknown patient'}
+            {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {isEmergency ? (
             <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }}>
@@ -259,9 +252,12 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
           <Text style={[st.metaText, { color: t.textMuted }]}>
             {showDate ? fmtDate(appt.appointment_date) + ' · ' : ''}{fmt12(appt.start_time)}
           </Text>
-          <Text style={[st.typeDot, { color: isVirtual ? '#5B9EFF' : t.textMuted }]}>
-            {isVirtual ? '💻 Virtual' : '🏥 In-person'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? '#5B9EFF' : t.textMuted} />
+            <Text style={[st.typeDot, { color: isVirtual ? '#5B9EFF' : t.textMuted }]}>
+              {isVirtual ? 'Virtual' : 'In-person'}
+            </Text>
+          </View>
         </View>
         {appt.reason && (
           <Text style={[st.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>

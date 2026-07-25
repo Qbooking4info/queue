@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import Link from 'next/link'
+import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 
@@ -29,7 +30,18 @@ export default function DoctorsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <style>{`
+        .doctors-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+        .doctor-stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
+        @media (max-width: 767px) {
+          .doctors-grid { grid-template-columns: 1fr; }
+          .doctor-stats-grid { grid-template-columns: repeat(3,1fr); gap: 6px; }
+        }
+        @media (max-width: 400px) {
+          .doctor-stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+      `}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
             {isFrontDesk ? 'Doctor Availability' : 'Doctors & Staff'}
@@ -53,12 +65,12 @@ export default function DoctorsPage() {
       ) : doctors.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', border: `2px dashed ${C.border}`,
           borderRadius: 20, color: C.textMuted }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍⚕️</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{opacity:0.3,display:"block",margin:"0 auto 12px"}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>No doctors yet</div>
           <div style={{ fontSize: 13 }}>Add your first doctor to start accepting bookings</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+        <div className="doctors-grid">
           {doctors.map(d => {
             const avail = AVAIL[d.availability_status] ?? AVAIL.on_duty
             return (
@@ -88,8 +100,10 @@ export default function DoctorsPage() {
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: C.amber }}>
-                        {'★'.repeat(Math.floor(d.avg_rating ?? 4))}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 1, color: C.amber }}>
+                        {Array.from({ length: Math.floor(d.avg_rating ?? 4) }).map((_, i) => (
+                          <Star key={i} size={12} fill={C.amber} strokeWidth={0} />
+                        ))}
                       </span>
                       <span style={{ fontSize: 11, color: C.textSub }}>
                         {d.avg_rating?.toFixed(1) ?? '—'} ({d.review_count ?? 0} reviews)
@@ -99,11 +113,13 @@ export default function DoctorsPage() {
                 </div>
 
                 {!isFrontDesk && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                  <div className="doctor-stats-grid">
                     {[
                       { label: 'Consult Fee', value: d.consultation_fee ? `₦${d.consultation_fee.toLocaleString()}` : '—' },
                       { label: 'Experience',  value: d.years_experience ? `${d.years_experience}yr` : '—' },
-                      { label: 'Virtual',     value: d.accepts_virtual ? '✓ Yes' : '✗ No' },
+                      { label: 'Virtual',     value: d.accepts_virtual
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Check size={12} /> Yes</span>
+                          : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><X size={12} /> No</span> },
                     ].map(s => (
                       <div key={s.label} style={{ background: C.bgAlt, borderRadius: 10, padding: '10px',
                         textAlign: 'center', transition: 'background .3s' }}>
