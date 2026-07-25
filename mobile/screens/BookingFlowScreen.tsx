@@ -10,7 +10,7 @@ import {
   getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
-  getHospitalHours, isOpenNow,
+  getHospitalHours, isOpenNow, findEmergencyClinic,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
@@ -181,7 +181,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   // Emergency Department clinic is selectable — every other clinic (specialist or OPD) is
   // hidden so patients can't accidentally route a life-threatening visit through a normal
   // referral queue.
-  const emergencyClinic    = clinics.find(c => c.is_emergency) ?? null
+  const emergencyClinic    = findEmergencyClinic(clinics)
   const visibleClinics     = isEmergency ? (emergencyClinic ? [emergencyClinic] : []) : clinics
   const noEmergencyClinic  = isEmergency && hospital?.clinic_model === 'multi' && !loadingClinics && !emergencyClinic
 

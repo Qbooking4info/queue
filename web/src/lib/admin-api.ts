@@ -630,6 +630,7 @@ export interface ScheduleSlot {
   patient: string
   type: string
   status: string
+  urgency: string
 }
 
 // Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
@@ -653,7 +654,7 @@ export async function getWeekAppointments(
   let q = adminDb
     .from('appointments')
     .select(`
-      id, appointment_date, start_time, type, status,
+      id, appointment_date, start_time, type, status, urgency,
       patient:users!appointments_patient_id_fkey(full_name),
       doctor:doctors!appointments_doctor_id_fkey(full_name)
     `)
@@ -685,6 +686,7 @@ export async function getWeekAppointments(
       patient: a.patient?.full_name ?? 'Patient',
       type: a.type,
       status: a.status,
+      urgency: a.urgency ?? 'routine',
     })
   })
 

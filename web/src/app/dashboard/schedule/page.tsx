@@ -326,14 +326,25 @@ function ScheduleContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {selected.items.map((s, i) => {
                 const pal = docPal(s.doc)
+                const isEmergency = s.urgency === 'emergency'
                 return (
-                  <div key={s.id ?? i} style={{ background: C.bgAlt, border: `1px solid ${C.border}`,
-                    borderLeft: `3px solid ${pal.dark}`, borderRadius: 10, padding: '10px 14px',
+                  <div key={s.id ?? i} style={{
+                    background: isEmergency ? C.redLight : C.bgAlt,
+                    border: `1px solid ${isEmergency ? C.red : C.border}`,
+                    borderLeft: `3px solid ${isEmergency ? C.red : pal.dark}`, borderRadius: 10, padding: '10px 14px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {s.patient}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.patient}
+                        </div>
+                        {isEmergency && (
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
+                            background: C.redLight, color: C.red, border: `1px solid ${C.red}`, flexShrink: 0 }}>
+                            🚨 EMERGENCY
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
                         {s.doc} {selected.kind !== 'cell' && `· ${selected.kind === 'day' ? s.time : s.date}`}

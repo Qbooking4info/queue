@@ -30,6 +30,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   const age = patient?.date_of_birth
     ? Math.floor((Date.now() - new Date(patient.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
     : null
+  const isEmergency = appt.urgency === 'emergency'
 
   return (
     <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
@@ -39,12 +40,31 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
         <span className="text-sm font-mono text-[#7A9089]">{appt.booking_ref}</span>
       </div>
 
+      {isEmergency && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-6 flex items-center gap-3">
+          <span className="text-2xl">🚨</span>
+          <div>
+            <div className="font-bold text-red-400">Emergency case</div>
+            <div className="text-xs text-[#7A9089] mt-0.5">Flagged for priority — treat and update status as soon as possible.</div>
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-5 gap-4">
         {/* Patient Info */}
         <div className="md:col-span-2 flex flex-col gap-3">
-          <div className="bg-[#111915] border border-white/7 rounded-2xl p-4">
-            <h2 className="font-bold text-sm mb-3 text-[#7A9089] uppercase tracking-wide">Patient</h2>
-            <div className="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-lg font-bold text-green-400 mb-3">
+          <div className={`rounded-2xl p-4 border ${isEmergency ? 'bg-red-500/8 border-red-500/30' : 'bg-[#111915] border-white/7'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-sm text-[#7A9089] uppercase tracking-wide">Patient</h2>
+              {isEmergency && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
+                  🚨 EMERGENCY
+                </span>
+              )}
+            </div>
+            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center text-lg font-bold mb-3 ${
+              isEmergency ? 'bg-red-500/15 border-red-500/30 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
+            }`}>
               {patient?.full_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2) ?? '?'}
             </div>
             <div className="font-bold text-base">{patient?.full_name ?? '—'}</div>

@@ -40,9 +40,9 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
   const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 
-  const [{ data: appointments }, { count: pending }, { count: checkedIn }] = await Promise.all([
+  const [{ data: appointmentsRaw }, { count: pending }, { count: checkedIn }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, users(full_name, phone), doctors(full_name, title)')
+      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, urgency, users(full_name, phone), doctors(full_name, title)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('appointment_date', selectedDate)
       .in('status', QUEUE_STATUSES)
@@ -59,6 +59,12 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
       .eq('appointment_date', selectedDate)
       .eq('status', 'checked_in'),
   ])
+
+  // Emergency walk-ins sort to the top of the front-desk queue, mirroring the doctor
+  // queue's own tiering — start_time/queue_position order is preserved within each tier.
+  const appointments = appointmentsRaw
+    ? [...appointmentsRaw].sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
+    : appointmentsRaw
 
   return (
     <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
@@ -106,16 +112,26 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
             const patient = Array.isArray(a.users)  ? a.users[0]  : a.users
             const doctor  = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
             const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
+            const isEmergency = a.urgency === 'emergency'
             return (
-              <div key={a.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
+              <div key={a.id} className={`rounded-2xl p-4 border ${isEmergency ? 'bg-red-500/8 border-red-500/30' : 'bg-[#111915] border-white/7'}`}>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-lg font-bold text-[#7A9089] shrink-0">
+                  <div className={`w-10 h-10 rounded-xl border flex items-center justify-center text-lg font-bold shrink-0 ${
+                    isEmergency ? 'bg-red-500/15 border-red-500/30 text-red-400' : 'bg-white/5 border-white/7 text-[#7A9089]'
+                  }`}>
                     {a.queue_position ?? idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div>
-                        <div className="font-semibold">{patient?.full_name ?? '—'}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold">{patient?.full_name ?? '—'}</div>
+                          {isEmergency && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
+                              🚨 EMERGENCY
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-[#7A9089] mt-0.5">
                           {doctor?.title} {doctor?.full_name} · {a.start_time?.slice(0, 5)} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
                         </div>

@@ -132,7 +132,11 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     ? appts.filter(a => a.patient?.full_name?.toLowerCase().includes(search.toLowerCase()))
     : appts
 
-  const active = filtered.filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
+  // Emergency walk-ins sort to the top of the active queue — same tiering used on the
+  // web front-desk queue and the specialist queue.
+  const active = filtered
+    .filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
+    .sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
   const done   = filtered.filter(a =>  ['completed', 'cancelled', 'no_show'].includes(a.status))
 
   // Stats from full (unfiltered) list
@@ -248,17 +252,24 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
   const isLoading = actioning === appt.id
   const canCheckIn = (appt.status === 'confirmed' || appt.status === 'pending') && appt.appointment_date === today
   const canApprove = appt.status === 'pending_approval'
-  const urgencyColor = appt.urgency === 'emergency' ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const isEmergency = appt.urgency === 'emergency'
+  const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
 
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => haptics.tap()}
-      style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
+      style={[s.card, {
+        backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+        borderColor: isEmergency ? '#FF5C5C' : t.cardBorder,
+        borderLeftWidth: isEmergency ? 4 : 1,
+      }]}
     >
       <View style={s.cardTop}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? 'Unknown patient'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? 'Unknown patient'}</Text>
+          </View>
           {appt.patient?.phone && <Text style={[s.patientPhone, { color: t.textMuted }]}>{appt.patient.phone}</Text>}
           <Text style={[s.meta, { color: t.textMuted }]}>
             {appt.appointment_date !== today ? `${appt.appointment_date} · ` : ''}{fmt12(appt.start_time)}
@@ -271,7 +282,11 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
           <View style={[s.badge, { backgroundColor: meta.bg }]}>
             <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
           </View>
-          {urgencyColor && (
+          {isEmergency ? (
+            <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
+              <Text style={[s.badgeText, { color: '#FF5C5C' }]}>🚨 EMERGENCY</Text>
+            </View>
+          ) : urgencyColor && (
             <View style={[s.badge, { backgroundColor: `${urgencyColor}18` }]}>
               <Text style={[s.badgeText, { color: urgencyColor, textTransform: 'capitalize' }]}>{appt.urgency}</Text>
             </View>

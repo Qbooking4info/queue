@@ -33,16 +33,16 @@ export default async function SpecialistPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: todayAppts }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
+  const [{ data: todayApptsRaw }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, users(full_name, phone, date_of_birth, gender)')
+      .select('id, booking_ref, start_time, type, status, urgency, users(full_name, phone, date_of_birth, gender)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .eq('appointment_date', today)
       .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
       .order('start_time'),
     db.from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, users(full_name)')
+      .select('id, booking_ref, appointment_date, start_time, type, status, urgency, users(full_name)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .gt('appointment_date', today)
@@ -55,6 +55,12 @@ export default async function SpecialistPage() {
       .eq('doctor_id', doctor?.id ?? '')
       .eq('status', 'completed'),
   ])
+
+  // Emergency cases jump to the front of the doctor's own view of the day, same tiering
+  // used on the front-desk queue — start_time order is preserved within each tier.
+  const todayAppts = todayApptsRaw
+    ? [...todayApptsRaw].sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
+    : todayApptsRaw
 
   const specialty = Array.isArray(doctor?.specialties) ? doctor?.specialties[0] : doctor?.specialties
 
@@ -101,14 +107,28 @@ export default async function SpecialistPage() {
               {todayAppts.map((a, idx) => {
                 const patient = Array.isArray(a.users) ? a.users[0] : a.users
                 const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
+                const isEmergency = a.urgency === 'emergency'
                 return (
                   <Link key={a.id} href={`/dashboard/specialist/${a.id}`}
-                    className="bg-[#111915] border border-white/7 hover:border-green-500/20 hover:bg-green-500/3 rounded-2xl p-4 flex items-center gap-4 transition-all group">
-                    <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/7 flex items-center justify-center text-sm font-bold text-[#7A9089] shrink-0">
+                    className={`rounded-2xl p-4 flex items-center gap-4 transition-all group border ${
+                      isEmergency
+                        ? 'bg-red-500/8 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/12'
+                        : 'bg-[#111915] border-white/7 hover:border-green-500/20 hover:bg-green-500/3'
+                    }`}>
+                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center text-sm font-bold shrink-0 ${
+                      isEmergency ? 'bg-red-500/15 border-red-500/30 text-red-400' : 'bg-white/5 border-white/7 text-[#7A9089]'
+                    }`}>
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                        {isEmergency && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
+                            🚨 EMERGENCY
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-[#7A9089] mt-0.5">
                         {a.start_time?.slice(0, 5)} · {a.type === 'virtual' ? '💻 Virtual' : '🏥 In-person'}
                         {patient?.gender ? ` · ${patient.gender}` : ''}
@@ -135,14 +155,20 @@ export default async function SpecialistPage() {
               <p className="text-sm text-[#4A6058] text-center py-4">No upcoming appointments</p>
             ) : upcomingAppts.map(a => {
               const patient = Array.isArray(a.users) ? a.users[0] : a.users
+              const isEmergency = a.urgency === 'emergency'
               return (
                 <Link key={a.id} href={`/dashboard/specialist/${a.id}`}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/3 transition-all group">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-xs font-bold text-green-400 shrink-0">
+                  className={`flex items-center gap-3 p-2 rounded-xl transition-all group ${isEmergency ? 'bg-red-500/8 hover:bg-red-500/12' : 'hover:bg-white/3'}`}>
+                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-bold shrink-0 ${
+                    isEmergency ? 'bg-red-500/15 border-red-500/30 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
+                  }`}>
                     {new Date(a.appointment_date + 'T00:00:00').getDate()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-sm font-medium truncate group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                      {isEmergency && <span className="text-[10px]">🚨</span>}
+                    </div>
                     <div className="text-xs text-[#4A6058]">{a.appointment_date} · {a.start_time?.slice(0, 5)}</div>
                   </div>
                 </Link>

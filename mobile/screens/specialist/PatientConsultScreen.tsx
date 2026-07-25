@@ -35,6 +35,12 @@ interface ApptFull {
 const NOTES_MAX = 1000
 const DIAG_MAX  = 500
 
+// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which silently
+// rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
   const h = parseFloat(heightCm) / 100
@@ -146,9 +152,42 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   async function updateStatus(newStatus: string) {
     setStatusUpdating(true)
+
+    // Starting a new consult auto-completes whatever this doctor was previously seeing if
+    // it was never explicitly ended — mirrors web dashboard's startConsultation, so a doctor
+    // switching patients on mobile doesn't leave a stale in_progress row behind.
+    if (newStatus === 'in_progress' && appt) {
+      const doctorId   = (appt as any).doctor_id ?? (appt as any).assigned_doctor_id
+      const hospitalId = (appt as any).hospital_id
+      const checkInDate = (appt as any).check_in_date ?? fmtLocalDate(new Date())
+      if (doctorId && hospitalId) {
+        const [byDoctor, byAssigned] = await Promise.all([
+          (supabase as any).from('appointments').select('id')
+            .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
+            .eq('status', 'in_progress').eq('doctor_id', doctorId).neq('id', appointmentId),
+          (supabase as any).from('appointments').select('id')
+            .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
+            .eq('status', 'in_progress').eq('assigned_doctor_id', doctorId).neq('id', appointmentId),
+        ])
+        const staleIds = Array.from(new Set([
+          ...((byDoctor.data ?? []) as { id: string }[]).map(r => r.id),
+          ...((byAssigned.data ?? []) as { id: string }[]).map(r => r.id),
+        ]))
+        if (staleIds.length > 0) {
+          await (supabase as any).from('appointments')
+            .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
+            .in('id', staleIds)
+        }
+      }
+    }
+
+    const patch: Record<string, any> = { status: newStatus, updated_at: new Date().toISOString() }
+    if (newStatus === 'in_progress') patch.consult_started_at = new Date().toISOString()
+    if (newStatus === 'completed')   patch.consult_ended_at   = new Date().toISOString()
+
     const { error } = await (supabase as any)
       .from('appointments')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', appointmentId)
 
     setStatusUpdating(false)
@@ -187,9 +226,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const isInProgress = appt.status === 'in_progress'
   const bmi = calcBMI(weight, height)
 
-  const urgencyBg  = appt.urgency === 'emergency' ? 'rgba(255,92,92,0.12)'
+  const isEmergency = appt.urgency === 'emergency'
+  const urgencyBg  = isEmergency ? 'rgba(255,92,92,0.12)'
     : appt.urgency === 'urgent' ? 'rgba(239,159,39,0.12)' : t.accentBg
-  const urgencyCol = appt.urgency === 'emergency' ? '#FF5C5C'
+  const urgencyCol = isEmergency ? '#FF5C5C'
     : appt.urgency === 'urgent' ? '#EF9F27' : t.accent
 
   return (
@@ -203,23 +243,33 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>
             {patient?.full_name ?? 'Patient'}
           </Text>
-          {isInProgress ? (
-            <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-              <InProgressPulse />
-              <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
-            </View>
-          ) : (
-            <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
-              <Text style={[st.statusText, { color: urgencyCol }]}>
-                {appt.urgency ?? 'routine'}
-              </Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isEmergency && (
+              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
+                <Text style={[st.statusText, { color: '#FF5C5C' }]}>🚨 EMERGENCY</Text>
+              </View>
+            )}
+            {isInProgress ? (
+              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                <InProgressPulse />
+                <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
+              </View>
+            ) : !isEmergency && (
+              <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
+                <Text style={[st.statusText, { color: urgencyCol }]}>
+                  {appt.urgency ?? 'routine'}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}
-          <View style={[st.heroCard, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
+          <View style={[st.heroCard, {
+            backgroundColor: isEmergency ? 'rgba(255,92,92,0.1)' : t.bannerBg,
+            borderColor: isEmergency ? '#FF5C5C' : t.bannerBorder,
+          }]}>
             <View style={st.patientRow}>
               <View style={[st.avatarLg, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
                 <Text style={[st.avatarText, { color: t.accent }]}>

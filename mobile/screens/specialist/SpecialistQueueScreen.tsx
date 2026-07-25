@@ -118,7 +118,11 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     return 'Good evening'
   })()
 
-  const active = appts.filter(a => ['pending','confirmed','checked_in','in_progress'].includes(a.status))
+  // Emergency patients sort to the top of the active queue — same tiering used on the
+  // front-desk queue and the web dashboard's queue view.
+  const active = appts
+    .filter(a => ['pending','confirmed','checked_in','in_progress'].includes(a.status))
+    .sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
   const done   = appts.filter(a => a.status === 'completed')
 
   return (
@@ -211,20 +215,28 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
   const initials = getInitials(appt.patient?.full_name)
   const isVirtual = appt.type === 'virtual'
-  const urgencyColor = appt.urgency === 'emergency' ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const isEmergency = appt.urgency === 'emergency'
+  const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
+      style={[st.card, {
+        backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+        borderColor: isEmergency ? '#FF5C5C' : t.cardBorder,
+        borderLeftWidth: isEmergency ? 4 : 1,
+      }]}
       onPress={() => {
         haptics.tap()
         navigation.navigate('PatientConsult', { appointmentId: appt.id })
       }}
     >
       {/* Avatar */}
-      <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-        <Text style={[st.avatarText, { color: t.accent }]}>{initials}</Text>
+      <View style={[st.avatar, {
+        backgroundColor: isEmergency ? 'rgba(255,92,92,0.14)' : t.accentBgMid,
+        borderColor: isEmergency ? '#FF5C5C' : t.accentBorder,
+      }]}>
+        <Text style={[st.avatarText, { color: isEmergency ? '#FF5C5C' : t.accent }]}>{initials}</Text>
       </View>
 
       {/* Info */}
@@ -233,7 +245,11 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
           <Text style={[st.patientName, { color: t.textPrimary }]}>
             {appt.patient?.full_name ?? 'Unknown patient'}
           </Text>
-          {urgencyColor && (
+          {isEmergency ? (
+            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }}>
+              <Text style={{ fontSize: 9, fontWeight: '800', color: '#FF5C5C' }}>🚨 EMERGENCY</Text>
+            </View>
+          ) : urgencyColor && (
             <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               {appt.urgency}
             </Text>

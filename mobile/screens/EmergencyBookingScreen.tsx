@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
-import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents } from '../lib/api'
+import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents, findEmergencyClinic } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
@@ -114,7 +114,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     let cancelled = false
     getClinicsForHospital(String(selectedHospital.id)).then(clinics => {
       if (cancelled) return
-      const er = clinics.find(c => c.is_emergency)
+      const er = findEmergencyClinic(clinics)
       if (er) setErClinicId(er.id)
     })
     return () => { cancelled = true }
