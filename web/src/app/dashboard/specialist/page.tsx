@@ -2,7 +2,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Building2, Monitor } from 'lucide-react'
+import { Building2, Monitor, AlertTriangle } from 'lucide-react'
 import { fmtLocalDate } from '@/lib/admin-api'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -126,8 +126,8 @@ export default async function SpecialistPage() {
                       <div className="flex items-center gap-2">
                         <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
                         {isEmergency && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
-                            🚨 EMERGENCY
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 inline-flex items-center gap-1">
+                            <AlertTriangle size={10} /> EMERGENCY
                           </span>
                         )}
                       </div>
@@ -172,7 +172,7 @@ export default async function SpecialistPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <div className="text-sm font-medium truncate group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
-                      {isEmergency && <span className="text-[10px]">🚨</span>}
+                      {isEmergency && <AlertTriangle size={10} className="text-red-400 shrink-0" />}
                     </div>
                     <div className="text-xs text-[#4A6058]">{a.appointment_date} · {a.start_time?.slice(0, 5)}</div>
                   </div>

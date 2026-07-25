@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { saveAppointmentNotes } from '../actions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { VideoCallPanel } from '@/components/video/VideoCallPanel'
 import { SubmitNotesButton } from '../SubmitNotesButton'
 
@@ -43,7 +43,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
 
       {isEmergency && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-6 flex items-center gap-3">
-          <span className="text-2xl">🚨</span>
+          <AlertTriangle size={28} className="text-red-400 shrink-0" />
           <div>
             <div className="font-bold text-red-400">Emergency case</div>
             <div className="text-xs text-[#7A9089] mt-0.5">Flagged for priority — treat and update status as soon as possible.</div>
@@ -58,8 +58,8 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-bold text-sm text-[#7A9089] uppercase tracking-wide">Patient</h2>
               {isEmergency && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
-                  🚨 EMERGENCY
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 inline-flex items-center gap-1">
+                  <AlertTriangle size={10} /> EMERGENCY
                 </span>
               )}
             </div>

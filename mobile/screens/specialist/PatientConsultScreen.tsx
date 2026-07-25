@@ -246,8 +246,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {isEmergency && (
-              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-                <Text style={[st.statusText, { color: '#FF5C5C' }]}>🚨 EMERGENCY</Text>
+              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
+                <Ionicons name="alert-circle-outline" size={10} color="#FF5C5C" />
+                <Text style={[st.statusText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
               </View>
             )}
             {isInProgress ? (

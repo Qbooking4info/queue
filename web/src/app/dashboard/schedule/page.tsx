@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import { RefreshCw, DoorClosed, ArrowRight } from 'lucide-react'
+import { RefreshCw, DoorClosed, ArrowRight, AlertTriangle } from 'lucide-react'
 import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
@@ -351,8 +351,9 @@ function ScheduleContent() {
                         </div>
                         {isEmergency && (
                           <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
-                            background: C.redLight, color: C.red, border: `1px solid ${C.red}`, flexShrink: 0 }}>
-                            🚨 EMERGENCY
+                            background: C.redLight, color: C.red, border: `1px solid ${C.red}`, flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <AlertTriangle size={9} /> EMERGENCY
                           </span>
                         )}
                       </div>

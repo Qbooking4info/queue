@@ -239,8 +239,9 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
             {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {isEmergency ? (
-            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }}>
-              <Text style={{ fontSize: 9, fontWeight: '800', color: '#FF5C5C' }}>🚨 EMERGENCY</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }}>
+              <Ionicons name="alert-circle-outline" size={9} color="#FF5C5C" />
+              <Text style={{ fontSize: 9, fontWeight: '800', color: '#FF5C5C' }}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
             <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>

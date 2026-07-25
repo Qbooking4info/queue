@@ -1,6 +1,6 @@
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
-import { PartyPopper, Monitor, Building2, Phone } from 'lucide-react'
+import { PartyPopper, Monitor, Building2, Phone, AlertTriangle } from 'lucide-react'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
 import { fmtLocalDate } from '@/lib/admin-api'
@@ -129,8 +129,8 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                         <div className="flex items-center gap-2">
                           <div className="font-semibold">{patient?.full_name ?? '—'}</div>
                           {isEmergency && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400">
-                              🚨 EMERGENCY
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 inline-flex items-center gap-1">
+                              <AlertTriangle size={10} /> EMERGENCY
                             </span>
                           )}
                         </div>

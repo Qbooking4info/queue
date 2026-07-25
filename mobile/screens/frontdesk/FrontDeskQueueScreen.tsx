@@ -283,8 +283,9 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
             <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
           </View>
           {isEmergency ? (
-            <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-              <Text style={[s.badgeText, { color: '#FF5C5C' }]}>🚨 EMERGENCY</Text>
+            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
+              <Ionicons name="alert-circle-outline" size={10} color="#FF5C5C" />
+              <Text style={[s.badgeText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
             <View style={[s.badge, { backgroundColor: `${urgencyColor}18` }]}>
