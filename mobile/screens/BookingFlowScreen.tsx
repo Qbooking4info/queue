@@ -351,6 +351,20 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setSubmitting(false)
 
     if (result?.ok) {
+      // Notify doctor/staff about new booking (best-effort)
+      if (result.id) {
+        const apiBase = process.env.EXPO_PUBLIC_API_URL ?? ''
+        fetch(`${apiBase}/api/appointments/notify-staff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appointmentId: result.id,
+            patientName: user.full_name ?? undefined,
+            hospitalName: hospital.name,
+          }),
+        }).catch(() => {/* best-effort */})
+      }
+
       const isPending = result.approvalStatus === 'pending_approval'
       const isReschedule = !!rescheduleCtx
       await addNotification({

@@ -7,13 +7,9 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment } from '@/lib/admin-api'
-import { CalendarDays, CheckCircle2, XCircle, Star, AlertTriangle, Building2, Video } from 'lucide-react'
+import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video } from 'lucide-react'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun']
-const BOOKINGS = [210, 248, 290, 312, 387, 421]
-const REVENUE  = [2.1, 2.6, 3.1, 3.4, 4.2, 4.8]
-const maxB = Math.max(...BOOKINGS)
-const maxR = Math.max(...REVENUE)
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function computeSpecialtyBreakdown(appts: AdminAppointment[]) {
   const counts: Record<string, number> = {}
@@ -48,16 +44,32 @@ export default function AnalyticsPage() {
   const [rangeStats, setRangeStats] = useState({ total: 0, completed: 0, cancelled: 0, pending: 0 })
   const [appts, setAppts]           = useState<AdminAppointment[]>([])
   const [loading, setLoading]       = useState(true)
+  const [ytdMonths, setYtdMonths]   = useState<string[]>([])
+  const [ytdBookings, setYtdBookings] = useState<number[]>([])
 
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const [statsRes, apptsRes] = await Promise.all([
+    const year = new Date().getFullYear()
+    const ytdTo = new Date().toISOString().split('T')[0]
+    const [statsRes, apptsRes, ytdRes] = await Promise.all([
       fetch(`/api/appointments/stats?from=${bounds.from}&to=${bounds.to}`),
       fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`),
+      fetch(`/api/appointments?from=${year}-01-01&to=${ytdTo}`),
     ])
     if (statsRes.ok) setRangeStats(await statsRes.json())
     if (apptsRes.ok) setAppts((await apptsRes.json()).appointments)
+    if (ytdRes.ok) {
+      const ytdAppts: AdminAppointment[] = (await ytdRes.json()).appointments ?? []
+      const currentMonth = new Date().getMonth()
+      const counts = Array(currentMonth + 1).fill(0)
+      ytdAppts.forEach(a => {
+        const m = new Date(a.appointment_date).getMonth()
+        if (m <= currentMonth) counts[m]++
+      })
+      setYtdMonths(MONTH_NAMES.slice(0, currentMonth + 1))
+      setYtdBookings(counts)
+    }
     setLoading(false)
   }, [hospital?.id, bounds])
 
@@ -84,16 +96,6 @@ export default function AnalyticsPage() {
         <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Analytics</div>
         <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
           Performance overview · {new Date().getFullYear()}
-        </div>
-      </div>
-
-      {/* Sample data notice */}
-      <div style={{ background: 'rgba(239,159,39,0.12)', border: '1px solid rgba(239,159,39,0.3)',
-        borderRadius: 12, padding: '12px 16px', marginBottom: 16,
-        display: 'flex', alignItems: 'center', gap: 10 }}>
-        <AlertTriangle size={18} style={{ flexShrink: 0, color: '#EF9F27' }} />
-        <div style={{ fontSize: 13, color: '#EF9F27', fontWeight: 600 }}>
-          Sample data — Real analytics coming soon. The monthly booking and revenue figures on this page are illustrative only.
         </div>
       </div>
 
@@ -187,31 +189,31 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Historical bar charts (static placeholder data) */}
-      <div className="dash-half-grid" style={{ marginBottom: 16 }}>
-        {[
-          { title: 'Monthly Bookings (YTD)',  sub: 'Total appointments per month',
-            data: BOOKINGS, max: maxB, fmt: (v: number) => `${v}`,  col: C.accent,  colDim: C.accentMid },
-          { title: 'Monthly Revenue (YTD)',   sub: '₦M net payout to hospital',
-            data: REVENUE,  max: maxR, fmt: (v: number) => `${v}M`, col: C.purple,  colDim: C.purpleLight },
-        ].map(chart => (
-          <div key={chart.title} style={{ background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: 16, padding: 20, transition: 'background .3s' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{chart.title}</div>
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 20 }}>{chart.sub}</div>
+      {/* Monthly Bookings YTD — real data */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`,
+        borderRadius: 16, padding: 20, marginBottom: 16, transition: 'background .3s' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Monthly Bookings (YTD)</div>
+        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 20 }}>Total appointments per month · {new Date().getFullYear()}</div>
+        {loading ? (
+          <div style={{ color: C.textMuted, fontSize: 13 }}>Loading…</div>
+        ) : ytdMonths.length === 0 ? (
+          <div style={{ color: C.textMuted, fontSize: 13 }}>No data yet this year</div>
+        ) : (() => {
+          const maxB = Math.max(...ytdBookings, 1)
+          return (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 140 }}>
-              {MONTHS.map((m, i) => (
+              {ytdMonths.map((m, i) => (
                 <div key={m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub }}>{chart.fmt(chart.data[i])}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub }}>{ytdBookings[i]}</div>
                   <div style={{ width: '100%', borderRadius: '6px 6px 0 0',
-                    background: i === MONTHS.length - 1 ? chart.col : chart.colDim,
-                    height: `${(chart.data[i] / chart.max) * 110}px`, transition: 'height .4s' }} />
+                    background: i === ytdMonths.length - 1 ? C.accent : C.accentMid,
+                    height: `${(ytdBookings[i] / maxB) * 110}px`, minHeight: 4, transition: 'height .4s' }} />
                   <div style={{ fontSize: 11, color: C.textMuted }}>{m}</div>
                 </div>
               ))}
             </div>
-          </div>
-        ))}
+          )
+        })()}
       </div>
     </div>
   )

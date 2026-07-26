@@ -65,7 +65,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [refreshing,  setRefreshing]  = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  async function load(silent = false) {
+  const load = useCallback(async (silent = false) => {
     if (!doctorProfile) return
     if (!silent) setLoading(true)
 
@@ -79,9 +79,9 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     setAppts((data as ApptRow[]) ?? [])
     setLoading(false)
-  }
+  }, [doctorProfile, tab])
 
-  useFocusEffect(useCallback(() => { load() }, [tab, doctorProfile]))
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   async function onRefresh() {
     setRefreshing(true)
@@ -102,7 +102,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     channelRef.current = ch
     return () => { supabase.removeChannel(ch) }
-  }, [doctorProfile, tab])
+  }, [doctorProfile, tab, load])
 
   const greeting = (() => {
     const h = new Date().getHours()
