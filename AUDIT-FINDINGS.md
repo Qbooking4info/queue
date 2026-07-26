@@ -109,3 +109,19 @@ exist. No `lat`/`lng` columns in the current schema, and no application code rea
 `web/src/app/dashboard/settings/page.tsx` is the Nominatim geocode API response shape,
 unrelated to the hospitals table). Task 11 as written doesn't apply to the current schema —
 nothing to migrate.
+
+## 2026-07-26 — Task 12: hospitals.total_bookings was never populated at all, not just drifting
+
+hospitals.avg_rating/review_count and doctors.avg_rating/review_count are already
+trigger-maintained (recompute from `reviews` on every change), so the "drift" concern
+there is only about a direct edit bypassing the trigger. hospitals.total_bookings, on
+inspection, has no trigger and no application code that writes it -- grepped web/src and
+mobile, every reference reads it, none set it. It wasn't drifting, it had never been
+populated (12 of the hospital rows corrected from stale/zero to a real count the first
+time `recompute_denormalised_counters()` ran, logged in `counter_reconciliation_log`).
+
+Defined it here as "count of all appointments ever created for that hospital, any status"
+-- this is an interpretation, not something the codebase specifies anywhere. If product
+intent is "completed/non-cancelled bookings only," the function
+(supabase/migrations/20260726000007_denormalised_counter_reconciliation.sql) needs a
+status filter added to that one UPDATE.
