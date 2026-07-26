@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { RefreshCw, DoorClosed, ArrowRight } from 'lucide-react'
-import { getWeekAppointments, getHospitalHours, getClinicHours } from '@/lib/admin-api'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
 import { Badge } from '@/components/dashboard/Badge'
@@ -92,15 +91,15 @@ function ScheduleContent() {
     const scopedDoctorId = role === 'doctor' && doctorId ? doctorId : (urlDoctorId ?? undefined)
     const weekStartISO = fmtLocalDate(monday)
 
-    const [sched, resolvedHours] = await Promise.all([
-      getWeekAppointments(hospital.id, weekStartISO, { doctorId: scopedDoctorId, clinicId: clinicId ?? undefined }),
-      clinicId
-        ? getClinicHours(clinicId).then(async ({ hours: h, isCustom }) =>
-            isCustom ? h : getHospitalHours(hospital.id))
-        : getHospitalHours(hospital.id),
-    ])
-    setSchedule(sched)
-    setHours(resolvedHours)
+    const params = new URLSearchParams({ weekStart: weekStartISO })
+    if (scopedDoctorId) params.set('doctorId', scopedDoctorId)
+    if (clinicId) params.set('clinicId', clinicId)
+    const res = await fetch(`/api/schedule?${params.toString()}`)
+    if (res.ok) {
+      const body = await res.json()
+      setSchedule(body.schedule)
+      setHours(body.hours)
+    }
     setLoading(false)
   }, [hospital?.id, role, doctorId, urlDoctorId, bounds.from, clinicId])
 

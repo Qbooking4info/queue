@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import { getRecentActivity, type AdminNotification } from '@/lib/admin-api'
+import type { AdminNotification } from '@/lib/admin-api'
 import { Search, Bell, XCircle, Star, Wallet, ClipboardList, Menu } from 'lucide-react'
 
 const TOPBAR_STYLES = `
@@ -39,7 +39,10 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
   useEffect(() => {
     if (!hospital?.id) return
     setLastSeen(localStorage.getItem(`q-notif-last-seen-${hospital.id}`))
-    getRecentActivity(hospital.id).then(setNotifications).catch(() => setNotifications([]))
+    fetch(`/api/hospitals/${hospital.id}/activity`)
+      .then(res => res.ok ? res.json() : { notifications: [] })
+      .then(body => setNotifications(body.notifications))
+      .catch(() => setNotifications([]))
   }, [hospital?.id])
 
   const hasUnread = notifications.some(n => !lastSeen || new Date(n.sortAt).getTime() > new Date(lastSeen).getTime())

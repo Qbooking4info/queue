@@ -215,96 +215,6 @@ export interface AdminNotification {
   sortAt: string
 }
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`
-  const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Yesterday'
-  return `${days} days ago`
-}
-
-// Recent hospital-scoped activity across appointments, reviews and payouts, merged and
-// sorted newest-first for the dashboard notification bell. Not a persisted notifications
-// table — derived live from the source tables. `sortAt` is kept on each item so the caller
-// can compare against a locally-stored "last seen" timestamp to know which are unread.
-export async function getRecentActivity(hospitalId: string, limit = 10): Promise<AdminNotification[]> {
-  // Only surface activity from the last 7 days — otherwise a booking from months ago gets
-  // relabeled as "New booking received" just because it's the most recent row in the table.
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
-  const [{ data: newAppts }, { data: cancelledAppts }, { data: reviews }, { data: payouts }] = await Promise.all([
-    (adminDb as any).from('appointments')
-      .select('id, created_at, patient:users!appointments_patient_id_fkey(full_name)')
-      .eq('hospital_id', hospitalId)
-      .gte('created_at', cutoff)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    (adminDb as any).from('appointments')
-      .select('id, cancelled_at, patient:users!appointments_patient_id_fkey(full_name)')
-      .eq('hospital_id', hospitalId)
-      .eq('status', 'cancelled')
-      .gte('cancelled_at', cutoff)
-      .order('cancelled_at', { ascending: false })
-      .limit(limit),
-    (adminDb as any).from('reviews')
-      .select('id, rating, created_at, doctor:doctors(full_name)')
-      .eq('hospital_id', hospitalId)
-      .gte('created_at', cutoff)
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    (adminDb as any).from('payouts')
-      .select('id, amount, paid_at, status')
-      .eq('hospital_id', hospitalId)
-      .eq('status', 'paid')
-      .gte('paid_at', cutoff)
-      .order('paid_at', { ascending: false })
-      .limit(limit),
-  ])
-
-  const items: AdminNotification[] = []
-
-  for (const a of (newAppts ?? []) as any[]) {
-    if (!a.created_at) continue
-    items.push({
-      id: `appt-new-${a.id}`, type: 'new', href: `/dashboard/appointments`,
-      msg: `New booking received from ${safePatientName(a.patient?.full_name, 'a patient')}`,
-      time: timeAgo(a.created_at), sortAt: a.created_at,
-    })
-  }
-  for (const a of (cancelledAppts ?? []) as any[]) {
-    if (!a.cancelled_at) continue
-    items.push({
-      id: `appt-cancel-${a.id}`, type: 'cancel', href: `/dashboard/appointments`,
-      msg: `Appointment cancelled by ${safePatientName(a.patient?.full_name, 'a patient')}`,
-      time: timeAgo(a.cancelled_at), sortAt: a.cancelled_at,
-    })
-  }
-  for (const r of (reviews ?? []) as any[]) {
-    if (!r.created_at) continue
-    items.push({
-      id: `review-${r.id}`, type: 'review', href: `/dashboard/doctors`,
-      msg: `New ${r.rating}-star review posted${r.doctor?.full_name ? ` for Dr. ${r.doctor.full_name}` : ''}`,
-      time: timeAgo(r.created_at), sortAt: r.created_at,
-    })
-  }
-  for (const p of (payouts ?? []) as any[]) {
-    if (!p.paid_at) continue
-    items.push({
-      id: `payout-${p.id}`, type: 'payment', href: `/dashboard/analytics`,
-      msg: `Payout of ${p.amount ? `₦${Number(p.amount).toLocaleString()}` : 'funds'} processed to your bank`,
-      time: timeAgo(p.paid_at), sortAt: p.paid_at,
-    })
-  }
-
-  return items
-    .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime())
-    .slice(0, limit)
-}
-
 export async function getHospitalIdForUser(authId: string): Promise<string | null> {
   const info = await getUserRole(authId)
   return info?.hospitalId ?? null
@@ -666,58 +576,6 @@ export interface ScheduleSlot {
   status: string
 }
 
-export async function getWeekAppointments(
-  hospitalId: string,
-  weekStart?: string,
-  opts?: { doctorId?: string; clinicId?: string },
-): Promise<Record<string, ScheduleSlot[]>> {
-  const anchor = weekStart ? new Date(weekStart + 'T00:00:00') : new Date()
-  const day = anchor.getDay()
-  const monday = new Date(anchor)
-  monday.setDate(anchor.getDate() - (day === 0 ? 6 : day - 1))
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-
-  let q = adminDb
-    .from('appointments')
-    .select(`
-      id, appointment_date, start_time, type, status,
-      patient:users!appointments_patient_id_fkey(full_name),
-      doctor:doctors!appointments_doctor_id_fkey(full_name)
-    `)
-    .eq('hospital_id', hospitalId)
-    .gte('appointment_date', fmtLocalDate(monday))
-    .lte('appointment_date', fmtLocalDate(sunday))
-    .neq('status', 'cancelled')
-    .order('start_time')
-  if (opts?.doctorId) q = (q as any).eq('doctor_id', opts.doctorId)
-  if (opts?.clinicId) q = (q as any).eq('clinic_id', opts.clinicId)
-  const { data } = await q
-
-  const schedule: Record<string, ScheduleSlot[]> = {}
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday); d.setDate(monday.getDate() + i)
-    schedule[fmtLocalDate(d)] = []
-  }
-
-  if (!data) return schedule
-
-  ;(data as any[]).forEach(a => {
-    const bucket = schedule[a.appointment_date]
-    if (!bucket) return
-    bucket.push({
-      id: a.id,
-      date: a.appointment_date,
-      time: (a.start_time ?? '').slice(0, 5),
-      doc: a.doctor?.full_name ?? 'Doctor',
-      patient: safePatientName(a.patient?.full_name, 'Patient'),
-      type: a.type,
-      status: a.status,
-    })
-  })
-
-  return schedule
-}
 
 export async function getDoctors(hospitalId: string, clinicId?: string): Promise<AdminDoctor[]> {
   let q = (adminDb as any)
@@ -1226,50 +1084,6 @@ export async function updateHospitalSettings(hospitalId: string, settings: {
 // ── Operating hours (hospital-wide + per-clinic) ────────────────────────────────
 
 export interface DayHours { day: number; open: string; close: string; closed: boolean }
-
-// Mirrors onboarding's defaultHours: Mon–Sat 08:00–18:00 open, Sunday closed
-function defaultHours(): DayHours[] {
-  return Array.from({ length: 7 }, (_, day) => ({
-    day, open: '08:00', close: '18:00', closed: day === 0,
-  }))
-}
-
-function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
-  const byDay = new Map(rows.map(r => [r.day_of_week, r]))
-  return defaultHours().map(d => {
-    const r = byDay.get(d.day)
-    if (!r) return d
-    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
-  })
-}
-
-export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> {
-  const { data } = await (adminDb as any)
-    .from('hospital_operating_hours')
-    .select('day_of_week, open_time, close_time, is_closed')
-    .eq('hospital_id', hospitalId)
-  return fillHours(data ?? [])
-}
-
-export async function updateHospitalHours(hospitalId: string, hours: DayHours[]): Promise<{ error: string | null }> {
-  const rows = hours.map(h => ({
-    hospital_id: hospitalId, day_of_week: h.day,
-    open_time: h.open, close_time: h.close, is_closed: h.closed,
-  }))
-  const { error } = await (adminDb as any)
-    .from('hospital_operating_hours')
-    .upsert(rows, { onConflict: 'hospital_id,day_of_week' })
-  return { error: error?.message ?? null }
-}
-
-export async function getClinicHours(clinicId: string): Promise<{ hours: DayHours[]; isCustom: boolean }> {
-  const { data } = await (adminDb as any)
-    .from('hospital_clinic_hours')
-    .select('day_of_week, open_time, close_time, is_closed')
-    .eq('clinic_id', clinicId)
-  const rows = data ?? []
-  return { hours: fillHours(rows), isCustom: rows.length > 0 }
-}
 
 // ── Doctor self-service ───────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { ArrowLeft } from 'lucide-react'
-import { getAllSpecialties } from '@/lib/admin-api'
+import { createClient } from '@/lib/supabase/client'
 import type { SpecialtyRow } from '@/lib/admin-api'
 
 export default function AddDoctorPage() {
@@ -33,7 +33,10 @@ export default function AddDoctorPage() {
 
   useEffect(() => {
     if (role === 'front_desk' || role === 'doctor') { router.replace('/dashboard'); return }
-    getAllSpecialties().then(setSpecialties)
+    // specialties is public read data -- fetched via the caller's own
+    // RLS-bound session, not the service-role client.
+    createClient().from('specialties').select('id, name, icon, slug').order('name')
+      .then(({ data }) => setSpecialties((data as SpecialtyRow[]) ?? []))
   }, [role])
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
