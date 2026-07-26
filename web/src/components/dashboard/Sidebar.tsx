@@ -77,7 +77,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const { theme: C } = useTheme()
-  const { hospital, stats, signOut, role, user } = useAdmin()
+  const { hospital, stats, signOut, role, user, clinicId } = useAdmin()
   const pathname = usePathname()
 
   const currentRole: UserRole = role ?? 'hospital_admin'
@@ -92,6 +92,15 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     navItems = [
       ...navItems.slice(0, schedIdx + 1),
       CLINICS_ITEM,
+      ...navItems.slice(schedIdx + 1),
+    ]
+  }
+
+  if (currentRole === 'clinic_admin' && clinicId) {
+    const schedIdx = navItems.findIndex(i => i.href === '/dashboard/schedule')
+    navItems = [
+      ...navItems.slice(0, schedIdx + 1),
+      { href: `/dashboard/clinics/${clinicId}`, icon: Building2, label: 'My Clinic' },
       ...navItems.slice(schedIdx + 1),
     ]
   }
