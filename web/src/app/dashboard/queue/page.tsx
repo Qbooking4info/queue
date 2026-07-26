@@ -6,7 +6,6 @@ import { X, RefreshCw, CheckCircle2, ClipboardList, AlertTriangle, Clock } from 
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
-import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 
@@ -43,7 +42,7 @@ function nextAction(status: string): { label: string; next: string } | null {
 
 export default function QueuePage() {
   const { theme: C } = useTheme()
-  const { hospital, role, doctorId, clinicId, todayAppointments, reload } = useAdmin()
+  const { hospital, role, doctorId, todayAppointments, reload } = useAdmin()
   const [appts, setAppts] = useState<AdminAppointment[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -53,19 +52,18 @@ export default function QueuePage() {
   const fetchQueue = useCallback(async () => {
     if (!hospital?.id) { setAppts(todayAppointments); setLoading(false); return }
     setLoading(true)
-    let data: AdminAppointment[]
-    if (role === 'doctor' && doctorId) {
-      // Fetch fresh from API so actions always show the latest state
-      const today = fmtLocalDate(new Date())
-      data = await getDoctorAppointments(doctorId, today, today)
-    } else if ((role === 'clinic_admin' || role === 'front_desk') && clinicId) {
-      data = await getQueueForToday(hospital.id, clinicId)
-    } else {
-      data = await getQueueForToday(hospital.id)
+    // Scope (own appointments / clinic / whole hospital) is derived
+    // server-side from the caller's session in both routes -- role/doctorId/
+    // clinicId here only pick which endpoint shape to call.
+    const res = role === 'doctor' && doctorId
+      ? await fetch(`/api/appointments?from=${fmtLocalDate(new Date())}&to=${fmtLocalDate(new Date())}`)
+      : await fetch('/api/appointments/queue')
+    if (res.ok) {
+      const body = await res.json()
+      setAppts(body.appointments as AdminAppointment[])
     }
-    setAppts(data)
     setLoading(false)
-  }, [hospital?.id, role, doctorId, clinicId])
+  }, [hospital?.id, role, doctorId])
 
   useEffect(() => { fetchQueue() }, [fetchQueue])
 
@@ -82,36 +80,49 @@ export default function QueuePage() {
     return () => { supabase.removeChannel(channel) }
   }, [hospital?.id, fetchQueue])
 
+  async function patchAppointment(id: string, action: string): Promise<string | null> {
+    const res = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (res.ok) return null
+    const body = await res.json().catch(() => null)
+    return body?.error ?? 'Action failed'
+  }
+
   async function advance(id: string, next: string, currentStatus: string) {
     setUpdating(id)
     setActionError('')
     try {
-      let result: { error: string | null } = { error: null }
+      let error: string | null = null
       if (next === 'confirmed') {
         if (currentStatus === 'pending_approval') {
-          // Use approveAppointment so that the patient receives a confirmation notification
-          // and the proper approval_status='approved' guard is respected.
-          await approveAppointment(id)
+          // Use the approve action so the patient receives a confirmation
+          // notification and the proper approval_status='approved' guard is respected.
+          error = await patchAppointment(id, 'approve')
         } else {
           // pending -> confirmed: only flip status; do NOT touch approval_status which may
           // already be 'auto_approved' (changing it to 'approved' would incorrectly imply
-          // a manual review happened when none did).
+          // a manual review happened when none did). This goes through the caller's own
+          // RLS-bound session, not the service-role client -- RLS already scopes it to
+          // the caller's hospital, so there's no separate API route for this one.
           const supabaseClient = createClient()
           const r = await (supabaseClient as any)
             .from('appointments')
             .update({ status: 'confirmed' })
             .eq('id', id)
             .in('status', ['pending'])
-          result = { error: r.error?.message ?? null }
+          error = r.error?.message ?? null
         }
       } else if (next === 'checked_in') {
-        result = await checkInAppointment(id)
+        error = await patchAppointment(id, 'check_in')
       } else if (next === 'in_progress') {
-        result = await startConsultation(id)
+        error = await patchAppointment(id, 'start_consultation')
       } else if (next === 'completed') {
-        result = await endConsultation(id)
+        error = await patchAppointment(id, 'end_consultation')
       }
-      if (result.error) setActionError(result.error)
+      if (error) setActionError(error)
     } catch {
       setActionError('Action failed — please try again')
     }
