@@ -236,24 +236,6 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
     .single()
   if (doctorRow) return { role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id, displayName: doctorRow.full_name }
 
-  // Fallback: clinic_admins with auth_user_id directly (no users row)
-  const { data: caRow } = await (db as any)
-    .from('clinic_admins')
-    .select('hospital_id, clinic_id, role')
-    .eq('auth_user_id', authId)
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-  if (caRow) {
-    const r = (caRow.role ?? 'clinic_admin') as string
-    const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
-    return {
-      role: isFrontDesk ? 'front_desk' : 'clinic_admin',
-      hospitalId: caRow.hospital_id,
-      clinicId: caRow.clinic_id ?? undefined,
-    }
-  }
-
   return null
 }
 
@@ -457,6 +439,8 @@ export interface PatientMedicalHistory {
   medications: string | null
   surgeries: string | null
   family_history: string | null
+  other_conditions: string | null
+  other_allergies: string | null
   updated_at: string | null
 }
 
@@ -472,7 +456,7 @@ export async function getPatientProfile(patientId: string): Promise<PatientProfi
 export async function getPatientMedicalHistory(patientId: string): Promise<PatientMedicalHistory | null> {
   const { data } = await (adminDb as any)
     .from('patient_medical_history')
-    .select('conditions, allergies, medications, surgeries, family_history, updated_at')
+    .select('conditions, allergies, medications, surgeries, family_history, other_conditions, other_allergies, updated_at')
     .eq('patient_id', patientId)
     .maybeSingle()
   return data as PatientMedicalHistory | null

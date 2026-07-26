@@ -54,6 +54,11 @@ export async function requireRole(allowed: CallerRole[]): Promise<{ caller: Call
       if (adminRow) {
         caller = { authId, role: 'hospital_admin', hospitalId: adminRow.hospital_id }
       } else {
+        // clinic_admins used to have a second identity column (auth_user_id)
+        // with its own separate fallback query below this whole block --
+        // confirmed zero production rows use it (Task 10), dropped in
+        // supabase/migrations/20260726000006_drop_clinic_admins_auth_user_id.sql.
+        // One lookup, keyed on user_id, is now the only path.
         const { data: clinicRow } = await (db as any)
           .from('clinic_admins')
           .select('hospital_id, clinic_id, role')
@@ -83,26 +88,6 @@ export async function requireRole(allowed: CallerRole[]): Promise<{ caller: Call
       .single()
     if (doctorRow) {
       caller = { authId, role: 'doctor', hospitalId: doctorRow.hospital_id }
-    }
-  }
-
-  if (!caller) {
-    const { data: caRow } = await (db as any)
-      .from('clinic_admins')
-      .select('hospital_id, clinic_id, role')
-      .eq('auth_user_id', authId)
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-    if (caRow) {
-      const r = (caRow.role ?? 'clinic_admin') as string
-      const isFrontDesk = r === 'front_desk' || r === 'desk_officer'
-      caller = {
-        authId,
-        role: isFrontDesk ? 'front_desk' : 'clinic_admin',
-        hospitalId: caRow.hospital_id,
-        clinicId: caRow.clinic_id ?? undefined,
-      }
     }
   }
 
