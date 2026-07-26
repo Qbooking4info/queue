@@ -910,8 +910,8 @@ export default function ClinicDetailPage() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState<Tab>('overview')
 
-  const [range,  setRange]  = useState<DateRangeKey>('this_week')
-  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('this_week'))
+  const [range,  setRange]  = useState<DateRangeKey>('today')
+  const [bounds, setBounds] = useState<DateBounds>(getDateBounds('today'))
 
   const [showAssign,      setShowAssign]      = useState(false)
   const [showAddStaff,    setShowAddStaff]    = useState(false)
