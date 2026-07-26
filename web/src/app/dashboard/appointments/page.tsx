@@ -583,7 +583,7 @@ function DetailPanel({
 
 export default function AppointmentsPage() {
   const { theme: C } = useTheme()
-  const { hospital, role, clinicId: userClinicId, doctorId: userDoctorId, user } = useAdmin()
+  const { hospital, role, clinicId: userClinicId, doctorId: userDoctorId } = useAdmin()
 
   const isDoctor         = role === 'doctor'
   const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
@@ -1215,7 +1215,6 @@ export default function AppointmentsPage() {
           appointment={vitalsAppt}
           onClose={() => setVitalsAppt(null)}
           onSaved={() => { load(); setVitalsAppt(null) }}
-          recordedByAuthId={user?.id}
         />
       )}
     </div>

@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
-import { updateAppointmentVitals } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 function bmiOf(weightKg: number | null, heightCm: number | null): number | null {
@@ -18,11 +17,10 @@ function bmiCategory(bmi: number): { label: string; color: string } {
   return { label: 'Obese', color: '#f07070' }
 }
 
-export function VitalsModal({ appointment, onClose, onSaved, recordedByAuthId }: {
+export function VitalsModal({ appointment, onClose, onSaved }: {
   appointment: AdminAppointment
   onClose: () => void
   onSaved: () => void
-  recordedByAuthId?: string
 }) {
   const { theme: C } = useTheme()
   const [weight,   setWeight]   = useState(appointment.vitals_weight_kg?.toString() ?? '')
@@ -38,15 +36,23 @@ export function VitalsModal({ appointment, onClose, onSaved, recordedByAuthId }:
 
   async function handleSave() {
     setSaving(true); setError('')
-    const { error: err } = await updateAppointmentVitals(appointment.id, {
-      weight_kg:   weight ? Number(weight) : null,
-      height_cm:   height ? Number(height) : null,
-      bp_systolic: systolic ? Number(systolic) : null,
-      bp_diastolic: diastolic ? Number(diastolic) : null,
-      blood_sugar: sugar ? Number(sugar) : null,
-    }, recordedByAuthId)
+    const res = await fetch(`/api/appointments/${appointment.id}/vitals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        weight_kg:    weight ? Number(weight) : null,
+        height_cm:    height ? Number(height) : null,
+        bp_systolic:  systolic ? Number(systolic) : null,
+        bp_diastolic: diastolic ? Number(diastolic) : null,
+        blood_sugar:  sugar ? Number(sugar) : null,
+      }),
+    })
     setSaving(false)
-    if (err) { setError(err); return }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setError(body?.error ?? 'Could not save vitals')
+      return
+    }
     onSaved()
   }
 

@@ -44,14 +44,6 @@ export interface AdminAppointment {
   consult_duration_secs?: number | null
 }
 
-export interface AppointmentVitals {
-  weight_kg: number | null
-  height_cm: number | null
-  bp_systolic: number | null
-  bp_diastolic: number | null
-  blood_sugar: number | null
-}
-
 interface VitalsRow {
   appointment_id: string
   weight_kg: number | null
@@ -1099,33 +1091,6 @@ export async function deleteClinic(clinicId: string): Promise<{ error?: string }
 
 export async function updateAppointmentStatus(id: string, status: string) {
   await adminDb.from('appointments').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
-}
-
-export async function updateAppointmentVitals(
-  id: string,
-  vitals: AppointmentVitals,
-  recordedByAuthId?: string,
-): Promise<{ error: string | null }> {
-  const now = new Date().toISOString()
-  const bmi = vitals.weight_kg && vitals.height_cm && vitals.height_cm > 0
-    ? Math.round((vitals.weight_kg / Math.pow(vitals.height_cm / 100, 2)) * 10) / 10
-    : null
-
-  // vitals_audit_log is the single source of truth; appointments no longer
-  // stores denormalized vitals columns (dropped in migration 20260719000004).
-  const { error } = await (adminDb as any).from('vitals_audit_log').insert({
-    appointment_id:      id,
-    recorded_by_auth_id: recordedByAuthId ?? null,
-    recorded_at:         now,
-    weight_kg:           vitals.weight_kg,
-    height_cm:           vitals.height_cm,
-    bp_systolic:         vitals.bp_systolic,
-    bp_diastolic:        vitals.bp_diastolic,
-    blood_sugar:         vitals.blood_sugar,
-    bmi,
-  })
-
-  return { error: error?.message ?? null }
 }
 
 // ── Queue & consultation timing ─────────────────────────────────────────────────
