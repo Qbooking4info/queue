@@ -3,9 +3,16 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { SpecialtyRow } from '@/lib/admin-api'
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let p = 'Queue@'
+  for (let i = 0; i < 6; i++) p += chars[Math.floor(Math.random() * chars.length)]
+  return p + '!'
+}
 
 export default function AddDoctorPage() {
   const { theme: C }                          = useTheme()
@@ -28,8 +35,9 @@ export default function AddDoctorPage() {
     qualification:    '',
     mdcn_number:      '',
     login_email:      '',
-    login_password:   '',
+    login_password:   generatePassword(),
   })
+  const [showPass, setShowPass] = useState(false)
 
   useEffect(() => {
     if (role === 'front_desk' || role === 'doctor') { router.replace('/dashboard'); return }
@@ -208,8 +216,21 @@ export default function AddDoctorPage() {
             </div>
             <div>
               <label style={label}>Temporary Password</label>
-              <input type="password" value={form.login_password} onChange={set('login_password')}
-                placeholder="Min. 8 characters" minLength={8} style={input} />
+              <div style={{ position: 'relative' }}>
+                <input type={showPass ? 'text' : 'password'} value={form.login_password} onChange={set('login_password')}
+                  placeholder="Min. 8 characters" minLength={8} style={{ ...input, paddingRight: 88 }} />
+                <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={() => setShowPass(v => !v)}
+                    style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer' }}>
+                    {showPass ? 'Hide' : 'Show'}
+                  </button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, login_password: generatePassword() }))}
+                    title="Reset password"
+                    style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer', display: 'flex' }}>
+                    <RefreshCw size={11} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

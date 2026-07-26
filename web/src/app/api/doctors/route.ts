@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
   const rlAllowed = await checkRateLimit(db, `doctors-create:${hospitalId}`, 10, 3600)
   if (!rlAllowed) return Errors.forbidden('Too many doctor creation attempts. Please try again later.')
 
+  if (login_email?.trim() && login_password && String(login_password).length < 8) {
+    return Errors.validation('Password must be at least 8 characters')
+  }
+
   let auth_user_id: string | null = null
 
   if (login_email?.trim() && login_password) {
