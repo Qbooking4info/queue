@@ -6,20 +6,11 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
-import {
-  getClinicDetail, getClinicStaff, getClinicDoctors, getClinicAppointments,
-  getClinicRangeStats, getUnassignedDoctors, assignDoctorToClinic,
-  removeDoctorFromClinic, createClinicDoctor, updateAppointmentStatus,
-  toggleClinicActive, deleteClinic, updateClinic,
-  setEmergencyClinic, clearEmergencyClinic,
-  approveAppointment, rejectAppointment,
-  getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
-} from '@/lib/admin-api'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
-import { adminDb } from '@/lib/supabase/admin-client'
+import { createClient } from '@/lib/supabase/client'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
@@ -74,13 +65,18 @@ function EditClinicModal({
   async function handleSave() {
     if (!name.trim()) return
     setSaving(true); setError('')
-    const { error: err } = await updateClinic(clinic.id, {
-      name: name.trim(),
-      description: desc.trim() || null,
-      service_tags: serviceTags,
+    const res = await fetch(`/api/clinics/${clinic.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update',
+        name: name.trim(),
+        description: desc.trim() || null,
+        service_tags: serviceTags,
+      }),
     })
     setSaving(false)
-    if (err) { setError(err.message ?? 'Failed to save'); return }
+    if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Failed to save'); return }
     onSave(name.trim(), desc.trim() || undefined, serviceTags)
   }
 
@@ -200,11 +196,13 @@ function EditClinicHoursModal({
 
   async function handleSave() {
     setSaving(true); setError('')
-    const { error: err } = isCustom
-      ? await updateClinicHours(clinicId, hours)
-      : await clearClinicHours(clinicId)
+    const res = await fetch(`/api/clinics/${clinicId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isCustom ? { action: 'update_hours', hours } : { action: 'clear_hours' }),
+    })
     setSaving(false)
-    if (err) { setError(err); return }
+    if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Failed to save'); return }
     onSave(isCustom ? hours : hospitalHours, isCustom)
   }
 
@@ -313,10 +311,14 @@ function AssignDoctorModal({
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [docs, { data: specs }] = await Promise.all([
-        getUnassignedDoctors(hospitalId),
-        adminDb.from('specialties').select('id, name').eq('is_active', true).order('name'),
+      // specialties is public read data -- fetched via the caller's own
+      // RLS-bound session, not the service-role client.
+      const supabase = createClient()
+      const [unassignedRes, { data: specs }] = await Promise.all([
+        fetch('/api/doctors/unassigned'),
+        supabase.from('specialties').select('id, name').eq('is_active', true).order('name'),
       ])
+      const docs = unassignedRes.ok ? (await unassignedRes.json()).doctors : []
       setPool(docs)
       setSpecialties((specs ?? []) as {id: string; name: string}[])
       setLoading(false)
@@ -326,7 +328,11 @@ function AssignDoctorModal({
 
   async function handleAssign(doctorId: string) {
     setWorking(doctorId)
-    await assignDoctorToClinic(doctorId, clinicId)
+    await fetch(`/api/clinics/${clinicId}/doctors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'assign', doctorId }),
+    })
     setPool(prev => prev.filter(d => d.id !== doctorId))
     setWorking(null)
     onDone()
@@ -335,15 +341,20 @@ function AssignDoctorModal({
   async function handleCreate() {
     if (!name.trim()) return
     setCreating(true); setNewError('')
-    const result = await createClinicDoctor(hospitalId, clinicId, {
-      full_name: name.trim(),
-      title,
-      specialty_id: specId || null,
-      consultation_fee: fee ? Number(fee) : null,
-      accepts_virtual: virtual,
+    const res = await fetch(`/api/clinics/${clinicId}/doctors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'create',
+        full_name: name.trim(),
+        title,
+        specialty_id: specId || null,
+        consultation_fee: fee ? Number(fee) : null,
+        accepts_virtual: virtual,
+      }),
     })
     setCreating(false)
-    if (!result) { setNewError('Failed to create doctor. Please try again.'); return }
+    if (!res.ok) { setNewError('Failed to create doctor. Please try again.'); return }
     onDone()
     onClose()
   }
@@ -927,23 +938,18 @@ export default function ClinicDetailPage() {
   const load = useCallback(async () => {
     if (!clinicId || !hospital?.id) return
     setLoading(true)
-    const [c, d, s, a, st, ch, hh] = await Promise.all([
-      getClinicDetail(clinicId),
-      getClinicDoctors(clinicId),
-      getClinicStaff(clinicId),
-      getClinicAppointments(hospital.id, clinicId, bounds.from, bounds.to),
-      getClinicRangeStats(hospital.id, clinicId, bounds.from, bounds.to),
-      getClinicHours(clinicId),
-      getHospitalHours(hospital.id),
-    ])
-    setClinic(c)
-    setDoctors(d)
-    setStaff(s)
-    setAppts(a)
-    setStats(st)
-    setClinicHours(ch.hours)
-    setHoursIsCustom(ch.isCustom)
-    setHospitalHours(hh)
+    const res = await fetch(`/api/clinics/${clinicId}?from=${bounds.from}&to=${bounds.to}`)
+    if (res.ok) {
+      const body = await res.json()
+      setClinic(body.clinic)
+      setDoctors(body.doctors)
+      setStaff(body.staff)
+      setAppts(body.appointments)
+      setStats(body.stats)
+      setClinicHours(body.clinicHours.hours)
+      setHoursIsCustom(body.clinicHours.isCustom)
+      setHospitalHours(body.hospitalHours)
+    }
     setLoading(false)
   }, [clinicId, hospital?.id, bounds])
 
@@ -953,38 +959,51 @@ export default function ClinicDetailPage() {
   useEffect(() => {
     if (!clinicId || !hospital?.id || tab !== 'analytics') return
     async function loadAnalytics() {
-      const [s, a] = await Promise.all([
-        getClinicRangeStats(hospital!.id, clinicId, aBounds.from, aBounds.to),
-        getClinicAppointments(hospital!.id, clinicId, aBounds.from, aBounds.to),
-      ])
-      setAStats(s); setAAppts(a)
+      const res = await fetch(`/api/clinics/${clinicId}?from=${aBounds.from}&to=${aBounds.to}`)
+      if (res.ok) {
+        const body = await res.json()
+        setAStats(body.stats)
+        setAAppts(body.appointments)
+      }
     }
     loadAnalytics()
   }, [clinicId, hospital?.id, tab, aBounds])
 
+  async function patchClinic(action: string) {
+    return fetch(`/api/clinics/${clinicId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+  }
+
   async function handleToggleActive() {
     if (!clinic) return
     const next = !clinic.is_active
-    await toggleClinicActive(clinicId, next)
+    await fetch(`/api/clinics/${clinicId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_active', is_active: next }),
+    })
     setClinic(prev => prev ? { ...prev, is_active: next } : prev)
   }
 
   async function handleToggleEmergency() {
     if (!clinic || !hospital) return
     if (clinic.is_emergency) {
-      await clearEmergencyClinic(clinicId)
+      await patchClinic('clear_emergency')
       setClinic(prev => prev ? { ...prev, is_emergency: false } : prev)
     } else {
-      await setEmergencyClinic(hospital.id, clinicId)
+      await patchClinic('set_emergency')
       setClinic(prev => prev ? { ...prev, is_emergency: true } : prev)
     }
   }
 
   async function handleDelete() {
     setDeleting(true)
-    const { error } = await deleteClinic(clinicId)
+    const res = await fetch(`/api/clinics/${clinicId}`, { method: 'DELETE' })
     setDeleting(false)
-    if (!error) router.push('/dashboard/clinics')
+    if (res.ok) router.push('/dashboard/clinics')
   }
 
   const subAdmin     = staff.find(s => s.role === 'clinic_admin')
@@ -1439,7 +1458,7 @@ export default function ClinicDetailPage() {
                       </button>
                     )}
                     <button onClick={async () => {
-                      await removeDoctorFromClinic(doc.id)
+                      await fetch(`/api/clinics/${clinicId}/doctors/${doc.id}`, { method: 'DELETE' })
                       setDoctors(prev => prev.filter(d => d.id !== doc.id))
                     }}
                       style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
@@ -1709,7 +1728,11 @@ export default function ClinicDetailPage() {
                           {/* Approve */}
                           {needsApproval && (
                             <button onClick={async () => {
-                              await approveAppointment(a.id)
+                              await fetch(`/api/appointments/${a.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'approve' }),
+                              })
                               setAppts(prev => prev.map(x => x.id === a.id
                                 ? { ...x, approval_status: 'auto_approved', status: 'confirmed' } : x))
                             }}
@@ -1731,7 +1754,11 @@ export default function ClinicDetailPage() {
                           {/* Check In */}
                           {!needsApproval && !['cancelled','completed','no_show'].includes(a.status) && (
                             <button onClick={async () => {
-                              await updateAppointmentStatus(a.id, 'checked_in')
+                              await fetch(`/api/appointments/${a.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'set_status', status: 'checked_in' }),
+                              })
                               setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
                             }}
                               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
@@ -1743,7 +1770,11 @@ export default function ClinicDetailPage() {
                           {/* Complete */}
                           {['checked_in','in_progress'].includes(a.status) && (
                             <button onClick={async () => {
-                              await updateAppointmentStatus(a.id, 'completed')
+                              await fetch(`/api/appointments/${a.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'set_status', status: 'completed' }),
+                              })
                               setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'completed' } : x))
                             }}
                               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7,
@@ -1793,7 +1824,11 @@ export default function ClinicDetailPage() {
                     onClick={async () => {
                       if (!rejectNote.trim()) return
                       setRejectSaving(true)
-                      await rejectAppointment(rejectClinicAppt.id, rejectNote.trim())
+                      await fetch(`/api/appointments/${rejectClinicAppt.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'reject', note: rejectNote.trim() }),
+                      })
                       setAppts(prev => prev.map(x => x.id === rejectClinicAppt.id
                         ? { ...x, approval_status: 'rejected', status: 'cancelled' } : x))
                       setRejectSaving(false)

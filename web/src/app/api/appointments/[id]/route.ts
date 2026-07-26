@@ -12,6 +12,7 @@ type Action =
   | { action: 'check_in' }
   | { action: 'start_consultation' }
   | { action: 'end_consultation' }
+  | { action: 'set_status'; status: string }
 
 async function getDoctorAvgConsultDuration(db: ReturnType<typeof createAdminClient>, doctorId: string): Promise<number | null> {
   const { data } = await (db as any)
@@ -264,6 +265,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await (db as any).from('virtual_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('appointment_id', id).eq('status', 'active')
+      return NextResponse.json({ success: true })
+    }
+
+    case 'set_status': {
+      // Bare status flip, no transition guard -- matches admin-api.ts's
+      // updateAppointmentStatus exactly (used by clinics/[clinicId]/page.tsx
+      // for its own check-in/complete buttons, which historically bypassed
+      // the queue-position logic the main queue/appointments pages use).
+      // Preserved as-is rather than silently rerouting it through
+      // check_in/end_consultation's extra logic, which would change
+      // behavior beyond adding the authorization check this task is about.
+      const { error } = await (db as any).from('appointments')
+        .update({ status: body.status, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
     }
 
