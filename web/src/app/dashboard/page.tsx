@@ -8,10 +8,6 @@ import { ViewPatientModal } from '@/components/dashboard/ViewPatientModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
-import {
-  getAppointments, getClinicAppointments, getRangeStats, getClinicRangeStats,
-  setDoctorAvailability, getDoctorAvgConsultDuration,
-} from '@/lib/admin-api'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
@@ -79,7 +75,7 @@ function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C:
 export default function OverviewPage() {
   const { theme: C } = useTheme()
   const {
-    hospital, clinicName, clinicId, role, user, doctorId, doctorAvailability,
+    hospital, clinicName, role, user, doctorId, doctorAvailability,
     stats, doctors, todayAppointments, loading: ctxLoading,
   } = useAdmin()
 
@@ -98,27 +94,25 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (role !== 'doctor' || !doctorId) return
-    getDoctorAvgConsultDuration(doctorId).then(setAvgConsultSecs)
+    fetch('/api/doctors/me')
+      .then(res => res.ok ? res.json() : { avgConsultSecs: null })
+      .then(({ avgConsultSecs }) => setAvgConsultSecs(avgConsultSecs))
   }, [role, doctorId])
-
-  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!clinicId
 
   const load = useCallback(async () => {
     if (role === 'doctor') { setLoading(false); return }
     if (!hospital?.id) return
     setLoading(true)
-    const [a, s] = await Promise.all([
-      isScopedToClinic
-        ? getClinicAppointments(hospital.id, clinicId!, bounds.from, bounds.to)
-        : getAppointments(hospital.id, bounds.from, bounds.to),
-      isScopedToClinic
-        ? getClinicRangeStats(hospital.id, clinicId!, bounds.from, bounds.to)
-        : getRangeStats(hospital.id, bounds.from, bounds.to),
+    // Scope (whole hospital / one clinic) is derived server-side from the
+    // caller's session in both routes.
+    const [apptsRes, statsRes] = await Promise.all([
+      fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`),
+      fetch(`/api/appointments/stats?from=${bounds.from}&to=${bounds.to}`),
     ])
-    setAppts(a)
-    setRangeStats(s)
+    if (apptsRes.ok) setAppts((await apptsRes.json()).appointments)
+    if (statsRes.ok) setRangeStats(await statsRes.json())
     setLoading(false)
-  }, [hospital?.id, bounds, isScopedToClinic, clinicId, role])
+  }, [hospital?.id, bounds, role])
 
   useEffect(() => { load() }, [load])
 
@@ -144,7 +138,12 @@ export default function OverviewPage() {
     setSavingAvail(true)
     setAvailError('')
     try {
-      await setDoctorAvailability(doctorId, status)
+      const res = await fetch('/api/doctors/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ availability_status: status }),
+      })
+      if (!res.ok) throw new Error('failed')
       setAvail(status)
     } catch {
       setAvail(prev)

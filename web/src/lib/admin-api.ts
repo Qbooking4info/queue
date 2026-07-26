@@ -1643,6 +1643,3 @@ export async function getDoctorProfile(doctorId: string): Promise<{
   }
 }
 
-export async function setDoctorAvailability(doctorId: string, status: DoctorAvailabilityStatus): Promise<void> {
-  await (adminDb.from('doctors') as any).update({ availability_status: status }).eq('id', doctorId)
-}
