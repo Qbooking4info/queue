@@ -6,8 +6,9 @@ import { X, RefreshCw, CheckCircle2, ClipboardList, AlertTriangle, Clock } from 
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
-import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment, fmtLocalDate } from '@/lib/admin-api'
+import { checkInAppointment, startConsultation, endConsultation, getQueueForToday, getDoctorAppointments, approveAppointment } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
 

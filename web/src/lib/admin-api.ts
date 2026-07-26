@@ -1,4 +1,5 @@
 import { adminDb } from './supabase/admin-client'
+import { safePatientName, calcAge, fmtLocalDate, todayLocalDate, nameToColor, nameToInitials } from './dashboard-utils'
 
 export interface AdminAppointment {
   id: string
@@ -108,34 +109,6 @@ export interface AdminHospital {
   avg_rating: number | null
   total_bookings: number | null
   logo_url: string | null
-}
-
-const AVATAR_COLORS = [
-  '#1A4A32', '#1A2A4A', '#3A1A4A', '#4A2A1A',
-  '#2A1A4A', '#1A3A4A', '#4A1A2A', '#1A4A4A',
-]
-
-function nameToColor(name: string) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i)
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
-
-function nameToInitials(name: string) {
-  return name.split(' ').filter(Boolean).slice(-2).map(w => w[0].toUpperCase()).join('')
-}
-
-// Some accounts have an incomplete profile where full_name was backfilled with the user's
-// email at signup — showing that verbatim as a "name" in the admin UI reads as spam/fake data.
-const EMAIL_RE = /\S+@\S+\.\S+/
-function safePatientName(name: string | null | undefined, fallback: string): string {
-  if (!name || EMAIL_RE.test(name)) return fallback
-  return name
-}
-
-function calcAge(dob: string | null): number | null {
-  if (!dob) return null
-  return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
 }
 
 export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk'
@@ -693,12 +666,6 @@ export interface ScheduleSlot {
   status: string
 }
 
-// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
-// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
-export function fmtLocalDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 export async function getWeekAppointments(
   hospitalId: string,
   weekStart?: string,
@@ -1104,11 +1071,6 @@ export async function getDoctorAvgConsultDuration(doctorId: string): Promise<num
   if (!data || data.length === 0) return null
   const total = (data as { consult_duration_secs: number }[]).reduce((sum, r) => sum + r.consult_duration_secs, 0)
   return total / data.length
-}
-
-function todayLocalDate(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
 const QUEUE_SELECT = `

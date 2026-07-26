@@ -3,7 +3,7 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Building2, Monitor } from 'lucide-react'
-import { fmtLocalDate } from '@/lib/admin-api'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 const STATUS_COLOR: Record<string, string> = {
   confirmed:   'text-green-400 bg-green-500/10 border-green-500/20',
@@ -37,14 +37,14 @@ export default async function SpecialistPage() {
 
   const [{ data: todayAppts }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, users(full_name, phone, date_of_birth, gender)')
+      .select('id, booking_ref, start_time, type, status, walkin_patient_name, users(full_name, phone, date_of_birth, gender)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .eq('appointment_date', today)
       .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
       .order('start_time'),
     db.from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, users(full_name)')
+      .select('id, booking_ref, appointment_date, start_time, type, status, walkin_patient_name, users(full_name)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .gt('appointment_date', today)
@@ -102,6 +102,7 @@ export default async function SpecialistPage() {
             <div className="flex flex-col gap-2">
               {todayAppts.map((a, idx) => {
                 const patient = Array.isArray(a.users) ? a.users[0] : a.users
+                const patientName = patient?.full_name ?? a.walkin_patient_name ?? 'Walk-in Patient'
                 const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
                 return (
                   <Link key={a.id} href={`/dashboard/specialist/${a.id}`}
@@ -110,7 +111,7 @@ export default async function SpecialistPage() {
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                      <div className="font-semibold text-sm group-hover:text-green-400 transition-colors">{patientName}</div>
                       <div className="text-xs text-[#7A9089] mt-0.5">
                         {a.start_time?.slice(0, 5)} ·{' '}
                         <span className="inline-flex items-center gap-1 align-middle">
@@ -140,6 +141,7 @@ export default async function SpecialistPage() {
               <p className="text-sm text-[#4A6058] text-center py-4">No upcoming appointments</p>
             ) : upcomingAppts.map(a => {
               const patient = Array.isArray(a.users) ? a.users[0] : a.users
+              const patientName = patient?.full_name ?? a.walkin_patient_name ?? 'Walk-in Patient'
               return (
                 <Link key={a.id} href={`/dashboard/specialist/${a.id}`}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/3 transition-all group">
@@ -147,7 +149,7 @@ export default async function SpecialistPage() {
                     {new Date(a.appointment_date + 'T00:00:00').getDate()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate group-hover:text-green-400 transition-colors">{patient?.full_name ?? '—'}</div>
+                    <div className="text-sm font-medium truncate group-hover:text-green-400 transition-colors">{patientName}</div>
                     <div className="text-xs text-[#4A6058]">{a.appointment_date} · {a.start_time?.slice(0, 5)}</div>
                   </div>
                 </Link>

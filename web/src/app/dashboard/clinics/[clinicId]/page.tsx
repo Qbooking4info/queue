@@ -14,8 +14,8 @@ import {
   setEmergencyClinic, clearEmergencyClinic,
   approveAppointment, rejectAppointment,
   getClinicHours, updateClinicHours, clearClinicHours, getHospitalHours,
-  fmtLocalDate,
 } from '@/lib/admin-api'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'

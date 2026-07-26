@@ -10,14 +10,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment, AdminDoctor } from '@/lib/admin-api'
 import { T, SPACE } from '@/lib/typography'
-import {
-  getAppointments, getClinicAppointments, getDoctorAppointments,
-  assignDoctorToAppointment, markNoShow,
-  approveAppointment, rejectAppointment,
-  checkInAppointment, startConsultation, endConsultation,
-  getDoctors as getDoctorsForHospital,
-  fmtLocalDate,
-} from '@/lib/admin-api'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 import {
   CheckCircle2, ClipboardList, X, AlertTriangle, Zap, RefreshCw, Search as SearchIcon,
   Check, Clock, Video, Building2, Footprints, Stethoscope, type LucideIcon,
@@ -354,9 +347,13 @@ function AssignDoctorModal({
     if (!selected) return
     setSaving(true)
     setError(null)
-    const { error } = await assignDoctorToAppointment(appointment.id, selected)
+    const res = await fetch(`/api/appointments/${appointment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'assign_doctor', doctorId: selected }),
+    })
     setSaving(false)
-    if (error) { setError(error); return }
+    if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Could not assign doctor'); return }
     onDone(selected)
   }
 
@@ -452,7 +449,11 @@ function RejectModal({
   async function handleReject() {
     if (!note.trim()) return
     setSaving(true)
-    await rejectAppointment(appointment.id, note.trim())
+    await fetch(`/api/appointments/${appointment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', note: note.trim() }),
+    })
     setSaving(false)
     onDone()
   }
@@ -583,10 +584,9 @@ function DetailPanel({
 
 export default function AppointmentsPage() {
   const { theme: C } = useTheme()
-  const { hospital, role, clinicId: userClinicId, doctorId: userDoctorId } = useAdmin()
+  const { hospital, role } = useAdmin()
 
-  const isDoctor         = role === 'doctor'
-  const isScopedToClinic = (role === 'clinic_admin' || role === 'front_desk') && !!userClinicId
+  const isDoctor = role === 'doctor'
 
   const [range,   setRange]   = useState<DateRangeKey>('this_week')
   const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('this_week'))
@@ -607,20 +607,14 @@ export default function AppointmentsPage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    if (isDoctor && userDoctorId) {
-      const a = await getDoctorAppointments(userDoctorId, bounds.from, bounds.to)
-      setAppts(a); setDoctors([])
-    } else {
-      const [a, d] = await Promise.all([
-        isScopedToClinic
-          ? getClinicAppointments(hospital.id, userClinicId!, bounds.from, bounds.to)
-          : getAppointments(hospital.id, bounds.from, bounds.to),
-        getDoctorsForHospital(hospital.id, isScopedToClinic ? userClinicId! : undefined),
-      ])
-      setAppts(a); setDoctors(d)
+    const res = await fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`)
+    if (res.ok) {
+      const { appointments, doctors: doctorList } = await res.json()
+      setAppts(appointments)
+      setDoctors(doctorList)
     }
     setLoading(false)
-  }, [hospital?.id, bounds, isDoctor, userDoctorId, isScopedToClinic, userClinicId])
+  }, [hospital?.id, bounds])
 
   useEffect(() => { load() }, [load])
 
@@ -640,20 +634,31 @@ export default function AppointmentsPage() {
     return () => { supabase.removeChannel(channel) }
   }, [hospital?.id, load])
 
+  async function patchAppointment(id: string, action: string, extra?: Record<string, unknown>): Promise<string | null> {
+    const res = await fetch(`/api/appointments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...extra }),
+    })
+    if (res.ok) return null
+    const body = await res.json().catch(() => null)
+    return body?.error ?? 'Action failed'
+  }
+
   async function handleApprove(appt: AdminAppointment) {
     setPendingActionId(appt.id)
-    try { await approveAppointment(appt.id); await load() } finally { setPendingActionId(null) }
+    try { await patchAppointment(appt.id, 'approve'); await load() } finally { setPendingActionId(null) }
   }
 
   async function handleNoShow(appt: AdminAppointment) {
     setPendingActionId(appt.id)
-    try { await markNoShow(appt.id); await load() } finally { setPendingActionId(null) }
+    try { await patchAppointment(appt.id, 'mark_no_show'); await load() } finally { setPendingActionId(null) }
   }
 
   async function handleCheckIn(appt: AdminAppointment) {
     setActionError(''); setPendingActionId(appt.id)
     try {
-      const { error } = await checkInAppointment(appt.id)
+      const error = await patchAppointment(appt.id, 'check_in')
       if (error) { setActionError(error); return }
       await load()
     } finally { setPendingActionId(null) }
@@ -662,7 +667,7 @@ export default function AppointmentsPage() {
   async function handleStartConsult(appt: AdminAppointment) {
     setActionError(''); setPendingActionId(appt.id)
     try {
-      const { error } = await startConsultation(appt.id)
+      const error = await patchAppointment(appt.id, 'start_consultation')
       if (error) { setActionError(error); return }
       await load()
     } finally { setPendingActionId(null) }
@@ -671,7 +676,7 @@ export default function AppointmentsPage() {
   async function handleEndConsult(appt: AdminAppointment) {
     setActionError(''); setPendingActionId(appt.id)
     try {
-      const { error } = await endConsultation(appt.id)
+      const error = await patchAppointment(appt.id, 'end_consultation')
       if (error) { setActionError(error); return }
       await load()
     } finally { setPendingActionId(null) }

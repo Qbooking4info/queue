@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { PartyPopper, Monitor, Building2, Phone } from 'lucide-react'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
-import { fmtLocalDate } from '@/lib/admin-api'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +44,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
 
   const [{ data: appointments }, { count: pending }, { count: checkedIn }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, users(full_name, phone), doctors(full_name, title)')
+      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, walkin_patient_name, walkin_patient_phone, users(full_name, phone), doctors(full_name, title)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('appointment_date', selectedDate)
       .in('status', QUEUE_STATUSES)
@@ -107,6 +107,8 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
           {appointments.map((a, idx) => {
             const patient = Array.isArray(a.users)  ? a.users[0]  : a.users
             const doctor  = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
+            const patientName  = patient?.full_name ?? a.walkin_patient_name ?? 'Walk-in Patient'
+            const patientPhone = patient?.phone ?? a.walkin_patient_phone
             const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
             return (
               <div key={a.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
@@ -117,15 +119,15 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div>
-                        <div className="font-semibold">{patient?.full_name ?? '—'}</div>
+                        <div className="font-semibold">{patientName}</div>
                         <div className="text-xs text-[#7A9089] mt-0.5">
                           {doctor?.title} {doctor?.full_name} · {a.start_time?.slice(0, 5)} ·{' '}
                           <span className="inline-flex items-center gap-1 align-middle">
                             {a.type === 'virtual' ? <><Monitor size={11} /> Virtual</> : <><Building2 size={11} /> In-person</>}
                           </span>
                         </div>
-                        {patient?.phone && (
-                          <div className="text-xs text-[#4A6058] mt-0.5 flex items-center gap-1"><Phone size={11} /> {patient.phone}</div>
+                        {patientPhone && (
+                          <div className="text-xs text-[#4A6058] mt-0.5 flex items-center gap-1"><Phone size={11} /> {patientPhone}</div>
                         )}
                       </div>
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusClass}`}>
