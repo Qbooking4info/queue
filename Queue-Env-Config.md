@@ -10,12 +10,15 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL — used by both browser and server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key — safe to expose to the browser; RLS enforces access control |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service-role key — **server-only**; never expose to the browser. Used by `createAdminClient()` to bypass RLS in API routes |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry DSN for error monitoring. Unset = Sentry is fully disabled (no-op init, zero overhead) |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | No | Enables source map upload on build. Unset = build skips upload, no functional change |
 
 **Template:**
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+NEXT_PUBLIC_SENTRY_DSN=<sentry-dsn>
 ```
 
 > `NEXT_PUBLIC_SITE_URL` is also read by `/api/clear-session` for the redirect target — defaults to `http://localhost:3000` if unset. Add it in production:
@@ -31,11 +34,15 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 |---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL — bundled into the app at build time |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key — bundled into the app; RLS enforces access control |
+| `EXPO_PUBLIC_API_URL` | Yes | Base URL of the web app's API (e.g. `https://queue-web-omega.vercel.app`). Used for `deleteAccount` and the cached `/api/public/hospitals` reads — falls back to a direct Supabase query if unreachable |
+| `EXPO_PUBLIC_SENTRY_DSN` | No | Sentry DSN for error monitoring. Unset = Sentry is fully disabled |
 
 **Template:**
 ```bash
 EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+EXPO_PUBLIC_API_URL=https://<your-vercel-domain>
+EXPO_PUBLIC_SENTRY_DSN=<sentry-dsn>
 ```
 
 > The mobile app uses the same Supabase project as the web app. Both the URL and anon key are identical to the web values.

@@ -60,13 +60,15 @@
         }
       ],
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      "@sentry/react-native"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/a46342ec-6f59-459a-8885-da9aab8d39e0"
-    }
+    },
+    "owner": "qbooking"
   }
 }
