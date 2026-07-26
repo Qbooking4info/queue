@@ -23,6 +23,8 @@ interface AuthState {
   doctorProfile: DoctorProfile | null
   staffProfile:  StaffProfile  | null
   loading:       boolean
+  staffMode:     boolean
+  setStaffMode:  (v: boolean) => void
   signIn:        (email: string, password: string) => Promise<string | null>
   signUp:        (email: string, password: string, fullName: string, phone: string) => Promise<string | null>
   signOut:       () => Promise<void>
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
   const [staffProfile,  setStaffProfile]  = useState<StaffProfile  | null>(null)
   const [loading,       setLoading]       = useState(true)
+  const [staffMode,     setStaffMode]     = useState(false)
 
   const initialLoadDone = useRef(false)
 
@@ -107,7 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Always check doctor first — doctor accounts may not have a users row
     const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '')
     if (!isDoctor) {
-      await fetchStaffProfile(data?.full_name ?? '')
+      const isStaff = await fetchStaffProfile(data?.full_name ?? '')
+      // Auto-enable staff mode on first login for staff accounts that have no patient booking history
+      if (isStaff) setStaffMode(true)
+    } else {
+      // Doctors auto-enter specialist mode
+      setStaffMode(true)
     }
   }
 
@@ -169,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    setStaffMode(false)
     setDoctorProfile(null)
     setStaffProfile(null)
     await supabase.auth.signOut()
@@ -177,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, doctorProfile, staffProfile, loading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, doctorProfile, staffProfile, loading, staffMode, setStaffMode, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

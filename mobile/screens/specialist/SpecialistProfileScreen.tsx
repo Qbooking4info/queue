@@ -32,7 +32,7 @@ interface Stats {
 
 export function SpecialistProfileScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, doctorProfile, signOut }   = useAuth()
+  const { user, doctorProfile, signOut, setStaffMode } = useAuth()
   const [doctor,       setDoctor]       = useState<DoctorDetails | null>(null)
   const [stats,        setStats]        = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
   const [loading,      setLoading]      = useState(true)
@@ -166,6 +166,17 @@ export function SpecialistProfileScreen({ navigation }: Props) {
             <Text style={[st.bio, { color: t.textSecondary }]}>{doctor.bio}</Text>
           </View>
         )}
+
+        {/* Switch to Patient Mode */}
+        <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
+          style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14 }]}>
+          <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+          <View style={{ flex: 1 }}>
+            <Text style={[st.rowLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
+            <Text style={[{ fontSize: 11, color: t.textMuted, marginTop: 1 }]}>Book appointments as a patient</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+        </TouchableOpacity>
 
         {/* Settings */}
         <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>

@@ -3,14 +3,10 @@ import { useState } from 'react'
 import React from 'react'
 import * as Sentry from '@sentry/react-native'
 
-// No-ops if EXPO_PUBLIC_SENTRY_DSN is unset — safe to leave in place until
-// a Sentry project/DSN exists.
 if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    tracesSampleRate: 0.1,
-  })
+  Sentry.init({ dsn: process.env.EXPO_PUBLIC_SENTRY_DSN, tracesSampleRate: 0.1 })
 }
+
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -21,8 +17,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { ThemeProvider, useTheme }     from './contexts/ThemeContext'
 import { AuthProvider, useAuth }       from './contexts/AuthContext'
 import { LocationProvider }            from './contexts/LocationContext'
-import { usePushNotifications }    from './hooks/usePushNotifications'
+import { usePushNotifications }        from './hooks/usePushNotifications'
 
+// Patient screens
 import { SplashScreen }             from './screens/SplashScreen'
 import { LoginScreen }              from './screens/LoginScreen'
 import { RegisterScreen }           from './screens/RegisterScreen'
@@ -45,103 +42,97 @@ import { InsuranceScreen }             from './screens/InsuranceScreen'
 import { SupportScreen }               from './screens/SupportScreen'
 import { VideoCallScreen }             from './screens/VideoCallScreen'
 
+// Specialist screens
 import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScreen'
 import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
 import { DoctorVideoCallScreen }   from './screens/specialist/DoctorVideoCallScreen'
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+
+// Front desk / Admin screens
 import { FrontDeskQueueScreen }   from './screens/frontdesk/FrontDeskQueueScreen'
 import { FrontDeskProfileScreen } from './screens/frontdesk/FrontDeskProfileScreen'
 import { AdminDashboardScreen }   from './screens/admin/AdminDashboardScreen'
 
-const Tab        = createBottomTabNavigator()
-const Stack      = createNativeStackNavigator()
-const DocTab     = createBottomTabNavigator()
-const DocStack   = createNativeStackNavigator()
-const FDTab      = createBottomTabNavigator()
-const FDStack    = createNativeStackNavigator()
+// New staff screens
+import { StaffAppointmentsScreen } from './screens/staff/StaffAppointmentsScreen'
+import { WalkInBookingScreen }     from './screens/staff/WalkInBookingScreen'
+import { StaffAnalyticsScreen }    from './screens/staff/StaffAnalyticsScreen'
+import { StaffManagementScreen }   from './screens/staff/StaffManagementScreen'
+import { HospitalSettingsScreen }  from './screens/staff/HospitalSettingsScreen'
+import { StaffMoreScreen }         from './screens/staff/StaffMoreScreen'
+
+// Onboarding
+import { HospitalOnboardingScreen } from './screens/onboarding/HospitalOnboardingScreen'
+
+const Tab      = createBottomTabNavigator()
+const Stack    = createNativeStackNavigator()
+const DocTab   = createBottomTabNavigator()
+const DocStack = createNativeStackNavigator()
+const FDTab    = createBottomTabNavigator()
+const FDStack  = createNativeStackNavigator()
 
 function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
   return <Ionicons name={name} size={22} color={color} />
 }
 
+// ── Patient navigator ─────────────────────────────────────────────────────────
+
 function MainTabs() {
   const { theme: t } = useTheme()
   const insets = useSafeAreaInsets()
-  const tabBarHeight = 52 + insets.bottom
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
-        tabBarActiveTintColor: t.accent,
-        tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-      }}>
-      <Tab.Screen name="Home" component={HomeScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />, tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Search" component={SearchScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />, tabBarLabel: 'Search' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Bookings' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    <Tab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+    }}>
+      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Bookings' }} />
+      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,         tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
 }
 
+function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="MainTabs"             component={MainTabs} />
+      <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
+      <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
+      <Stack.Screen name="Confirmation"         component={ConfirmationScreen}         options={{ animation: 'fade' }} />
+      <Stack.Screen name="Notifications"        component={NotificationsScreen} />
+      <Stack.Screen name="AppointmentDetail"    component={AppointmentDetailScreen} />
+      <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
+      <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="MedicalHistory"       component={MedicalHistoryScreen} />
+      <Stack.Screen name="Dependents"           component={DependentsScreen} />
+      <Stack.Screen name="Prescriptions"        component={PrescriptionsScreen} />
+      <Stack.Screen name="PrivacySecurity"      component={PrivacySecurityScreen} />
+      <Stack.Screen name="Insurance"            component={InsuranceScreen} />
+      <Stack.Screen name="Support"              component={SupportScreen} />
+      <Stack.Screen name="VideoCall"            component={VideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
+      <Stack.Screen name="HospitalOnboarding"  component={HospitalOnboardingScreen} />
+    </Stack.Navigator>
+  )
+}
+
+// ── Specialist navigator ──────────────────────────────────────────────────────
+
 function SpecialistTabs() {
   const { theme: t } = useTheme()
   const insets = useSafeAreaInsets()
-  const tabBarHeight = 52 + insets.bottom
   return (
-    <DocTab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
-        tabBarActiveTintColor:   t.accent,
-        tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-      }}>
-      <DocTab.Screen name="Queue" component={SpecialistQueueScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
-      <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    <DocTab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+    }}>
+      <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
+      <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,     tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
-  )
-}
-
-function FrontDeskTabs() {
-  const { theme: t } = useTheme()
-  const { staffProfile } = useAuth()
-  const insets = useSafeAreaInsets()
-  const tabBarHeight = 52 + insets.bottom
-  const isAdmin = staffProfile?.role === 'hospital_admin' || staffProfile?.role === 'clinic_admin'
-  return (
-    <FDTab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: tabBarHeight },
-        tabBarActiveTintColor:   t.accent,
-        tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-      }}>
-      {isAdmin && (
-        <FDTab.Screen name="FDDashboard" component={AdminDashboardScreen}
-          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Dashboard' }} />
-      )}
-      <FDTab.Screen name="FDQueue"   component={FrontDeskQueueScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
-      <FDTab.Screen name="FDProfile" component={FrontDeskProfileScreen}
-        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
-    </FDTab.Navigator>
-  )
-}
-
-function FrontDeskStack() {
-  return (
-    <FDStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <FDStack.Screen name="FrontDeskTabs" component={FrontDeskTabs} />
-    </FDStack.Navigator>
   )
 }
 
@@ -150,33 +141,74 @@ function SpecialistStack() {
     <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
-      <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any}
-        options={{ animation: 'fade', gestureEnabled: false }} />
+      <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
     </DocStack.Navigator>
   )
 }
 
-function AppStack() {
+// ── Staff / Admin navigator ───────────────────────────────────────────────────
+
+function StaffTabs() {
+  const { theme: t } = useTheme()
+  const { staffProfile } = useAuth()
+  const insets = useSafeAreaInsets()
+  const role = staffProfile?.role
+
+  const isAdmin       = role === 'hospital_admin'
+  const isClinicAdmin = role === 'clinic_admin'
+  const isFrontDesk   = role === 'front_desk'
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <Stack.Screen name="MainTabs"          component={MainTabs} />
-      <Stack.Screen name="HospitalProfile"   component={HospitalProfileScreen} />
-      <Stack.Screen name="BookingFlow"       component={BookingFlowScreen} />
-      <Stack.Screen name="Confirmation"      component={ConfirmationScreen} options={{ animation: 'fade' }} />
-      <Stack.Screen name="Notifications"     component={NotificationsScreen} />
-      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
-      <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
-      <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
-      <Stack.Screen name="MedicalHistory"    component={MedicalHistoryScreen} />
-      <Stack.Screen name="Dependents"        component={DependentsScreen} />
-      <Stack.Screen name="Prescriptions"     component={PrescriptionsScreen} />
-      <Stack.Screen name="PrivacySecurity"   component={PrivacySecurityScreen} />
-      <Stack.Screen name="Insurance"         component={InsuranceScreen} />
-      <Stack.Screen name="Support"           component={SupportScreen} />
-      <Stack.Screen name="VideoCall"         component={VideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
-    </Stack.Navigator>
+    <FDTab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+    }}>
+      {/* Dashboard — admin & clinic admin */}
+      {(isAdmin || isClinicAdmin) && (
+        <FDTab.Screen name="FDDashboard" component={AdminDashboardScreen}
+          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Dashboard' }} />
+      )}
+
+      {/* Queue — all roles */}
+      <FDTab.Screen name="FDQueue" component={FrontDeskQueueScreen}
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
+
+      {/* Walk-in — front desk & admin */}
+      {(isAdmin || isClinicAdmin || isFrontDesk) && (
+        <FDTab.Screen name="WalkIn" component={WalkInBookingScreen}
+          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person-add' : 'person-add-outline'} {...p} />, tabBarLabel: 'Walk-in' }} />
+      )}
+
+      {/* Appointments — all roles */}
+      <FDTab.Screen name="StaffAppointments" component={StaffAppointmentsScreen}
+        options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Bookings' }} />
+
+      {/* More — admin gets analytics/staff/settings; others get profile */}
+      {(isAdmin || isClinicAdmin) ? (
+        <FDTab.Screen name="StaffMore" component={StaffMoreScreen}
+          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'} {...p} />, tabBarLabel: 'More' }} />
+      ) : (
+        <FDTab.Screen name="FDProfile" component={FrontDeskProfileScreen}
+          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+      )}
+    </FDTab.Navigator>
   )
 }
+
+function StaffStack() {
+  return (
+    <FDStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <FDStack.Screen name="StaffTabs"       component={StaffTabs} />
+      <FDStack.Screen name="StaffAnalytics"  component={StaffAnalyticsScreen} />
+      <FDStack.Screen name="StaffManagement" component={StaffManagementScreen} />
+      <FDStack.Screen name="HospitalSettings" component={HospitalSettingsScreen} />
+    </FDStack.Navigator>
+  )
+}
+
+// ── Auth navigator ────────────────────────────────────────────────────────────
 
 function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
   return (
@@ -187,14 +219,15 @@ function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
   )
 }
 
+// ── Root navigator ────────────────────────────────────────────────────────────
+
 function AppNavigator() {
   const [splashDone,   setSplashDone]   = useState(false)
   const [initialRoute, setInitialRoute] = useState<'Login' | 'Register'>('Login')
-  const { session, loading, user, doctorProfile, staffProfile } = useAuth()
+  const { session, loading, user, doctorProfile, staffProfile, staffMode } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
-  // Wait for Supabase to restore any existing session before deciding what to show
   if (loading) {
     return (
       <SafeAreaProvider>
@@ -205,20 +238,22 @@ function AppNavigator() {
     )
   }
 
-  // Already authenticated — go straight into the app, skip splash
   if (session) {
+    let content: React.ReactElement
+    if (staffMode && doctorProfile) {
+      content = <SpecialistStack />
+    } else if (staffMode && staffProfile) {
+      content = <StaffStack />
+    } else {
+      content = <AppStack />
+    }
     return (
       <SafeAreaProvider>
-        <NavigationContainer>
-          {doctorProfile ? <SpecialistStack />
-            : staffProfile ? <FrontDeskStack />
-            : <AppStack />}
-        </NavigationContainer>
+        <NavigationContainer>{content}</NavigationContainer>
       </SafeAreaProvider>
     )
   }
 
-  // No session — show splash first, then auth screens
   if (!splashDone) {
     return (
       <SafeAreaProvider>

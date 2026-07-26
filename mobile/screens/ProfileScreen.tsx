@@ -10,7 +10,7 @@ interface Props { navigation?: any }
 
 export function ProfileScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, signOut }                  = useAuth()
+  const { user, signOut, staffProfile, doctorProfile, setStaffMode } = useAuth()
   const [signingOut, setSigningOut]         = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [idCopied, setIdCopied]             = useState(false)
@@ -116,6 +116,7 @@ export function ProfileScreen({ navigation }: Props) {
           { icon: 'notifications-outline' as const,      label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => { haptics.tap(); navigation?.navigate('Notifications') } },
           { icon: 'lock-closed-outline' as const,        label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => { haptics.tap(); navigation?.navigate('PrivacySecurity') } },
           { icon: 'chatbubbles-outline' as const,        label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => { haptics.tap(); navigation?.navigate('Support') } },
+          { icon: 'business-outline' as const,          label: 'Register a hospital',         sub: 'Set up your hospital on Queue',           onPress: () => { haptics.tap(); navigation?.navigate('HospitalOnboarding') } },
         ].map(item => (
           <TouchableOpacity key={item.label} onPress={item.onPress}
             style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -127,6 +128,23 @@ export function ProfileScreen({ navigation }: Props) {
             <Text style={[styles.menuArrow, { color: t.textMuted }]}>›</Text>
           </TouchableOpacity>
         ))}
+
+        {/* Switch to Staff/Doctor Mode */}
+        {(staffProfile || doctorProfile) && (
+          <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(true) }}
+            style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 8 }]}>
+            <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.menuLabel, { color: t.textPrimary }]}>
+                Switch to {doctorProfile ? 'Doctor' : 'Staff'} Mode
+              </Text>
+              <Text style={[styles.menuSub, { color: t.textMuted }]}>
+                {doctorProfile ? 'Access your specialist queue' : 'Access the hospital portal'}
+              </Text>
+            </View>
+            <Text style={[styles.menuArrow, { color: '#5B9EFF' }]}>›</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Sign out */}
         {!confirmVisible ? (
