@@ -91,3 +91,12 @@ review back to a specific patient/appointment. Other public-read tables (`hospit
 `slot_overrides`, `availability_templates`, `doctor_specialties`) were spot-checked and appear
 to hold only structural/scheduling data, not PII -- not re-verified column-by-column beyond
 that spot check.
+
+## 2026-07-26 — Task 8: account deletion retention model — product decision, not made here
+
+Fixed the patient_id/auth_uid bug so appointments actually get cancelled before the auth user
+is deleted (see commit f8dda4c). Left the hard-delete model itself unchanged, per explicit
+user decision: "fix the bug only, keep hard delete for now." The audit's alternative --
+anonymizing the `users` row instead of calling `auth.admin.deleteUser()`, to align with
+Nigerian medical record retention obligations -- is still on the table as a future decision,
+not implemented here.
