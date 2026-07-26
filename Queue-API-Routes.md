@@ -41,12 +41,18 @@ Resolves the caller's role from their session. Used by `AdminContext` on every d
 | Auth | Session cookie |
 | Returns | `{ role, hospitalId?, clinicId?, doctorId?, displayName }` or `null` |
 
-**Role resolution order:**
-1. `users.is_super_admin = true` → `super_admin`
-2. Row in `hospital_admins` → `hospital_admin`
-3. Row in `clinic_admins` (by `user_id`) → `clinic_admin` or `front_desk`
-4. Row in `doctors` (by `auth_user_id`) → `doctor`
-5. Row in `clinic_admins` (by `auth_user_id` fallback) → `clinic_admin` or `front_desk`
+**Role resolution order** (updated after Task 10's `clinic_admins` cleanup — the table's
+`auth_user_id` column was dropped; every clinic_admin/front_desk row now resolves via
+`user_id` only, confirmed zero rows depended on the old column):
+1. Active row in `platform_admins` (by `user_id`) → `super_admin`
+2. Row in `hospital_admins` with `role IN ('admin', 'owner')` → `hospital_admin`; `role = 'front_desk'` → `front_desk`
+3. Row in `clinic_admins` (by `user_id`) → `clinic_admin` or `front_desk` (by `role` column)
+4. Row in `doctors` (by `user_id`, then `auth_user_id`) → `doctor`
+
+`requireRole()` (`web/src/lib/supabase/auth-server.ts`) follows the same order and is
+the one place this logic should live — `/api/me/role` and `admin-api.ts`'s
+`getUserRole()` duplicate it for historical reasons; keep all three in sync if this
+order ever changes.
 
 ---
 
@@ -216,6 +222,12 @@ Creates a clinic staff member (clinic_admin or front_desk). Creates Supabase Aut
 | Body | `{ clinicId, hospitalId, staffName, staffEmail, tempPassword, role: 'clinic_admin' | 'front_desk' }` |
 | Returns | `{ success: true }` |
 
+Scoping (added after a cross-tenant IDOR was found — a clinic admin at Hospital A could
+previously POST Hospital B's IDs): `hospitalId` must equal `caller.hospitalId` unless
+`super_admin`; `clinicId` must belong to that `hospitalId`; a `clinic_admin` caller may
+only create staff in their own clinic and may only create `front_desk` (not another
+`clinic_admin`). `role` is allowlisted and `tempPassword` must be ≥12 characters.
+
 ---
 
 ### `PATCH /api/clinic-staff`
@@ -287,15 +299,25 @@ Looks up a registered patient by patient number or phone number for the walk-in 
 | PHI note | `super_admin` excluded — patient contact details are PHI |
 | Returns | `{ found: boolean, patient?: { id, full_name, phone, patient_number, email } }` |
 
+Scoping: only matches a patient who has an existing appointment at `caller.hospitalId`
+(`findLinkablePatient()`). This used to be a platform-wide lookup — any front desk
+account could confirm whether a phone number or patient reference existed anywhere on
+the platform. A patient with no prior relationship to the caller's hospital now returns
+`found: false`; staff link the walk-in in person instead.
+
 ---
 
 ### `POST /api/appointments/walkin`
-Creates a walk-in appointment. Attempts to link to a registered patient by patient_number or phone. Enforces monthly booking cap (belt-and-suspenders above the DB trigger).
+Creates a walk-in appointment. Attempts to link to a registered patient by patient_number or phone (same hospital-scoped lookup as the GET above). Enforces monthly booking cap (belt-and-suspenders above the DB trigger). Rate limited: 100/hour per hospital.
 
 | Field | Value |
 |---|---|
 | Auth | `requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])` |
 | PHI note | `super_admin` excluded — walk-in intake creates patient records |
+
+Scoping (added after a cross-tenant IDOR): `hospitalId` must equal `caller.hospitalId`
+unless `super_admin`; `doctorId`/`clinicId`, if given, must belong to that hospital; a
+`front_desk` caller may only book into their own clinic.
 
 **Body:**
 ```json
@@ -316,6 +338,42 @@ Creates a walk-in appointment. Attempts to link to a registered patient by patie
 **Returns:** `{ id: uuid, bookingRef: "WLK-XXXXXX", linked: boolean }`
 
 > `linked: true` means the walk-in was matched and linked to an existing patient account.
+
+---
+
+## Dashboard Data
+
+Added to move ~19 `'use client'` dashboard components off a service-role client that was
+directly reachable from the browser (`web/src/lib/supabase/admin-client.ts` /
+`admin-api.ts`'s `adminDb`) — see `AUDIT-FINDINGS.md` and the git history for the full
+incident and the component-by-component migration. Every route below follows the same
+shape: `requireRole([...])`, then scope every query by `caller.hospitalId` /
+`caller.clinicId` / `caller.doctorId` from the resolved session — never by an ID read
+from the request. Full request/response bodies are in each route file; this is a map of
+what exists and what replaced what.
+
+| Route | Replaces (`admin-api.ts`) | Notes |
+|---|---|---|
+| `GET /api/dashboard/bootstrap` | `getHospital`, `getHospitalStats`, `getClinicStats`, `getDoctors`, `getTodayAppointments`, `getDoctorTodayAppointments`, `getAllHospitals`, `getClinicDetail`, `getDoctorProfile` | `AdminContext`'s bootstrap — every dashboard page's initial load. `?hospitalId=` is honoured only for `super_admin` ("switch hospital") |
+| `GET /api/patients/[id]` | `getPatientProfile`, `getPatientMedicalHistory` | Staff may view a patient's chart only if that patient has an appointment at the caller's hospital — `patient_medical_history` has no staff-read RLS policy, so this check lives in the route |
+| `POST /api/appointments/[id]/vitals` | `updateAppointmentVitals` | `recorded_by_auth_id` comes from the session, not a client-supplied value |
+| `GET /api/appointments?from&to` | `getAppointments`, `getClinicAppointments`, `getDoctorAppointments` | Also returns the doctors list in the same response |
+| `PATCH /api/appointments/[id]` | `assignDoctorToAppointment`, `markNoShow`, `approveAppointment`, `rejectAppointment`, `checkInAppointment`, `startConsultation`, `endConsultation`, `updateAppointmentStatus` | Action discriminator: `assign_doctor`, `mark_no_show`, `approve`, `reject`, `check_in`, `start_consultation`, `end_consultation`, `set_status` (bare status flip, no transition guard — matches the original `updateAppointmentStatus` exactly, distinct from `check_in`/`end_consultation`'s queue-position logic) |
+| `GET /api/appointments/queue` | `getQueueForToday` | Today's physical queue (scheduled today OR checked in today) |
+| `GET /api/appointments/stats?from&to` | `getRangeStats`, `getClinicRangeStats` | |
+| `GET/PATCH /api/doctors/me` | `getDoctorAvgConsultDuration`, `setDoctorAvailability` | Doctor self-service, keyed on `caller.doctorId` |
+| `GET /api/doctors/unassigned` | `getUnassignedDoctors` | |
+| `GET/PATCH/DELETE /api/clinics/[clinicId]` | `getClinicDetail`, `getClinicDoctors`, `getClinicStaff`, `getClinicAppointments`, `getClinicRangeStats`, `getClinicHours`, `getHospitalHours`, `updateClinic`, `toggleClinicActive`, `setEmergencyClinic`/`clearEmergencyClinic`, `updateClinicHours`/`clearClinicHours`, `deleteClinic` | `DELETE` is `super_admin`/`hospital_admin` only — deliberately excludes `clinic_admin` (the original had no check at all); flagged for product confirmation |
+| `POST /api/clinics/[clinicId]/doctors`, `DELETE .../doctors/[doctorId]` | `assignDoctorToClinic`, `createClinicDoctor`, `removeDoctorFromClinic` | |
+| `GET/POST /api/hospitals/[id]/settings` | `getHospitalSettings`, `updateHospitalSettings`, `getHospitalHours`, `updateHospitalHours` | `super_admin`/`hospital_admin` only |
+| `GET /api/hospitals/[id]/activity` | `getRecentActivity` | Dashboard notification bell |
+| `POST /api/hospitals/[id]/specialties`, `DELETE .../specialties/[specialtyId]` | `addHospitalSpecialty`, `removeHospitalSpecialty` | |
+| `GET/POST /api/services`, `PATCH/DELETE /api/services/[serviceId]` | `getHospitalServices`, `getRegisteredSpecialties`, `createService`, `updateService`, `toggleServiceActive`, `deleteService` | |
+| `GET /api/schedule?weekStart&doctorId&clinicId` | `getWeekAppointments`, `getHospitalHours`, `getClinicHours` | A `doctor` caller is forced onto their own `doctorId` regardless of the query param |
+
+`getAllSpecialties` was **not** given a route — `specialties` has a public RLS read
+policy, so the pages that listed all specialties (doctor add form, services page)
+fetch it via the caller's own anon-key client instead.
 
 ---
 

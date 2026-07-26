@@ -45,6 +45,16 @@ GET /rest/v1/hospitals?id=eq.{id}
   &select=*,hospital_specialties(specialty_id,specialties(name,icon)),hospital_operating_hours(*),hospital_clinics(id,name,description,is_active)
 ```
 
+> `select=*` here is illustrative, not literal — as of migration `20260726000004`,
+> `anon` no longer has table-level SELECT on `hospitals` or `doctors` at all (a direct
+> `select=*`/`select=email,...` now gets `42501`); it's granted SELECT on an explicit
+> column allowlist instead (excludes `hospitals.email`/`registration_number`/
+> `mdcn_accreditation`). The actual public directory query lives in
+> `web/src/lib/public-hospital-select.ts` (web) and `mobile/lib/api.ts`'s `HOSPITAL_SELECT`
+> (mobile's direct-Supabase fallback) — keep both in sync with the grant if either
+> changes. See `AUDIT-FINDINGS.md` for why this needed a DB-level fix, not just an
+> application-layer column list.
+
 ### List doctors for a hospital
 
 ```
@@ -96,6 +106,13 @@ Body: {
 RLS: authenticated patient can insert their own appointment (patient_id = auth.uid()).
 
 **Important:** The plan's monthly booking cap is enforced by a DB trigger on appointments INSERT. If the limit is hit, the insert fails with a custom Postgres error.
+
+`time_slots.booked_count` is incremented by the web API's booking flow using the
+service-role client, not by the mobile client directly. The `increment_slot_booking`
+RPC exists in the schema but has no client call site in either app — as of migration
+`20260726000002` it's granted to `service_role` only (previously `anon` and
+`authenticated` could both call it with no ownership check, letting anyone drive any
+doctor's `booked_count` to its cap).
 
 ### Cancel appointment
 
@@ -165,6 +182,23 @@ GET /rest/v1/appointments
 ```
 
 RLS: doctor can read appointments where `doctor_id` matches their `doctors.id`.
+
+### Doctor queue (RPC, `get_doctor_queue`)
+
+```
+POST /rest/v1/rpc/get_doctor_queue
+Body: { p_doctor_id, p_date, p_today }
+```
+
+Matches reassigned/OPD appointments the plain REST query above doesn't (via
+`assigned_doctor_id`, and `check_in_date` for a walk-in that checked in today under a
+different originally-booked date). `SECURITY DEFINER`, so it bypasses RLS by design —
+**as of `20260726000001`, it requires the caller to be the doctor themselves or active
+staff at that doctor's hospital, raising `42501` otherwise.** Previously granted to
+`anon` with no caller check at all: doctor IDs are enumerable (`doctors` has a public
+read policy) and the anon key ships in the APK, so any unauthenticated caller could pull
+patient names, phone numbers and visit reasons for any doctor on any date. See
+`Queue-RLS-Policies.md` and `AUDIT-FINDINGS.md` for the full incident.
 
 ### Record vitals
 
@@ -260,5 +294,13 @@ Direct Supabase PostgREST calls return Postgres errors in the form `{ message, d
 | POST /api/onboarding | 5 | per user per hour |
 | POST /api/clinic-staff | 20 | per hospital per hour |
 | POST /api/doctors/create | 10 | per hospital per hour |
+| POST /api/appointments/walkin | 100 | per hospital per hour |
+| POST /api/doctors/schedule | 20 | per hospital per hour |
+| GET /api/geocode | 30 | per user per hour |
+| DELETE /api/account | 3 | per user per hour |
 
 Rate limit responses return HTTP 403 with code `FORBIDDEN`.
+
+`checkRateLimit()` fails open (allows the request) if its underlying RPC errors, logged
+via `console.error` — a defensible availability choice, but it means a misconfiguration
+disables rate limiting everywhere; check server logs if a route's limit stops applying.

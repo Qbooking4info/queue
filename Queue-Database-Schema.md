@@ -155,7 +155,29 @@ Immutable record of every vitals save. One row per save event.
 | `bmi` | float8 | yes | Calculated at write time |
 
 **Index:** `(appointment_id, recorded_at DESC)`  
-**RLS:** Enabled; service-role writes only. No SELECT policies yet.
+**RLS:** Enabled; writes are service-role only. Two SELECT policies (verified directly
+against production 2026-07-26, applied outside the tracked migration history — see
+`Queue-RLS-Policies.md`): the treating doctor, and front-desk staff scoped to their
+hospital via `clinic_admins`.
+
+---
+
+### `counter_reconciliation_log` *(added July 2026)*
+Logs `hospitals`/`doctors` denormalised counter values that were wrong, immediately
+before `recompute_denormalised_counters()` (scheduled nightly at 02:00 UTC via
+`pg_cron`) overwrites them — so drift is visible instead of silently self-healing.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `ran_at` | timestamptz | no | Default: `now()` |
+| `entity_type` | text | no | `'hospital'` or `'doctor'` |
+| `entity_id` | uuid | no | |
+| `column_name` | text | no | e.g. `avg_rating`, `total_bookings` |
+| `old_value` | text | yes | |
+| `new_value` | text | yes | |
+
+**RLS:** Enabled; readable by active platform admins only.
 
 ---
 
@@ -182,10 +204,13 @@ Links users to clinics with a scoped role (`clinic_admin` or `front_desk`).
 | `clinic_id` | uuid | no | FK → hospital_clinics |
 | `hospital_id` | uuid | no | FK → hospitals |
 | `user_id` | uuid | no | FK → users |
-| `auth_user_id` | uuid | yes | Direct Supabase Auth UID (fallback path) |
 | `role` | text | yes | `clinic_admin` or `front_desk` |
 | `is_active` | boolean | yes | Deactivate without deleting |
 | `created_at` | timestamptz | yes | |
+
+> Used to also have `auth_user_id` (a second identity path alongside `user_id`) — dropped
+> after confirming zero production rows depended on it (`user_id` was already NOT NULL in
+> practice). `requireRole()` and this table now have a single identity path.
 
 ### `hospital_clinics`
 Individual clinics within a multi-clinic hospital.
@@ -556,3 +581,11 @@ Batch hospital payouts.
 | `20260714000000` | Add `latitude`, `longitude` (double precision) to hospitals |
 | `20260719000000` | Create `vitals_audit_log` table + RLS |
 | `20260719000001` | `guard_appointment_status` trigger + `enforce_plan_booking_limit` trigger |
+| … | *(`20260719000002` through `20260724000004` predate this list and aren't documented here — pre-existing gap, not introduced this session)* |
+| `20260726000001` | `get_doctor_queue`: add caller authorisation check, revoke `anon` grant |
+| `20260726000002` | `increment_slot_booking`: revoke `anon`/`authenticated`, grant `service_role` only |
+| `20260726000003` | *(superseded, kept for history)* first attempt at column-level privacy on `doctors`/`hospitals` — a no-op, see `000004` |
+| `20260726000004` | Column-privacy fix for `doctors`/`hospitals`: revoke `anon`'s table-level SELECT, grant an explicit column allowlist (closes a direct-PostgREST leak of `doctors.email`/`auth_user_id`/`mdcn_number` and `hospitals.email`/`registration_number`/`mdcn_accreditation`) |
+| `20260726000005` | `clinic_admins` identity collapse, prep: fix `vitals_audit_log`'s front-desk policy and `get_doctor_queue` to key on `user_id` instead of the dead `auth_user_id`; `user_id` set NOT NULL |
+| `20260726000006` | `clinic_admins`: drop `auth_user_id` column |
+| `20260726000007` | Add `counter_reconciliation_log` table + `recompute_denormalised_counters()` + nightly `pg_cron` schedule |
