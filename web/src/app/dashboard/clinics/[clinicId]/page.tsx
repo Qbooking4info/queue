@@ -1656,12 +1656,16 @@ export default function ClinicDetailPage() {
                   </td></tr>
                 ) : appts.map((a, i) => {
                   const needsApproval = a.approval_status === 'pending_approval'
+                  const isEmergency = a.urgency === 'emergency'
                   return (
                     <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`,
-                      background: needsApproval
-                        ? 'rgba(239,159,39,0.04)'
-                        : i % 2 === 0 ? C.card : C.rowAlt,
-                      outline: needsApproval ? '1px solid rgba(239,159,39,0.15)' : 'none' }}>
+                      background: isEmergency
+                        ? C.redLight
+                        : needsApproval
+                          ? 'rgba(239,159,39,0.04)'
+                          : i % 2 === 0 ? C.card : C.rowAlt,
+                      boxShadow: isEmergency ? `inset 3px 0 0 ${C.red}` : 'none',
+                      outline: !isEmergency && needsApproval ? '1px solid rgba(239,159,39,0.15)' : 'none' }}>
                       <td style={{ padding: '11px 14px', fontSize: 12, color: C.textSub, whiteSpace: 'nowrap' }}>
                         <div>{new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>{a.start_time}</div>
@@ -1676,6 +1680,13 @@ export default function ClinicDetailPage() {
                         </div>
                       </td>
                       <td style={{ padding: '11px 14px', maxWidth: 200 }}>
+                        {isEmergency && (
+                          <div style={{ fontSize: 10, fontWeight: 700, color: C.red, background: C.redLight,
+                            border: `1px solid ${C.red}`, borderRadius: 6, padding: '1px 6px', marginBottom: 3,
+                            display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <AlertTriangle size={10} /> EMERGENCY
+                          </div>
+                        )}
                         <div style={{ fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {a.reason ?? '—'}
                         </div>
