@@ -1,3 +1,7 @@
+This is the Next.js dashboard + API for [Queue](../README.md) — see the root README for
+project-wide setup (env vars, Supabase CLI, running both `web` and `mobile`) and
+[`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the contribution workflow.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
