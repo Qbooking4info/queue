@@ -20,3 +20,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vercel
+
+# Local build artifacts
+*.apk
+
+# Leftover isolated agent worktrees (Agent tool, isolation: "worktree")
+.claude/worktrees/
