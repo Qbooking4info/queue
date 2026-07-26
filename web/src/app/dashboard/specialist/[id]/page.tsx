@@ -27,6 +27,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
 
   const patient = Array.isArray(appt.users) ? appt.users[0] : appt.users
   const doctor  = Array.isArray(appt.doctors) ? appt.doctors[0] : appt.doctors
+  const patientName = patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in Patient'
 
   const age = patient?.date_of_birth
     ? Math.floor((Date.now() - new Date(patient.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
@@ -48,7 +49,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
             <div className="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-lg font-bold text-green-400 mb-3">
               {patient?.full_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2) ?? '?'}
             </div>
-            <div className="font-bold text-base">{patient?.full_name ?? '—'}</div>
+            <div className="font-bold text-base">{patientName}</div>
             {age && <div className="text-sm text-[#7A9089] mt-0.5">{age} yrs · {patient?.gender ?? '—'}</div>}
             <div className="mt-3 flex flex-col gap-1.5 text-xs text-[#7A9089]">
               {patient?.phone && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18a2 2 0 012-2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 6.91a16 16 0 006.18 6.18l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14z"/></svg>{patient.phone}</div>}
@@ -84,7 +85,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
           {appt.type === 'virtual' && (
             <VideoCallPanel
               appointmentId={appt.id}
-              patientName={patient?.full_name ?? 'Patient'}
+              patientName={patientName}
             />
           )}
 

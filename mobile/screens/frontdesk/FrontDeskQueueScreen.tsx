@@ -20,6 +20,8 @@ interface Appt {
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
+  walkin_patient_name:  string | null
+  walkin_patient_phone: string | null
   patient:          { id: string; full_name: string; phone: string | null } | null
   doctor:           { full_name: string } | null
 }
@@ -63,7 +65,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     const today = new Date().toISOString().split('T')[0]
     let query = (supabase as any)
       .from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, reason, urgency, queue_position, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
+      .select('id, booking_ref, appointment_date, start_time, type, status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
       .eq('hospital_id', hospitalId)
       .order('appointment_date', { ascending: true })
       .order('start_time',       { ascending: true })
@@ -129,7 +131,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
 
   // Client-side search filter (no API call)
   const filtered = search.trim()
-    ? appts.filter(a => a.patient?.full_name?.toLowerCase().includes(search.toLowerCase()))
+    ? appts.filter(a => (a.patient?.full_name ?? a.walkin_patient_name ?? '').toLowerCase().includes(search.toLowerCase()))
     : appts
 
   const active = filtered.filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
@@ -258,8 +260,8 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
     >
       <View style={s.cardTop}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? 'Unknown patient'}</Text>
-          {appt.patient?.phone && <Text style={[s.patientPhone, { color: t.textMuted }]}>{appt.patient.phone}</Text>}
+          <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in Patient'}</Text>
+          {(appt.patient?.phone ?? appt.walkin_patient_phone) && <Text style={[s.patientPhone, { color: t.textMuted }]}>{appt.patient?.phone ?? appt.walkin_patient_phone}</Text>}
           <Text style={[s.meta, { color: t.textMuted }]}>
             {appt.appointment_date !== today ? `${appt.appointment_date} · ` : ''}{fmt12(appt.start_time)}
             {appt.doctor ? ` · Dr. ${appt.doctor.full_name}` : ''}
