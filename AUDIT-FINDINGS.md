@@ -100,3 +100,12 @@ user decision: "fix the bug only, keep hard delete for now." The audit's alterna
 anonymizing the `users` row instead of calling `auth.admin.deleteUser()`, to align with
 Nigerian medical record retention obligations -- is still on the table as a future decision,
 not implemented here.
+
+## 2026-07-26 — Task 11: legacy hospitals.lat/lng columns don't exist
+
+Checked `information_schema.columns` for `hospitals` directly: only `latitude`/`longitude`
+exist. No `lat`/`lng` columns in the current schema, and no application code reads
+`hospitals.lat`/`hospitals.lng` (the one `data.lat`/`data.lon` hit in
+`web/src/app/dashboard/settings/page.tsx` is the Nominatim geocode API response shape,
+unrelated to the hospitals table). Task 11 as written doesn't apply to the current schema —
+nothing to migrate.
