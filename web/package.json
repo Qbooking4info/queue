@@ -10,7 +10,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:rls": "supabase test db"
+    "test:rls": "supabase test db",
+    "gen-types": "bash ../scripts/gen-types.sh",
+    "gen-types:check": "bash ../scripts/gen-types.sh --check"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.68.0",

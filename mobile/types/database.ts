@@ -1,6 +1,3 @@
-// Auto-generated from Supabase schema — do not edit by hand
-// Regenerate with: supabase gen types typescript --linked (from repo root)
-
 export type Json =
   | string
   | number
@@ -391,7 +388,6 @@ export type Database = {
       }
       clinic_admins: {
         Row: {
-          auth_user_id: string | null
           clinic_id: string
           created_at: string | null
           hospital_id: string
@@ -401,7 +397,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          auth_user_id?: string | null
           clinic_id: string
           created_at?: string | null
           hospital_id: string
@@ -411,7 +406,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          auth_user_id?: string | null
           clinic_id?: string
           created_at?: string | null
           hospital_id?: string
@@ -497,6 +491,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      counter_reconciliation_log: {
+        Row: {
+          column_name: string
+          entity_id: string
+          entity_type: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          ran_at: string
+        }
+        Insert: {
+          column_name: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ran_at?: string
+        }
+        Update: {
+          column_name?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ran_at?: string
+        }
+        Relationships: []
       }
       dependents: {
         Row: {
@@ -1042,10 +1066,12 @@ export type Database = {
           daily_booking_limit: number | null
           description: string | null
           email: string | null
+          email_reminders: boolean
           emergency_hours: boolean | null
           emr_system: string | null
           hospital_id: string | null
           id: string
+          is_24_hours: boolean
           is_active: boolean | null
           is_verified: boolean | null
           latitude: number | null
@@ -1059,6 +1085,7 @@ export type Database = {
           requires_referral: boolean | null
           review_count: number | null
           slug: string
+          sms_reminders: boolean
           state: string
           total_bookings: number | null
           type: string | null
@@ -1078,10 +1105,12 @@ export type Database = {
           daily_booking_limit?: number | null
           description?: string | null
           email?: string | null
+          email_reminders?: boolean
           emergency_hours?: boolean | null
           emr_system?: string | null
           hospital_id?: string | null
           id?: string
+          is_24_hours?: boolean
           is_active?: boolean | null
           is_verified?: boolean | null
           latitude?: number | null
@@ -1095,6 +1124,7 @@ export type Database = {
           requires_referral?: boolean | null
           review_count?: number | null
           slug: string
+          sms_reminders?: boolean
           state: string
           total_bookings?: number | null
           type?: string | null
@@ -1114,10 +1144,12 @@ export type Database = {
           daily_booking_limit?: number | null
           description?: string | null
           email?: string | null
+          email_reminders?: boolean
           emergency_hours?: boolean | null
           emr_system?: string | null
           hospital_id?: string | null
           id?: string
+          is_24_hours?: boolean
           is_active?: boolean | null
           is_verified?: boolean | null
           latitude?: number | null
@@ -1131,6 +1163,7 @@ export type Database = {
           requires_referral?: boolean | null
           review_count?: number | null
           slug?: string
+          sms_reminders?: boolean
           state?: string
           total_bookings?: number | null
           type?: string | null
@@ -1193,6 +1226,7 @@ export type Database = {
           family_history: string | null
           id: string
           medications: string | null
+          other_allergies: string | null
           other_conditions: string | null
           patient_id: string
           surgeries: string | null
@@ -1204,6 +1238,7 @@ export type Database = {
           family_history?: string | null
           id?: string
           medications?: string | null
+          other_allergies?: string | null
           other_conditions?: string | null
           patient_id: string
           surgeries?: string | null
@@ -1215,6 +1250,7 @@ export type Database = {
           family_history?: string | null
           id?: string
           medications?: string | null
+          other_allergies?: string | null
           other_conditions?: string | null
           patient_id?: string
           surgeries?: string | null
@@ -1411,21 +1447,24 @@ export type Database = {
           },
         ]
       }
-      rate_limit_log: {
+      rate_limit_counters: {
         Row: {
-          created_at: string
-          id: number
+          count: number
           key: string
+          updated_at: string
+          window_bucket: number
         }
         Insert: {
-          created_at?: string
-          id?: never
+          count?: number
           key: string
+          updated_at?: string
+          window_bucket: number
         }
         Update: {
-          created_at?: string
-          id?: never
+          count?: number
           key?: string
+          updated_at?: string
+          window_bucket?: number
         }
         Relationships: []
       }
@@ -2125,6 +2164,23 @@ export type Database = {
         Args: { p_clinic_id?: string; p_date: string; p_hospital_id: string }
         Returns: number
       }
+      get_doctor_queue: {
+        Args: { p_date: string; p_doctor_id: string; p_today: string }
+        Returns: {
+          appointment_date: string
+          id: string
+          patient_gender: string
+          patient_id: string
+          patient_name: string
+          patient_phone: string
+          queue_position: number
+          reason: string
+          start_time: string
+          status: string
+          type: string
+          urgency: string
+        }[]
+      }
       get_my_staff_profile: {
         Args: never
         Returns: {
@@ -2133,8 +2189,13 @@ export type Database = {
           staff_role: string
         }[]
       }
+      increment_rate_limit: {
+        Args: { p_key: string; p_window_bucket: number }
+        Returns: number
+      }
       increment_slot_booking: { Args: { slot_id: string }; Returns: string }
       is_hospital_admin: { Args: { hospital_uuid: string }; Returns: boolean }
+      recompute_denormalised_counters: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
@@ -2270,7 +2331,6 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
 // ── Convenience row types ────────────────────────────────────────────────────
 // Named `TableRow` (not `Tables`) to avoid colliding with the generated
 // `Tables<>` helper type above.
