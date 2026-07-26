@@ -1,6 +1,16 @@
 import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
 import React from 'react'
+import * as Sentry from '@sentry/react-native'
+
+// No-ops if EXPO_PUBLIC_SENTRY_DSN is unset — safe to leave in place until
+// a Sentry project/DSN exists.
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    tracesSampleRate: 0.1,
+  })
+}
 import { NavigationContainer } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -41,6 +51,7 @@ import { DoctorVideoCallScreen }   from './screens/specialist/DoctorVideoCallScr
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
 import { FrontDeskQueueScreen }   from './screens/frontdesk/FrontDeskQueueScreen'
 import { FrontDeskProfileScreen } from './screens/frontdesk/FrontDeskProfileScreen'
+import { AdminDashboardScreen }   from './screens/admin/AdminDashboardScreen'
 
 const Tab        = createBottomTabNavigator()
 const Stack      = createNativeStackNavigator()
@@ -101,8 +112,10 @@ function SpecialistTabs() {
 
 function FrontDeskTabs() {
   const { theme: t } = useTheme()
+  const { staffProfile } = useAuth()
   const insets = useSafeAreaInsets()
   const tabBarHeight = 52 + insets.bottom
+  const isAdmin = staffProfile?.role === 'hospital_admin' || staffProfile?.role === 'clinic_admin'
   return (
     <FDTab.Navigator
       screenOptions={{
@@ -112,6 +125,10 @@ function FrontDeskTabs() {
         tabBarInactiveTintColor: t.textMuted,
         tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
       }}>
+      {isAdmin && (
+        <FDTab.Screen name="FDDashboard" component={AdminDashboardScreen}
+          options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Dashboard' }} />
+      )}
       <FDTab.Screen name="FDQueue"   component={FrontDeskQueueScreen}
         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />, tabBarLabel: 'Queue' }} />
       <FDTab.Screen name="FDProfile" component={FrontDeskProfileScreen}
@@ -222,7 +239,7 @@ function AppNavigator() {
   )
 }
 
-export default function App() {
+function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -233,3 +250,5 @@ export default function App() {
     </ThemeProvider>
   )
 }
+
+export default process.env.EXPO_PUBLIC_SENTRY_DSN ? Sentry.wrap(App) : App
