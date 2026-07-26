@@ -167,3 +167,20 @@ access* was fully migrated (see the Task 15 clinics/[clinicId] commit), but rest
 JSX into sub-components is a separate, purely-presentational refactor with real risk of
 prop-drilling or conditional-rendering bugs that I can't visually verify in this environment.
 Left for a follow-up pass with browser testing.
+
+## 2026-07-26 — Task 18: design token infrastructure already exists, adoption is incomplete
+
+Checked before attempting this: a token system already exists --
+`web/src/contexts/ThemeContext.tsx` (colors: `accent`, `textMuted`, `border`, etc., consumed
+via `useTheme()` almost everywhere already) and `web/src/lib/typography.ts` (`T` for font
+scale, `SPACE` for spacing scale). The review's "inline styles throughout" finding is really
+about incomplete *adoption* of these existing tokens, not their absence -- many components
+still hardcode `fontSize: 13` or `padding: '10px 14px'` instead of referencing `T.body`/
+`SPACE.md`.
+
+Did not do a mechanical sweep replacing every inline literal across every dashboard component
+-- that's dozens of files, each individually low-risk but the aggregate blast radius is large
+for a P4 hygiene item, and I can't visually verify the result without a running browser.
+Flagging as a follow-up: audit which components already import `T`/`SPACE` vs. which still
+hardcode values, and convert incrementally when next touching each file (per the review's own
+suggestion), rather than as one large mechanical pass.
