@@ -107,10 +107,22 @@ Web API routes use `createAdminClient()` (service role key) and are **not affect
 
 ---
 
+## `patient_medical_history`
+| Policy | Operation | Rule |
+|---|---|---|
+| patients manage their own medical history | ALL | `patient_id IN (SELECT id FROM users WHERE auth_id = auth.uid())` |
+
+> Table predates the migration history (no `CREATE TABLE` in `supabase/migrations/`), so this policy was applied directly against the project rather than via a tracked migration. Verified current as of 2026-07-26. The web dashboard reads/writes this table through the service-role client, which bypasses RLS regardless.
+
+---
+
 ## `vitals_audit_log`
 | Policy | Operation | Rule |
 |---|---|---|
-| *(none yet)* | — | RLS enabled; service role writes only. No SELECT policies defined. |
+| Doctors can read appointment vitals | SELECT | `appointment_id IN (SELECT id FROM appointments WHERE doctor_id IN (SELECT id FROM doctors WHERE auth_user_id = auth.uid()) OR assigned_doctor_id IN (...))` |
+| Front desk can read clinic vitals | SELECT | `appointment_id IN (SELECT id FROM appointments WHERE hospital_id IN (SELECT hospital_id FROM clinic_admins WHERE auth_user_id = auth.uid() AND is_active = true))` |
+
+> RLS enabled, writes remain service-role only (append-only audit log). Policies applied directly against the project rather than via a tracked migration; verified current as of 2026-07-26.
 
 ---
 
