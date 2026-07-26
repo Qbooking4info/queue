@@ -6,7 +6,6 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
-import { getRangeStats, getAppointments } from '@/lib/admin-api'
 import type { AdminAppointment } from '@/lib/admin-api'
 import { CalendarDays, CheckCircle2, XCircle, Star, AlertTriangle, Building2, Video } from 'lucide-react'
 
@@ -53,12 +52,12 @@ export default function AnalyticsPage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    const [s, a] = await Promise.all([
-      getRangeStats(hospital.id, bounds.from, bounds.to),
-      getAppointments(hospital.id, bounds.from, bounds.to),
+    const [statsRes, apptsRes] = await Promise.all([
+      fetch(`/api/appointments/stats?from=${bounds.from}&to=${bounds.to}`),
+      fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`),
     ])
-    setRangeStats(s)
-    setAppts(a)
+    if (statsRes.ok) setRangeStats(await statsRes.json())
+    if (apptsRes.ok) setAppts((await apptsRes.json()).appointments)
     setLoading(false)
   }, [hospital?.id, bounds])
 
