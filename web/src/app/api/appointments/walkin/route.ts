@@ -2,14 +2,45 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { randomBytes } from 'crypto'
 
-// GET — look up a registered patient by patient_number or phone.
+// Only auto-links (or surfaces via lookup) a patient who has an existing
+// relationship with this hospital -- otherwise the walk-in is recorded
+// against the free-text name and phone, and staff can link it properly once
+// the patient confirms identity in person. Prevents front desk at any
+// hospital from using patient_number/phone as a platform-wide probe to
+// confirm whether a given person is registered on Queue at all.
+async function findLinkablePatient(
+  db: ReturnType<typeof createAdminClient>,
+  hospitalId: string,
+  column: 'patient_number' | 'phone',
+  value: string,
+): Promise<{ id: string; full_name: string; phone: string; patient_number: string; email: string } | null> {
+  const { data: user } = await (db.from('users') as any)
+    .select('id, full_name, phone, patient_number, email')
+    .eq(column, value)
+    .limit(1)
+    .single()
+  if (!user) return null
+
+  const { count } = await db
+    .from('appointments')
+    .select('*', { count: 'exact', head: true })
+    .eq('patient_id', user.id)
+    .eq('hospital_id', hospitalId)
+
+  return (count ?? 0) > 0 ? user : null
+}
+
+// GET — look up a registered patient by patient_number or phone, scoped to
+// patients who have previously booked with the caller's own hospital.
 // super_admin excluded: patient contact details are PHI and super_admin
 // has no operational need to query individual patients.
 export async function GET(req: NextRequest) {
   const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   const { searchParams } = new URL(req.url)
   const patientNumber = searchParams.get('patientNumber')?.trim().toUpperCase()
@@ -19,15 +50,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'patientNumber or phone required' }, { status: 400 })
   }
 
-  let query = (db.from('users') as any).select('id, full_name, phone, patient_number, email')
+  if (!caller.hospitalId) return Errors.forbidden()
 
-  if (patientNumber) {
-    query = query.eq('patient_number', patientNumber)
-  } else {
-    query = query.eq('phone', phone!)
-  }
+  const data = patientNumber
+    ? await findLinkablePatient(db, caller.hospitalId, 'patient_number', patientNumber)
+    : await findLinkablePatient(db, caller.hospitalId, 'phone', phone!)
 
-  const { data } = await query.limit(1).single()
   if (!data) return NextResponse.json({ found: false })
 
   return NextResponse.json({
@@ -47,6 +75,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const body = await req.json()
@@ -58,6 +87,31 @@ export async function POST(req: NextRequest) {
     if (!hospitalId || !patientName || !date || !startTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    if (caller.role !== 'super_admin' && caller.hospitalId !== hospitalId) {
+      return Errors.forbidden('Cannot create appointments for another hospital')
+    }
+
+    if (doctorId) {
+      const { data: doc } = await db.from('doctors').select('hospital_id').eq('id', doctorId).single()
+      if (!doc || (doc as any).hospital_id !== hospitalId) {
+        return Errors.validation('Doctor does not belong to this hospital')
+      }
+    }
+
+    if (clinicId) {
+      const { data: cl } = await db.from('hospital_clinics').select('hospital_id').eq('id', clinicId).single()
+      if (!cl || (cl as any).hospital_id !== hospitalId) {
+        return Errors.validation('Clinic does not belong to this hospital')
+      }
+    }
+
+    if (caller.role === 'front_desk' && caller.clinicId && clinicId && clinicId !== caller.clinicId) {
+      return Errors.forbidden('Front desk staff may only book into their own clinic')
+    }
+
+    const allowed = await checkRateLimit(db, `walkin:${hospitalId}`, 100, 3600)
+    if (!allowed) return Errors.forbidden('Too many walk in registrations. Please try again later.')
 
     // ── Plan: subscription status + monthly booking cap ──────────────────────
     // BH3+BH4: fetch subscription (any status) and block suspended/cancelled
@@ -96,26 +150,20 @@ export async function POST(req: NextRequest) {
       if ((count ?? 0) >= maxMonthly) return Errors.planLimitMonthly(maxMonthly)
     }
 
-    // Try to link to a registered patient — look up by patient_number first, then phone
+    // Try to link to a registered patient who has previously booked with this
+    // hospital — look up by patient_number first, then phone. A patient with
+    // no prior relationship to this hospital is not linked; the walk-in is
+    // recorded against the free-text name/phone instead.
     let patientUserId: string | null = null
 
     if (patientNumber?.trim()) {
-      const { data } = await (db.from('users') as any)
-        .select('id')
-        .eq('patient_number', patientNumber.trim().toUpperCase())
-        .limit(1)
-        .single()
-      if (data) patientUserId = data.id
+      const match = await findLinkablePatient(db, hospitalId, 'patient_number', patientNumber.trim().toUpperCase())
+      if (match) patientUserId = match.id
     }
 
     if (!patientUserId && patientPhone?.trim()) {
-      const { data } = await db
-        .from('users')
-        .select('id')
-        .eq('phone', patientPhone.trim())
-        .limit(1)
-        .single()
-      if (data) patientUserId = data.id
+      const match = await findLinkablePatient(db, hospitalId, 'phone', patientPhone.trim())
+      if (match) patientUserId = match.id
     }
 
     // BM7: use cryptographically random suffix — Date.now() modulo collides every ~16 minutes
