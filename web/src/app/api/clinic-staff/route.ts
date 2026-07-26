@@ -4,9 +4,12 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 
+const ALLOWED_STAFF_ROLES = ['front_desk', 'clinic_admin'] as const
+
 export async function POST(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
   if (auth instanceof NextResponse) return auth
+  const { caller } = auth
   const db = createAdminClient()
   try {
     const body = await req.json()
@@ -15,6 +18,40 @@ export async function POST(req: NextRequest) {
 
     if (!clinicId || !hospitalId || !staffName || !staffEmail || !tempPassword) {
       return Errors.validation('Missing required fields')
+    }
+
+    if (!ALLOWED_STAFF_ROLES.includes(role)) {
+      return Errors.validation('Invalid role')
+    }
+
+    if (typeof tempPassword !== 'string' || tempPassword.length < 12) {
+      return Errors.validation('Temporary password must be at least 12 characters')
+    }
+
+    // BC3-shape check: a caller below super_admin may only create staff inside their own hospital.
+    if (caller.role !== 'super_admin' && caller.hospitalId !== hospitalId) {
+      return Errors.forbidden('Cannot create staff for another hospital')
+    }
+
+    // The clinic named in the request must actually belong to that hospital.
+    const { data: clinic } = await db
+      .from('hospital_clinics')
+      .select('hospital_id')
+      .eq('id', clinicId)
+      .single()
+
+    if (!clinic || (clinic as any).hospital_id !== hospitalId) {
+      return Errors.validation('Clinic does not belong to this hospital')
+    }
+
+    // A clinic_admin may only create staff inside their own clinic, and may not mint peers.
+    if (caller.role === 'clinic_admin') {
+      if (caller.clinicId && caller.clinicId !== clinicId) {
+        return Errors.forbidden('Cannot create staff for another clinic')
+      }
+      if (role !== 'front_desk') {
+        return Errors.forbidden('Clinic admins may only create front desk staff')
+      }
     }
 
     // 20 staff creations per hospital per hour
