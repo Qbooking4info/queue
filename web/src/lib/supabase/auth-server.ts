@@ -11,6 +11,7 @@ export interface CallerInfo {
   role: CallerRole
   hospitalId?: string
   clinicId?: string
+  doctorId?: string
 }
 
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
@@ -81,13 +82,21 @@ export async function requireRole(allowed: CallerRole[]): Promise<{ caller: Call
   }
 
   if (!caller) {
+    // Portal-created doctor accounts link via user_id; self-registered ones
+    // via auth_user_id (same comment as admin-api.ts's getUserRole). This
+    // used to only check auth_user_id -- doctors linked via user_id could
+    // never authenticate to a requireRole(['doctor']) route at all. Checked
+    // live: 6 of 92 doctor rows use user_id with no auth_user_id set.
+    const orConditions = [`auth_user_id.eq.${authId}`]
+    if (profile) orConditions.push(`user_id.eq.${profile.id}`)
+
     const { data: doctorRow } = await (db as any)
       .from('doctors')
       .select('id, hospital_id')
-      .eq('auth_user_id', authId)
+      .or(orConditions.join(','))
       .single()
     if (doctorRow) {
-      caller = { authId, role: 'doctor', hospitalId: doctorRow.hospital_id }
+      caller = { authId, role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id }
     }
   }
 
