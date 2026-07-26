@@ -38,7 +38,7 @@ export default function DoctorSchedulePage() {
   const [clearExisting, setClear]       = useState(false)
 
   const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<{ inserted?: number; error?: string } | null>(null)
+  const [result, setResult]     = useState<{ inserted?: number; skippedForHours?: number; error?: string } | null>(null)
   const [slots, setSlots]       = useState<Slot[]>([])
   const [loadingSlots, setLS]   = useState(true)
   const [doctorName, setName]   = useState('')
@@ -213,9 +213,16 @@ export default function DoctorSchedulePage() {
           {result && (
             result.error
               ? <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{result.error}</p>
-              : <p className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
-                  <CheckCircle2 size={14} /> Generated {result.inserted} slots successfully
-                </p>
+              : <div className="flex flex-col gap-2">
+                  <p className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
+                    <CheckCircle2 size={14} /> Generated {result.inserted} slots successfully
+                  </p>
+                  {!!result.skippedForHours && (
+                    <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                      {result.skippedForHours} working day{result.skippedForHours === 1 ? '' : 's'} skipped — outside the clinic's operating hours
+                    </p>
+                  )}
+                </div>
           )}
 
           <button onClick={handleGenerate} disabled={loading}

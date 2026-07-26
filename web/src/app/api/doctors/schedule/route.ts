@@ -58,11 +58,40 @@ export async function POST(req: NextRequest) {
 
   // Verify doctor belongs to this hospital
   const { data: doctor } = await db.from('doctors')
-    .select('id, accepts_virtual')
+    .select('id, accepts_virtual, clinic_id')
     .eq('id', doctor_id)
     .eq('hospital_id', adminRecord.hospital_id)
     .single()
   if (!doctor) return Errors.notFound('Doctor')
+
+  // Slots may only be generated inside the doctor's clinic's declared operating
+  // hours (falling back to the hospital's hours if the clinic has no custom
+  // override, and to the app-wide Mon-Sat 08:00-18:00 default if neither is
+  // set) — otherwise a clinic marking itself "closed" on a day has no effect
+  // on what patients can actually book.
+  type DayHours = { open: string; close: string; closed: boolean }
+  const defaultHoursForDay = (dow: number): DayHours => ({ open: '08:00', close: '18:00', closed: dow === 0 })
+
+  const [{ data: clinicHourRows }, { data: hospitalHourRows }] = await Promise.all([
+    (doctor as any).clinic_id
+      ? (db as any).from('hospital_clinic_hours')
+          .select('day_of_week, open_time, close_time, is_closed')
+          .eq('clinic_id', (doctor as any).clinic_id)
+      : Promise.resolve({ data: [] }),
+    (db as any).from('hospital_operating_hours')
+      .select('day_of_week, open_time, close_time, is_closed')
+      .eq('hospital_id', adminRecord.hospital_id),
+  ])
+
+  type HourRow = { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }
+  const clinicByDay = new Map<number, HourRow>(((clinicHourRows ?? []) as HourRow[]).map(r => [r.day_of_week, r]))
+  const hospitalByDay = new Map<number, HourRow>(((hospitalHourRows ?? []) as HourRow[]).map(r => [r.day_of_week, r]))
+
+  function effectiveHours(dow: number): DayHours {
+    const row = clinicByDay.get(dow) ?? hospitalByDay.get(dow)
+    if (!row) return defaultHoursForDay(dow)
+    return { open: row.open_time.slice(0, 5), close: row.close_time.slice(0, 5), closed: row.is_closed }
+  }
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -74,6 +103,8 @@ export async function POST(req: NextRequest) {
     is_available: boolean; max_capacity: number; booked_count: number
   }[] = []
 
+  let skippedForHours = 0
+
   for (let i = 0; i < days_ahead; i++) {
     const date = new Date(today)
     date.setDate(today.getDate() + i)
@@ -81,10 +112,22 @@ export async function POST(req: NextRequest) {
 
     if (!working_days.includes(dow)) continue
 
+    const hours = effectiveHours(dow)
+    if (hours.closed) { skippedForHours++; continue }
+
+    const [oh, om] = hours.open.split(':').map(Number)
+    const [ch, cm] = hours.close.split(':').map(Number)
+    const openMins = oh * 60 + om
+    const closeMins = ch * 60 + cm
+
     const dateStr = date.toISOString().split('T')[0]
 
-    let cursor = sh * 60 + sm
-    const endMins = eh * 60 + em
+    // Clamp the requested [start_time, end_time] to the clinic/hospital's
+    // actual open window for this day of week.
+    let cursor = Math.max(sh * 60 + sm, openMins)
+    const endMins = Math.min(eh * 60 + em, closeMins)
+
+    if (cursor >= endMins) { skippedForHours++; continue }
 
     while (cursor + slot_duration <= endMins) {
       const sH = String(Math.floor(cursor / 60)).padStart(2, '0')
@@ -112,8 +155,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!slots.length)
-    return Errors.validation('No slots generated — check working days and time range')
+  if (!slots.length) {
+    return Errors.validation(
+      skippedForHours > 0
+        ? 'No slots generated — the requested time range falls outside the clinic’s operating hours on every working day'
+        : 'No slots generated — check working days and time range'
+    )
+  }
 
   // BM5: upsert (not insert) in batches of 500 to prevent duplicate slots when the schedule
   // is regenerated. ON CONFLICT on (doctor_id, slot_date, start_time, is_virtual) is a no-op
@@ -129,7 +177,7 @@ export async function POST(req: NextRequest) {
     inserted += batch.length
   }
 
-  return NextResponse.json({ success: true, inserted })
+  return NextResponse.json({ success: true, inserted, skippedForHours })
 }
 
 // GET — return existing upcoming slots for a doctor
