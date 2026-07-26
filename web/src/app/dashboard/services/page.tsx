@@ -3,10 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, Stethoscope } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import {
-  getAllSpecialties, getRegisteredSpecialties, addHospitalSpecialty, removeHospitalSpecialty,
-  getHospitalServices, createService, updateService, toggleServiceActive, deleteService,
-} from '@/lib/admin-api'
+import { createClient } from '@/lib/supabase/client'
 import type { SpecialtyRow, HospitalService } from '@/lib/admin-api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,10 +47,15 @@ function ServiceModal({
       duration_mins: durationMins ? Number(durationMins) : undefined,
     }
     const res = editing
-      ? await updateService(editing.id, payload)
-      : await createService(hospitalId, payload, clinicId ?? undefined)
+      ? await fetch(`/api/services/${editing.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+      : await fetch('/api/services', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, clinicId: clinicId ?? undefined }),
+        })
     setSaving(false)
-    if (res.error) { setError(res.error); return }
+    if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Failed to save'); return }
     onSave()
   }
 
@@ -187,7 +189,11 @@ function AddSpecialtyModal({
 
   async function add(s: SpecialtyRow) {
     setSaving(s.id)
-    await addHospitalSpecialty(hospitalId, s.id)
+    await fetch(`/api/hospitals/${hospitalId}/specialties`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ specialtyId: s.id }),
+    })
     setSaving(null)
     onSave()
     setSuccessMsg(`${s.name} added successfully`)
@@ -286,35 +292,33 @@ export default function ServicesPage() {
   const load = useCallback(async () => {
     if (!hospital?.id) return
     setLoading(true)
-    if (isScopedToClinic) {
-      const [svc, all] = await Promise.all([
-        getHospitalServices(hospital.id, userClinicId!),
-        getAllSpecialties(),
-      ])
-      setServices(svc)
-      setAllSpecialties(all)
-    } else {
-      const [svc, spec, all] = await Promise.all([
-        getHospitalServices(hospital.id),
-        getRegisteredSpecialties(hospital.id),
-        getAllSpecialties(),
-      ])
-      setServices(svc)
-      setSpecialties(spec)
-      setAllSpecialties(all)
+    // specialties is public read data -- fetched via the caller's own
+    // RLS-bound session, not the service-role client.
+    const [svcRes, { data: all }] = await Promise.all([
+      fetch('/api/services'),
+      createClient().from('specialties').select('id, name, icon, slug').order('name'),
+    ])
+    if (svcRes.ok) {
+      const body = await svcRes.json()
+      setServices(body.services)
+      setSpecialties(body.registeredSpecialties)
     }
+    setAllSpecialties((all as SpecialtyRow[]) ?? [])
     setLoading(false)
   }, [hospital?.id, isScopedToClinic, userClinicId])
 
   useEffect(() => { load() }, [load])
 
   async function handleToggleService(s: HospitalService) {
-    await toggleServiceActive(s.id, !s.is_active)
+    await fetch(`/api/services/${s.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !s.is_active }),
+    })
     setServices(prev => prev.map(x => x.id === s.id ? { ...x, is_active: !x.is_active } : x))
   }
 
   async function handleDeleteService(s: HospitalService) {
-    await deleteService(s.id)
+    await fetch(`/api/services/${s.id}`, { method: 'DELETE' })
     setServices(prev => prev.filter(x => x.id !== s.id))
     setDeleteConfirm(null)
   }
@@ -322,7 +326,7 @@ export default function ServicesPage() {
   async function handleRemoveSpecialty(spec: SpecialtyRow) {
     setDeletingSpec(spec.id)
     setRemoveSpecConfirm(null)
-    await removeHospitalSpecialty(hospital!.id, spec.id)
+    await fetch(`/api/hospitals/${hospital!.id}/specialties/${spec.id}`, { method: 'DELETE' })
     setSpecialties(prev => prev.filter(x => x.id !== spec.id))
     setDeletingSpec(null)
   }

@@ -848,49 +848,6 @@ export async function getHospitalSpecialties(hospitalId: string) {
 
 export interface SpecialtyRow { id: string; name: string; icon: string | null; slug: string }
 
-export async function getAllSpecialties(): Promise<SpecialtyRow[]> {
-  const { data } = await adminDb
-    .from('specialties')
-    .select('id, name, icon, slug')
-    .order('name')
-  return (data as SpecialtyRow[]) ?? []
-}
-
-export async function getRegisteredSpecialties(hospitalId: string): Promise<SpecialtyRow[]> {
-  // Union: specialties linked via hospital_specialties OR via doctors
-  const [hsRes, docRes] = await Promise.all([
-    adminDb.from('hospital_specialties')
-      .select('specialty:specialties!hospital_specialties_specialty_id_fkey(id, name, icon, slug)')
-      .eq('hospital_id', hospitalId),
-    adminDb.from('doctors')
-      .select('specialty:specialties!doctors_specialty_id_fkey(id, name, icon, slug)')
-      .eq('hospital_id', hospitalId).eq('is_active', true),
-  ])
-  const seen = new Set<string>()
-  const combined = [
-    ...((hsRes.data as any[]) ?? []),
-    ...((docRes.data as any[]) ?? []),
-  ]
-  return combined
-    .map(r => r.specialty)
-    .filter(s => s?.id && !seen.has(s.id) && seen.add(s.id)) as SpecialtyRow[]
-}
-
-export async function addHospitalSpecialty(hospitalId: string, specialtyId: string): Promise<{ error?: string }> {
-  const { error } = await adminDb
-    .from('hospital_specialties')
-    .insert({ hospital_id: hospitalId, specialty_id: specialtyId })
-  return { error: error?.message }
-}
-
-export async function removeHospitalSpecialty(hospitalId: string, specialtyId: string): Promise<void> {
-  await adminDb
-    .from('hospital_specialties')
-    .delete()
-    .eq('hospital_id', hospitalId)
-    .eq('specialty_id', specialtyId)
-}
-
 // ── Services ──────────────────────────────────────────────────────────────────
 
 export interface HospitalService {
@@ -904,63 +861,6 @@ export interface HospitalService {
   duration_mins: number | null
   is_active:    boolean
   clinic_id:    string | null
-}
-
-export async function getHospitalServices(hospitalId: string, clinicId?: string): Promise<HospitalService[]> {
-  let q = adminDb
-    .from('services')
-    .select('id, name, description, specialty_id, base_price, virtual_price, duration_mins, is_active, clinic_id, specialty:specialties!services_specialty_id_fkey(name)')
-    .eq('hospital_id', hospitalId)
-  // Clinic-scoped users see only their clinic's services (+ hospital-wide ones with no clinic)
-  if (clinicId) q = (q as any).or(`clinic_id.eq.${clinicId},clinic_id.is.null`)
-  const { data } = await (q as any).order('name')
-  return ((data as any[]) ?? []).map(s => ({
-    id:           s.id,
-    name:         s.name,
-    description:  s.description ?? null,
-    specialty_id: s.specialty_id ?? null,
-    specialty_name: s.specialty?.name ?? null,
-    base_price:   s.base_price ?? null,
-    virtual_price: s.virtual_price ?? null,
-    duration_mins: s.duration_mins ?? null,
-    is_active:    s.is_active ?? true,
-    clinic_id:    s.clinic_id ?? null,
-  }))
-}
-
-export async function createService(
-  hospitalId: string,
-  data: { name: string; description?: string; specialty_id?: string; base_price?: number; virtual_price?: number; duration_mins?: number },
-  clinicId?: string
-): Promise<{ error?: string }> {
-  const { error } = await (adminDb as any).from('services').insert({
-    hospital_id:   hospitalId,
-    clinic_id:     clinicId ?? null,
-    name:          data.name,
-    description:   data.description ?? null,
-    specialty_id:  data.specialty_id ?? null,
-    base_price:    data.base_price ?? null,
-    virtual_price: data.virtual_price ?? null,
-    duration_mins: data.duration_mins ?? null,
-    is_active:     true,
-  })
-  return { error: error?.message }
-}
-
-export async function updateService(
-  serviceId: string,
-  data: { name?: string; description?: string | null; specialty_id?: string | null; base_price?: number | null; virtual_price?: number | null; duration_mins?: number | null }
-): Promise<{ error?: string }> {
-  const { error } = await adminDb.from('services').update(data).eq('id', serviceId)
-  return { error: error?.message }
-}
-
-export async function toggleServiceActive(serviceId: string, isActive: boolean): Promise<void> {
-  await adminDb.from('services').update({ is_active: isActive }).eq('id', serviceId)
-}
-
-export async function deleteService(serviceId: string): Promise<void> {
-  await adminDb.from('services').delete().eq('id', serviceId)
 }
 
 export async function getHospitalStats(hospitalId: string) {
