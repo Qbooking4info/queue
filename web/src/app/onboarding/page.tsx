@@ -3,11 +3,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Specialty, SubscriptionPlan } from '@/types/database'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Building2, Stethoscope, Microscope, ScanLine, Clock, Building, X, Check,
-  Video, AlertTriangle,
+  Video, AlertTriangle, ArrowRight,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -58,16 +56,16 @@ const STEP_LABELS = ['Basics', 'Verification', 'Location', 'Clinics', 'Specialti
 
 function StepBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="w-full mb-10">
-      <div className="flex gap-1 mb-3">
+    <div style={{ width: '100%', marginBottom: 28 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
         {Array.from({ length: total }).map((_, i) => (
-          <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
-            style={{ background: i < current ? '#00E87A' : i === current ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)' }} />
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, transition: 'background .3s',
+            background: i < current ? '#1A7FC1' : i === current ? 'rgba(26,127,193,0.35)' : '#DDE8F5' }} />
         ))}
       </div>
-      <div className="flex justify-between">
-        <span className="text-xs text-[#7A9089]">Step {current + 1} of {total}</span>
-        <span className="text-xs font-medium text-green-400">{STEP_LABELS[current]}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, color: '#6A8FAA' }}>Step {current + 1} of {total}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#1A7FC1' }}>{STEP_LABELS[current]}</span>
       </div>
     </div>
   )
@@ -75,39 +73,47 @@ function StepBar({ current, total }: { current: number; total: number }) {
 
 // ── Step 1: Hospital Basics ───────────────────────────────────────────────────
 
+const lightInput: React.CSSProperties = {
+  width: '100%', background: '#FFFFFF', border: '1.5px solid #DDE8F5',
+  borderRadius: 10, padding: '11px 14px', fontSize: 14, color: '#0C2A4A',
+  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+}
+const lightLabel: React.CSSProperties = {
+  display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em',
+}
+
 function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Tell us about your hospital</h2>
-        <p className="text-sm text-[#7A9089]">This is how patients will find and recognise you</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Tell us about your hospital</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>This is how patients will find and recognise you</p>
       </div>
-      <Input label="Hospital / Clinic Name" value={data.name} onChange={e => onChange({ name: e.target.value })}
-        placeholder="e.g. Lagos Island General Hospital" required />
       <div>
-        <label className="text-sm font-medium text-gray-300 block mb-2">Facility Type</label>
-        <div className="grid grid-cols-2 gap-2">
+        <label style={lightLabel}>Hospital / Clinic Name</label>
+        <input value={data.name} onChange={e => onChange({ name: e.target.value })}
+          placeholder="e.g. Lagos Island General Hospital" required style={lightInput} />
+      </div>
+      <div>
+        <label style={lightLabel}>Facility Type</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {HOSPITAL_TYPES.map(t => (
             <button key={t.value} type="button" onClick={() => onChange({ type: t.value })}
-              className="text-left p-3 rounded-xl border transition-all"
-              style={{
-                borderColor: data.type === t.value ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
-                background:  data.type === t.value ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
-              }}>
-              <span className="block mb-1" style={{ color: data.type === t.value ? '#00E87A' : '#7A9089' }}>{t.icon}</span>
-              <span className="text-sm font-semibold block" style={{ color: data.type === t.value ? '#00E87A' : '#F0F5F2' }}>{t.label}</span>
-              <span className="text-xs text-[#4A6058]">{t.desc}</span>
+              style={{ textAlign: 'left', padding: 12, borderRadius: 12, border: `1.5px solid ${data.type === t.value ? '#1A7FC1' : '#DDE8F5'}`,
+                background: data.type === t.value ? '#EAF4FC' : '#FAFCFF', cursor: 'pointer', transition: 'all .15s' }}>
+              <span style={{ display: 'block', marginBottom: 4, color: data.type === t.value ? '#1A7FC1' : '#6A8FAA' }}>{t.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, display: 'block', color: data.type === t.value ? '#1A7FC1' : '#0C2A4A' }}>{t.label}</span>
+              <span style={{ fontSize: 11, color: '#6A8FAA' }}>{t.desc}</span>
             </button>
           ))}
         </div>
       </div>
       <div>
-        <label className="text-sm font-medium text-gray-300 block mb-1.5">
-          Description <span className="text-[#4A6058] font-normal">(optional)</span>
-        </label>
+        <label style={lightLabel}>Description <span style={{ fontWeight: 400, textTransform: 'none', color: '#6A8FAA' }}>(optional)</span></label>
         <textarea value={data.description} onChange={e => onChange({ description: e.target.value })}
           placeholder="Briefly describe your facility, key strengths, and what patients can expect…"
-          rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50 transition-all" />
+          rows={3} style={{ ...lightInput, resize: 'none' } as React.CSSProperties} />
       </div>
     </div>
   )
@@ -117,49 +123,35 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
 
 function StepVerification({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Verify your facility</h2>
-        <p className="text-sm text-[#7A9089]">
-          These credentials are used to verify your hospital before patients can book appointments
-        </p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Verify your facility</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>These credentials are used to verify your hospital before patients can book appointments</p>
       </div>
 
-      <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
-        <div className="flex items-start gap-3">
-          <Clock size={18} className="mt-0.5 text-amber-400 shrink-0" />
-          <div>
-            <div className="text-sm font-semibold text-amber-400 mb-0.5">Verification pending</div>
-            <div className="text-xs text-[#7A9089] leading-relaxed">
-              Your hospital will be reviewed by the Queue team within 24–48 hours after submission.
-              You can complete your setup and use the dashboard while verification is in progress.
-            </div>
+      <div style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(217,119,6,0.25)', background: '#FFFBEB',
+        display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <Clock size={16} style={{ marginTop: 2, color: '#D97706', flexShrink: 0 }} />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#B45309', marginBottom: 2 }}>Verification pending</div>
+          <div style={{ fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+            Your hospital will be reviewed by the Queue team within 24–48 hours. You can use the dashboard while we verify your details.
           </div>
         </div>
       </div>
 
-      <Input
-        label="Hospital / CAC Registration Number"
-        value={data.registrationNumber}
-        onChange={e => onChange({ registrationNumber: e.target.value })}
-        placeholder="e.g. RC-1234567 or MHN/123/2020"
-        hint="Issued by CAC or your State Ministry of Health"
-        required
-      />
+      <div>
+        <label style={lightLabel}>Hospital / CAC Registration Number *</label>
+        <input value={data.registrationNumber} onChange={e => onChange({ registrationNumber: e.target.value })}
+          placeholder="e.g. RC-1234567 or MHN/123/2020" required style={lightInput} />
+        <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 4 }}>Issued by CAC or your State Ministry of Health</p>
+      </div>
 
-      <Input
-        label="MDCN Accreditation Number"
-        value={data.mdcnNumber}
-        onChange={e => onChange({ mdcnNumber: e.target.value })}
-        placeholder="e.g. MDCN/A/12345"
-        hint="Medical and Dental Council of Nigeria accreditation reference"
-      />
-
-      <div className="p-4 rounded-xl border border-white/7 bg-white/2">
-        <p className="text-xs text-[#7A9089] leading-relaxed">
-          <span className="font-semibold text-[#F0F5F2]">Don&apos;t have your MDCN number yet?</span>{' '}
-          You can skip it now and add it from your dashboard settings. The registration number is required to begin verification.
-        </p>
+      <div>
+        <label style={lightLabel}>MDCN Accreditation Number <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+        <input value={data.mdcnNumber} onChange={e => onChange({ mdcnNumber: e.target.value })}
+          placeholder="e.g. MDCN/A/12345" style={lightInput} />
+        <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 4 }}>You can add this later from dashboard settings</p>
       </div>
     </div>
   )
@@ -169,38 +161,47 @@ function StepVerification({ data, onChange }: { data: FormData; onChange: (d: Pa
 
 function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Contact & Location</h2>
-        <p className="text-sm text-[#7A9089]">Patients will use this to find and reach you</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Contact & Location</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>Patients will use this to find and reach you</p>
       </div>
-      <Input label="Street Address" value={data.address} onChange={e => onChange({ address: e.target.value })}
-        placeholder="3 Marina Street, Lagos Island" required />
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="City" value={data.city} onChange={e => onChange({ city: e.target.value })}
-          placeholder="Lagos" required />
+      <div>
+        <label style={lightLabel}>Street Address *</label>
+        <input value={data.address} onChange={e => onChange({ address: e.target.value })}
+          placeholder="3 Marina Street, Lagos Island" required style={lightInput} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label className="text-sm font-medium text-gray-300 block mb-1.5">State</label>
+          <label style={lightLabel}>City *</label>
+          <input value={data.city} onChange={e => onChange({ city: e.target.value })}
+            placeholder="Lagos" required style={lightInput} />
+        </div>
+        <div>
+          <label style={lightLabel}>State *</label>
           <select value={data.state} onChange={e => onChange({ state: e.target.value })}
-            style={{
-              width: '100%', background: '#0E1A12', color: data.state ? '#F0F5F2' : '#4A6058',
-              border: '1px solid rgba(255,255,255,0.10)', borderRadius: '12px',
-              padding: '12px 16px', fontSize: '14px', fontFamily: 'inherit',
-              outline: 'none', cursor: 'pointer', appearance: 'auto',
-            }}>
-            <option value="" style={{ background: '#0E1A12', color: '#4A6058' }}>Select state</option>
-            {NIGERIAN_STATES.map(s => (
-              <option key={s} value={s} style={{ background: '#0E1A12', color: '#F0F5F2' }}>{s}</option>
-            ))}
+            style={{ ...lightInput, color: data.state ? '#0C2A4A' : '#6A8FAA', appearance: 'auto' } as React.CSSProperties}>
+            <option value="">Select state</option>
+            {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
       </div>
-      <Input label="Phone Number" type="tel" value={data.phone} onChange={e => onChange({ phone: e.target.value })}
-        placeholder="+234 802 000 0001" required />
-      <Input label="Hospital Email" type="email" value={data.email} onChange={e => onChange({ email: e.target.value })}
-        placeholder="info@hospital.com" />
-      <Input label="WhatsApp Number" type="tel" value={data.whatsapp} onChange={e => onChange({ whatsapp: e.target.value })}
-        placeholder="+234 802 000 0001" hint="Patients may use this for quick queries" />
+      <div>
+        <label style={lightLabel}>Phone Number *</label>
+        <input type="tel" value={data.phone} onChange={e => onChange({ phone: e.target.value })}
+          placeholder="+234 802 000 0001" required style={lightInput} />
+      </div>
+      <div>
+        <label style={lightLabel}>Hospital Email <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+        <input type="email" value={data.email} onChange={e => onChange({ email: e.target.value })}
+          placeholder="info@hospital.com" style={lightInput} />
+      </div>
+      <div>
+        <label style={lightLabel}>WhatsApp Number <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+        <input type="tel" value={data.whatsapp} onChange={e => onChange({ whatsapp: e.target.value })}
+          placeholder="+234 802 000 0001" style={lightInput} />
+        <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 4 }}>Patients may use this for quick queries</p>
+      </div>
     </div>
   )
 }
@@ -212,151 +213,106 @@ function newClinic(): ClinicEntry {
 }
 
 function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
-  function addClinic() {
-    onChange({ clinics: [...data.clinics, newClinic()] })
-  }
-  function removeClinic(id: string) {
-    onChange({ clinics: data.clinics.filter(c => c.id !== id) })
-  }
+  function addClinic() { onChange({ clinics: [...data.clinics, newClinic()] }) }
+  function removeClinic(id: string) { onChange({ clinics: data.clinics.filter(c => c.id !== id) }) }
   function updateClinic(id: string, field: keyof ClinicEntry, value: string) {
     onChange({ clinics: data.clinics.map(c => c.id === id ? { ...c, [field]: value } : c) })
   }
+  const EXAMPLE_CLINICS = ['OPD Clinic', 'General Surgery Clinic', 'Orthopaedic Clinic', 'Cardiology Clinic', 'Paediatrics Clinic', 'Gynaecology Clinic']
 
-  const EXAMPLE_CLINICS = ['OPD Clinic', 'General Surgery Clinic', 'Orthopaedic Clinic',
-    'Cardiology Clinic', 'Paediatrics Clinic', 'Gynaecology Clinic']
+  const modelBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'flex-start', gap: 14, padding: 16, borderRadius: 12, textAlign: 'left',
+    border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
+    cursor: 'pointer', width: '100%', transition: 'all .15s',
+  })
 
   return (
-    <div className="flex flex-col gap-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">How is your facility organised?</h2>
-        <p className="text-sm text-[#7A9089]">
-          This determines how you manage bookings, doctors, and front desk across your facility
-        </p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>How is your facility organised?</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>This determines how you manage bookings, doctors, and front desk</p>
       </div>
 
-      {/* Single clinic option */}
-      <button type="button" onClick={() => onChange({ clinicModel: 'single' })}
-        className="flex items-start gap-4 p-4 rounded-xl border text-left transition-all"
-        style={{
-          borderColor: data.clinicModel === 'single' ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
-          background:  data.clinicModel === 'single' ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
-        }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: data.clinicModel === 'single' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)',
-            color: data.clinicModel === 'single' ? '#00E87A' : '#7A9089' }}>
+      <button type="button" onClick={() => onChange({ clinicModel: 'single' })} style={modelBtn(data.clinicModel === 'single')}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: data.clinicModel === 'single' ? 'rgba(26,127,193,0.12)' : '#F0F5FF', color: data.clinicModel === 'single' ? '#1A7FC1' : '#6A8FAA' }}>
           <Building2 size={20} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-sm font-semibold" style={{ color: data.clinicModel === 'single' ? '#00E87A' : '#F0F5F2' }}>
-              Single Clinic
-            </span>
-          </div>
-          <div className="text-xs text-[#7A9089] leading-relaxed">
-            One central operation — you manage all doctors, queues, and appointments from a single dashboard.
-            Best for standalone clinics and specialist centres.
-          </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'single' ? '#1A7FC1' : '#0C2A4A', marginBottom: 3 }}>Single Clinic</div>
+          <div style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>One operation — manage all doctors, queues, and appointments from one dashboard. Best for standalone clinics.</div>
         </div>
-        <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5"
-          style={{ borderColor: data.clinicModel === 'single' ? '#00E87A' : 'rgba(255,255,255,0.2)' }}>
-          {data.clinicModel === 'single' && <div className="w-2.5 h-2.5 rounded-full bg-green-400" />}
+        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'single' ? '#1A7FC1' : '#DDE8F5'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+          {data.clinicModel === 'single' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
         </div>
       </button>
 
-      {/* Multi-clinic option */}
-      <button type="button" onClick={() => {
-        onChange({ clinicModel: 'multi', clinics: data.clinics.length > 0 ? data.clinics : [newClinic()] })
-      }}
-        className="flex items-start gap-4 p-4 rounded-xl border text-left transition-all"
-        style={{
-          borderColor: data.clinicModel === 'multi' ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
-          background:  data.clinicModel === 'multi' ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
-        }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: data.clinicModel === 'multi' ? 'rgba(0,232,122,0.12)' : 'rgba(255,255,255,0.05)',
-            color: data.clinicModel === 'multi' ? '#00E87A' : '#7A9089' }}>
+      <button type="button" onClick={() => onChange({ clinicModel: 'multi', clinics: data.clinics.length > 0 ? data.clinics : [newClinic()] })}
+        style={modelBtn(data.clinicModel === 'multi')}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: data.clinicModel === 'multi' ? 'rgba(26,127,193,0.12)' : '#F0F5FF', color: data.clinicModel === 'multi' ? '#1A7FC1' : '#6A8FAA' }}>
           <Building size={20} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-sm font-semibold" style={{ color: data.clinicModel === 'multi' ? '#00E87A' : '#F0F5F2' }}>
-              Multiple Clinics / Departments
-            </span>
-            <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(0,232,122,0.12)', color: '#00E87A', border: '1px solid rgba(0,232,122,0.25)' }}>
-              Growth+
-            </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'multi' ? '#1A7FC1' : '#0C2A4A' }}>Multiple Clinics / Departments</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(26,127,193,0.1)', color: '#1A7FC1', border: '1px solid rgba(26,127,193,0.2)' }}>Growth+</span>
           </div>
-          <div className="text-xs text-[#7A9089] leading-relaxed">
-            Your facility runs several departments (OPD, Surgery, Cardiology, etc.), each with their own
-            sub-admin, doctors, and patient queue. Best for large hospitals and multi-specialty centres.
-          </div>
+          <div style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>Several departments (OPD, Surgery, Cardiology…) each with their own sub-admin and queue.</div>
         </div>
-        <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5"
-          style={{ borderColor: data.clinicModel === 'multi' ? '#00E87A' : 'rgba(255,255,255,0.2)' }}>
-          {data.clinicModel === 'multi' && <div className="w-2.5 h-2.5 rounded-full bg-green-400" />}
+        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'multi' ? '#1A7FC1' : '#DDE8F5'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+          {data.clinicModel === 'multi' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
         </div>
       </button>
 
-      {/* Clinic list (only when multi selected) */}
       {data.clinicModel === 'multi' && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div className="text-sm font-semibold text-[#F0F5F2]">Define your clinics / departments</div>
-              <div className="text-xs text-[#7A9089] mt-0.5">You can add or rename these later from your dashboard</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0C2A4A' }}>Define your clinics / departments</div>
+              <div style={{ fontSize: 11, color: '#6A8FAA' }}>You can rename these later from your dashboard</div>
             </div>
             <button type="button" onClick={addClinic}
-              className="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(0,232,122,0.1)', color: '#00E87A', border: '1px solid rgba(0,232,122,0.25)' }}>
-              + Add Clinic
+              style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 8,
+                background: '#EAF4FC', color: '#1A7FC1', border: '1px solid rgba(26,127,193,0.25)', cursor: 'pointer' }}>
+              + Add
             </button>
           </div>
-
-          {/* Suggestion chips */}
-          <div>
-            <div className="text-xs text-[#4A6058] mb-2">Quick add:</div>
-            <div className="flex flex-wrap gap-1.5">
-              {EXAMPLE_CLINICS.filter(ex => !data.clinics.some(c => c.name === ex)).map(ex => (
-                <button key={ex} type="button"
-                  onClick={() => onChange({ clinics: [...data.clinics, { id: Math.random().toString(36).slice(2), name: ex, description: '' }] })}
-                  className="text-xs px-2.5 py-1 rounded-full border transition-colors"
-                  style={{ borderColor: 'rgba(255,255,255,0.1)', color: '#7A9089', background: 'rgba(255,255,255,0.03)' }}>
-                  + {ex}
-                </button>
-              ))}
-            </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {EXAMPLE_CLINICS.filter(ex => !data.clinics.some(c => c.name === ex)).map(ex => (
+              <button key={ex} type="button"
+                onClick={() => onChange({ clinics: [...data.clinics, { id: Math.random().toString(36).slice(2), name: ex, description: '' }] })}
+                style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: '1px solid #DDE8F5',
+                  color: '#6A8FAA', background: '#FAFCFF', cursor: 'pointer' }}>
+                + {ex}
+              </button>
+            ))}
           </div>
-
-          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-0.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
             {data.clinics.map((clinic, idx) => (
-              <div key={clinic.id} className="flex items-center gap-2 p-3 rounded-xl border"
-                style={{ borderColor: clinic.name ? 'rgba(0,232,122,0.2)' : 'rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                  style={{ background: 'rgba(0,232,122,0.12)', color: '#00E87A' }}>
+              <div key={clinic.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                borderRadius: 10, border: `1.5px solid ${clinic.name ? 'rgba(26,127,193,0.25)' : '#DDE8F5'}`, background: '#FAFCFF' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#EAF4FC', color: '#1A7FC1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                   {idx + 1}
                 </div>
-                <input
-                  value={clinic.name}
-                  onChange={e => updateClinic(clinic.id, 'name', e.target.value)}
-                  placeholder="e.g. OPD Clinic, General Surgery Clinic…"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-[#4A6058] outline-none"
-                />
+                <input value={clinic.name} onChange={e => updateClinic(clinic.id, 'name', e.target.value)}
+                  placeholder="e.g. OPD Clinic…"
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: '#0C2A4A' }} />
                 <button type="button" onClick={() => removeClinic(clinic.id)}
-                  className="text-[#4A6058] hover:text-red-400 transition-colors shrink-0 flex items-center">
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6A8FAA', display: 'flex', padding: 0 }}>
                   <X size={14} />
                 </button>
               </div>
             ))}
           </div>
-
           {data.clinics.filter(c => c.name.trim()).length === 0 && (
-            <p className="text-xs text-amber-400">Add at least one clinic name to continue</p>
+            <p style={{ fontSize: 12, color: '#D97706' }}>Add at least one clinic name to continue</p>
           )}
           {data.clinics.filter(c => c.name.trim()).length > 0 && (
-            <p className="text-xs text-green-400">
-              {data.clinics.filter(c => c.name.trim()).length} clinic{data.clinics.filter(c => c.name.trim()).length !== 1 ? 's' : ''} defined
-            </p>
+            <p style={{ fontSize: 12, color: '#1A7FC1' }}>{data.clinics.filter(c => c.name.trim()).length} clinic(s) defined</p>
           )}
         </div>
       )}
@@ -368,36 +324,32 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
 
 function StepSpecialties({ data, onChange, specialties }: { data: FormData; onChange: (d: Partial<FormData>) => void; specialties: Specialty[] }) {
   const toggle = (id: string) => {
-    const ids = data.specialtyIds.includes(id)
-      ? data.specialtyIds.filter(s => s !== id)
-      : [...data.specialtyIds, id]
+    const ids = data.specialtyIds.includes(id) ? data.specialtyIds.filter(s => s !== id) : [...data.specialtyIds, id]
     onChange({ specialtyIds: ids })
   }
   return (
-    <div className="flex flex-col gap-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">What do you specialise in?</h2>
-        <p className="text-sm text-[#7A9089]">Select all that apply — patients filter by specialty</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>What do you specialise in?</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>Select all that apply — patients filter by specialty</p>
       </div>
-      <div className="grid grid-cols-2 gap-2 max-h-[420px] overflow-y-auto pr-1">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
         {specialties.map(s => {
           const selected = data.specialtyIds.includes(s.id)
           return (
             <button key={s.id} type="button" onClick={() => toggle(s.id)}
-              className="flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all"
-              style={{
-                borderColor: selected ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
-                background:  selected ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
-              }}>
-              <span className="text-xl">{s.icon}</span>
-              <span className="text-sm font-medium" style={{ color: selected ? '#00E87A' : '#F0F5F2' }}>{s.name}</span>
-              {selected && <Check size={14} className="ml-auto text-green-400" />}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
+                border: `1.5px solid ${selected ? '#1A7FC1' : '#DDE8F5'}`,
+                background: selected ? '#EAF4FC' : '#FAFCFF', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' }}>
+              <span style={{ fontSize: 18 }}>{s.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, flex: 1, color: selected ? '#1A7FC1' : '#0C2A4A' }}>{s.name}</span>
+              {selected && <Check size={13} style={{ color: '#1A7FC1', flexShrink: 0 }} />}
             </button>
           )
         })}
       </div>
       {data.specialtyIds.length > 0 && (
-        <p className="text-sm text-green-400">{data.specialtyIds.length} specialty{data.specialtyIds.length !== 1 ? 'ies' : 'y'} selected</p>
+        <p style={{ fontSize: 13, color: '#1A7FC1', fontWeight: 600 }}>{data.specialtyIds.length} specialty selected</p>
       )}
     </div>
   )
@@ -407,42 +359,42 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
 
 function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   const features = [
-    { key: 'accepts_virtual',  icon: <Video size={24} />,         label: 'Virtual Consultations',  desc: 'Patients can book and attend appointments via video call' },
-    { key: 'emergency_hours',  icon: <AlertTriangle size={24} />, label: '24/7 Emergency Services', desc: 'You provide round-the-clock emergency care' },
+    { key: 'accepts_virtual',  icon: <Video size={22} />,         label: 'Virtual Consultations',  desc: 'Patients can book and attend appointments via video call' },
+    { key: 'emergency_hours',  icon: <AlertTriangle size={22} />, label: '24/7 Emergency Services', desc: 'You provide round-the-clock emergency care' },
   ] as const
   return (
-    <div className="flex flex-col gap-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Additional Features</h2>
-        <p className="text-sm text-[#7A9089]">Let patients know what you offer beyond in-person visits</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Additional Features</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>Let patients know what you offer beyond in-person visits</p>
       </div>
-      <div className="flex flex-col gap-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {features.map(f => {
           const enabled = data[f.key]
           return (
             <button key={f.key} type="button" onClick={() => onChange({ [f.key]: !enabled })}
-              className="flex items-center gap-4 p-4 rounded-xl border text-left transition-all"
-              style={{
-                borderColor: enabled ? 'rgba(0,232,122,0.4)' : 'rgba(255,255,255,0.07)',
-                background:  enabled ? 'rgba(0,232,122,0.08)' : 'rgba(255,255,255,0.02)',
-              }}>
-              <span style={{ color: enabled ? '#00E87A' : '#7A9089' }}>{f.icon}</span>
-              <div className="flex-1">
-                <div className="text-sm font-semibold" style={{ color: enabled ? '#00E87A' : '#F0F5F2' }}>{f.label}</div>
-                <div className="text-xs text-[#4A6058] mt-0.5">{f.desc}</div>
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 12, textAlign: 'left',
+                border: `1.5px solid ${enabled ? '#1A7FC1' : '#DDE8F5'}`, background: enabled ? '#EAF4FC' : '#FAFCFF',
+                cursor: 'pointer', transition: 'all .15s', width: '100%' }}>
+              <span style={{ color: enabled ? '#1A7FC1' : '#6A8FAA' }}>{f.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: enabled ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{f.label}</div>
+                <div style={{ fontSize: 12, color: '#6A8FAA' }}>{f.desc}</div>
               </div>
-              <div className="w-10 h-6 rounded-full relative transition-all" style={{ background: enabled ? '#00E87A' : 'rgba(255,255,255,0.1)' }}>
-                <div className="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
-                  style={{ left: enabled ? 22 : 4 }} />
+              <div style={{ width: 40, height: 22, borderRadius: 11, position: 'relative', flexShrink: 0,
+                background: enabled ? '#1A7FC1' : '#DDE8F5', transition: 'background .2s' }}>
+                <div style={{ position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%',
+                  background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left .2s',
+                  left: enabled ? 21 : 3 }} />
               </div>
             </button>
           )
         })}
       </div>
-      <div className="p-4 rounded-xl border border-white/7 bg-white/2">
-        <p className="text-xs text-[#7A9089] leading-relaxed">
-          <span className="font-semibold text-[#F0F5F2]">EMR Integration</span> is available on the Growth and Enterprise plans.
-          You can connect your existing system (OpenMRS, Epic, Meditech) after completing setup.
+      <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #DDE8F5', background: '#F4F8FC' }}>
+        <p style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>
+          <strong style={{ color: '#2A5070' }}>EMR Integration</strong> is available on the Growth and Enterprise plans.
+          Connect your existing system (OpenMRS, Epic, Meditech) after setup.
         </p>
       </div>
     </div>
@@ -453,38 +405,36 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
 
 function StepHours({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
   const updateHour = (day: number, field: 'open' | 'close' | 'closed', value: string | boolean) => {
-    const hours = data.hours.map(h => h.day === day ? { ...h, [field]: value } : h)
-    onChange({ hours })
+    onChange({ hours: data.hours.map(h => h.day === day ? { ...h, [field]: value } : h) })
   }
   return (
-    <div className="flex flex-col gap-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Operating Hours</h2>
-        <p className="text-sm text-[#7A9089]">Set when patients can book appointments</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Operating Hours</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>Set when patients can book appointments</p>
       </div>
-      <div className="flex flex-col gap-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {data.hours.map(h => (
-          <div key={h.day} className="flex items-center gap-3 p-3 rounded-xl border border-white/7 bg-white/2">
-            <span className="text-sm font-medium w-24 shrink-0" style={{ color: h.closed ? '#4A6058' : '#F0F5F2' }}>
+          <div key={h.day} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+            borderRadius: 10, border: '1.5px solid #DDE8F5', background: h.closed ? '#F8FAFC' : '#FFFFFF' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, width: 36, flexShrink: 0, color: h.closed ? '#6A8FAA' : '#0C2A4A' }}>
               {DAYS[h.day].slice(0, 3)}
             </span>
             {h.closed ? (
-              <span className="text-xs text-[#4A6058] flex-1">Closed</span>
+              <span style={{ fontSize: 12, color: '#6A8FAA', flex: 1 }}>Closed</span>
             ) : (
-              <div className="flex items-center gap-2 flex-1">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
                 <input type="time" value={h.open} onChange={e => updateHour(h.day, 'open', e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-green-500/50" />
-                <span className="text-[#4A6058] text-xs">to</span>
+                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#0C2A4A', outline: 'none' }} />
+                <span style={{ fontSize: 12, color: '#6A8FAA' }}>to</span>
                 <input type="time" value={h.close} onChange={e => updateHour(h.day, 'close', e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-green-500/50" />
+                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#0C2A4A', outline: 'none' }} />
               </div>
             )}
             <button type="button" onClick={() => updateHour(h.day, 'closed', !h.closed)}
-              className="text-xs shrink-0 px-2 py-1 rounded-lg border transition-all"
-              style={{
-                borderColor: h.closed ? 'rgba(0,232,122,0.3)' : 'rgba(255,255,255,0.1)',
-                color: h.closed ? '#00E87A' : '#4A6058',
-              }}>
+              style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, flexShrink: 0,
+                border: `1px solid ${h.closed ? 'rgba(26,127,193,0.3)' : '#DDE8F5'}`,
+                color: h.closed ? '#1A7FC1' : '#6A8FAA', background: h.closed ? '#EAF4FC' : '#F4F8FC', cursor: 'pointer' }}>
               {h.closed ? 'Open' : 'Close'}
             </button>
           </div>
@@ -498,22 +448,23 @@ function StepHours({ data, onChange }: { data: FormData; onChange: (d: Partial<F
 
 function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onChange: (d: Partial<FormData>) => void; plans: SubscriptionPlan[]; clinicModel: ClinicModel }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 className="text-xl font-bold mb-1">Choose your plan</h2>
-        <p className="text-sm text-[#7A9089]">Start free for 3 months — upgrade or cancel anytime</p>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Choose your plan</h2>
+        <p style={{ fontSize: 13, color: '#6A8FAA' }}>Start free for 3 months — upgrade or cancel anytime</p>
       </div>
 
       {clinicModel === 'multi' && (
-        <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-2">
-          <AlertTriangle size={14} className="mt-0.5 text-amber-400 shrink-0" />
-          <p className="text-xs text-amber-400">
-            You selected <strong>Multiple Clinics</strong>. This feature requires the <strong>Growth plan or higher</strong>.
+        <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(217,119,6,0.25)', background: '#FFFBEB',
+          display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <AlertTriangle size={13} style={{ marginTop: 1, color: '#D97706', flexShrink: 0 }} />
+          <p style={{ fontSize: 12, color: '#92400E' }}>
+            You selected <strong>Multiple Clinics</strong>. This requires the <strong>Growth plan or higher</strong>.
           </p>
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {plans.map(plan => {
           const features = plan.features as string[]
           const selected = data.planId === plan.id
@@ -525,39 +476,38 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
             <button key={plan.id} type="button"
               onClick={() => !lockedForMulti && onChange({ planId: plan.id })}
               disabled={lockedForMulti}
-              className="text-left p-4 rounded-xl border transition-all relative"
-              style={{
-                borderColor: selected ? 'rgba(0,232,122,0.5)' : isGrowth ? 'rgba(0,232,122,0.2)' : 'rgba(255,255,255,0.07)',
-                background:  selected ? 'rgba(0,232,122,0.1)' : isGrowth ? 'rgba(0,232,122,0.04)' : 'rgba(255,255,255,0.02)',
-                opacity: lockedForMulti ? 0.45 : 1,
-                cursor: lockedForMulti ? 'not-allowed' : 'pointer',
-              }}>
+              style={{ textAlign: 'left', padding: 16, borderRadius: 12, position: 'relative',
+                border: `1.5px solid ${selected ? '#1A7FC1' : isGrowth ? 'rgba(26,127,193,0.25)' : '#DDE8F5'}`,
+                background: selected ? '#EAF4FC' : isGrowth ? '#F0F7FD' : '#FAFCFF',
+                opacity: lockedForMulti ? 0.45 : 1, cursor: lockedForMulti ? 'not-allowed' : 'pointer', transition: 'all .15s' }}>
               {isGrowth && !selected && (
-                <span className="absolute top-3 right-3 text-xs font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">Popular</span>
+                <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, fontWeight: 700,
+                  color: '#1A7FC1', background: '#EAF4FC', border: '1px solid rgba(26,127,193,0.25)', padding: '2px 8px', borderRadius: 20 }}>Popular</span>
               )}
               {lockedForMulti && (
-                <span className="absolute top-3 right-3 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">Upgrade needed</span>
+                <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, fontWeight: 700,
+                  color: '#D97706', background: '#FFFBEB', border: '1px solid rgba(217,119,6,0.25)', padding: '2px 8px', borderRadius: 20 }}>Upgrade needed</span>
               )}
-              <div className="flex items-start justify-between mb-2">
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
-                  <div className="font-bold" style={{ color: selected ? '#00E87A' : '#F0F5F2' }}>{plan.display_name}</div>
-                  <div className="text-xs text-[#4A6058] mt-0.5">
-                    {plan.max_doctors ? `Up to ${plan.max_doctors} doctors` : 'Unlimited doctors'} · {plan.max_monthly_bookings ? `${plan.max_monthly_bookings?.toLocaleString()} bookings/mo` : 'Unlimited bookings'}
+                  <div style={{ fontWeight: 700, fontSize: 15, color: selected ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{plan.display_name}</div>
+                  <div style={{ fontSize: 11, color: '#6A8FAA' }}>
+                    {plan.max_doctors ? `Up to ${plan.max_doctors} doctors` : 'Unlimited doctors'} · {plan.max_monthly_bookings ? `${plan.max_monthly_bookings.toLocaleString()} bookings/mo` : 'Unlimited bookings'}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-sm" style={{ color: selected ? '#00E87A' : '#F0F5F2' }}>
-                    ₦{plan.price_monthly.toLocaleString()}<span className="font-normal text-[#4A6058]">/mo</span>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: selected ? '#1A7FC1' : '#0C2A4A' }}>
+                    ₦{plan.price_monthly.toLocaleString()}<span style={{ fontWeight: 400, color: '#6A8FAA', fontSize: 12 }}>/mo</span>
                   </div>
                   {plan.price_annual && (
-                    <div className="text-xs text-green-400">₦{plan.price_annual.toLocaleString()} annually</div>
+                    <div style={{ fontSize: 11, color: '#1A7FC1' }}>₦{plan.price_annual.toLocaleString()} annually</div>
                   )}
                 </div>
               </div>
-              <ul className="flex flex-col gap-1 mt-3">
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {features.map(f => (
-                  <li key={f} className="flex items-center gap-1.5 text-xs text-[#7A9089]">
-                    <Check size={12} className="text-green-500" /> {f}
+                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6A8FAA' }}>
+                    <Check size={11} style={{ color: '#1A7FC1', flexShrink: 0 }} /> {f}
                   </li>
                 ))}
               </ul>
@@ -669,34 +619,113 @@ export default function OnboardingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#060A07] flex items-start justify-center p-4 py-12">
-      <div className="w-full max-w-lg">
-        <div className="text-center mb-8">
-          <div className="text-2xl font-bold tracking-tight mb-0.5">Queue</div>
-          <div className="text-xs text-[#4A6058] tracking-widest uppercase">Hospital Registration</div>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      {/* Left panel — branding */}
+      <div style={{ width: 300, flexShrink: 0, background: '#061208', display: 'flex',
+        flexDirection: 'column', justifyContent: 'space-between', padding: '48px 36px',
+        position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
+          borderRadius: '50%', background: 'rgba(0,232,122,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,232,122,0.1)',
+              border: '1px solid rgba(0,232,122,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2.5"/>
+                <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
+                <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="30" cy="30" r="8" fill="#061208" stroke="#00E87A" strokeWidth="2.5"/>
+                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.03em' }}>Queue</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: '.08em', textTransform: 'uppercase' }}>Hospital Portal</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.04em', lineHeight: 1.3, marginBottom: 12 }}>
+            Set up your<br />hospital profile
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, marginBottom: 40 }}>
+            Complete each step to configure your facility and go live on the Queue platform.
+          </div>
+
+          {/* Step indicator list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {STEP_LABELS.map((label, i) => {
+              const done    = i < step
+              const current = i === step
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: done || current ? 1 : 0.3 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                    background: done ? '#00E87A' : current ? 'rgba(0,232,122,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: `1.5px solid ${done ? '#00E87A' : current ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {done
+                      ? <Check size={12} color="#061208" strokeWidth={3} />
+                      : <span style={{ fontSize: 10, fontWeight: 700, color: current ? '#00E87A' : 'rgba(255,255,255,0.3)' }}>{i + 1}</span>
+                    }
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: current ? 700 : 500,
+                    color: done ? '#00E87A' : current ? '#FFFFFF' : 'rgba(255,255,255,0.4)' }}>
+                    {label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="bg-[#111915] border border-white/7 rounded-2xl p-6">
-          <StepBar current={step} total={TOTAL_STEPS} />
-          {steps[step]}
-          {error && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mt-4">
-              {error}
-            </p>
-          )}
-          <div className="flex gap-3 mt-8">
-            {step > 0 && (
-              <Button variant="outline" onClick={() => setStep(s => s - 1)} className="flex-1">Back</Button>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+          © {new Date().getFullYear()} Queue Health Technologies
+        </div>
+      </div>
+
+      {/* Right panel — form */}
+      <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'flex-start',
+        justifyContent: 'center', padding: '48px 24px', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 520 }}>
+          <div style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #DDE8F5',
+            padding: '32px', boxShadow: '0 2px 12px rgba(12,42,74,0.06)' }}>
+            <StepBar current={step} total={TOTAL_STEPS} />
+            {steps[step]}
+            {error && (
+              <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#E03E3E',
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 16 }}>
+                <AlertTriangle size={14} /> {error}
+              </div>
             )}
-            {step < TOTAL_STEPS - 1 ? (
-              <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex-1">
-                Continue
-              </Button>
-            ) : (
-              <Button onClick={handleSubmit} loading={loading} disabled={!canProceed()} className="flex-1">
-                Complete Setup
-              </Button>
-            )}
+            <div style={{ display: 'flex', gap: 12, marginTop: 32 }}>
+              {step > 0 && (
+                <button type="button" onClick={() => setStep(s => s - 1)}
+                  style={{ flex: 1, background: '#FFFFFF', color: '#2A5070', border: '1.5px solid #DDE8F5',
+                    borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Back
+                </button>
+              )}
+              {step < TOTAL_STEPS - 1 ? (
+                <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
+                  style={{ flex: 1, background: canProceed() ? '#1A7FC1' : '#A0BDD4', color: '#FFFFFF', border: 'none',
+                    borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 700,
+                    cursor: canProceed() ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  Continue <ArrowRight size={15} />
+                </button>
+              ) : (
+                <button type="button" onClick={handleSubmit} disabled={loading || !canProceed()}
+                  style={{ flex: 1, background: canProceed() && !loading ? '#1A7FC1' : '#A0BDD4', color: '#FFFFFF', border: 'none',
+                    borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 700,
+                    cursor: canProceed() && !loading ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {loading ? 'Completing setup…' : <><Check size={15} /> Complete Setup</>}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
