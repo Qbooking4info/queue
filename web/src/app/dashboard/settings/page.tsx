@@ -2,10 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import { getHospitalSettings, updateHospitalSettings, getHospitalHours, updateHospitalHours } from '@/lib/admin-api'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
-import { createClient } from '@/lib/supabase/client'
 import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -74,30 +72,26 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!hospital?.id) return
-    const db = createClient()
-    Promise.all([
-      getHospitalSettings(hospital.id),
-      getHospitalHours(hospital.id),
-      db.from('hospitals').select('sms_reminders, email_reminders').eq('id', hospital.id).single(),
-    ]).then(([s, h, { data: reminderData }]) => {
-      if (s) {
-        setVirtual(s.accepts_virtual ?? false)
-        setEmergency(s.emergency_hours ?? false)
-        setIs24Hours(s.is_24_hours ?? false)
-        setApprovalMode((s.approval_mode ?? 'auto') as 'auto' | 'manual')
-        setRequiresRef(s.requires_referral ?? false)
-        setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
-        setOpdFee(String(s.opd_fee ?? 0))
-        if (s.latitude  != null) setLat(String(s.latitude))
-        if (s.longitude != null) setLng(String(s.longitude))
-      }
-      if (reminderData) {
-        setSmsReminder((reminderData as any).sms_reminders ?? true)
-        setEmailReminder((reminderData as any).email_reminders ?? true)
-      }
-      setHours(h)
-      setLoading(false)
-    })
+    fetch(`/api/hospitals/${hospital.id}/settings`)
+      .then(res => res.ok ? res.json() : null)
+      .then(body => {
+        const s = body?.settings
+        if (s) {
+          setVirtual(s.accepts_virtual ?? false)
+          setEmergency(s.emergency_hours ?? false)
+          setIs24Hours(s.is_24_hours ?? false)
+          setApprovalMode((s.approval_mode ?? 'auto') as 'auto' | 'manual')
+          setRequiresRef(s.requires_referral ?? false)
+          setDailyLimit(s.daily_booking_limit != null ? String(s.daily_booking_limit) : '')
+          setOpdFee(String(s.opd_fee ?? 0))
+          if (s.latitude  != null) setLat(String(s.latitude))
+          if (s.longitude != null) setLng(String(s.longitude))
+          setSmsReminder(s.sms_reminders ?? true)
+          setEmailReminder(s.email_reminders ?? true)
+        }
+        setHours(body?.hours ?? [])
+        setLoading(false)
+      })
   }, [hospital?.id])
 
   async function geocodeAddress() {
@@ -123,9 +117,10 @@ export default function SettingsPage() {
     try {
       const parsedLat = lat ? parseFloat(lat) : null
       const parsedLng = lng ? parseFloat(lng) : null
-      const db = createClient()
-      const [{ error }, { error: hoursError }] = await Promise.all([
-        updateHospitalSettings(hospital.id, {
+      const res = await fetch(`/api/hospitals/${hospital.id}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           accepts_virtual:     virtual,
           emergency_hours:     emergency,
           is_24_hours:         is24Hours,
@@ -136,13 +131,15 @@ export default function SettingsPage() {
           ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
           sms_reminders:   smsReminder,
           email_reminders: emailReminder,
-        } as any),
-        updateHospitalHours(hospital.id, hours),
-      ])
-      // Also persist reminder flags via browser client (handles columns if they exist)
-      await db.from('hospitals').update({ sms_reminders: smsReminder, email_reminders: emailReminder } as any).eq('id', hospital.id)
+          hours,
+        }),
+      })
       setSaving(false)
-      if (error || hoursError) { setSaveErr(error ?? hoursError ?? 'Failed to save'); return }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        setSaveErr(body?.error ?? 'Failed to save')
+        return
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {

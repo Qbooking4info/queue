@@ -145,3 +145,14 @@ Did not attempt to visually verify the two UI changes (MedicalHistoryScreen erro
 retry, AppointmentsScreen error empty-state) in a running simulator -- no Expo/RN
 environment available in this session. Verified via TypeScript (`tsc --noEmit` clean) and
 by reading the render logic; recommend a manual pass in Expo Go/simulator before shipping.
+
+## 2026-07-26 — Task 15: dead code found in web/src/app/dashboard/settings/actions.ts
+
+While migrating the settings page off admin-api.ts, found `settings/actions.ts` -- a
+Next.js Server Actions file (`updateHospitalProfile`, `upsertOperatingHours`) that
+duplicates part of what the new `/api/hospitals/[id]/settings` route now does, using
+`getHospitalContext()` for authorization instead of `requireRole`. `settings/page.tsx`
+does not import from it at all -- it's unused dead code, likely an earlier attempt
+superseded by the direct admin-api.ts calls that were in the page until this migration.
+Not deleted (out of scope for this task, could be intentionally kept); flagging in case
+it should be removed in a cleanup pass.
