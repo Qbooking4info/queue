@@ -12,6 +12,7 @@ interface ScheduleSlot {
   patient: string
   type: string
   status: string
+  urgency: string
 }
 interface DayHours { day: number; open: string; close: string; closed: boolean }
 
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
   let q = (db as any)
     .from('appointments')
     .select(`
-      id, appointment_date, start_time, type, status,
+      id, appointment_date, start_time, type, status, urgency,
       patient:users!appointments_patient_id_fkey(full_name),
       doctor:doctors!appointments_doctor_id_fkey(full_name)
     `)
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
       patient: safePatientName(a.patient?.full_name, 'Patient'),
       type: a.type,
       status: a.status,
+      urgency: a.urgency ?? 'routine',
     })
   }
 

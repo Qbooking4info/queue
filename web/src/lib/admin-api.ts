@@ -574,6 +574,7 @@ export interface ScheduleSlot {
   patient: string
   type: string
   status: string
+  urgency: string
 }
 
 

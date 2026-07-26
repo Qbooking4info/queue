@@ -108,6 +108,16 @@ export async function getClinicsForHospital(hospitalId: string): Promise<Clinic[
   return ((data ?? []) as any[]).map(c => ({ ...c, is_emergency: c.is_emergency ?? false })) as Clinic[]
 }
 
+// A clinic explicitly flagged is_emergency always wins. If none is flagged — e.g. a hospital
+// admin created an "Accident and Emergency" clinic but never hit the "Set as Emergency Dept"
+// toggle — fall back to name matching so emergency routing still works out of the box instead
+// of silently dropping the booking into the unassigned bucket.
+const EMERGENCY_NAME_PATTERN = /accident.*emergency|emergency.*(dept|department|room|ward|unit)|\ba\s*&\s*e\b|casualty|trauma\s*(centre|center|unit)/i
+
+export function findEmergencyClinic(clinics: Clinic[]): Clinic | null {
+  return clinics.find(c => c.is_emergency) ?? clinics.find(c => EMERGENCY_NAME_PATTERN.test(c.name)) ?? null
+}
+
 // ── Operating hours ──────────────────────────────────────────────────────────
 
 export interface DayHours { day: number; open: string; close: string; closed: boolean }

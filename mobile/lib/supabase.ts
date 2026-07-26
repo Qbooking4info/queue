@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto'
+import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { createClient } from '@supabase/supabase-js'
 
@@ -44,10 +45,27 @@ const SecureStoreAdapter = {
   },
 }
 
-// Auth client — session stored encrypted in the device keychain/keystore
+// expo-secure-store has no keychain on web — its native module is an empty {} there,
+// so every SecureStore call throws. Left unhandled that stranded the app on "loading"
+// forever (nothing ever caught the rejection to flip loading to false). Fall back to
+// localStorage on web, matching Supabase's own default browser storage.
+const WebStorageAdapter = {
+  async getItem(key: string): Promise<string | null> {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value)
+  },
+  async removeItem(key: string): Promise<void> {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(key)
+  },
+}
+
+// Auth client — session stored encrypted in the device keychain/keystore on native,
+// localStorage on web.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: SecureStoreAdapter,
+    storage: Platform.OS === 'web' ? WebStorageAdapter : SecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

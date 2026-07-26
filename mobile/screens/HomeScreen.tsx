@@ -94,7 +94,7 @@ function SpecialtyGrid({
                   backgroundColor: active ? t.accentBg : t.inputBg,
                   borderColor:     active ? t.accent   : t.cardBorder,
                 }}>
-                <Ionicons name="medical-outline" size={20} color={active ? t.accent : t.textMuted} />
+                <Ionicons name={sp.icon as any} size={20} color={active ? t.accent : sp.color} />
                 <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
                   numberOfLines={2}>{sp.label}</Text>
                 {active && (
@@ -368,6 +368,7 @@ export function HomeScreen({ navigation }: Props) {
                   borderColor:     active ? t.accent    : t.cardBorder,
                   borderWidth:     active ? 1.5 : 1,
                 }]}>
+                <Ionicons name={sp.icon as any} size={14} color={active ? t.accent : sp.color} />
                 <Text style={[s.chipLabel, { color: active ? t.accent : t.textMuted, fontWeight: active ? '700' : '500' }]}>
                   {sp.label}
                 </Text>
