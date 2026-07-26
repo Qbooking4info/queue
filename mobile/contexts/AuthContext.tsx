@@ -116,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Without this catch, any rejection here (e.g. a broken storage adapter) leaves
+    // loading stuck true forever with no way for the UI to recover — better to fall
+    // back to a logged-out state than spin indefinitely.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) {
@@ -127,6 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
         initialLoadDone.current = true
       }
+    }).catch(err => {
+      console.warn('[AuthContext] getSession failed:', err)
+      setLoading(false)
+      initialLoadDone.current = true
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
