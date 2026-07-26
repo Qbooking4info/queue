@@ -1,6 +1,14 @@
 'use client'
 import { useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import type { AdminDoctor } from '@/lib/admin-api'
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let p = 'Queue@'
+  for (let i = 0; i < 6; i++) p += chars[Math.floor(Math.random() * chars.length)]
+  return p + '!'
+}
 
 export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
   doctor: AdminDoctor
@@ -16,7 +24,8 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
   const [fee,      setFee]      = useState(doctor.consultation_fee?.toString() ?? '')
   const [vFee,     setVFee]     = useState(String((doctor as any).virtual_fee ?? ''))
   const [exp,      setExp]      = useState(doctor.years_experience?.toString() ?? '')
-  const [password, setPassword] = useState('')
+  const [password, setPassword] = useState(generatePassword)
+  const [showPass, setShowPass] = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
   const [success,  setSuccess]  = useState('')
@@ -79,7 +88,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
     setSaving(false)
     if (data.error) { setError(data.error); return }
     setSuccess('Password updated successfully')
-    setPassword('')
+    setPassword(generatePassword())
   }
 
   return (
@@ -163,8 +172,21 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
               Share the new password with the doctor securely.
             </div>
             <label style={lbl}>New Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Min. 8 characters" style={inp} />
+            <div style={{ position: 'relative' }}>
+              <input type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="Min. 8 characters" style={{ ...inp, paddingRight: 88 }} />
+              <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer' }}>
+                  {showPass ? 'Hide' : 'Show'}
+                </button>
+                <button type="button" onClick={() => setPassword(generatePassword())}
+                  title="Generate new password"
+                  style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.textSub, cursor: 'pointer', display: 'flex' }}>
+                  <RefreshCw size={11} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -27,9 +27,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { data: doc } = await (db as any)
       .from('doctors')
-      .select('auth_user_id, full_name')
+      .select('auth_user_id, full_name, clinic_id')
       .eq('id', id)
       .single()
+
+    // Sub-admins (clinic_admin) may only reset passwords for doctors in their own clinic
+    if (caller.role === 'clinic_admin' && caller.clinicId && doc?.clinic_id !== caller.clinicId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     if (!doc?.auth_user_id) {
       return NextResponse.json({ error: 'This doctor has no login account. Add login credentials from the Add Doctor form.' }, { status: 404 })
