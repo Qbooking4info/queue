@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -18,6 +19,11 @@ export async function POST(req: NextRequest) {
     .eq('user_id', profile.id).single()
   if (!adminRecord || (adminRecord.role !== 'admin' && adminRecord.role !== 'owner'))
     return Errors.forbidden()
+
+  // Bulk slot generation (up to 180 days x multiple slots/day) -- 20 regenerations
+  // per hospital per hour is generous for legitimate schedule editing.
+  const rlAllowed = await checkRateLimit(db, `doctors-schedule:${adminRecord.hospital_id}`, 20, 3600)
+  if (!rlAllowed) return Errors.forbidden('Too many schedule generation attempts. Please try again later.')
 
   const body = await req.json()
   const {

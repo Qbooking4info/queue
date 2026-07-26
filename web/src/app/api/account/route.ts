@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { createClient } from '@supabase/supabase-js'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,6 +13,11 @@ const adminDb = createClient(
 export async function DELETE(req: NextRequest) {
   const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  const rlAllowed = await checkRateLimit(adminDb, `account-delete:${user.id}`, 3, 3600)
+  if (!rlAllowed) {
+    return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 403 })
+  }
 
   // user.id is the auth UID; appointments.patient_id is a FK to users.id,
   // a different value. Resolve the profile row first -- every RLS policy

@@ -3,56 +3,43 @@ import { SupabaseClient } from '@supabase/supabase-js'
 // DB-backed rate limiter — works correctly on Vercel's multi-instance serverless.
 // Key format: "<action>:<identifier>"  e.g. "onboarding:user_abc123"
 //
-// BH9 — TOCTOU fix: we INSERT first (registering our intent), then COUNT.
-// This ensures we always include ourselves in the count and dramatically reduces
-// the race window compared to the previous count-then-insert pattern (where two
-// concurrent requests could both see count < max before either inserts).
-// A true atomic fix would require a UNIQUE constraint on (key, window_bucket) with
-// an UPSERT counter, but that requires a schema change; insert-first is the best
-// mitigation within the current single-column schema.
+// Fixed-window counter via UPSERT: one atomic round trip per request instead
+// of the old insert-then-count-then-conditional-delete (3 round trips, plus
+// a growing rate_limit_log table). Postgres serializes concurrent UPSERTs on
+// the same (key, window_bucket) row, so there's no app-level TOCTOU logic —
+// the database does the mutual exclusion.
 export async function checkRateLimit(
   db: SupabaseClient,
   key: string,
   max: number,
   windowSeconds: number,
 ): Promise<boolean> {
-  const since = new Date(Date.now() - windowSeconds * 1000).toISOString()
+  const windowBucket = Math.floor(Date.now() / 1000 / windowSeconds)
 
-  // Insert first — this registers the request before we count, so we always
-  // see ourselves in the window and concurrent requests are less likely to all slip through.
-  const { data: inserted, error: insertErr } = await (db as any)
-    .from('rate_limit_log')
-    .insert({ key })
-    .select('id')
-    .single()
+  const { data, error } = await (db as any).rpc('increment_rate_limit', {
+    p_key: key,
+    p_window_bucket: windowBucket,
+  })
 
-  if (insertErr || !inserted) {
-    // If the insert itself fails (e.g. RLS misconfiguration) allow the request
-    // rather than false-positive blocking all traffic.
+  if (error || data == null) {
+    // If the RPC itself fails (e.g. misconfiguration) allow the request
+    // rather than false-positive blocking all traffic -- but log it, since
+    // failing open silently means a misconfiguration disables rate
+    // limiting everywhere with no signal.
+    console.error('[checkRateLimit] increment_rate_limit RPC failed, failing open:', key, error?.message)
     return true
   }
 
-  // Count all entries within the window — includes the row we just inserted.
-  const { count } = await (db as any)
-    .from('rate_limit_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('key', key)
-    .gte('created_at', since)
-
-  if ((count ?? 0) > max) {
-    // Over limit — undo our insert so it doesn't inflate future counts
-    await (db as any).from('rate_limit_log').delete().eq('id', inserted.id)
-    return false
+  // Best-effort cleanup of buckets more than a day old — cheap, fire-and-forget,
+  // only runs on a small fraction of requests so it doesn't add latency.
+  if (Math.random() < 0.01) {
+    ;(db as any)
+      .from('rate_limit_counters')
+      .delete()
+      .lt('updated_at', new Date(Date.now() - 86_400_000).toISOString())
+      .then(() => {})
+      .catch(() => {})
   }
 
-  // Best-effort cleanup of entries older than 24 h for this key
-  ;(db as any)
-    .from('rate_limit_log')
-    .delete()
-    .eq('key', key)
-    .lt('created_at', new Date(Date.now() - 86_400_000).toISOString())
-    .then(() => {})
-    .catch(() => {})
-
-  return true
+  return (data as number) <= max
 }

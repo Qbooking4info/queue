@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // BM6 — IMPORTANT: This in-process cache is INEFFECTIVE on Vercel serverless.
 // Each lambda invocation may run in a different container/process, so `cache` and
@@ -32,6 +34,13 @@ export async function GET(req: NextRequest) {
   // before a hospital record (and therefore a role) exists.
   const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
+
+  // This proxies to Nominatim, whose usage policy (1 req/sec, no bulk
+  // geocoding) you can breach through this route -- 30 lookups per user
+  // per hour is generous for onboarding/settings address entry.
+  const db = createAdminClient()
+  const rlAllowed = await checkRateLimit(db, `geocode:${user.id}`, 30, 3600)
+  if (!rlAllowed) return Errors.forbidden('Too many geocode requests. Please try again later.')
 
   const q = new URL(req.url).searchParams.get('q')?.trim()
   if (!q) return Errors.validation('q is required')
