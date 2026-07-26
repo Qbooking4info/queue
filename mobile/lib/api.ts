@@ -192,15 +192,18 @@ export type AppointmentWithRelations = Appointment & {
 
 export async function getPatientAppointments(
   patientId: string
-): Promise<AppointmentWithRelations[]> {
+): Promise<Result<AppointmentWithRelations[]>> {
   // Must use the authenticated supabase client so RLS can verify the user session
   const { data, error } = await supabase
     .from('appointments')
     .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
     .eq('patient_id', patientId)
     .order('appointment_date', { ascending: false })
-  if (error) console.warn('[getPatientAppointments]', error.message, error.details)
-  return (data as any[]) ?? []
+  if (error) {
+    console.warn('[getPatientAppointments]', error.message, error.details)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true, data: (data as any[]) ?? [] }
 }
 
 export async function getAppointmentById(appointmentId: string): Promise<AppointmentWithRelations | null> {
@@ -480,26 +483,35 @@ export interface MedicalHistory {
 
 const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '', otherAllergies: '' }
 
-export async function getMedicalHistory(patientId: string): Promise<MedicalHistory> {
+// A failed fetch and "no history recorded" used to both surface as
+// EMPTY_MEDICAL_HISTORY -- indistinguishable to the doctor viewing this
+// chart, but a blank allergy list read as "no known allergies" is a
+// clinically meaningful difference from "we don't know, the load failed."
+export type Result<T> = { ok: true; data: T } | { ok: false; error: string }
+
+export async function getMedicalHistory(patientId: string): Promise<Result<MedicalHistory>> {
   const { data, error } = await supabase
     .from('patient_medical_history')
     .select('conditions, allergies, medications, surgeries, family_history, other_conditions, other_allergies')
     .eq('patient_id', patientId)
     .maybeSingle()
-  if (error) { console.warn('getMedicalHistory error:', error.message); return EMPTY_MEDICAL_HISTORY }
-  if (!data) return EMPTY_MEDICAL_HISTORY
+  if (error) { console.warn('getMedicalHistory error:', error.message); return { ok: false, error: error.message } }
+  if (!data) return { ok: true, data: EMPTY_MEDICAL_HISTORY }
   return {
-    conditions: (data as any).conditions ?? [],
-    allergies: (data as any).allergies ?? [],
-    medications: (data as any).medications ?? '',
-    surgeries: (data as any).surgeries ?? '',
-    familyHistory: (data as any).family_history ?? '',
-    otherConditions: (data as any).other_conditions ?? '',
-    otherAllergies: (data as any).other_allergies ?? '',
+    ok: true,
+    data: {
+      conditions: (data as any).conditions ?? [],
+      allergies: (data as any).allergies ?? [],
+      medications: (data as any).medications ?? '',
+      surgeries: (data as any).surgeries ?? '',
+      familyHistory: (data as any).family_history ?? '',
+      otherConditions: (data as any).other_conditions ?? '',
+      otherAllergies: (data as any).other_allergies ?? '',
+    },
   }
 }
 
-export async function updateMedicalHistory(patientId: string, notes: MedicalHistory): Promise<boolean> {
+export async function updateMedicalHistory(patientId: string, notes: MedicalHistory): Promise<Result<void>> {
   const { error } = await supabase.from('patient_medical_history').upsert({
     patient_id: patientId,
     conditions: notes.conditions,
@@ -511,8 +523,8 @@ export async function updateMedicalHistory(patientId: string, notes: MedicalHist
     other_allergies: notes.otherAllergies || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'patient_id' })
-  if (error) { console.warn('updateMedicalHistory error:', error.message); return false }
-  return true
+  if (error) { console.warn('updateMedicalHistory error:', error.message); return { ok: false, error: error.message } }
+  return { ok: true, data: undefined }
 }
 
 export async function deleteAccount(apiUrl: string, jwt: string): Promise<boolean> {

@@ -105,7 +105,11 @@ function decodeAndParseSession(raw: string): string | null {
       : raw
     const session = JSON.parse(decoded)
     return session?.access_token ?? null
-  } catch {
+  } catch (e) {
+    // Swallowed on purpose (a corrupt cookie is expected to fall through to
+    // the chunked-cookie path or return null), but logged -- this is
+    // exactly the diagnostic you want during an auth incident.
+    console.warn('[getServerUser] failed to decode/parse auth cookie:', e instanceof Error ? e.message : e)
     return null
   }
 }

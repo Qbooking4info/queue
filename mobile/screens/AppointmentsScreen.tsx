@@ -41,12 +41,21 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   const [appts,      setAppts]      = useState<AppointmentWithRelations[]>([])
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [loadError,  setLoadError]  = useState<string | null>(null)
 
   const load = useCallback(async (silent = false) => {
     if (!user) return
     if (!silent) setLoading(true)
-    const data = await getPatientAppointments(user.id)
-    setAppts(data)
+    const result = await getPatientAppointments(user.id)
+    if (result.ok) {
+      setLoadError(null)
+      setAppts(result.data)
+    } else {
+      // Distinct from "no appointments" -- showing the empty state's "Book
+      // an appointment to get started" copy on a failed fetch would be
+      // actively misleading.
+      setLoadError(result.error)
+    }
     setLoading(false)
     setRefreshing(false)
   }, [user])
@@ -132,7 +141,17 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
               />
             }>
 
-            {filtered.length === 0 && (
+            {loadError && (
+              <View style={s.empty}>
+                <Ionicons name="alert-circle-outline" size={52} color="#FF5C5C" style={{ marginBottom: 10, opacity: 0.6 }} />
+                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>Couldn't load your bookings</Text>
+                <Text style={[s.emptySubtitle, { color: t.textMuted }]}>
+                  Pull down to try again.
+                </Text>
+              </View>
+            )}
+
+            {!loadError && filtered.length === 0 && (
               <View style={s.empty}>
                 <Ionicons name="calendar-outline" size={52} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.4 }} />
                 <Text style={[s.emptyTitle, { color: t.textPrimary }]}>

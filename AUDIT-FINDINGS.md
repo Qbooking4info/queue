@@ -125,3 +125,23 @@ Defined it here as "count of all appointments ever created for that hospital, an
 intent is "completed/non-cancelled bookings only," the function
 (supabase/migrations/20260726000007_denormalised_counter_reconciliation.sql) needs a
 status filter added to that one UPDATE.
+
+## 2026-07-26 — Task 14: scope of the Result<T> conversion
+
+Converted getMedicalHistory/updateMedicalHistory (the clinically-flagged example -- a blank
+allergy list is not the same as "failed to load") and getPatientAppointments (identical
+shape: empty array on error was indistinguishable from "no appointments," and the empty
+state's "Book an appointment to get started" copy was actively misleading on a failed
+fetch). Both had exactly one screen consumer each, updated to show an explicit error state.
+
+Checked the other console.warn spots in mobile/lib/api.ts: createAppointment,
+createHospitalAppointment, cancelAppointment, and rescheduleAppointment already return a
+discriminated `{ ok/success, error }` shape and their callers already branch on it --
+they don't have the "swallowed, looks like success/empty" problem this task is about.
+Left them as-is rather than reshaping working code to match a slightly different
+convention.
+
+Did not attempt to visually verify the two UI changes (MedicalHistoryScreen error banner +
+retry, AppointmentsScreen error empty-state) in a running simulator -- no Expo/RN
+environment available in this session. Verified via TypeScript (`tsc --noEmit` clean) and
+by reading the render logic; recommend a manual pass in Expo Go/simulator before shipping.

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, ActivityIndicator, Alert } from 'react-native'
+  StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
@@ -27,7 +27,7 @@ const ALLERGY_PROMPTS = [
   'Latex', 'Peanuts', 'Shellfish', 'Pollen', 'Dust', 'Bee stings',
 ]
 
-const DEFAULT_NOTES: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '' }
+const DEFAULT_NOTES: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '', otherAllergies: '' }
 
 export function MedicalHistoryScreen({ navigation }: Props) {
   const { theme: t }          = useTheme()
@@ -38,12 +38,14 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   const [loading,  setLoading] = useState(true)
   const [tab,      setTab]     = useState<'history' | 'profile'>('profile')
   const [saving,   setSaving]  = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   // Editable profile fields
   const [bloodGroup, setBloodGroup] = useState(user?.blood_group ?? '')
   const [gender,     setGender]     = useState(user?.gender ?? '')
   const [dob,        setDob]        = useState(user?.date_of_birth ?? '')
   const [otherConditions, setOtherConditions] = useState('')
+  const [otherAllergies, setOtherAllergies] = useState('')
 
   // ML3: Re-sync form fields when user context refreshes (e.g. after saving)
   useEffect(() => {
@@ -55,22 +57,36 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    const [completed, history] = await Promise.all([
+    const [completed, historyResult] = await Promise.all([
       getCompletedAppointments(user.id),
       getMedicalHistory(user.id),
     ])
     setAppts(completed)
-    setNotes(history)
-    setOtherConditions(history.otherConditions ?? '')
+    if (historyResult.ok) {
+      setHistoryError(null)
+      setNotes(historyResult.data)
+      setOtherConditions(historyResult.data.otherConditions ?? '')
+      setOtherAllergies(historyResult.data.otherAllergies ?? '')
+    } else {
+      // Distinct from "no history recorded" -- a blank allergy list read as
+      // "no known allergies" would be a clinically meaningful difference
+      // from "we couldn't load it."
+      setHistoryError(historyResult.error)
+    }
     setLoading(false)
   }, [user])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
   async function saveNotes(updated: MedicalHistory) {
+    const previous = notes
     setNotes(updated)
     if (!user) return
-    await updateMedicalHistory(user.id, updated)
+    const result = await updateMedicalHistory(user.id, updated)
+    if (!result.ok) {
+      setNotes(previous)
+      Alert.alert('Could not save', 'Your change was not saved. Please check your connection and try again.')
+    }
   }
 
   function toggleCondition(c: string) {
@@ -127,11 +143,29 @@ export function MedicalHistoryScreen({ navigation }: Props) {
       {loading ? (
         <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled">
 
           {/* ── Health Profile Tab ── */}
           {tab === 'profile' && (
             <>
+              {historyError && (
+                <View style={[s.errorCard, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: '#FF5C5C' }]}>
+                  <Ionicons name="alert-circle-outline" size={18} color="#FF5C5C" style={{ marginRight: 8 }} />
+                  <Text style={[s.errorText, { color: '#FF5C5C' }]}>
+                    Couldn't load your conditions, allergies and medications -- this is not the same as having none recorded.
+                  </Text>
+                  <TouchableOpacity onPress={load}>
+                    <Text style={[s.errorRetry, { color: '#FF5C5C' }]}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Basic info */}
               <Text style={[s.sectionTitle, { color: t.textMuted }]}>Basic information</Text>
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -199,6 +233,15 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                     </TouchableOpacity>
                   ))}
                 </View>
+                <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 12 }]}>Other allergies</Text>
+                <TextInput
+                  value={otherAllergies}
+                  onChangeText={setOtherAllergies}
+                  onEndEditing={() => saveNotes({ ...notes, otherAllergies })}
+                  placeholder="Type any other allergies…"
+                  placeholderTextColor={t.textMuted}
+                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
+                />
               </View>
 
               {/* Medications */}
@@ -334,6 +377,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
             </>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )
@@ -348,6 +392,9 @@ const s = StyleSheet.create({
   tabItem:           { flex: 1, alignItems: 'center', paddingVertical: 11 },
   tabText:           { fontSize: 13 },
   tabUnderline:      { height: 2, width: '80%', borderRadius: 99, marginTop: 4 },
+  errorCard:         { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
+  errorText:         { flex: 1, fontSize: 12, lineHeight: 17 },
+  errorRetry:        { fontSize: 12, fontWeight: '700', marginLeft: 10 },
   sectionTitle:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4, marginTop: 16 },
   sectionSub:        { fontSize: 11, marginBottom: 8 },
   card:              { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 4 },
