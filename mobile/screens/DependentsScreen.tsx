@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
+  View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
   StyleSheet, ActivityIndicator, Modal, Pressable, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -105,7 +105,11 @@ export function DependentsScreen({ navigation }: Props) {
       {/* Add / Edit Modal */}
       <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => setModalOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setModalOpen(false)} />
-        <View style={[s.sheet, { backgroundColor: t.cardBg }]}>
+        <KeyboardAvoidingView
+          style={[s.sheet, { backgroundColor: t.cardBg }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
+        >
           <View style={[s.sheetHandle, { backgroundColor: t.inputBorder }]} />
           <Text style={[s.sheetTitle, { color: t.textPrimary }]}>{editing ? 'Edit dependent' : 'Add dependent'}</Text>
 
@@ -171,7 +175,7 @@ export function DependentsScreen({ navigation }: Props) {
             )}
             <View style={{ height: 20 }} />
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* List */}

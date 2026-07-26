@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, ActivityIndicator, Alert } from 'react-native'
+  StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -77,7 +77,8 @@ export function PrivacySecurityScreen({ navigation }: Props) {
         <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Account info */}
         <View style={[s.accountCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -138,6 +139,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }

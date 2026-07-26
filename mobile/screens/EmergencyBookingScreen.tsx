@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, StyleSheet, ActivityIndicator } from 'react-native'
+  TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -205,6 +205,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         ))}
       </View>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       {/* ── Step 0: Triage ───────────────────────────────────── */}
       {step === 0 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
@@ -436,6 +437,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           <View style={{ height: 20 }} />
         </ScrollView>
       )}
+      </KeyboardAvoidingView>
 
       {/* CTA */}
       {!!submitError && (

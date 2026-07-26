@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
+  View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
   StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -413,6 +413,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
@@ -1090,6 +1091,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           )}
         </View>
+        </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   )
