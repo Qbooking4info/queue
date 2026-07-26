@@ -11,6 +11,15 @@ import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
 
+// `status` and `approval_status` are independent columns -- a booking awaiting manual
+// review has status='pending', approval_status='pending_approval'. `status` itself never
+// literally holds the string 'pending_approval'. This derives a single display/action
+// status so badge color, label, and the next-action button all agree on what state a
+// pending_approval booking is actually in.
+function displayStatus(appt: { status: string; approval_status?: string | null }): string {
+  return appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
+}
+
 function statusColor(s: string) {
   if (s === 'pending')          return { bg: 'rgba(239,159,39,0.10)', text: '#EF9F27', border: 'rgba(239,159,39,0.25)' }
   if (s === 'pending_approval') return { bg: 'rgba(167,139,250,0.12)', text: '#A78BFA', border: 'rgba(167,139,250,0.3)' }
@@ -235,8 +244,9 @@ export default function QueuePage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {shown.map((appt, idx) => {
-            const sc = statusColor(appt.status)
-            const action = nextAction(appt.status)
+            const dispStatus = displayStatus(appt)
+            const sc = statusColor(dispStatus)
+            const action = nextAction(dispStatus)
             const isUpdating = updating === appt.id
             const isEmergency = appt.urgency === 'emergency'
             return (
@@ -285,12 +295,12 @@ export default function QueuePage() {
                 <span style={{ padding: '4px 12px', borderRadius: 99, fontSize: 11, fontWeight: 700,
                   background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
                   whiteSpace: 'nowrap' }}>
-                  {statusLabel(appt.status)}
+                  {statusLabel(dispStatus)}
                 </span>
 
                 {/* Action button */}
                 {action && (role === 'front_desk' || role === 'clinic_admin' || role === 'hospital_admin' || role === 'doctor') && (
-                  <button onClick={() => advance(appt.id, action.next, appt.status)} disabled={isUpdating}
+                  <button onClick={() => advance(appt.id, action.next, dispStatus)} disabled={isUpdating}
                     style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
                       cursor: isUpdating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                       background: C.accentMid, color: C.accent, border: `1px solid ${C.accentBorder}`,

@@ -17,6 +17,7 @@ interface Appt {
   start_time:       string
   type:             string
   status:           string
+  approval_status:  string | null
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
@@ -25,6 +26,8 @@ interface Appt {
   patient:          { id: string; full_name: string; phone: string | null } | null
   doctor:           { full_name: string } | null
 }
+
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:           { label: 'Pending',          color: '#EF9F27', bg: 'rgba(239,159,39,0.12)' },
@@ -65,7 +68,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     const today = new Date().toISOString().split('T')[0]
     let query = (supabase as any)
       .from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
+      .select('id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
       .eq('hospital_id', hospitalId)
       .order('appointment_date', { ascending: true })
       .order('start_time',       { ascending: true })
@@ -95,6 +98,10 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       Alert.alert('Cannot check in', `Status is "${STATUS_META[appt.status]?.label ?? appt.status}".`)
       return
     }
+    if (appt.approval_status === 'pending_approval') {
+      Alert.alert('Cannot check in', 'This booking is still awaiting approval.')
+      return
+    }
     setActioning(appt.id)
     const { error } = await (supabase as any)
       .from('appointments')
@@ -112,18 +119,29 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
 
   async function handleApprove(appt: Appt) {
     setActioning(appt.id)
-    const { error } = await (supabase as any)
-      .from('appointments')
-      .update({ approval_status: 'approved', status: 'confirmed' })
-      .eq('id', appt.id)
-      .eq('approval_status', 'pending_approval')
-    setActioning(null)
-    if (error) {
-      haptics.error()
-      Alert.alert('Error', error.message)
-    } else {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) throw new Error('Not authenticated')
+      // Routed through the same PATCH /api/appointments/[id] endpoint the web dashboard
+      // uses (not a raw table update) so the patient actually gets notified their
+      // booking was approved -- a direct update here would silently skip that.
+      const res = await fetch(`${API_URL}/api/appointments/${appt.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ action: 'approve' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? 'Approval failed')
+      }
       haptics.success()
       load(true)
+    } catch (e) {
+      haptics.error()
+      Alert.alert('Error', e instanceof Error ? e.message : 'Approval failed')
+    } finally {
+      setActioning(null)
     }
   }
 
@@ -250,10 +268,15 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
   appt: Appt; theme: any; actioning: string | null
   onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; today: string
 }) {
-  const meta      = STATUS_META[appt.status] ?? { label: appt.status, color: '#888', bg: 'rgba(128,128,128,0.1)' }
+  // `status` and `approval_status` are independent columns -- a booking awaiting manual
+  // review has status='pending', approval_status='pending_approval'; status itself never
+  // holds that string. Derive a single display status so the badge agrees with canApprove below.
+  const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
+  const meta      = STATUS_META[dispStatus] ?? { label: dispStatus, color: '#888', bg: 'rgba(128,128,128,0.1)' }
   const isLoading = actioning === appt.id
   const canCheckIn = (appt.status === 'confirmed' || appt.status === 'pending') && appt.appointment_date === today
-  const canApprove = appt.status === 'pending_approval'
+    && appt.approval_status !== 'pending_approval'
+  const canApprove = appt.approval_status === 'pending_approval'
   const isEmergency = appt.urgency === 'emergency'
   const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
 

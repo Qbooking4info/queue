@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { Check, X, LogIn, Play } from 'lucide-react'
-import { updateAppointmentStatus, rejectPendingApprovalAppointment } from '../appointments/actions'
+import { updateAppointmentStatus, approvePendingApprovalAppointment, rejectPendingApprovalAppointment } from '../appointments/actions'
 
 const NEXT: Record<string, { label: React.ReactNode; status: string; color: string }[]> = {
   pending:    [{ label: <span className="inline-flex items-center gap-1"><Check size={12} /> Confirm</span>,   status: 'confirmed',  color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
@@ -27,6 +27,11 @@ export function FrontDeskActions({ appointmentId, currentStatus, approvalStatus,
         // WM11: cancelling a pending_approval appointment routes through reject flow
         if (targetStatus === 'cancelled' && approvalStatus === 'pending_approval') {
           await rejectPendingApprovalAppointment(appointmentId)
+        } else if (targetStatus === 'confirmed' && approvalStatus === 'pending_approval') {
+          // Confirming a pending_approval booking must go through the approve flow so
+          // approval_status actually clears and the patient gets notified -- a bare
+          // status flip here would leave approval_status stuck at 'pending_approval' forever.
+          await approvePendingApprovalAppointment(appointmentId)
         } else {
           await updateAppointmentStatus(appointmentId, targetStatus)
         }

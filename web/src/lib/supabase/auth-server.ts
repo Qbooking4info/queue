@@ -16,9 +16,22 @@ export interface CallerInfo {
 
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
 // Returns the CallerInfo if the caller's role is in `allowed`, otherwise a 401/403 NextResponse.
-export async function requireRole(allowed: CallerRole[]): Promise<{ caller: CallerInfo } | NextResponse> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+// `req` is optional and only changes behavior when passed: mobile clients have no cookies
+// and send `Authorization: Bearer <jwt>` instead, so routes that mobile calls directly
+// (rather than through admin-api.ts style client-side Supabase queries) pass `req` through
+// so this falls back to bearer-token auth. Omitting `req` preserves the prior cookie-only
+// behavior exactly, unchanged for every other call site.
+export async function requireRole(allowed: CallerRole[], req?: Request): Promise<{ caller: CallerInfo } | NextResponse> {
+  const authHeader = req?.headers.get('authorization')
+  let user: { id: string } | null = null
+  if (authHeader?.startsWith('Bearer ')) {
+    const { data: { user: bearerUser } } = await adminDb.auth.getUser(authHeader.slice(7))
+    user = bearerUser
+  } else {
+    const supabase = await createClient()
+    const { data: { user: cookieUser } } = await supabase.auth.getUser()
+    user = cookieUser
+  }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const authId = user.id

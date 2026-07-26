@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { todayLocalDate } from '@/lib/dashboard-utils'
+import { notifyPatient } from '@/lib/notify-patient'
 
 type Action =
   | { action: 'assign_doctor'; doctorId: string }
@@ -25,51 +26,13 @@ async function getDoctorAvgConsultDuration(db: ReturnType<typeof createAdminClie
   return total / data.length
 }
 
-async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
-    })
-  } catch { /* best-effort */ }
-}
-
-async function notifyPatient(
-  db: ReturnType<typeof createAdminClient>,
-  appointmentId: string,
-  type: 'confirmed' | 'cancelled',
-  title: string,
-  body: string,
-) {
-  try {
-    const { data: appt } = await db.from('appointments').select('patient_id, booking_ref').eq('id', appointmentId).single()
-    if (!appt?.patient_id) return
-
-    const { data: patient } = await db.from('users').select('push_token').eq('id', appt.patient_id).single()
-
-    await (db as any).from('notifications').insert({
-      user_id: appt.patient_id,
-      type,
-      title,
-      body,
-      data: { appointment_id: appointmentId, booking_ref: appt.booking_ref },
-      is_read: false,
-      sent_via: ['in_app'],
-    })
-
-    const pushToken = (patient as any)?.push_token
-    if (pushToken) await sendExpoPush(pushToken, title, body, { appointment_id: appointmentId })
-  } catch { /* best-effort — never block the approval/rejection action */ }
-}
-
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
 // checkInAppointment/startConsultation/endConsultation, none of which had
 // any caller ownership check at all (adminDb, reachable from the browser).
 // Every action here is scoped to the caller's own hospital first.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { id } = await params
