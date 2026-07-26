@@ -1,10 +1,9 @@
+import 'server-only'
 import { createClient } from '@supabase/supabase-js'
-import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/types/database'
 
 const url        = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const serviceKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY
-const anonKey    = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Short fetch timeout prevents DNS failures from accumulating in memory and causing OOM
 const fetchWithTimeout: typeof fetch = (input, init) => {
@@ -14,22 +13,15 @@ const fetchWithTimeout: typeof fetch = (input, init) => {
     .finally(() => clearTimeout(timer))
 }
 
-// Service-role client (server/API routes): bypasses RLS entirely.
-// Browser fallback: use createBrowserClient so the session is read from cookies,
-// matching the auth client in @/lib/supabase/client. Using createClient here would
-// read from localStorage and miss the cookie-stored session, making every RLS
-// policy see an anonymous request and return no rows.
-export const adminDb = serviceKey
-  ? createClient<Database>(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: fetchWithTimeout },
-    })
-  : (typeof window !== 'undefined'
-      ? createBrowserClient<Database>(url, anonKey, {
-          global: { fetch: fetchWithTimeout },
-        })
-      : createClient<Database>(url, anonKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-          global: { fetch: fetchWithTimeout },
-        })
-    )
+// Service-role client. Server only -- the `server-only` import above makes
+// the build fail loudly if a client component ever imports this module,
+// instead of silently shipping the key to the browser (Task 1/Task 15: this
+// module used to fall back to a browser-reachable client keyed off
+// NEXT_PUBLIC_SUPABASE_SERVICE_KEY, which is how a service-role key ends up
+// in client JavaScript if that env var is ever set). All 19 dashboard
+// components that used to import adminDb (via admin-api.ts) or this module
+// directly have been moved to fetch()-based API routes.
+export const adminDb = createClient<Database>(url, serviceKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: { fetch: fetchWithTimeout },
+})
