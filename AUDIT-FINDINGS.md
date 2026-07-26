@@ -69,3 +69,25 @@ verified via the Supabase or Vercel CLI available in this environment (no `verce
 across all three environments. If it was ever set, rotate the Supabase `service_role` key
 (Settings → API) and check Supabase API logs for anomalous service-role usage before
 concluding no access occurred, per the NDPC 72-hour reporting window noted in the review.
+
+## 2026-07-26 — Task 7: RLS row policies don't restrict columns; fixed doctors/hospitals, flagging the rest
+
+While fixing Task 7, confirmed live via curl that `anon`'s public-read RLS policies on
+`doctors` and `hospitals` (`is_active = true`, etc.) only restrict *rows* — Postgres RLS
+cannot restrict columns, and Supabase's default schema grants give `anon` full table-level
+SELECT. A `select('*')` anywhere in the client (Next.js route, or a direct PostgREST call
+with just the anon key from the APK) returned `doctors.email/auth_user_id/user_id/mdcn_number`
+and `hospitals.email/registration_number/mdcn_accreditation` regardless of what the app UI
+displayed. Fixed both tables with `REVOKE SELECT ON <table> FROM anon` + an explicit column
+`GRANT`, and fixed the matching `select('*')` call sites in `mobile/lib/api.ts` that would
+otherwise break under the new column allowlist. See
+`supabase/migrations/20260726000004_column_privacy_doctors_hospitals_v2.sql`.
+
+**Not fixed here (flagging per "don't widen a fix"):** `reviews` also has a public policy
+(`is_visible = true`) and its columns include `patient_id` and `appointment_id` (raw UUIDs).
+Individually low sensitivity, but combined with any future IDOR it's a linkage from a public
+review back to a specific patient/appointment. Other public-read tables (`hospital_clinics`,
+`hospital_operating_hours`, `services`, `specialties`, `hospital_images`, `time_slots`,
+`slot_overrides`, `availability_templates`, `doctor_specialties`) were spot-checked and appear
+to hold only structural/scheduling data, not PII -- not re-verified column-by-column beyond
+that spot check.

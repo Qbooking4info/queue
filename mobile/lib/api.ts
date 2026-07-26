@@ -1,6 +1,8 @@
 import { supabase, publicDb } from './supabase'
 import type { Hospital, Doctor, Appointment, TimeSlot } from '../types/database'
 
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
 // ── Hospitals ────────────────────────────────────────────────────────────────
 
 export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitude?: number | null } & {
@@ -15,9 +17,40 @@ export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitu
   services?: { name: string; is_active: boolean | null }[]
 }
 
-const HOSPITAL_SELECT = '*, doctors(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), services(name, is_active)'
+// Explicit column lists, not '*' -- doctors and hospitals are both readable
+// by anon (public directory RLS policy), and '*' would pull doctors.email,
+// auth_user_id, user_id, mdcn_number and hospitals.email/registration_number/
+// mdcn_accreditation. Keep in sync with web/src/lib/public-hospital-select.ts;
+// the two can't share a module across the mobile/web boundary (see Task 13).
+const DOCTOR_SELECT = 'id, full_name, title, qualification, bio, avatar_url, ' +
+  'years_experience, consultation_fee, virtual_fee, accepts_virtual, ' +
+  'avg_rating, review_count, availability_status, ' +
+  'specialty:specialties!doctors_specialty_id_fkey(name, icon)'
 
+const HOSPITAL_SELECT = 'id, name, slug, address, city, state, country, phone, whatsapp, ' +
+  'type, description, logo_url, cover_url, latitude, longitude, ' +
+  'accepts_virtual, emergency_hours, opd_fee, avg_rating, review_count, is_verified, ' +
+  'is_24_hours, daily_booking_limit, approval_mode, requires_referral, clinic_model, ' +
+  `doctors(${DOCTOR_SELECT}), ` +
+  'hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), ' +
+  'services(name, is_active)'
+
+// Routed through a cached Next.js API route (60s edge cache) instead of
+// querying Supabase directly — this is the highest-volume read in the app
+// (every screen that shows the hospital directory), and the underlying data
+// changes on the order of hours, not seconds. Falls back to a direct
+// Supabase query if the API route is unreachable.
 export async function getHospitals(search?: string): Promise<HospitalWithDoctors[]> {
+  if (API_URL) {
+    try {
+      const qs = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
+      const res = await fetch(`${API_URL}/api/public/hospitals${qs}`)
+      if (res.ok) return (await res.json()) as HospitalWithDoctors[]
+    } catch {
+      // fall through to direct query below
+    }
+  }
+
   let query = publicDb
     .from('hospitals')
     .select(HOSPITAL_SELECT)
@@ -33,6 +66,15 @@ export async function getHospitals(search?: string): Promise<HospitalWithDoctors
 }
 
 export async function getHospitalById(id: string): Promise<HospitalWithDoctors | null> {
+  if (API_URL) {
+    try {
+      const res = await fetch(`${API_URL}/api/public/hospitals/${id}`)
+      if (res.ok) return (await res.json()) as HospitalWithDoctors
+    } catch {
+      // fall through to direct query below
+    }
+  }
+
   const { data } = await publicDb
     .from('hospitals')
     .select(HOSPITAL_SELECT)
@@ -104,11 +146,11 @@ export function isOpenNow(hours: DayHours[], is24Hours?: boolean | null): boolea
 export async function getDoctorsByHospital(hospitalId: string): Promise<Doctor[]> {
   const { data } = await publicDb
     .from('doctors')
-    .select('*')
+    .select(DOCTOR_SELECT)
     .eq('hospital_id', hospitalId)
     .eq('is_active', true)
     .order('avg_rating', { ascending: false })
-  return data ?? []
+  return (data as any) ?? []
 }
 
 // ── Time slots ───────────────────────────────────────────────────────────────
@@ -433,14 +475,15 @@ export interface MedicalHistory {
   surgeries: string
   familyHistory: string
   otherConditions: string
+  otherAllergies: string
 }
 
-const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '' }
+const EMPTY_MEDICAL_HISTORY: MedicalHistory = { conditions: [], allergies: [], medications: '', surgeries: '', familyHistory: '', otherConditions: '', otherAllergies: '' }
 
 export async function getMedicalHistory(patientId: string): Promise<MedicalHistory> {
   const { data, error } = await supabase
     .from('patient_medical_history')
-    .select('conditions, allergies, medications, surgeries, family_history, other_conditions')
+    .select('conditions, allergies, medications, surgeries, family_history, other_conditions, other_allergies')
     .eq('patient_id', patientId)
     .maybeSingle()
   if (error) { console.warn('getMedicalHistory error:', error.message); return EMPTY_MEDICAL_HISTORY }
@@ -452,6 +495,7 @@ export async function getMedicalHistory(patientId: string): Promise<MedicalHisto
     surgeries: (data as any).surgeries ?? '',
     familyHistory: (data as any).family_history ?? '',
     otherConditions: (data as any).other_conditions ?? '',
+    otherAllergies: (data as any).other_allergies ?? '',
   }
 }
 
@@ -464,6 +508,7 @@ export async function updateMedicalHistory(patientId: string, notes: MedicalHist
     surgeries: notes.surgeries || null,
     family_history: notes.familyHistory || null,
     other_conditions: notes.otherConditions || null,
+    other_allergies: notes.otherAllergies || null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'patient_id' })
   if (error) { console.warn('updateMedicalHistory error:', error.message); return false }
