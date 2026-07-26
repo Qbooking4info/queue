@@ -1,11 +1,6 @@
 'use client'
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import {
-  getHospital, getHospitalStats, getClinicStats,
-  getDoctors, getTodayAppointments, getDoctorTodayAppointments,
-  getAllHospitals, getClinicDetail, getDoctorProfile,
-} from '@/lib/admin-api'
 import type { AdminHospital, AdminDoctor, AdminAppointment, UserRole, DoctorAvailabilityStatus } from '@/lib/admin-api'
 
 interface AdminContextValue {
@@ -82,81 +77,39 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     setUser({ id: session.user.id, email: session.user.email ?? '' })
 
-    // Fetch role via server-side API route (uses service role key, bypasses RLS)
-    const roleRes = await fetch('/api/me/role')
-    const roleInfo: { role: string; hospitalId?: string; clinicId?: string; doctorId?: string; displayName?: string } | null =
-      roleRes.ok ? await roleRes.json() : null
-    if (!roleInfo) {
+    // Single requireRole-gated route (Task 15) replaces the separate
+    // /api/me/role call plus 9 direct admin-api.ts/adminDb calls that used
+    // to run in the browser. Scope (whole hospital / one clinic / one
+    // doctor / all hospitals for super_admin) is resolved server-side from
+    // the caller's session, not from anything this client sends.
+    const res = await fetch('/api/dashboard/bootstrap')
+    if (!res.ok) {
       setAccessDenied(true)
       setLoading(false)
       return
     }
+    const data = await res.json()
 
-    setRole(roleInfo.role as UserRole)
-    setDoctorId(roleInfo.doctorId ?? null)
-    setClinicId(roleInfo.clinicId ?? null)
-    if (roleInfo.displayName) {
-      setUser(u => u ? { ...u, displayName: roleInfo.displayName } : u)
+    setRole(data.role as UserRole)
+    setDoctorId(data.doctorId ?? null)
+    setClinicId(data.clinicId ?? null)
+    setClinicName(data.clinicName ?? null)
+    if (data.displayName) {
+      setUser(u => u ? { ...u, displayName: data.displayName } : u)
     }
 
-    // ── Super admin: load all hospitals, no specific hospital context ───────
-    if (roleInfo.role === 'super_admin') {
-      const hospitals = await getAllHospitals()
-      setAllHospitals(hospitals)
+    // ── Super admin with no hospital selected yet: just the hospital list ───
+    if (data.role === 'super_admin' && data.allHospitals) {
+      setAllHospitals(data.allHospitals)
       setLoading(false)
       return
     }
 
-    if (!roleInfo.hospitalId) { setAccessDenied(true); setLoading(false); return }
-
-    const h = await getHospital(roleInfo.hospitalId)
-    setHospital(h)
-
-    // ── Doctor: load only their own today's appointments + profile ──────────
-    if (roleInfo.role === 'doctor' && roleInfo.doctorId) {
-      const [a, profile] = await Promise.all([
-        getDoctorTodayAppointments(roleInfo.doctorId),
-        getDoctorProfile(roleInfo.doctorId),
-      ])
-      setTodayAppointments(a)
-      setDoctorAvailability(profile?.availability_status ?? 'on_duty')
-      setStats({
-        todayTotal:      a.length,
-        todayCompleted:  a.filter(x => x.status === 'completed').length,
-        activeDoctors:   0,
-        avgRating:       profile?.avg_rating ?? 0,
-        reviewCount:     profile?.review_count ?? 0,
-        totalBookings:   profile?.total_bookings ?? 0,
-      })
-      setLoading(false)
-      return
-    }
-
-    // ── Clinic admin / front desk: scope to their clinic ───────────────────
-    if ((roleInfo.role === 'clinic_admin' || roleInfo.role === 'front_desk') && roleInfo.clinicId) {
-      const [s, d, a, clinic] = await Promise.all([
-        getClinicStats(roleInfo.hospitalId, roleInfo.clinicId),
-        getDoctors(roleInfo.hospitalId, roleInfo.clinicId),
-        getTodayAppointments(roleInfo.hospitalId, roleInfo.clinicId),
-        getClinicDetail(roleInfo.clinicId),
-      ])
-      setStats(s)
-      setDoctors(d)
-      setTodayAppointments(a)
-      setClinicName(clinic?.name ?? null)
-      setLoading(false)
-      return
-    }
-
-    // ── Hospital admin: full hospital data ──────────────────────────────────
-    const [s, d, a] = await Promise.all([
-      getHospitalStats(roleInfo.hospitalId),
-      getDoctors(roleInfo.hospitalId),
-      getTodayAppointments(roleInfo.hospitalId),
-    ])
-    setStats(s)
-    setDoctors(d)
-    setTodayAppointments(a)
+    setHospital(data.hospital ?? null)
+    setDoctorAvailability(data.doctorAvailability ?? null)
+    setStats(data.stats ?? { todayTotal: 0, todayCompleted: 0, activeDoctors: 0, avgRating: 4.8, totalBookings: 0, reviewCount: 0 })
+    setDoctors(data.doctors ?? [])
+    setTodayAppointments(data.todayAppointments ?? [])
     setLoading(false)
   }
 
@@ -172,14 +125,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   async function switchHospital(h: AdminHospital) {
     setHospital(h)
     setLoading(true)
-    const [s, d, a] = await Promise.all([
-      getHospitalStats(h.id),
-      getDoctors(h.id),
-      getTodayAppointments(h.id),
-    ])
-    setStats(s)
-    setDoctors(d)
-    setTodayAppointments(a)
+    // ?hospitalId is only honoured by the route for the super_admin role --
+    // trusted there since super_admin already has platform-wide access.
+    const res = await fetch(`/api/dashboard/bootstrap?hospitalId=${h.id}`)
+    if (res.ok) {
+      const data = await res.json()
+      setStats(data.stats)
+      setDoctors(data.doctors)
+      setTodayAppointments(data.todayAppointments)
+    }
     setLoading(false)
   }
 
