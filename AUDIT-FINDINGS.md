@@ -156,3 +156,14 @@ does not import from it at all -- it's unused dead code, likely an earlier attem
 superseded by the direct admin-api.ts calls that were in the page until this migration.
 Not deleted (out of scope for this task, could be intentionally kept); flagging in case
 it should be removed in a cleanup pass.
+
+## 2026-07-26 — Task 17: admin-api.ts split via Task 15; clinics/[clinicId]/page.tsx not split
+
+admin-api.ts shrank from 1869 to 1001 lines as a side effect of the Task 15 migration
+(every function moved to an API route was deleted from it, not just the data-fetching call
+sites in components). Did not do the second half of Task 17 -- splitting
+clinics/[clinicId]/page.tsx (still 2074 lines) into smaller components. That page's *data
+access* was fully migrated (see the Task 15 clinics/[clinicId] commit), but restructuring its
+JSX into sub-components is a separate, purely-presentational refactor with real risk of
+prop-drilling or conditional-rendering bugs that I can't visually verify in this environment.
+Left for a follow-up pass with browser testing.
