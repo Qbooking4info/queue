@@ -682,15 +682,6 @@ export async function updateClinic(clinicId: string, updates: { name?: string; d
   return { error }
 }
 
-export async function toggleClinicActive(clinicId: string, isActive: boolean): Promise<void> {
-  await adminDb.from('hospital_clinics').update({ is_active: isActive }).eq('id', clinicId)
-}
-
-export async function deleteClinic(clinicId: string): Promise<{ error?: string }> {
-  const { error } = await adminDb.from('hospital_clinics').delete().eq('id', clinicId)
-  return { error: error?.message }
-}
-
 export async function updateAppointmentStatus(id: string, status: string) {
   await adminDb.from('appointments').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
 }

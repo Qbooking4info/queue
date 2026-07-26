@@ -5,7 +5,6 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { AlertTriangle, ArrowRight, X, RefreshCw, Check } from 'lucide-react'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
-import { toggleClinicActive, deleteClinic } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -452,7 +451,11 @@ export default function ClinicsPage() {
   useEffect(() => { loadClinics() }, [loadClinics])
 
   async function handleToggleActive(id: string, active: boolean) {
-    await toggleClinicActive(id, active)
+    await fetch(`/api/clinics/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_active', is_active: active }),
+    })
     setClinics(prev => prev.map(c => c.id === id ? { ...c, is_active: active } : c))
   }
 
@@ -460,10 +463,11 @@ export default function ClinicsPage() {
     if (!deleteTarget) return
     setDeleting(true)
     setDeleteError('')
-    const { error } = await deleteClinic(deleteTarget.id)
+    const res = await fetch(`/api/clinics/${deleteTarget.id}`, { method: 'DELETE' })
     setDeleting(false)
-    if (error) {
-      setDeleteError(error)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setDeleteError(body?.error ?? 'Failed to delete')
     } else {
       setClinics(prev => prev.filter(c => c.id !== deleteTarget.id))
       setDeleteTarget(null)
