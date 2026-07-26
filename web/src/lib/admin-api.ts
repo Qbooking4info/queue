@@ -421,47 +421,6 @@ export async function getAllHospitals(): Promise<AdminHospital[]> {
 
 // ── Patient chart (doctor-facing) ───────────────────────────────────────────────
 
-export interface PatientProfile {
-  id: string
-  full_name: string
-  date_of_birth: string | null
-  gender: string | null
-  blood_group: string | null
-  phone: string | null
-  email: string | null
-  city: string | null
-  state: string | null
-}
-
-export interface PatientMedicalHistory {
-  conditions: string[]
-  allergies: string[]
-  medications: string | null
-  surgeries: string | null
-  family_history: string | null
-  other_conditions: string | null
-  other_allergies: string | null
-  updated_at: string | null
-}
-
-export async function getPatientProfile(patientId: string): Promise<PatientProfile | null> {
-  const { data } = await adminDb
-    .from('users')
-    .select('id, full_name, date_of_birth, gender, blood_group, phone, email, city, state')
-    .eq('id', patientId)
-    .single()
-  return data as PatientProfile | null
-}
-
-export async function getPatientMedicalHistory(patientId: string): Promise<PatientMedicalHistory | null> {
-  const { data } = await (adminDb as any)
-    .from('patient_medical_history')
-    .select('conditions, allergies, medications, surgeries, family_history, other_conditions, other_allergies, updated_at')
-    .eq('patient_id', patientId)
-    .maybeSingle()
-  return data as PatientMedicalHistory | null
-}
-
 export async function getDoctorTodayAppointments(doctorId: string): Promise<AdminAppointment[]> {
   const today = todayLocalDate()
   const select = `

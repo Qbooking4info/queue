@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { AlertTriangle } from 'lucide-react'
-import { getPatientProfile, getPatientMedicalHistory } from '@/lib/admin-api'
-import type { PatientProfile, PatientMedicalHistory } from '@/lib/admin-api'
+import type { PatientProfile, PatientMedicalHistory } from '@/app/api/patients/[id]/route'
 
 function calcAge(dob: string | null): number | null {
   if (!dob) return null
@@ -23,12 +22,14 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([getPatientProfile(patientId), getPatientMedicalHistory(patientId)]).then(([p, h]) => {
-      if (cancelled) return
-      setProfile(p)
-      setHistory(h)
-      setLoading(false)
-    })
+    fetch(`/api/patients/${patientId}`)
+      .then(res => res.ok ? res.json() : { profile: null, history: null })
+      .then(({ profile: p, history: h }) => {
+        if (cancelled) return
+        setProfile(p)
+        setHistory(h)
+        setLoading(false)
+      })
     return () => { cancelled = true }
   }, [patientId])
 
@@ -51,6 +52,8 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
   const age = profile?.date_of_birth ? calcAge(profile.date_of_birth) : null
   const hasAllergies  = (history?.allergies ?? []).length > 0
   const hasConditions = (history?.conditions ?? []).length > 0
+  const hasOtherAllergies  = !!history?.other_allergies
+  const hasOtherConditions = !!history?.other_conditions
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -87,7 +90,7 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
               <div style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <AlertTriangle size={11} /> Allergies
               </div>
-              {hasAllergies ? (
+              {hasAllergies || hasOtherAllergies ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {history!.allergies.map(a => (
                     <span key={a} style={{ fontSize: 12, fontWeight: 700, padding: '4px 11px', borderRadius: 99,
@@ -95,6 +98,12 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
                       {a}
                     </span>
                   ))}
+                  {hasOtherAllergies && (
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 11px', borderRadius: 99,
+                      background: C.redLight, color: C.red, border: `1px solid ${C.red}33` }}>
+                      {history!.other_allergies}
+                    </span>
+                  )}
                 </div>
               ) : <div style={emptyText}>No allergies on file</div>}
             </div>
@@ -102,7 +111,7 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
             {/* Conditions */}
             <div>
               <div style={sectionLabel}>Current conditions</div>
-              {hasConditions ? (
+              {hasConditions || hasOtherConditions ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {history!.conditions.map(c => (
                     <span key={c} style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 99,
@@ -110,6 +119,12 @@ export function ViewPatientModal({ patientId, patientName, onClose }: {
                       {c}
                     </span>
                   ))}
+                  {hasOtherConditions && (
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 99,
+                      background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}` }}>
+                      {history!.other_conditions}
+                    </span>
+                  )}
                 </div>
               ) : <div style={emptyText}>No conditions on file</div>}
             </div>
