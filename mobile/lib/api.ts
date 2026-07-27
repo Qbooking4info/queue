@@ -201,17 +201,19 @@ export async function getAvailableSlots(
   return data ?? []
 }
 
-// ── Daily booking count check ─────────────────────────────────────────────────
+// ── Daily booking limit check ─────────────────────────────────────────────────
+// Server computes the limit comparison itself (see get_daily_booking_count
+// migration) and returns only whether the day is full, not the exact count.
 
-export async function getDailyBookingCount(
+export async function isDailyBookingLimitReached(
   hospitalId: string, date: string, clinicId?: string
-): Promise<number> {
+): Promise<boolean> {
   const { data } = await publicDb.rpc('get_daily_booking_count', {
     p_hospital_id: hospitalId,
     p_date:        date,
     p_clinic_id:   clinicId ?? null,
   })
-  return (data as number) ?? 0
+  return (data as boolean) ?? false
 }
 
 // ── Appointments ─────────────────────────────────────────────────────────────

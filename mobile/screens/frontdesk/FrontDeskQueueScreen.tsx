@@ -66,7 +66,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     if (!silent) setLoading(true)
 
     const today = new Date().toISOString().split('T')[0]
-    let query = (supabase as any)
+    let query = supabase
       .from('appointments')
       .select('id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
       .eq('hospital_id', hospitalId)
@@ -76,7 +76,11 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     if (tab === 'today') query = query.eq('appointment_date', today)
 
     const { data } = await query
-    setAppts((data ?? []) as Appt[])
+    // Supabase's generated types model the patient/doctor FK joins below as
+    // arrays even though each appointment has exactly one of each at runtime
+    // (a known codegen limitation for `!fk_name(...)` embeds it can't prove
+    // are one-to-one) -- cast through unknown to reflect the real shape.
+    setAppts((data ?? []) as unknown as Appt[])
     setLoading(false)
     setRefreshing(false)
   }, [hospitalId, tab])
@@ -103,7 +107,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       return
     }
     setActioning(appt.id)
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('appointments')
       .update({ status: 'checked_in' })
       .eq('id', appt.id)

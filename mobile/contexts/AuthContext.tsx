@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // MH1: Try user_id first, fall back to auth_user_id
   async function fetchDoctorProfile(authUid: string, usersRowId: string): Promise<boolean> {
     if (usersRowId) {
-      const { data: byUserId } = await (supabase as any)
+      const { data: byUserId } = await supabase
         .from('doctors')
         .select('id, hospital_id, full_name, specialty_id')
         .eq('is_active', true)
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('doctors')
       .select('id, hospital_id, full_name, specialty_id')
       .eq('is_active', true)
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchStaffProfile(name: string): Promise<boolean> {
     // Use a SECURITY DEFINER function to bypass RLS on hospital_admins / clinic_admins.
-    const { data, error } = await (supabase as any).rpc('get_my_staff_profile')
+    const { data, error } = await supabase.rpc('get_my_staff_profile')
 
     if (error || !data || data.length === 0) {
       setStaffProfile(null)

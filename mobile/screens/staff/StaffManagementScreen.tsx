@@ -61,34 +61,30 @@ export function StaffManagementScreen({ navigation }: Props) {
     if (!hospitalId) return
     if (!silent) setLoading(true)
 
-    const [adminsRes, clinicAdminsRes, doctorsRes] = await Promise.all([
-      (supabase as any).from('hospital_admins')
-        .select('id, role, user:users!hospital_admins_user_id_fkey(id, full_name, email, avatar_url)')
-        .eq('hospital_id', hospitalId),
-      (supabase as any).from('clinic_admins')
-        .select('id, role, clinic:hospital_clinics!clinic_admins_clinic_id_fkey(name), user:users!clinic_admins_user_id_fkey(id, full_name, email, avatar_url)')
-        .eq('hospital_id', hospitalId),
-      (supabase as any).from('doctors')
-        .select('id, full_name, title, availability_status, auth_user_id, specialty:specialties!doctors_specialty_id_fkey(name), user:users!doctors_user_id_fkey(email)')
-        .eq('hospital_id', hospitalId)
-        .eq('is_active', true)
-        .order('full_name'),
-    ])
+    // Direct .from('hospital_admins')/.from('clinic_admins') reads used to be blocked
+    // silently by RLS for anyone but the caller's own row (clinic_admins' SELECT policy
+    // only allows reading your own row). get_hospital_staff_roster does its own staff
+    // membership check and returns the full roster instead.
+    const { data, error } = await supabase.rpc('get_hospital_staff_roster', { p_hospital_id: hospitalId })
 
-    const members: StaffMember[] = []
-    ;(adminsRes.data ?? []).forEach((r: any) => {
-      if (r.user) members.push({ id: r.user.id, full_name: r.user.full_name, email: r.user.email, role: r.role, clinic_name: null, avatar_url: r.user.avatar_url })
-    })
-    ;(clinicAdminsRes.data ?? []).forEach((r: any) => {
-      if (r.user) members.push({ id: r.user.id, full_name: r.user.full_name, email: r.user.email, role: r.role, clinic_name: r.clinic?.name ?? null, avatar_url: r.user.avatar_url })
-    })
-    setStaff(members)
+    if (error) {
+      setStaff([])
+      setDoctors([])
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
 
-    setDoctors((doctorsRes.data ?? []).map((d: any) => ({
+    setStaff((data?.staff ?? []).map((r: any) => ({
+      id: r.id, full_name: r.full_name, email: r.email, role: r.role,
+      clinic_name: r.clinic_name, avatar_url: r.avatar_url,
+    })))
+
+    setDoctors((data?.doctors ?? []).map((d: any) => ({
       id: d.id, full_name: d.full_name, title: d.title,
-      specialty_name: d.specialty?.name ?? null,
+      specialty_name: d.specialty_name,
       availability_status: d.availability_status ?? 'off_duty',
-      email: d.user?.email ?? null,
+      email: d.email,
     })))
 
     setLoading(false)

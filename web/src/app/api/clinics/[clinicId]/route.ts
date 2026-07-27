@@ -9,12 +9,12 @@ interface DayHours { day: number; open: string; close: string; closed: boolean }
 function defaultHours(): DayHours[] {
   return Array.from({ length: 7 }, (_, day) => ({ day, open: '08:00', close: '18:00', closed: day === 0 }))
 }
-function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
+function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean | null }[]): DayHours[] {
   const byDay = new Map(rows.map(r => [r.day_of_week, r]))
   return defaultHours().map(d => {
     const r = byDay.get(d.day)
     if (!r) return d
-    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed ?? false }
   })
 }
 
@@ -65,15 +65,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
     { data: hospitalHoursRows },
   ] = await Promise.all([
     db.from('hospital_clinics').select('*').eq('id', clinicId).single(),
-    (db as any).from('doctors').select(`
+    db.from('doctors').select(`
         id, full_name, email, title, avg_rating, review_count, is_active,
         accepts_virtual, consultation_fee, years_experience, clinic_id, availability_status,
         specialty:specialties!doctors_specialty_id_fkey(name)
       `).eq('clinic_id', clinicId).eq('is_active', true).order('full_name'),
-    (db as any).from('clinic_admins').select('id, user_id, role, is_active, created_at, users(full_name, email)')
+    db.from('clinic_admins').select('id, user_id, role, is_active, created_at, users(full_name, email)')
       .eq('clinic_id', clinicId).eq('is_active', true).order('created_at'),
     from && to
-      ? (db as any).from('appointments').select(`
+      ? db.from('appointments').select(`
           id, booking_ref, appointment_date, start_time, status, type, reason,
           booking_mode, approval_status, urgency, symptom_description, approval_note,
           assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
@@ -95,8 +95,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
             .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).or(orFilter).eq('status', 'cancelled'),
         ])
       : Promise.resolve(null),
-    (db as any).from('hospital_clinic_hours').select('day_of_week, open_time, close_time, is_closed').eq('clinic_id', clinicId),
-    (db as any).from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', hospitalId),
+    db.from('hospital_clinic_hours').select('day_of_week, open_time, close_time, is_closed').eq('clinic_id', clinicId),
+    db.from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', hospitalId),
   ])
 
   const apptRows = (apptsResult.data ?? []) as any[]
@@ -220,12 +220,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
       const rows = body.hours.map(h => ({
         clinic_id: clinicId, day_of_week: h.day, open_time: h.open, close_time: h.close, is_closed: h.closed,
       }))
-      const { error } = await (db as any).from('hospital_clinic_hours').upsert(rows, { onConflict: 'clinic_id,day_of_week' })
+      const { error } = await db.from('hospital_clinic_hours').upsert(rows, { onConflict: 'clinic_id,day_of_week' })
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
     }
     case 'clear_hours': {
-      const { error } = await (db as any).from('hospital_clinic_hours').delete().eq('clinic_id', clinicId)
+      const { error } = await db.from('hospital_clinic_hours').delete().eq('clinic_id', clinicId)
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
     }

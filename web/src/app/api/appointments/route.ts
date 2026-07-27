@@ -17,7 +17,7 @@ interface VitalsRow {
 
 async function fetchVitalsBatch(db: ReturnType<typeof createAdminClient>, ids: string[]): Promise<Map<string, VitalsRow>> {
   if (!ids.length) return new Map()
-  const { data } = await (db as any)
+  const { data } = await db
     .from('vitals_audit_log')
     .select('appointment_id, weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, bmi, recorded_at')
     .in('appointment_id', ids)
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
   // ── Doctor: only their own appointments ────────────────────────────────────
   if (caller.role === 'doctor') {
     if (!caller.doctorId) return Errors.forbidden()
-    const { data } = await (db as any)
+    const { data } = await db
       .from('appointments')
       .select(FULL_SELECT)
       .eq('doctor_id', caller.doctorId)
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
   if (!caller.hospitalId) return Errors.forbidden()
 
   // ── Clinic admin / front desk: scoped to their clinic ──────────────────────
-  let query = (db as any)
+  let query = db
     .from('appointments')
     .select(FULL_SELECT)
     .eq('hospital_id', caller.hospitalId)
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     .order('appointment_date', { ascending: false })
     .order('start_time')
 
-  let doctorsQuery = (db as any)
+  let doctorsQuery = db
     .from('doctors')
     .select(`
       id, full_name, email, title, avg_rating, review_count, is_active,

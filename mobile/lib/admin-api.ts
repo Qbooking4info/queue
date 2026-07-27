@@ -26,7 +26,7 @@ export interface RangeStats {
 
 export async function getRangeStats(hospitalId: string, from: string, to: string, clinicId?: string | null): Promise<RangeStats> {
   const base = () => {
-    let q = (supabase as any).from('appointments').select('id', { count: 'exact', head: true })
+    let q = supabase.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to)
     if (clinicId) q = q.eq('clinic_id', clinicId)
     return q
@@ -56,7 +56,7 @@ export interface AdminAppointmentRow {
 
 export async function getTodayAppointments(hospitalId: string, clinicId?: string | null): Promise<AdminAppointmentRow[]> {
   const today = fmtLocalDate(new Date())
-  let query = (supabase as any)
+  let query = supabase
     .from('appointments')
     .select('id, booking_ref, appointment_date, start_time, status, type, queue_position, booking_mode, walkin_patient_name, patient:users!appointments_patient_id_fkey(full_name), doctor:doctors!appointments_doctor_id_fkey(full_name), assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name)')
     .eq('hospital_id', hospitalId)
@@ -97,7 +97,7 @@ export interface AdminDoctorRow {
 }
 
 export async function getDoctorsOnDuty(hospitalId: string, clinicId?: string | null): Promise<AdminDoctorRow[]> {
-  let query = (supabase as any)
+  let query = supabase
     .from('doctors')
     .select('id, full_name, title, availability_status, specialty:specialties!doctors_specialty_id_fkey(name)')
     .eq('hospital_id', hospitalId)

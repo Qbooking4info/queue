@@ -130,7 +130,7 @@ async function getDoctorTodayAppointments(db: ReturnType<typeof createAdminClien
       queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
       patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender)
     `
-  const base = () => (db as any).from('appointments').select(select)
+  const base = () => db.from('appointments').select(select)
   const [byDoctorSched, byDoctorCheckedIn] = await Promise.all([
     base().eq('doctor_id', doctorId).eq('appointment_date', today),
     base().eq('doctor_id', doctorId).eq('check_in_date', today),
@@ -203,7 +203,7 @@ async function getTodayAppointments(db: ReturnType<typeof createAdminClient>, ho
 }
 
 async function getDoctors(db: ReturnType<typeof createAdminClient>, hospitalId: string, clinicId?: string) {
-  let q = (db as any)
+  let q = db
     .from('doctors')
     .select(`
       id, full_name, email, title, avg_rating, review_count, is_active,

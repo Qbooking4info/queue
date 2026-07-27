@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import type { Database } from '@/types/database'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(['hospital_admin', 'clinic_admin'])
@@ -14,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // BC2: verify the doctor belongs to the caller's hospital before any write
     if (caller.hospitalId) {
-      const { data: ownerCheck } = await (db as any)
+      const { data: ownerCheck } = await db
         .from('doctors')
         .select('id')
         .eq('id', id)
@@ -24,8 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const allowed = ['full_name','title','specialty_id','consultation_fee','virtual_fee',
-                     'years_experience','accepts_virtual','bio','qualification','mdcn_number']
-    const updates: Record<string, unknown> = {}
+                     'years_experience','accepts_virtual','bio','qualification','mdcn_number'] as const
+    const updates: Partial<Database['public']['Tables']['doctors']['Update']> = {}
     for (const k of allowed) {
       if (k in body) updates[k] = body[k]
     }
@@ -34,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const email = (body.email as string)?.trim()
       if (!email) return Errors.validation('Email cannot be blank')
 
-      const { data: doc } = await (db as any).from('doctors').select('auth_user_id').eq('id', id).single()
+      const { data: doc } = await db.from('doctors').select('auth_user_id').eq('id', id).single()
       if (doc?.auth_user_id) {
         const { error: authErr } = await db.auth.admin.updateUserById(doc.auth_user_id, { email })
         if (authErr) return Errors.internal(authErr.message)
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Object.keys(updates).length === 0) {
       return Errors.validation('No fields to update')
     }
-    const { error } = await (db as any).from('doctors').update(updates).eq('id', id)
+    const { error } = await db.from('doctors').update(updates).eq('id', id)
     if (error) return Errors.internal(error.message)
     return NextResponse.json({ success: true })
   } catch (e: unknown) {

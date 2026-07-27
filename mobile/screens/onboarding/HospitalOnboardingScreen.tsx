@@ -76,7 +76,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
 
   const loadSpecialties = useCallback(async () => {
     if (specsLoaded) return
-    const { data } = await (supabase as any).from('specialties').select('id, name').order('name')
+    const { data } = await supabase.from('specialties').select('id, name').order('name')
     setSpecialties(data ?? [])
     setSpecsLoaded(true)
   }, [specsLoaded])

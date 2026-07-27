@@ -16,7 +16,7 @@ type Action =
   | { action: 'set_status'; status: string }
 
 async function getDoctorAvgConsultDuration(db: ReturnType<typeof createAdminClient>, doctorId: string): Promise<number | null> {
-  const { data } = await (db as any)
+  const { data } = await db
     .from('appointments')
     .select('consult_duration_secs')
     .eq('doctor_id', doctorId)
@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const db = createAdminClient()
 
-  const { data: appt, error: apptErr } = await (db as any)
+  const { data: appt, error: apptErr } = await db
     .from('appointments')
     .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date')
     .eq('id', id)
@@ -123,7 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const now = new Date().toISOString()
       const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
       // BM2: only pending/confirmed/checked_in can be marked no-show; in_progress has already started.
-      await (db as any).from('appointments').update({
+      await db.from('appointments').update({
         status: 'no_show', no_show_at: now, reschedule_deadline: deadline, updated_at: now,
       }).eq('id', id).in('status', ['pending', 'confirmed', 'checked_in'])
       return NextResponse.json({ success: true })
@@ -138,7 +138,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       // BH1: manual admin approval should use 'approved', not 'auto_approved'
       // BH2: guard against re-approving already-decided or closed appointments
-      await (db as any).from('appointments').update({
+      await db.from('appointments').update({
         approval_status: 'approved', status: 'confirmed', approval_note: body.note ?? null, updated_at: new Date().toISOString(),
       }).eq('id', id).eq('approval_status', 'pending_approval').not('status', 'in', '("cancelled","completed")')
 
@@ -164,7 +164,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .single()
 
       // BH2: guard against re-rejecting already-decided or closed appointments
-      await (db as any).from('appointments').update({
+      await db.from('appointments').update({
         approval_status: 'rejected', status: 'cancelled', approval_note: body.note,
         cancellation_reason: `Booking rejected: ${body.note}`, cancelled_at: new Date().toISOString(),
         refund_pct: 100, updated_at: new Date().toISOString(),
@@ -195,7 +195,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       // BH6: enforce SOP -- only 'confirmed' appointments may be checked in
-      const { error } = await (db as any).from('appointments').update({
+      const { error } = await db.from('appointments').update({
         status: 'checked_in', check_in_date: checkInDate,
         queue_position: queuePosition, estimated_wait: estimatedWait, updated_at: new Date().toISOString(),
       }).eq('id', id).in('status', ['confirmed'])
@@ -210,10 +210,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Auto-end whatever this doctor was previously seeing, if it was never explicitly ended.
       if (doctorId) {
         const [byDoctor, byAssigned] = await Promise.all([
-          (db as any).from('appointments').select('id')
+          db.from('appointments').select('id')
             .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
             .eq('status', 'in_progress').eq('doctor_id', doctorId).neq('id', id),
-          (db as any).from('appointments').select('id')
+          db.from('appointments').select('id')
             .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
             .eq('status', 'in_progress').eq('assigned_doctor_id', doctorId).neq('id', id),
         ])
@@ -222,20 +222,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ...((byAssigned.data ?? []) as { id: string }[]).map(r => r.id),
         ]))
         if (staleIds.length > 0) {
-          const { error: autoEndErr } = await (db as any).from('appointments')
+          const { error: autoEndErr } = await db.from('appointments')
             .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
             .in('id', staleIds)
           if (autoEndErr) return Errors.internal(`Failed to auto-end previous consult: ${autoEndErr.message}`)
 
           // BM3: end any orphaned virtual sessions for auto-completed appointments
-          await (db as any).from('virtual_sessions')
+          await db.from('virtual_sessions')
             .update({ status: 'ended', ended_at: new Date().toISOString() })
             .in('appointment_id', staleIds).eq('status', 'active')
         }
       }
 
       // BH5: enforce state machine -- only 'checked_in' or 'confirmed' may start a consultation
-      const { error } = await (db as any).from('appointments').update({
+      const { error } = await db.from('appointments').update({
         status: 'in_progress', consult_started_at: new Date().toISOString(),
       }).eq('id', id).in('status', ['checked_in', 'confirmed'])
       if (error) return Errors.internal(error.message)
@@ -244,13 +244,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     case 'end_consultation': {
       // BH5: enforce state machine -- only 'in_progress' may be ended
-      const { error } = await (db as any).from('appointments').update({
+      const { error } = await db.from('appointments').update({
         status: 'completed', consult_ended_at: new Date().toISOString(),
       }).eq('id', id).eq('status', 'in_progress')
       if (error) return Errors.internal(error.message)
 
       // BM4: end the virtual session (if any) now that the appointment is completed
-      await (db as any).from('virtual_sessions')
+      await db.from('virtual_sessions')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('appointment_id', id).eq('status', 'active')
       return NextResponse.json({ success: true })
@@ -264,7 +264,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Preserved as-is rather than silently rerouting it through
       // check_in/end_consultation's extra logic, which would change
       // behavior beyond adding the authorization check this task is about.
-      const { error } = await (db as any).from('appointments')
+      const { error } = await db.from('appointments')
         .update({ status: body.status, updated_at: new Date().toISOString() })
         .eq('id', id)
       if (error) return Errors.internal(error.message)

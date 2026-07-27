@@ -13,7 +13,7 @@ export async function GET() {
   if (!caller.hospitalId) return Errors.forbidden()
   const db = createAdminClient()
 
-  const { data, error } = await (db as any)
+  const { data, error } = await db
     .from('doctors')
     .select(`
       id, full_name, title, avg_rating, review_count, is_active,

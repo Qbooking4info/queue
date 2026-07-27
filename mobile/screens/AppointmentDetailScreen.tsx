@@ -561,7 +561,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                       text: `${stars} Star${stars === 1 ? '' : 's'}`,
                       onPress: async () => {
                         if (!user || !doctorObj?.id) return
-                        await (supabase as any).from('reviews').insert({
+                        await supabase.from('reviews').insert({
                           appointment_id: raw.id,
                           patient_id:     user.id,
                           doctor_id:      doctorObj.id,

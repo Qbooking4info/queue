@@ -116,7 +116,6 @@ export function ProfileScreen({ navigation }: Props) {
           { icon: 'notifications-outline' as const,      label: 'Notifications',               sub: 'Alerts, reminders & updates',             onPress: () => { haptics.tap(); navigation?.navigate('Notifications') } },
           { icon: 'lock-closed-outline' as const,        label: 'Privacy & security',          sub: 'Password, data & account settings',       onPress: () => { haptics.tap(); navigation?.navigate('PrivacySecurity') } },
           { icon: 'chatbubbles-outline' as const,        label: 'Support & queries',           sub: 'FAQs, live chat & contact us',            onPress: () => { haptics.tap(); navigation?.navigate('Support') } },
-          { icon: 'business-outline' as const,          label: 'Register a hospital',         sub: 'Set up your hospital on Queue',           onPress: () => { haptics.tap(); navigation?.navigate('HospitalOnboarding') } },
         ].map(item => (
           <TouchableOpacity key={item.label} onPress={item.onPress}
             style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

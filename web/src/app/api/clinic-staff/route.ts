@@ -114,7 +114,7 @@ export async function PATCH(req: NextRequest) {
       .single()
     if (caErr || !caRow) return Errors.notFound('Staff')
 
-    if (caller.role !== 'super_admin' && caller.hospitalId !== (caRow as any).hospital_id) {
+    if (caller.role !== 'super_admin' && caller.hospitalId !== caRow.hospital_id) {
       return Errors.forbidden()
     }
 
@@ -126,12 +126,12 @@ export async function PATCH(req: NextRequest) {
       .single()
     if (!userRow) return Errors.notFound('User record')
 
-    const updates: Record<string, string> = {}
+    const updates: { full_name?: string; email?: string } = {}
     if (full_name?.trim()) updates.full_name = full_name.trim()
     if (email?.trim()) updates.email = email.trim()
 
     if (Object.keys(updates).length) {
-      await (db as any).from('users').update(updates).eq('id', userRow.id)
+      await db.from('users').update(updates).eq('id', userRow.id)
       if (email?.trim() && userRow.auth_id) {
         await db.auth.admin.updateUserById(userRow.auth_id, { email: email.trim() })
       }
@@ -161,7 +161,7 @@ export async function DELETE(req: NextRequest) {
       .single()
 
     if (!caRow) return Errors.notFound('Staff')
-    if (caller.role !== 'super_admin' && caller.hospitalId !== (caRow as any).hospital_id) {
+    if (caller.role !== 'super_admin' && caller.hospitalId !== caRow.hospital_id) {
       return Errors.forbidden()
     }
 

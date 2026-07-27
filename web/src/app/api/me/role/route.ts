@@ -19,7 +19,7 @@ export async function GET() {
     .single() as { data: { id: string; full_name: string | null } | null; error: unknown }
 
   if (profile) {
-    const { data: paRow } = await (db as any)
+    const { data: paRow } = await db
       .from('platform_admins')
       .select('id')
       .eq('user_id', profile.id)
@@ -45,7 +45,7 @@ export async function GET() {
       return NextResponse.json({ role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name })
     }
 
-    const { data: clinicRow } = await (db as any)
+    const { data: clinicRow } = await db
       .from('clinic_admins')
       .select('hospital_id, clinic_id, role')
       .eq('user_id', profile.id)
@@ -66,7 +66,7 @@ export async function GET() {
 
   // 3. Doctor — portal-created accounts link via doctors.user_id; self-registered via auth_user_id.
   if (profile) {
-    const { data: byUserId } = await (db as any)
+    const { data: byUserId } = await db
       .from('doctors')
       .select('id, hospital_id, full_name')
       .eq('user_id', profile.id)
@@ -76,7 +76,7 @@ export async function GET() {
     }
   }
 
-  const { data: doctorRow } = await (db as any)
+  const { data: doctorRow } = await db
     .from('doctors')
     .select('id, hospital_id, full_name')
     .eq('auth_user_id', authId)

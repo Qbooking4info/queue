@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // client-supplied value -- the previous client component passed its own
   // auth id as a prop, which is weaker than deriving it from the session
   // requireRole() already validated.
-  const { error } = await (db as any).from('vitals_audit_log').insert({
+  const { error } = await db.from('vitals_audit_log').insert({
     appointment_id:      appointmentId,
     recorded_by_auth_id: caller.authId,
     recorded_at:         new Date().toISOString(),

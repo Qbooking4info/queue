@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     // ── Plan: subscription status + monthly booking cap ──────────────────────
     // BH3+BH4: fetch subscription (any status) and block suspended/cancelled
-    const { data: sub } = await (db as any)
+    const { data: sub } = await db
       .from('hospital_subscriptions')
       .select('status, subscription_plans(max_monthly_bookings)')
       .eq('hospital_id', hospitalId)

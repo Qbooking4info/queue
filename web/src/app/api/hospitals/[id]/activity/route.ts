@@ -44,26 +44,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   const [{ data: newAppts }, { data: cancelledAppts }, { data: reviews }, { data: payouts }] = await Promise.all([
-    (db as any).from('appointments')
+    db.from('appointments')
       .select('id, created_at, patient:users!appointments_patient_id_fkey(full_name)')
       .eq('hospital_id', hospitalId)
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false })
       .limit(limit),
-    (db as any).from('appointments')
+    db.from('appointments')
       .select('id, cancelled_at, patient:users!appointments_patient_id_fkey(full_name)')
       .eq('hospital_id', hospitalId)
       .eq('status', 'cancelled')
       .gte('cancelled_at', cutoff)
       .order('cancelled_at', { ascending: false })
       .limit(limit),
-    (db as any).from('reviews')
+    db.from('reviews')
       .select('id, rating, created_at, doctor:doctors(full_name)')
       .eq('hospital_id', hospitalId)
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false })
       .limit(limit),
-    (db as any).from('payouts')
+    db.from('payouts')
       .select('id, amount, paid_at, status')
       .eq('hospital_id', hospitalId)
       .eq('status', 'paid')

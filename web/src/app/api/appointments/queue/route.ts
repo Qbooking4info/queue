@@ -81,8 +81,8 @@ export async function GET() {
   }
 
   const [byAppointmentDate, byCheckIn] = await Promise.all([
-    scoped((db as any).from('appointments').select(QUEUE_SELECT)).eq('appointment_date', today),
-    scoped((db as any).from('appointments').select(QUEUE_SELECT)).eq('check_in_date', today),
+    scoped(db.from('appointments').select(QUEUE_SELECT)).eq('appointment_date', today),
+    scoped(db.from('appointments').select(QUEUE_SELECT)).eq('check_in_date', today),
   ])
 
   const byId = new Map<string, any>()

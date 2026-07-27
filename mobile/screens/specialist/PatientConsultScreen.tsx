@@ -100,7 +100,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [saved,  setSaved]    = useState(false)
 
   async function fetchAppt() {
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('appointments')
       .select('*, patient:users!appointments_patient_id_fkey(id, full_name, phone, date_of_birth, gender, blood_group)')
       .eq('id', appointmentId)
@@ -124,7 +124,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   async function saveVitalsAndNotes() {
     setSaving(true)
     const bmi = calcBMI(weight, height)
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('appointments')
       .update({
         vitals_weight_kg:    parseFloat(weight)  || null,
@@ -163,10 +163,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       const checkInDate = (appt as any).check_in_date ?? fmtLocalDate(new Date())
       if (doctorId && hospitalId) {
         const [byDoctor, byAssigned] = await Promise.all([
-          (supabase as any).from('appointments').select('id')
+          supabase.from('appointments').select('id')
             .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
             .eq('status', 'in_progress').eq('doctor_id', doctorId).neq('id', appointmentId),
-          (supabase as any).from('appointments').select('id')
+          supabase.from('appointments').select('id')
             .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
             .eq('status', 'in_progress').eq('assigned_doctor_id', doctorId).neq('id', appointmentId),
         ])
@@ -175,7 +175,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           ...((byAssigned.data ?? []) as { id: string }[]).map(r => r.id),
         ]))
         if (staleIds.length > 0) {
-          await (supabase as any).from('appointments')
+          await supabase.from('appointments')
             .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
             .in('id', staleIds)
         }
@@ -186,7 +186,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
     if (newStatus === 'in_progress') patch.consult_started_at = new Date().toISOString()
     if (newStatus === 'completed')   patch.consult_ended_at   = new Date().toISOString()
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('appointments')
       .update(patch)
       .eq('id', appointmentId)

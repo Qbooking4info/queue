@@ -132,7 +132,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
   const db = authedClient ?? adminDb
 
   // Try users table lookup
-  const { data: profileRaw } = await (db as any)
+  const { data: profileRaw } = await db
     .from('users')
     .select('id, full_name')
     .eq('auth_id', authId)
@@ -141,7 +141,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
 
   if (profile) {
     // Platform admin (replaces deprecated users.is_super_admin boolean)
-    const { data: paRow } = await (db as any)
+    const { data: paRow } = await db
       .from('platform_admins')
       .select('id')
       .eq('user_id', profile.id)
@@ -155,7 +155,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
     // (created by the doctor/front-desk portal-account flows), so the role column must be
     // checked rather than treating any row as an admin. 'specialist' falls through to the
     // doctor lookup below so it resolves to role: 'doctor', not 'hospital_admin'.
-    const { data: adminRow } = await (db as any)
+    const { data: adminRow } = await db
       .from('hospital_admins')
       .select('hospital_id, role')
       .eq('user_id', profile.id)
@@ -169,7 +169,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
     }
 
     // Clinic staff (clinic_admin / front_desk share the clinic_admins table, differentiated by role column)
-    const { data: clinicRow } = await (db as any)
+    const { data: clinicRow } = await db
       .from('clinic_admins')
       .select('hospital_id, clinic_id, role')
       .eq('user_id', profile.id)
@@ -190,7 +190,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
 
   // Doctor — portal-created accounts link via doctors.user_id; self-registered ones via auth_user_id.
   if (profile) {
-    const { data: byUserId } = await (db as any)
+    const { data: byUserId } = await db
       .from('doctors')
       .select('id, hospital_id, full_name')
       .eq('user_id', profile.id)
@@ -198,7 +198,7 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
     if (byUserId) return { role: 'doctor', hospitalId: byUserId.hospital_id, doctorId: byUserId.id, displayName: byUserId.full_name }
   }
 
-  const { data: doctorRow } = await (db as any)
+  const { data: doctorRow } = await db
     .from('doctors')
     .select('id, hospital_id, full_name')
     .eq('auth_user_id', authId)
