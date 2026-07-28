@@ -1,8 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
-import { HOSPITAL_SELECT } from '@/lib/public-hospital-select'
+import { HOSPITAL_SELECT, PUBLIC_CORS_HEADERS } from '@/lib/public-hospital-select'
 
 export const revalidate = 60
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: PUBLIC_CORS_HEADERS })
+}
 
 // Public, unauthenticated directory listing — mirrors the query mobile used
 // to run directly against Supabase. Cached at the edge (60s) since hospital
@@ -24,10 +28,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
   if (error) {
-    return NextResponse.json({ error: 'Failed to load hospitals' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load hospitals' }, { status: 500, headers: PUBLIC_CORS_HEADERS })
   }
 
   return NextResponse.json(data ?? [], {
-    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300', ...PUBLIC_CORS_HEADERS },
   })
 }

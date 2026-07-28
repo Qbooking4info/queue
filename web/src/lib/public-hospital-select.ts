@@ -20,3 +20,11 @@ export const HOSPITAL_SELECT =
   `${HOSPITAL_PUBLIC}, doctors(${DOCTOR_PUBLIC}), ` +
   `hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), ` +
   `services(name, is_active)`
+
+// The mobile app (in its Expo-web dev/test form) calls these routes cross-origin --
+// e.g. the app on localhost:8081 fetching localhost:3000. Without this header the
+// browser blocks the response entirely (a plain network failure to the caller, no
+// error surfaced), even though the exact same request works fine from curl/Postman,
+// which don't enforce CORS. Wildcard is safe here: no cookies/credentials are sent
+// or read, and the data is already public/unauthenticated.
+export const PUBLIC_CORS_HEADERS = { 'Access-Control-Allow-Origin': '*' }
