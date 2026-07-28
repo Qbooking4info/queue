@@ -11,12 +11,12 @@ import {
   getHospitals, getDailyBookingCount,
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
-  getHospitalHours, isOpenNow, findEmergencyClinic,
+  getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
-import type { Clinic, BookingResult } from '../lib/api'
+import type { Clinic, BookingResult, DayHours } from '../lib/api'
 
 interface Props { navigation: any; route: any }
 
@@ -37,13 +37,20 @@ function fmtLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function getBookingDates(n = 8) {
+// hours=null means "not loaded yet" — falls back to the old default (every day but
+// Sunday) so the picker never sits empty while the real hours are still in flight.
+// A day is only skipped when hours explicitly mark it closed, so a clinic that's
+// open exactly one day a week (e.g. Wednesdays only) correctly surfaces just its
+// next N occurrences of that day, however many weeks out that spans.
+function getBookingDates(n = 8, hours: DayHours[] | null = null) {
+  const closedDays = new Set(hours ? hours.filter(h => h.closed).map(h => h.day) : [0])
   const dates: { iso: string; label: string }[] = []
   let offset = 0
-  while (dates.length < n) {
+  const maxOffset = 180 // safety cap — avoids an infinite loop if hours are misconfigured as closed every day
+  while (dates.length < n && offset < maxOffset) {
     const d = new Date()
     d.setDate(d.getDate() + offset)
-    if (d.getDay() !== 0) {
+    if (!closedDays.has(d.getDay())) {
       const iso  = fmtLocalDate(d)
       const day  = d.toLocaleDateString('en-NG', { weekday: 'short' })
       const num  = d.getDate()
@@ -100,7 +107,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   // Computed fresh on every screen visit — a module-level constant here would get cached
   // for the lifetime of the JS bundle and silently go stale ("Today" pointing at an old date).
-  const [DATES] = useState(() => getBookingDates(8))
+  // Starts with the naive "every day but Sunday" list and gets replaced once real hours
+  // load (see the hours-driven effect below), so the picker is never empty while loading.
+  const [DATES, setDATES] = useState(() => getBookingDates(8))
 
   const startStep = presetType && presetHospital ? STEP_DETAILS
                   : presetType                   ? STEP_HOSPITAL
@@ -158,6 +167,44 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [loadingClinics, setLoadingClinics] = useState(false)
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null)
   const [referralNote,   setReferralNote]   = useState('')
+
+  // Operating hours drive which dates are even offered in the picker below — a clinic
+  // that's only open Wednesdays should only ever show upcoming Wednesdays, not every
+  // day of the week. The clinic's own hours win if it has set any; otherwise the
+  // hospital's hours apply (same fallback convention as the web dashboard's Schedule
+  // page and the "Emergency Department" clinic lookup).
+  const [hospitalHours, setHospitalHours] = useState<DayHours[] | null>(null)
+  useEffect(() => {
+    if (!hospital?.id) { setHospitalHours(null); return }
+    let cancelled = false
+    getHospitalHours(String(hospital.id)).then(h => { if (!cancelled) setHospitalHours(h) })
+    return () => { cancelled = true }
+  }, [hospital?.id])
+
+  const [clinicHoursState, setClinicHoursState] = useState<{ hours: DayHours[]; isCustom: boolean } | null>(null)
+  useEffect(() => {
+    if (!selectedClinic?.id) { setClinicHoursState(null); return }
+    let cancelled = false
+    getClinicHours(selectedClinic.id).then(h => { if (!cancelled) setClinicHoursState(h) })
+    return () => { cancelled = true }
+  }, [selectedClinic?.id])
+
+  const effectiveHours: DayHours[] | null = selectedClinic
+    ? (clinicHoursState?.isCustom ? clinicHoursState.hours : hospitalHours)
+    : hospitalHours
+
+  useEffect(() => {
+    setDATES(getBookingDates(8, effectiveHours))
+  }, [effectiveHours])
+
+  // If the newly-computed date list no longer contains what was selected (e.g. hours
+  // just loaded and today isn't actually an open day for this clinic), snap to the
+  // first valid option instead of leaving an invalid date selected.
+  useEffect(() => {
+    if (DATES.length > 0 && !DATES.some(d => d.iso === selectedDate)) {
+      setSelectedDate(DATES[0].iso)
+    }
+  }, [DATES])
 
   // Forces opdSlots to re-filter periodically — otherwise a slot that was valid when this
   // screen first rendered can keep showing as bookable long after it's actually passed if

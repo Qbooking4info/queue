@@ -140,6 +140,23 @@ export async function getHospitalHours(hospitalId: string): Promise<DayHours[]> 
   })
 }
 
+// isCustom=false means the clinic never set its own hours — callers should fall back
+// to the hospital's own hours instead of treating the returned defaults as authoritative.
+export async function getClinicHours(clinicId: string): Promise<{ hours: DayHours[]; isCustom: boolean }> {
+  const { data } = await publicDb
+    .from('hospital_clinic_hours')
+    .select('day_of_week, open_time, close_time, is_closed')
+    .eq('clinic_id', clinicId)
+  const rows = data ?? []
+  const byDay = new Map(rows.map((r: any) => [r.day_of_week, r]))
+  const hours = defaultDayHours().map(d => {
+    const r = byDay.get(d.day)
+    if (!r) return d
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+  })
+  return { hours, isCustom: rows.length > 0 }
+}
+
 export function isOpenNow(hours: DayHours[], is24Hours?: boolean | null): boolean {
   if (is24Hours) return true
   const now = new Date()
