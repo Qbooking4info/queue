@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
 
   const [{ data: clinicHourRows }, { data: hospitalHourRows }] = await Promise.all([
     (doctor as any).clinic_id
-      ? (db as any).from('hospital_clinic_hours')
+      ? db.from('hospital_clinic_hours')
           .select('day_of_week, open_time, close_time, is_closed')
           .eq('clinic_id', (doctor as any).clinic_id)
       : Promise.resolve({ data: [] }),
-    (db as any).from('hospital_operating_hours')
+    db.from('hospital_operating_hours')
       .select('day_of_week, open_time, close_time, is_closed')
       .eq('hospital_id', adminRecord.hospital_id),
   ])

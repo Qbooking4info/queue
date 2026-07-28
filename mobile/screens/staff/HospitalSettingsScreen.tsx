@@ -52,7 +52,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
         fetch(`${API_URL}/api/hospitals/${hospitalId}/settings`, {
           headers: { Authorization: `Bearer ${jwt}` },
         }),
-        (supabase as any).from('hospitals').select('name').eq('id', hospitalId).single(),
+        supabase.from('hospitals').select('name').eq('id', hospitalId).single(),
       ])
       if (settingsRes.ok) {
         const body = await settingsRes.json()

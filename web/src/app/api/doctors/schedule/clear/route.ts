@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   if (error) return Errors.internal(error.message)
 
   // Log the destructive action for audit trail
-  await (db as any).from('admin_audit_log').insert({
+  await db.from('admin_audit_log').insert({
     actor_auth_id: user.id,
     actor_role:    adminRecord.role,
     action:        'clear_doctor_schedule',

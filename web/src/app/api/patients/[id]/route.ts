@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .select('id, full_name, date_of_birth, gender, blood_group, phone, email, city, state')
       .eq('id', patientId)
       .single(),
-    (db as any)
+    db
       .from('patient_medical_history')
       .select('conditions, allergies, medications, surgeries, family_history, other_conditions, other_allergies, updated_at')
       .eq('patient_id', patientId)

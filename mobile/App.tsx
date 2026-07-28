@@ -61,15 +61,21 @@ import { StaffManagementScreen }   from './screens/staff/StaffManagementScreen'
 import { HospitalSettingsScreen }  from './screens/staff/HospitalSettingsScreen'
 import { StaffMoreScreen }         from './screens/staff/StaffMoreScreen'
 
-// Onboarding
+// Onboarding & auth
 import { HospitalOnboardingScreen } from './screens/onboarding/HospitalOnboardingScreen'
+import { RoleSelectScreen }          from './screens/RoleSelectScreen'
+import { HospitalAuthScreen }        from './screens/HospitalAuthScreen'
+import { HospitalRegisterScreen }    from './screens/HospitalRegisterScreen'
 
-const Tab      = createBottomTabNavigator()
-const Stack    = createNativeStackNavigator()
-const DocTab   = createBottomTabNavigator()
-const DocStack = createNativeStackNavigator()
-const FDTab    = createBottomTabNavigator()
-const FDStack  = createNativeStackNavigator()
+const Tab        = createBottomTabNavigator()
+const Stack      = createNativeStackNavigator()
+const DocTab     = createBottomTabNavigator()
+const DocStack   = createNativeStackNavigator()
+const FDTab      = createBottomTabNavigator()
+const FDStack    = createNativeStackNavigator()
+const AuthNav    = createNativeStackNavigator()
+const PatientNav = createNativeStackNavigator()
+const HospitalNav = createNativeStackNavigator()
 
 function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
   return <Ionicons name={name} size={22} color={color} />
@@ -113,7 +119,6 @@ function AppStack() {
       <Stack.Screen name="Insurance"            component={InsuranceScreen} />
       <Stack.Screen name="Support"              component={SupportScreen} />
       <Stack.Screen name="VideoCall"            component={VideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
-      <Stack.Screen name="HospitalOnboarding"  component={HospitalOnboardingScreen} />
     </Stack.Navigator>
   )
 }
@@ -208,22 +213,40 @@ function StaffStack() {
   )
 }
 
-// ── Auth navigator ────────────────────────────────────────────────────────────
+// ── Auth navigators ───────────────────────────────────────────────────────────
 
-function AuthStack({ initialRoute }: { initialRoute: 'Login' | 'Register' }) {
+function PatientAuthStack() {
   return (
-    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <Stack.Screen name="Login"    component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-    </Stack.Navigator>
+    <PatientNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <PatientNav.Screen name="Login"    component={LoginScreen} />
+      <PatientNav.Screen name="Register" component={RegisterScreen} />
+    </PatientNav.Navigator>
+  )
+}
+
+function HospitalAuthStack() {
+  return (
+    <HospitalNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <HospitalNav.Screen name="HospitalPortal"   component={HospitalAuthScreen} />
+      <HospitalNav.Screen name="HospitalRegister" component={HospitalRegisterScreen} />
+    </HospitalNav.Navigator>
+  )
+}
+
+function RootAuthNavigator() {
+  return (
+    <AuthNav.Navigator initialRouteName="RoleSelect" screenOptions={{ headerShown: false, animation: 'fade' }}>
+      <AuthNav.Screen name="RoleSelect"   component={RoleSelectScreen} />
+      <AuthNav.Screen name="PatientAuth"  component={PatientAuthStack} />
+      <AuthNav.Screen name="HospitalAuth" component={HospitalAuthStack} />
+    </AuthNav.Navigator>
   )
 }
 
 // ── Root navigator ────────────────────────────────────────────────────────────
 
 function AppNavigator() {
-  const [splashDone,   setSplashDone]   = useState(false)
-  const [initialRoute, setInitialRoute] = useState<'Login' | 'Register'>('Login')
+  const [splashDone, setSplashDone] = useState(false)
   const { session, loading, user, doctorProfile, staffProfile, staffMode } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
@@ -258,8 +281,8 @@ function AppNavigator() {
     return (
       <SafeAreaProvider>
         <SplashScreen
-          onGetStarted={() => { setInitialRoute('Register'); setSplashDone(true) }}
-          onSignIn={() => { setInitialRoute('Login'); setSplashDone(true) }}
+          onGetStarted={() => setSplashDone(true)}
+          onSignIn={() => setSplashDone(true)}
         />
       </SafeAreaProvider>
     )
@@ -268,7 +291,7 @@ function AppNavigator() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <AuthStack initialRoute={initialRoute} />
+        <RootAuthNavigator />
       </NavigationContainer>
     </SafeAreaProvider>
   )

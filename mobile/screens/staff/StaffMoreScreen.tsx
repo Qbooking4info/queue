@@ -27,7 +27,7 @@ export function StaffMoreScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
-    ;(supabase as any)
+    ;supabase
       .from('hospitals').select('name').eq('id', staffProfile.hospitalId).single()
       .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
   }, [staffProfile?.hospitalId])

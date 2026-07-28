@@ -8,7 +8,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
 import {
-  getHospitals, getDailyBookingCount,
+  getHospitals, isDailyBookingLimitReached,
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
@@ -281,9 +281,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setCheckingLim(true)
     Promise.all(
       DATES.map(d =>
-        getDailyBookingCount(String(hospital.id), d.iso, selectedClinic?.id).then(count => ({
+        isDailyBookingLimitReached(String(hospital.id), d.iso, selectedClinic?.id).then(limitReached => ({
           date: d.iso,
-          full: urgency !== 'emergency' && effectiveDailyLimit != null && count >= effectiveDailyLimit,
+          full: urgency !== 'emergency' && limitReached,
         }))
       )
     ).then(results => {
@@ -333,9 +333,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setSubmitError(''); setSubmitting(true)
 
     // MM8: Re-validate slot availability at submit time to prevent race conditions
-    if (effectiveDailyLimit != null && urgency !== 'emergency') {
-      const freshCount = await getDailyBookingCount(String(hospital.id), selectedDate, selectedClinic?.id)
-      if (freshCount >= effectiveDailyLimit) {
+    if (urgency !== 'emergency') {
+      const limitReached = await isDailyBookingLimitReached(String(hospital.id), selectedDate, selectedClinic?.id)
+      if (limitReached) {
         setSubmitError('This time slot is now full. Please choose a different time.')
         setSubmitting(false)
         return

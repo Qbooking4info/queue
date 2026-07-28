@@ -15,7 +15,7 @@ export async function GET() {
   if (!caller.doctorId) return Errors.forbidden()
   const db = createAdminClient()
 
-  const { data } = await (db as any)
+  const { data } = await db
     .from('appointments')
     .select('consult_duration_secs')
     .eq('doctor_id', caller.doctorId)

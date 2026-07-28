@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // BC5: verify the doctor belongs to the caller's hospital before resetting password
     if (caller.hospitalId) {
-      const { data: ownerCheck } = await (db as any)
+      const { data: ownerCheck } = await db
         .from('doctors')
         .select('id')
         .eq('id', id)
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!ownerCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { data: doc } = await (db as any)
+    const { data: doc } = await db
       .from('doctors')
       .select('auth_user_id, full_name, clinic_id')
       .eq('id', id)

@@ -19,12 +19,12 @@ interface DayHours { day: number; open: string; close: string; closed: boolean }
 function defaultHours(): DayHours[] {
   return Array.from({ length: 7 }, (_, day) => ({ day, open: '08:00', close: '18:00', closed: day === 0 }))
 }
-function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
+function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean | null }[]): DayHours[] {
   const byDay = new Map(rows.map(r => [r.day_of_week, r]))
   return defaultHours().map(d => {
     const r = byDay.get(d.day)
     if (!r) return d
-    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed ?? false }
   })
 }
 
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)
 
-  let q = (db as any)
+  let q = db
     .from('appointments')
     .select(`
       id, appointment_date, start_time, type, status, urgency,
@@ -90,17 +90,17 @@ export async function GET(req: NextRequest) {
 
   let hours: DayHours[]
   if (clinicId) {
-    const { data: clinicHoursRows } = await (db as any)
+    const { data: clinicHoursRows } = await db
       .from('hospital_clinic_hours').select('day_of_week, open_time, close_time, is_closed').eq('clinic_id', clinicId)
     if ((clinicHoursRows ?? []).length > 0) {
-      hours = fillHours(clinicHoursRows)
+      hours = fillHours(clinicHoursRows ?? [])
     } else {
-      const { data: hospitalHoursRows } = await (db as any)
+      const { data: hospitalHoursRows } = await db
         .from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', hospitalId)
       hours = fillHours(hospitalHoursRows ?? [])
     }
   } else {
-    const { data: hospitalHoursRows } = await (db as any)
+    const { data: hospitalHoursRows } = await db
       .from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', hospitalId)
     hours = fillHours(hospitalHoursRows ?? [])
   }

@@ -53,7 +53,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
 
     async function fetchOrSubscribe() {
       // Try immediate read first
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('virtual_sessions')
         .select('guest_token, room_name, status')
         .eq('appointment_id', appointmentId)

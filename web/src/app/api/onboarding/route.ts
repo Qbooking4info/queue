@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // BH7: block super_admins from onboarding hospitals — they have no operational hospital context
-    const { data: paRow } = await (db as any)
+    const { data: paRow } = await db
       .from('platform_admins')
       .select('id')
       .eq('user_id', profile!.id)
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     // If not provided, auto-assign the free/starter plan; if none exists return 400.
     let resolvedPlanId: string | null = planId ?? null
     if (!resolvedPlanId) {
-      const { data: defaultPlan } = await (db as any)
+      const { data: defaultPlan } = await db
         .from('subscription_plans')
         .select('id')
         .or('name.ilike.%free%,slug.ilike.%free%,name.ilike.%starter%,slug.ilike.%starter%')

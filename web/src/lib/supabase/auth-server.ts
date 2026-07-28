@@ -46,7 +46,7 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
   let caller: CallerInfo | null = null
 
   if (profile) {
-    const { data: paRow } = await (db as any)
+    const { data: paRow } = await db
       .from('platform_admins')
       .select('id')
       .eq('user_id', profile.id)
@@ -73,7 +73,7 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
         // confirmed zero production rows use it (Task 10), dropped in
         // supabase/migrations/20260726000006_drop_clinic_admins_auth_user_id.sql.
         // One lookup, keyed on user_id, is now the only path.
-        const { data: clinicRow } = await (db as any)
+        const { data: clinicRow } = await db
           .from('clinic_admins')
           .select('hospital_id, clinic_id, role')
           .eq('user_id', profile.id)
@@ -103,7 +103,7 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
     const orConditions = [`auth_user_id.eq.${authId}`]
     if (profile) orConditions.push(`user_id.eq.${profile.id}`)
 
-    const { data: doctorRow } = await (db as any)
+    const { data: doctorRow } = await db
       .from('doctors')
       .select('id, hospital_id')
       .or(orConditions.join(','))

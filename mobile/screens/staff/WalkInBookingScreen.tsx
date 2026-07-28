@@ -45,12 +45,12 @@ export function WalkInBookingScreen({ navigation }: Props) {
     if (!hospitalId) return
     ;(async () => {
       const [docRes, clinicRes] = await Promise.all([
-        (supabase as any).from('doctors')
+        supabase.from('doctors')
           .select('id, full_name, title, specialty:specialties!doctors_specialty_id_fkey(name)')
           .eq('hospital_id', hospitalId)
           .eq('is_active', true)
           .order('full_name'),
-        (supabase as any).from('hospital_clinics')
+        supabase.from('hospital_clinics')
           .select('id, name, is_opd')
           .eq('hospital_id', hospitalId)
           .order('name'),

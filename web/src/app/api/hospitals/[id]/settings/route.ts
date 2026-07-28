@@ -12,12 +12,12 @@ function defaultHours(): DayHours[] {
   }))
 }
 
-function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }[]): DayHours[] {
+function fillHours(rows: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean | null }[]): DayHours[] {
   const byDay = new Map(rows.map(r => [r.day_of_week, r]))
   return defaultHours().map(d => {
     const r = byDay.get(d.day)
     if (!r) return d
-    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed }
+    return { day: d.day, open: r.open_time.slice(0, 5), close: r.close_time.slice(0, 5), closed: r.is_closed ?? false }
   })
 }
 
@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .select('accepts_virtual, emergency_hours, is_24_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude, sms_reminders, email_reminders')
       .eq('id', id)
       .single(),
-    (db as any).from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', id),
+    db.from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', id),
   ])
 
   return NextResponse.json({
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const rows = hours.map(h => ({
       hospital_id: id, day_of_week: h.day, open_time: h.open, close_time: h.close, is_closed: h.closed,
     }))
-    const { error } = await (db as any)
+    const { error } = await db
       .from('hospital_operating_hours')
       .upsert(rows, { onConflict: 'hospital_id,day_of_week' })
     if (error) return Errors.internal(error.message)

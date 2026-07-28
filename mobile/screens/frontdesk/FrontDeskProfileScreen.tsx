@@ -28,7 +28,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
-    ;(supabase as any)
+    ;supabase
       .from('hospitals')
       .select('name')
       .eq('id', staffProfile.hospitalId)

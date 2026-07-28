@@ -71,7 +71,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    const { data } = await (supabase as any).rpc('get_doctor_queue', {
+    const { data } = await supabase.rpc('get_doctor_queue', {
       p_doctor_id: doctorProfile.doctorId,
       p_date:      tab === 'today' ? today : null,
       p_today:     today,

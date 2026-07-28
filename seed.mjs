@@ -1,7 +1,14 @@
 import { createClient } from './web/node_modules/@supabase/supabase-js/dist/index.mjs'
 
-const SUPABASE_URL      = 'https://qzodmkgyzguzzyovjpfx.supabase.co'
-const SERVICE_ROLE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDE0MjY2NiwiZXhwIjoyMDk1NzE4NjY2fQ.sWAGt1x-xylUfntHvD4eCaU2h9giAVidRZYMwABZOsY'
+process.loadEnvFile(new URL('./web/.env.local', import.meta.url))
+
+const SUPABASE_URL      = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SERVICE_ROLE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in web/.env.local')
+  process.exit(1)
+}
 
 const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 

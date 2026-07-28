@@ -74,7 +74,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
     if (!hospitalId) return
     if (!silent) setLoading(true)
 
-    let query = (supabase as any)
+    let query = supabase
       .from('appointments')
       .select('id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name), clinic:hospital_clinics!appointments_clinic_id_fkey(name)')
       .eq('hospital_id', hospitalId)
@@ -93,7 +93,9 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
     }
 
     const { data } = await query
-    setAppts((data ?? []) as Appt[])
+    // See FrontDeskQueueScreen.tsx: Supabase's generated types model these FK
+    // joins as arrays even though each appointment has exactly one of each.
+    setAppts((data ?? []) as unknown as Appt[])
     setLoading(false)
     setRefreshing(false)
   }, [hospitalId, tab])

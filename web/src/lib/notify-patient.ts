@@ -27,7 +27,7 @@ export async function notifyPatient(
 
     const { data: patient } = await db.from('users').select('push_token').eq('id', appt.patient_id).single()
 
-    await (db as any).from('notifications').insert({
+    await db.from('notifications').insert({
       user_id: appt.patient_id,
       type,
       title,

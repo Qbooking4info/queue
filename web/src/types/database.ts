@@ -2168,7 +2168,7 @@ export type Database = {
       fn_get_my_admin_hospital_ids: { Args: never; Returns: string[] }
       get_daily_booking_count: {
         Args: { p_clinic_id?: string; p_date: string; p_hospital_id: string }
-        Returns: number
+        Returns: boolean
       }
       get_doctor_queue: {
         Args: { p_date: string; p_doctor_id: string; p_today: string }
@@ -2186,6 +2186,10 @@ export type Database = {
           type: string
           urgency: string
         }[]
+      }
+      get_hospital_staff_roster: {
+        Args: { p_hospital_id: string }
+        Returns: Json
       }
       get_my_staff_profile: {
         Args: never

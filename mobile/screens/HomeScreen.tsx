@@ -161,7 +161,7 @@ export function HomeScreen({ navigation }: Props) {
 
     // MM3: fetch unread notifications count
     if (user) {
-      const { count } = await (supabase as any)
+      const { count } = await supabase
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
