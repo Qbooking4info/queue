@@ -109,7 +109,11 @@ export interface AdminHospital {
   avg_rating: number | null
   total_bookings: number | null
   logo_url: string | null
+  bed_space_status: BedSpaceStatus
+  bed_space_updated_at: string | null
 }
+
+export type BedSpaceStatus = 'enough' | 'limited' | 'very_limited' | 'none' | 'unknown'
 
 export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk'
 

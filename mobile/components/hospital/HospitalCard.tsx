@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { Avatar } from '../ui/Avatar'
 import { Stars } from '../ui/Stars'
 import { StatusBadge } from '../ui/StatusBadge'
+import type { BedSpaceStatus } from '../../lib/api'
 
 export interface DisplayHospital {
   id:        string | number
@@ -38,6 +39,8 @@ export interface DisplayHospital {
   daily_booking_limit?: number | null
   requires_referral?:  boolean | null
   is_24_hours?:        boolean | null
+  bed_space_status?:      BedSpaceStatus | null
+  bed_space_updated_at?:  string | null
 }
 
 interface Props { hospital: DisplayHospital; onPress: () => void }

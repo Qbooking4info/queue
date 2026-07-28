@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { PartyPopper, Monitor, Building2, Phone, AlertTriangle } from 'lucide-react'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
+import { BedSpaceWidget } from './BedSpaceWidget'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
   const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 
-  const [{ data: appointmentsRaw }, { count: pending }, { count: checkedIn }] = await Promise.all([
+  const [{ data: appointmentsRaw }, { count: pending }, { count: checkedIn }, { data: hospital }] = await Promise.all([
     db.from('appointments')
       .select('id, booking_ref, start_time, type, status, approval_status, queue_position, urgency, walkin_patient_name, walkin_patient_phone, users(full_name, phone), doctors(full_name, title)')
       .eq('hospital_id', adminRecord.hospital_id)
@@ -60,7 +61,22 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('appointment_date', selectedDate)
       .eq('status', 'checked_in'),
+    db.from('hospitals')
+      .select('clinic_model, emergency_hours, bed_space_status, bed_space_updated_at')
+      .eq('id', adminRecord.hospital_id)
+      .single(),
   ])
+
+  // Multi-clinic hospitals designate one clinic as their Emergency Department (same
+  // is_emergency flag used throughout booking); single-clinic hospitals use their own
+  // emergency_hours flag instead, since there's no separate clinic to check.
+  let emergencyCapable = (hospital as any)?.emergency_hours === true
+  if ((hospital as any)?.clinic_model === 'multi') {
+    const { count: erClinicCount } = await db.from('hospital_clinics')
+      .select('id', { count: 'exact', head: true })
+      .eq('hospital_id', adminRecord.hospital_id).eq('is_emergency', true)
+    emergencyCapable = (erClinicCount ?? 0) > 0
+  }
 
   // Emergency walk-ins sort to the top of the front-desk queue, mirroring the doctor
   // queue's own tiering — start_time/queue_position order is preserved within each tier.
@@ -71,6 +87,13 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   return (
     <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
       <AutoRefresh hospitalId={adminRecord.hospital_id} />
+      {emergencyCapable && (
+        <BedSpaceWidget
+          hospitalId={adminRecord.hospital_id}
+          initialStatus={(hospital as any)?.bed_space_status ?? 'unknown'}
+          initialUpdatedAt={(hospital as any)?.bed_space_updated_at ?? null}
+        />
+      )}
       <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Front Desk Queue</h1>

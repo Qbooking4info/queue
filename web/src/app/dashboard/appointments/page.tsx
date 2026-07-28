@@ -338,10 +338,13 @@ function AssignDoctorModal({
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
-  // Only show doctors from the appointment's clinic (if one is assigned)
+  // Only active, on-duty doctors can be assigned -- someone on break or off duty isn't
+  // actually available to see this patient right now. Also scoped to the appointment's
+  // clinic, if one is assigned.
+  const onDuty = (d: AdminDoctor) => d.is_active && d.availability_status === 'on_duty'
   const eligibleDoctors = appointment.clinic_id
-    ? doctors.filter(d => d.is_active && d.clinic_id === appointment.clinic_id)
-    : doctors.filter(d => d.is_active)
+    ? doctors.filter(d => onDuty(d) && d.clinic_id === appointment.clinic_id)
+    : doctors.filter(onDuty)
 
   async function handleAssign() {
     if (!selected) return
@@ -385,7 +388,7 @@ function AssignDoctorModal({
         <div style={{ padding: '16px 22px', maxHeight: '55vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {eligibleDoctors.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px', color: C.textMuted, fontSize: 13 }}>
-              No doctors registered to this clinic yet
+              No doctors currently on duty{appointment.clinic_id ? ' in this clinic' : ''}
             </div>
           ) : eligibleDoctors.map(d => (
             <button key={d.id} onClick={() => setSelected(d.id)}
@@ -879,9 +882,9 @@ export default function AppointmentsPage() {
               const urg = urgencyColor(a.urgency, C)
               const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
               const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
-              // Assign/reassign only before check-in — queue_position is computed per-doctor at
-              // check-in time, so swapping doctors after that would leave a stale queue slot.
-              const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
+              // Assign/reassign only at check-in — that's the first point staff know who's
+              // actually on duty right now, and queue_position is computed per-doctor here too.
+              const canAssignDoctor = !isDoctor && a.status === 'checked_in'
               const needsApproval = a.approval_status === 'pending_approval'
               const isEmergency = a.urgency === 'emergency'
               return (
@@ -1071,7 +1074,7 @@ export default function AppointmentsPage() {
           const urg = urgencyColor(a.urgency, C)
           const needsAssign   = a.booking_mode === 'hospital' && !a.assigned_doctor_id && !a.doctor_id
           const hasDoctor     = !!(a.assigned_doctor_id || a.doctor_id)
-          const canAssignDoctor = !isDoctor && ['pending', 'confirmed'].includes(a.status)
+          const canAssignDoctor = !isDoctor && a.status === 'checked_in'
           const needsApproval = a.approval_status === 'pending_approval'
           const isEmergency   = a.urgency === 'emergency'
           const isPending     = pendingActionId === a.id

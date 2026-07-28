@@ -26,6 +26,38 @@ async function getDoctorAvgConsultDuration(db: ReturnType<typeof createAdminClie
   return total / data.length
 }
 
+// Shared by check_in (when a doctor is already known, e.g. doctor-mode bookings) and
+// assign_doctor (when a hospital-mode booking gets its doctor assigned after check-in,
+// once staff actually know who's on duty) -- queue scope is "checked in today," not the
+// originally booked appointment_date, so a future-dated booking that walks in today
+// joins today's physical queue, per doctor.
+async function computeQueuePosition(
+  db: ReturnType<typeof createAdminClient>, hospitalId: string, checkInDate: string,
+  doctorId: string, isEmergency: boolean, excludeApptId: string,
+): Promise<{ queuePosition: number; estimatedWait: number | null }> {
+  const [byDoctor, byAssigned] = await Promise.all([
+    (db as any).from('appointments').select('id, queue_position')
+      .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
+      .in('status', ['checked_in', 'in_progress']).eq('doctor_id', doctorId).neq('id', excludeApptId),
+    (db as any).from('appointments').select('id, queue_position')
+      .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
+      .in('status', ['checked_in', 'in_progress']).eq('assigned_doctor_id', doctorId).neq('id', excludeApptId),
+  ])
+  const others = [...(byDoctor.data ?? []), ...(byAssigned.data ?? [])] as { id: string; queue_position: number | null }[]
+  const ahead = others.length
+
+  if (isEmergency) {
+    // Emergency jumps straight to the front -- shift everyone already in this
+    // doctor's queue today back by one instead of just appending to the end.
+    await Promise.all(others.map(o =>
+      (db as any).from('appointments').update({ queue_position: (o.queue_position ?? ahead) + 1 }).eq('id', o.id)
+    ))
+    return { queuePosition: 1, estimatedWait: 0 }
+  }
+  const avgSecs = await getDoctorAvgConsultDuration(db, doctorId)
+  return { queuePosition: ahead + 1, estimatedWait: avgSecs != null ? Math.round((ahead * avgSecs) / 60) : null }
+}
+
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
 // checkInAppointment/startConsultation/endConsultation, none of which had
@@ -40,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: appt, error: apptErr } = await (db as any)
     .from('appointments')
-    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status')
+    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date')
     .eq('id', id)
     .single()
   if (apptErr || !appt) return Errors.notFound('Appointment')
@@ -53,22 +85,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   switch (body.action) {
     case 'assign_doctor': {
       const { data: doctor, error: docErr } = await (db as any)
-        .from('doctors').select('hospital_id, clinic_id, is_active').eq('id', body.doctorId).single()
+        .from('doctors').select('hospital_id, clinic_id, is_active, availability_status').eq('id', body.doctorId).single()
       if (docErr || !doctor) return Errors.notFound('Doctor')
-      if (!['pending', 'confirmed'].includes(appt.status)) {
-        return Errors.validation('Doctor can only be assigned or reassigned before check-in')
+
+      // Assignment can only happen at check-in -- that's the first point staff actually
+      // know who's on duty right now. Assigning earlier (while still pending/confirmed)
+      // can't reflect real-time availability, and queue_position is computed per-doctor
+      // right here, so doing it before check-in would leave a stale slot regardless.
+      if (appt.status !== 'checked_in') {
+        return Errors.validation('Doctor can only be assigned at check-in')
       }
       if (doctor.hospital_id !== appt.hospital_id) return Errors.validation('Doctor does not belong to this hospital')
       if (appt.clinic_id && doctor.clinic_id !== appt.clinic_id) {
         return Errors.validation("Doctor is not registered to this appointment's clinic")
       }
       if (!doctor.is_active) return Errors.validation('Doctor is not active')
+      if (doctor.availability_status && doctor.availability_status !== 'on_duty') {
+        return Errors.validation('Doctor is on break or off duty and cannot be assigned patients')
+      }
+
+      const checkInDate = appt.check_in_date ?? todayLocalDate()
+      const isEmergency = appt.urgency === 'emergency'
+      const { queuePosition, estimatedWait } = await computeQueuePosition(db, appt.hospital_id, checkInDate, body.doctorId, isEmergency, id)
 
       const { error } = await db.from('appointments').update({
         assigned_doctor_id: body.doctorId,
         doctor_id: body.doctorId,
+        queue_position: queuePosition,
+        estimated_wait: estimatedWait,
         updated_at: new Date().toISOString(),
-      } as any).eq('id', id).in('status', ['pending', 'confirmed'])
+      } as any).eq('id', id).eq('status', 'checked_in')
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
     }
@@ -140,33 +186,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       let queuePosition: number | null = null
       let estimatedWait: number | null = null
 
-      // Queue scope is "checked in today," not the originally booked appointment_date -- a
-      // future-dated booking that walks in today joins today's physical queue, per doctor.
+      // Only doctor-mode bookings (patient picked a specific doctor) already have one at
+      // check-in -- hospital-mode/OPD bookings check in with no doctor and no queue
+      // position at all until staff assign one (see assign_doctor), since that's now the
+      // only point a doctor's real-time on-duty status is known.
       if (doctorId) {
-        const [byDoctor, byAssigned] = await Promise.all([
-          (db as any).from('appointments').select('id, queue_position')
-            .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
-            .in('status', ['checked_in', 'in_progress']).eq('doctor_id', doctorId).neq('id', id),
-          (db as any).from('appointments').select('id, queue_position')
-            .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
-            .in('status', ['checked_in', 'in_progress']).eq('assigned_doctor_id', doctorId).neq('id', id),
-        ])
-        const others = [...(byDoctor.data ?? []), ...(byAssigned.data ?? [])] as { id: string; queue_position: number | null }[]
-        const ahead = others.length
-
-        if (isEmergency) {
-          // Emergency jumps straight to the front -- shift everyone already in this
-          // doctor's queue today back by one instead of just appending to the end.
-          queuePosition = 1
-          estimatedWait = 0
-          await Promise.all(others.map(o =>
-            (db as any).from('appointments').update({ queue_position: (o.queue_position ?? ahead) + 1 }).eq('id', o.id)
-          ))
-        } else {
-          queuePosition = ahead + 1
-          const avgSecs = await getDoctorAvgConsultDuration(db, doctorId)
-          if (avgSecs != null) estimatedWait = Math.round((ahead * avgSecs) / 60)
-        }
+        ({ queuePosition, estimatedWait } = await computeQueuePosition(db, appt.hospital_id, checkInDate, doctorId, isEmergency, id))
       }
 
       // BH6: enforce SOP -- only 'confirmed' appointments may be checked in

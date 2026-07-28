@@ -82,5 +82,7 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     daily_booking_limit: (h as any).daily_booking_limit ?? null,
     requires_referral:   (h as any).requires_referral   ?? null,
     is_24_hours:         (h as any).is_24_hours          ?? null,
+    bed_space_status:      h.bed_space_status      ?? null,
+    bed_space_updated_at:  h.bed_space_updated_at  ?? null,
   }
 }

@@ -1058,6 +1058,8 @@ export type Database = {
           address: string
           approval_mode: string | null
           avg_rating: number | null
+          bed_space_status: string
+          bed_space_updated_at: string | null
           city: string
           clinic_model: string | null
           country: string | null
@@ -1097,6 +1099,8 @@ export type Database = {
           address: string
           approval_mode?: string | null
           avg_rating?: number | null
+          bed_space_status?: string
+          bed_space_updated_at?: string | null
           city: string
           clinic_model?: string | null
           country?: string | null
@@ -1136,6 +1140,8 @@ export type Database = {
           address?: string
           approval_mode?: string | null
           avg_rating?: number | null
+          bed_space_status?: string
+          bed_space_updated_at?: string | null
           city?: string
           clinic_model?: string | null
           country?: string | null

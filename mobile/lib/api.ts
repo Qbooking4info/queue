@@ -5,6 +5,8 @@ const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 // ── Hospitals ────────────────────────────────────────────────────────────────
 
+export type BedSpaceStatus = 'enough' | 'limited' | 'very_limited' | 'none' | 'unknown'
+
 export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitude?: number | null } & {
   doctors: Doctor[]
   daily_booking_limit?: number | null
@@ -13,6 +15,8 @@ export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitu
   opd_fee?: number | null
   clinic_model?: string | null
   is_24_hours?: boolean | null
+  bed_space_status?: BedSpaceStatus | null
+  bed_space_updated_at?: string | null
   hospital_specialties?: { specialty: { name: string; icon: string | null } | null }[]
   services?: { name: string; is_active: boolean | null }[]
 }
@@ -31,6 +35,7 @@ const HOSPITAL_SELECT = 'id, name, slug, address, city, state, country, phone, w
   'type, description, logo_url, cover_url, latitude, longitude, ' +
   'accepts_virtual, emergency_hours, opd_fee, avg_rating, review_count, is_verified, ' +
   'is_24_hours, daily_booking_limit, approval_mode, requires_referral, clinic_model, ' +
+  'bed_space_status, bed_space_updated_at, ' +
   `doctors(${DOCTOR_SELECT}), ` +
   'hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), ' +
   'services(name, is_active)'

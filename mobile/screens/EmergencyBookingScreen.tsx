@@ -26,6 +26,15 @@ function fmtLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// null/'unknown' means the hospital hasn't reported bed space yet — no badge shown
+// rather than implying a status nobody actually confirmed.
+const BED_SPACE_META: Partial<Record<string, { icon: 'checkmark-circle-outline' | 'alert-circle-outline' | 'close-circle-outline'; label: string; color: string }>> = {
+  enough:       { icon: 'checkmark-circle-outline', label: 'Bed space: Enough',       color: '#00C265' },
+  limited:      { icon: 'alert-circle-outline',      label: 'Bed space: Limited',      color: '#FFB547' },
+  very_limited: { icon: 'alert-circle-outline',      label: 'Bed space: Very limited', color: '#FF8C42' },
+  none:         { icon: 'close-circle-outline',       label: 'Bed space: None',         color: '#FF5C5C' },
+}
+
 const ARRIVAL_OPTIONS = ['Now (walk-in)', '15 min', '30 min', '45 min', '1 hr']
 
 const SYMPTOMS = [
@@ -283,6 +292,13 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {step === 1 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
           <Text style={[s.label, { color: t.textMuted }]}>Select hospital</Text>
+          <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', marginTop: 0, marginBottom: 12 }]}>
+            <Text style={[s.noteText, { color: '#FFB547' }]}>
+              Bed space shown isn't guaranteed by the time you arrive — other emergencies, especially
+              those triaged as more urgent, are seen first. Basic first aid may still be given as the
+              hospital's capacity allows.
+            </Text>
+          </View>
           {loadingHospitals ? (
             <ActivityIndicator color="#FF5C5C" style={{ marginTop: 20 }} />
           ) : hospitals.length === 0 ? (
@@ -321,13 +337,14 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 </View>
                 <View style={s.hospitalMeta}>
                   {[
+                    ...(BED_SPACE_META[h.bed_space_status ?? ''] ? [BED_SPACE_META[h.bed_space_status ?? '']!] : []),
                     { icon: 'alert-circle-outline' as const, label: 'Emergency', color: '#FF5C5C' },
                     { icon: 'time-outline' as const,         label: h.wait,      color: t.textSecondary },
                     { icon: 'location-outline' as const,     label: h.distance,  color: t.textSecondary },
                   ].map(m => (
                     <View key={m.label} style={[s.metaChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
                       <Ionicons name={m.icon} size={11} color={m.color} />
-                      <Text style={[s.metaText, { color: m.color, fontWeight: m.color === '#FF5C5C' ? '700' : '400' }]}>{m.label}</Text>
+                      <Text style={[s.metaText, { color: m.color, fontWeight: m.color === '#FF5C5C' || m.color === '#FF8C42' ? '700' : '400' }]}>{m.label}</Text>
                     </View>
                   ))}
                 </View>
