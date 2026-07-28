@@ -645,6 +645,7 @@ export interface ClinicDetail {
   created_at: string | null
   sort_order: number | null
   service_tags: string[]
+  daily_booking_limit: number | null
 }
 
 export interface ClinicStaffMember {

@@ -224,15 +224,19 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     }
   }, [selectedDate])
 
-  // Daily limit check when entering schedule
+  // Daily limit check when entering schedule — a selected clinic's own limit (including
+  // an explicit "unlimited") always governs over the hospital-wide default; only when no
+  // clinic is selected (single-clinic hospitals, or OPD without a clinic) does the
+  // hospital-level limit apply.
+  const effectiveDailyLimit = selectedClinic ? selectedClinic.daily_booking_limit : (hospital?.daily_booking_limit ?? null)
   useEffect(() => {
     if (step !== STEP_SCHEDULE || !hospital) return
     setCheckingLim(true)
     Promise.all(
       DATES.map(d =>
-        getDailyBookingCount(String(hospital.id), d.iso).then(count => ({
+        getDailyBookingCount(String(hospital.id), d.iso, selectedClinic?.id).then(count => ({
           date: d.iso,
-          full: urgency !== 'emergency' && hospital.daily_booking_limit != null && count >= hospital.daily_booking_limit,
+          full: urgency !== 'emergency' && effectiveDailyLimit != null && count >= effectiveDailyLimit,
         }))
       )
     ).then(results => {
@@ -241,7 +245,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       setDateFullMap(map)
       setCheckingLim(false)
     })
-  }, [step, bookingType, hospital?.id])
+  }, [step, bookingType, hospital?.id, selectedClinic?.id, effectiveDailyLimit])
 
   // Load clinics when entering STEP_DETAILS for multi-clinic hospitals
   useEffect(() => {
@@ -282,9 +286,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setSubmitError(''); setSubmitting(true)
 
     // MM8: Re-validate slot availability at submit time to prevent race conditions
-    if (hospital.daily_booking_limit && urgency !== 'emergency') {
+    if (effectiveDailyLimit != null && urgency !== 'emergency') {
       const freshCount = await getDailyBookingCount(String(hospital.id), selectedDate, selectedClinic?.id)
-      if (freshCount >= hospital.daily_booking_limit) {
+      if (freshCount >= effectiveDailyLimit) {
         setSubmitError('This time slot is now full. Please choose a different time.')
         setSubmitting(false)
         return

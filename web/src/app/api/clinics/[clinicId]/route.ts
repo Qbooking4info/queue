@@ -171,7 +171,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
 }
 
 type PatchBody =
-  | { action: 'update'; name?: string; description?: string | null; is_active?: boolean; service_tags?: string[] }
+  | { action: 'update'; name?: string; description?: string | null; is_active?: boolean; service_tags?: string[]; daily_booking_limit?: number | null }
   | { action: 'toggle_active'; is_active: boolean }
   | { action: 'set_emergency' }
   | { action: 'clear_emergency' }

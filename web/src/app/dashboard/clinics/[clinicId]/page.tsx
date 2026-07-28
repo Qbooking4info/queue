@@ -54,17 +54,19 @@ type Tab = 'overview' | 'doctors' | 'staff' | 'appointments' | 'analytics'
 
 function EditClinicModal({
   clinic, col, onClose, onSave,
-}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined, serviceTags: string[]) => void }) {
+}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined, serviceTags: string[], dailyBookingLimit: number | null) => void }) {
   const { theme: C } = useTheme()
   const [name,        setName]        = useState(clinic.name)
   const [desc,        setDesc]        = useState(clinic.description ?? '')
   const [serviceTags, setServiceTags] = useState<string[]>(clinic.service_tags ?? [])
+  const [dailyLimit,  setDailyLimit]  = useState(clinic.daily_booking_limit != null ? String(clinic.daily_booking_limit) : '')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
   async function handleSave() {
     if (!name.trim()) return
     setSaving(true); setError('')
+    const limit = dailyLimit.trim() ? parseInt(dailyLimit, 10) : null
     const res = await fetch(`/api/clinics/${clinic.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -73,11 +75,12 @@ function EditClinicModal({
         name: name.trim(),
         description: desc.trim() || null,
         service_tags: serviceTags,
+        daily_booking_limit: limit,
       }),
     })
     setSaving(false)
     if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Failed to save'); return }
-    onSave(name.trim(), desc.trim() || undefined, serviceTags)
+    onSave(name.trim(), desc.trim() || undefined, serviceTags, limit)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -141,6 +144,20 @@ function EditClinicModal({
             <ServiceTagPicker selected={serviceTags} onChange={setServiceTags} />
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
               Helps patients find this clinic when searching by service type.
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+              marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+              Daily Booking Limit <span style={{ fontWeight: 400, textTransform: 'none' }}>(leave blank = unlimited)</span>
+            </label>
+            <input type="number" min="1" value={dailyLimit}
+              onChange={e => setDailyLimit(e.target.value)}
+              placeholder="e.g. 50 — blank for no limit"
+              style={inputStyle} />
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+              Caps how many patients can book this clinic per day. Overrides the hospital-wide limit for this clinic.
             </div>
           </div>
 
@@ -1070,8 +1087,15 @@ export default function ClinicDetailPage() {
               </span>
             )}
             {clinic && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                background: C.bgAlt, color: C.textSub, border: `1px solid ${C.border}` }}
+                title="Daily booking capacity for this clinic">
+                {clinic.daily_booking_limit != null ? `${clinic.daily_booking_limit}/day` : 'Unlimited/day'}
+              </span>
+            )}
+            {clinic && (
               <button onClick={() => setShowEdit(true)}
-                title="Edit clinic name & description"
+                title="Edit clinic name, description, services & booking limit"
                 style={{ width: 26, height: 26, borderRadius: 7, background: C.bgAlt,
                   border: `1px solid ${C.border}`, color: C.textMuted, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1993,8 +2017,8 @@ export default function ClinicDetailPage() {
           clinic={clinic}
           col={col}
           onClose={() => setShowEdit(false)}
-          onSave={(name, description, serviceTags) => {
-            setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags } : prev)
+          onSave={(name, description, serviceTags, dailyBookingLimit) => {
+            setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags, daily_booking_limit: dailyBookingLimit } : prev)
             setShowEdit(false)
           }}
         />
