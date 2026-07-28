@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { PartyPopper, Monitor, Building2, Phone, AlertTriangle } from 'lucide-react'
 import { FrontDeskActions } from './FrontDeskActions'
 import { AutoRefresh } from './AutoRefresh'
-import { BedSpaceWidget } from './BedSpaceWidget'
+import { BedSpaceWidget } from '@/components/dashboard/BedSpaceWidget'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 export const dynamic = 'force-dynamic'
