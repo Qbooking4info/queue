@@ -7,7 +7,7 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment } from '@/lib/admin-api'
-import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video } from 'lucide-react'
+import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video, Wallet } from 'lucide-react'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -41,7 +41,7 @@ export default function AnalyticsPage() {
 
   const [range, setRange]       = useState<DateRangeKey>('this_month')
   const [bounds, setBounds]     = useState<DateBounds>(getDateBounds('this_month'))
-  const [rangeStats, setRangeStats] = useState({ total: 0, completed: 0, cancelled: 0, pending: 0 })
+  const [rangeStats, setRangeStats] = useState({ total: 0, completed: 0, cancelled: 0, pending: 0, revenue: 0 })
   const [appts, setAppts]           = useState<AdminAppointment[]>([])
   const [loading, setLoading]       = useState(true)
   const [ytdMonths, setYtdMonths]   = useState<string[]>([])
@@ -106,7 +106,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="dash-stat-grid-4" style={{ marginBottom: 22 }}>
+      <div className="dash-stat-grid-5" style={{ marginBottom: 22 }}>
         <StatCard icon={<CalendarDays size={18} />} label="Total Appointments"
           value={loading ? '…' : rangeStats.total.toLocaleString()}
           sub="Selected period" colorKey="accent" />
@@ -119,6 +119,9 @@ export default function AnalyticsPage() {
         <StatCard icon={<Star size={18} />} label="Patient Rating"
           value={stats.avgRating.toFixed(1)}
           sub={`${stats.reviewCount} reviews`} colorKey="amber" />
+        <StatCard icon={<Wallet size={18} />} label="Est. Revenue"
+          value={loading ? '…' : `₦${rangeStats.revenue.toLocaleString()}`}
+          sub="From completed visits" colorKey="accent" />
       </div>
 
       {/* Breakdown + charts */}
