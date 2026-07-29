@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 
 const ROLE_LABEL: Record<string, string> = {
@@ -16,11 +17,24 @@ const ROLE_LABEL: Record<string, string> = {
 
 export function CrewProfileScreen() {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { crewProfile, user, signOut }     = useAuth()
+  const { crewProfile, staffProfile, user, signOut } = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut,     setSigningOut]     = useState(false)
+  const [hospitalName,   setHospitalName]   = useState<string | null>(null)
+
+  // Hospital-fleet crew resolve through staffProfile, not crewProfile (that's
+  // third-party only) — same organisation display either way, different source.
+  const isHospitalFleet = !crewProfile && staffProfile?.role === 'ambulance_crew'
+  const crewRole = crewProfile?.crewRole ?? staffProfile?.crewRole
+  const crewTier = crewProfile?.crewTier ?? staffProfile?.crewTier
 
   const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+
+  useEffect(() => {
+    if (!isHospitalFleet || !staffProfile?.hospitalId) return
+    supabase.from('hospitals').select('name').eq('id', staffProfile.hospitalId).single()
+      .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
+  }, [isHospitalFleet, staffProfile?.hospitalId])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -39,17 +53,17 @@ export function CrewProfileScreen() {
           <Text style={[s.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
           <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
             <Text style={[s.roleBadgeText, { color: t.accent }]}>
-              {ROLE_LABEL[crewProfile?.crewRole ?? ''] ?? crewProfile?.crewRole ?? 'Crew'}
+              {ROLE_LABEL[crewRole ?? ''] ?? crewRole ?? 'Crew'}
             </Text>
           </View>
-          {crewProfile?.providerName && (
-            <Text style={[s.providerName, { color: t.textMuted }]}>{crewProfile.providerName}</Text>
+          {(crewProfile?.providerName ?? hospitalName) && (
+            <Text style={[s.providerName, { color: t.textMuted }]}>{crewProfile?.providerName ?? hospitalName}</Text>
           )}
         </View>
 
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DETAILS</Text>
-          <Row label="Care tier"  value={crewProfile?.crewTier ?? '—'} theme={t} />
+          <Row label="Care tier"  value={crewTier ?? '—'} theme={t} />
           <Row label="Phone"     value={user?.phone ?? '—'} theme={t} last />
         </View>
 

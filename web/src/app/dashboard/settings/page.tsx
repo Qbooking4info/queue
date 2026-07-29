@@ -65,6 +65,12 @@ export default function SettingsPage() {
   const [smsReminder,   setSmsReminder]   = useState(true)
   const [emailReminder, setEmailReminder] = useState(true)
 
+  // Ambulance service — only shown once the hospital has its own fleet set up
+  const [hasFleet,            setHasFleet]            = useState(false)
+  const [ambulancePrivate,    setAmbulancePrivate]     = useState(true)
+  const [ambulanceRadius,     setAmbulanceRadius]      = useState<string>('')
+  const [ambulance247,        setAmbulance247]         = useState(true)
+
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -88,10 +94,17 @@ export default function SettingsPage() {
           if (s.longitude != null) setLng(String(s.longitude))
           setSmsReminder(s.sms_reminders ?? true)
           setEmailReminder(s.email_reminders ?? true)
+          setAmbulancePrivate(s.ambulance_private_fleet ?? true)
+          setAmbulanceRadius(s.ambulance_service_radius_m != null ? String(s.ambulance_service_radius_m) : '')
+          setAmbulance247(s.ambulance_service_hours_247 ?? true)
         }
         setHours(body?.hours ?? [])
         setLoading(false)
       })
+    fetch('/api/ambulances/fleet')
+      .then(res => res.ok ? res.json() : null)
+      .then(body => setHasFleet(!!body?.provider))
+      .catch(() => {})
   }, [hospital?.id])
 
   async function geocodeAddress() {
@@ -131,6 +144,9 @@ export default function SettingsPage() {
           ...(parsedLat != null && parsedLng != null ? { latitude: parsedLat, longitude: parsedLng } : {}),
           sms_reminders:   smsReminder,
           email_reminders: emailReminder,
+          ambulance_private_fleet:     ambulancePrivate,
+          ambulance_service_radius_m:  ambulanceRadius ? parseInt(ambulanceRadius) : null,
+          ambulance_service_hours_247: ambulance247,
           hours,
         }),
       })
@@ -387,6 +403,33 @@ export default function SettingsPage() {
               <Toggle value={emailReminder} onChange={() => setEmailReminder(v => !v)}
                 label="Email Reminders" sub="Send patients email 1h before appointment" />
             </SectionCard>
+
+            {/* Ambulance Service — only relevant once a fleet is set up */}
+            {hasFleet && (
+              <SectionCard title="Ambulance Service">
+                <Toggle value={ambulancePrivate} onChange={() => setAmbulancePrivate(v => !v)}
+                  label="Private Fleet"
+                  sub="Your units are reserved for patients heading to your own hospital once a destination is set — off shares them with the wider dispatch network" />
+                <div style={{ padding: '14px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <label style={labelStyle}>Service Radius (meters, blank = no cap)</label>
+                  <input type="number" min="0" value={ambulanceRadius}
+                    onChange={e => setAmbulanceRadius(e.target.value)}
+                    placeholder="e.g. 15000 — blank for no limit"
+                    style={inputStyle} />
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 5 }}>
+                    Caps how far your fleet will travel for a pickup, regardless of the dispatch search radius.
+                  </div>
+                </div>
+                <Toggle value={ambulance247} onChange={() => setAmbulance247(v => !v)}
+                  label="24/7 Dispatch"
+                  sub="Off means your fleet only dispatches during your hospital's operating hours above" />
+                <div style={{ paddingTop: 10 }}>
+                  <a href="/dashboard/ambulances/fleet" style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+                    Manage fleet, units &amp; crew &rarr;
+                  </a>
+                </div>
+              </SectionCard>
+            )}
 
             {/* Subscription */}
             <SectionCard title="Subscription Plan">

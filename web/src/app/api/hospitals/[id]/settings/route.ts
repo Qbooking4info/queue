@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const [{ data: settings }, { data: hoursRows }] = await Promise.all([
     db.from('hospitals')
-      .select('accepts_virtual, emergency_hours, is_24_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude, sms_reminders, email_reminders')
+      .select('accepts_virtual, emergency_hours, is_24_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude, sms_reminders, email_reminders, ambulance_private_fleet, ambulance_service_radius_m, ambulance_service_hours_247')
       .eq('id', id)
       .single(),
     db.from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', id),

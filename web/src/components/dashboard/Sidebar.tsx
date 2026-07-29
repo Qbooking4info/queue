@@ -61,6 +61,12 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulances'    },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
   ],
+  // Ambulance crew work through the mobile crew app, not this dashboard — this
+  // nav only covers the rare case of a crew account signing into the web login.
+  ambulance_crew: [
+    { href: '/dashboard',            icon: LayoutDashboard, label: 'Overview'   },
+    { href: '/dashboard/ambulances', icon: Ambulance,       label: 'Ambulances' },
+  ],
 }
 
 const CLINICS_ITEM: NavItem = { href: '/dashboard/clinics', icon: Building2, label: 'Clinics' }
@@ -71,6 +77,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   clinic_admin:   'Clinic Admin',
   doctor:         'Doctor',
   front_desk:     'Front Desk',
+  ambulance_crew: 'Ambulance Crew',
 }
 
 interface SidebarProps {

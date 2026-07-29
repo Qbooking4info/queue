@@ -11,10 +11,12 @@ export interface DoctorProfile {
 }
 
 export interface StaffProfile {
-  role:       'front_desk' | 'clinic_admin' | 'hospital_admin'
+  role:       'front_desk' | 'clinic_admin' | 'hospital_admin' | 'ambulance_crew'
   hospitalId: string
   clinicId:   string | null
   name:       string
+  crewRole?:  string
+  crewTier?:  string
 }
 
 export interface CrewProfile {
@@ -98,12 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const role: string = row.staff_role ?? ''
     const isFrontDesk = role === 'front_desk' || role === 'desk_officer'
     const isAdmin     = role === 'admin' || role === 'owner'
+    const isCrew      = role === 'ambulance_crew'
 
     setStaffProfile({
-      role:       isFrontDesk ? 'front_desk' : isAdmin ? 'hospital_admin' : 'clinic_admin',
+      role:       isFrontDesk ? 'front_desk' : isCrew ? 'ambulance_crew' : isAdmin ? 'hospital_admin' : 'clinic_admin',
       hospitalId: row.hospital_id,
       clinicId:   row.clinic_id ?? null,
       name,
+      crewRole:   row.crew_role ?? undefined,
+      crewTier:   row.crew_tier ?? undefined,
     })
     return true
   }

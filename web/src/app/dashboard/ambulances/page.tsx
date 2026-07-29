@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { Ambulance, Phone, Clock, MapPin, AlertTriangle } from 'lucide-react'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { safePatientName } from '@/lib/dashboard-utils'
@@ -87,13 +88,21 @@ export default async function AmbulancesPage() {
   return (
     <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
       <AutoRefreshAmbulances hospitalId={adminRecord.hospital_id} />
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Ambulance size={22} className="text-red-400" /> Inbound Ambulances
-        </h1>
-        <p className="text-sm text-[#7A9089] mt-0.5">
-          Transport requests heading to this hospital, dispatched by Queue&apos;s ambulance network.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Ambulance size={22} className="text-red-400" /> Inbound Ambulances
+          </h1>
+          <p className="text-sm text-[#7A9089] mt-0.5">
+            Transport requests heading to this hospital, dispatched by Queue&apos;s ambulance network.
+          </p>
+        </div>
+        {(adminRecord.role === 'admin' || adminRecord.role === 'owner') && (
+          <Link href="/dashboard/ambulances/fleet"
+            className="px-4 py-2 bg-white/5 border border-white/10 hover:border-white/20 text-sm font-semibold rounded-xl transition-all">
+            Manage Fleet
+          </Link>
+        )}
       </div>
 
       {!active.length ? (

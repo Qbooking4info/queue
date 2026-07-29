@@ -1,11 +1,15 @@
 'use client'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Stethoscope } from 'lucide-react'
 import { addStaff } from '../actions'
 
+const CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
+const CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
+
 export default function AddStaffPage() {
   const [state, action, pending] = useActionState(addStaff, null)
+  const [role, setRole] = useState('admin')
 
   return (
     <div className="flex-1 p-6 max-w-xl mx-auto w-full">
@@ -14,12 +18,12 @@ export default function AddStaffPage() {
           <ArrowLeft size={14} /> Staff
         </Link>
         <span className="text-[#4A6058]">/</span>
-        <span className="text-sm">Add Admin</span>
+        <span className="text-sm">Add Staff</span>
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">Add Admin</h1>
+      <h1 className="text-2xl font-bold mb-2">Add Staff</h1>
       <p className="text-sm text-[#7A9089] mb-8">
-        Grant another person full admin access to this hospital portal.
+        Grant another person access to this hospital portal, or add someone to your ambulance crew.
       </p>
 
       {/* Auto-generated login notes */}
@@ -47,7 +51,18 @@ export default function AddStaffPage() {
       )}
 
       <form action={action} className="flex flex-col gap-6">
-        <input type="hidden" name="role" value="admin" />
+        <div>
+          <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
+            Role *
+          </label>
+          <select
+            name="role" value={role} onChange={e => setRole(e.target.value)}
+            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
+          >
+            <option value="admin">Admin</option>
+            <option value="ambulance_crew">Ambulance Crew</option>
+          </select>
+        </div>
 
         <div>
           <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
@@ -55,13 +70,43 @@ export default function AddStaffPage() {
           </label>
           <input
             name="email" type="email" required
-            placeholder="admin@hospital.com"
+            placeholder={role === 'ambulance_crew' ? 'crew@hospital.com' : 'admin@hospital.com'}
             className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
           />
           <p className="text-xs text-[#4A6058] mt-1.5">
             An invite email will be sent if they don&apos;t have an account yet.
           </p>
         </div>
+
+        {role === 'ambulance_crew' && (
+          <>
+            <div>
+              <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
+                Crew Role *
+              </label>
+              <select name="crew_role" required defaultValue=""
+                className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                <option value="" disabled>Select a role</option>
+                {CREW_ROLES.map(r => (
+                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
+                Care Tier *
+              </label>
+              <select name="crew_tier" required defaultValue=""
+                className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                <option value="" disabled>Select a tier</option>
+                {CREW_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <p className="text-xs text-[#4A6058] mt-1.5">
+                Determines which triage levels this crew member can be dispatched for.
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="flex gap-3 pt-2">
           <Link href="/dashboard/staff"

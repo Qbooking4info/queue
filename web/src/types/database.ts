@@ -248,15 +248,21 @@ export type Database = {
       }
       ambulance_shift_crew: {
         Row: {
-          crew_member_id: string
+          crew_member_id: string | null
+          hospital_admin_id: string | null
+          id: string
           shift_id: string
         }
         Insert: {
-          crew_member_id: string
+          crew_member_id?: string | null
+          hospital_admin_id?: string | null
+          id?: string
           shift_id: string
         }
         Update: {
-          crew_member_id?: string
+          crew_member_id?: string | null
+          hospital_admin_id?: string | null
+          id?: string
           shift_id?: string
         }
         Relationships: [
@@ -265,6 +271,13 @@ export type Database = {
             columns: ["crew_member_id"]
             isOneToOne: false
             referencedRelation: "ambulance_crew"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_shift_crew_hospital_admin_id_fkey"
+            columns: ["hospital_admin_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_admins"
             referencedColumns: ["id"]
           },
           {
@@ -1171,6 +1184,8 @@ export type Database = {
           admin_id: string | null
           created_at: string | null
           credentials: Json | null
+          crew_role: string | null
+          crew_tier: string | null
           hospital_id: string
           id: string
           is_active: boolean
@@ -1181,6 +1196,8 @@ export type Database = {
           admin_id?: string | null
           created_at?: string | null
           credentials?: Json | null
+          crew_role?: string | null
+          crew_tier?: string | null
           hospital_id: string
           id?: string
           is_active?: boolean
@@ -1191,6 +1208,8 @@ export type Database = {
           admin_id?: string | null
           created_at?: string | null
           credentials?: Json | null
+          crew_role?: string | null
+          crew_tier?: string | null
           hospital_id?: string
           id?: string
           is_active?: boolean
@@ -1469,6 +1488,9 @@ export type Database = {
         Row: {
           accepts_virtual: boolean | null
           address: string
+          ambulance_private_fleet: boolean
+          ambulance_service_hours_247: boolean
+          ambulance_service_radius_m: number | null
           approval_mode: string | null
           avg_rating: number | null
           bed_space_status: string
@@ -1510,6 +1532,9 @@ export type Database = {
         Insert: {
           accepts_virtual?: boolean | null
           address: string
+          ambulance_private_fleet?: boolean
+          ambulance_service_hours_247?: boolean
+          ambulance_service_radius_m?: number | null
           approval_mode?: string | null
           avg_rating?: number | null
           bed_space_status?: string
@@ -1551,6 +1576,9 @@ export type Database = {
         Update: {
           accepts_virtual?: boolean | null
           address?: string
+          ambulance_private_fleet?: boolean
+          ambulance_service_hours_247?: boolean
+          ambulance_service_radius_m?: number | null
           approval_mode?: string | null
           avg_rating?: number | null
           bed_space_status?: string
@@ -3340,6 +3368,8 @@ export type Database = {
         Args: never
         Returns: {
           clinic_id: string
+          crew_role: string
+          crew_tier: string
           hospital_id: string
           staff_role: string
         }[]
@@ -3358,6 +3388,10 @@ export type Database = {
       }
       increment_slot_booking: { Args: { slot_id: string }; Returns: string }
       is_hospital_admin: { Args: { hospital_uuid: string }; Returns: boolean }
+      is_hospital_open_now: {
+        Args: { p_hospital_id: string }
+        Returns: boolean
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }

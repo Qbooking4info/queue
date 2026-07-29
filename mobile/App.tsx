@@ -312,10 +312,10 @@ function AppNavigator() {
     let content: React.ReactElement
     if (staffMode && doctorProfile) {
       content = <SpecialistStack />
+    } else if (staffMode && (staffProfile?.role === 'ambulance_crew' || crewProfile)) {
+      content = <CrewTabs />
     } else if (staffMode && staffProfile) {
       content = <StaffStack />
-    } else if (staffMode && crewProfile) {
-      content = <CrewTabs />
     } else {
       content = <AppStack />
     }

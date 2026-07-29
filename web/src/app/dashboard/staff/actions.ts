@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 
-const VALID_ROLES = ['specialist', 'front_desk', 'admin']
+const VALID_ROLES = ['specialist', 'front_desk', 'admin', 'ambulance_crew']
+const VALID_CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
+const VALID_CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 
 const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
 function genPassword() {
@@ -113,9 +115,15 @@ export async function addStaff(
     const email    = (formData.get('email') as string ?? '').trim().toLowerCase()
     const role     = (formData.get('role')  as string ?? '').trim()
     const doctorId = (formData.get('doctor_id') as string ?? '') || null
+    const crewRole = (formData.get('crew_role') as string ?? '').trim() || null
+    const crewTier = (formData.get('crew_tier') as string ?? '').trim() || null
 
     if (!email) return { error: 'Email is required.' }
     if (!VALID_ROLES.includes(role)) return { error: 'Please select a role.' }
+    if (role === 'ambulance_crew') {
+      if (!crewRole || !VALID_CREW_ROLES.includes(crewRole)) return { error: 'Please select a crew role.' }
+      if (!crewTier || !VALID_CREW_TIERS.includes(crewTier)) return { error: 'Please select a care tier.' }
+    }
 
     const db = createAdminClient()
 
@@ -169,6 +177,7 @@ export async function addStaff(
       hospital_id: adminRecord.hospital_id,
       user_id:     userId,
       role,
+      ...(role === 'ambulance_crew' ? { crew_role: crewRole, crew_tier: crewTier } : {}),
     })
 
     if (error) return { error: error.message }

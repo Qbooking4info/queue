@@ -115,7 +115,7 @@ export interface AdminHospital {
 
 export type BedSpaceStatus = 'enough' | 'limited' | 'very_limited' | 'none' | 'unknown'
 
-export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk'
+export type UserRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'doctor' | 'front_desk' | 'ambulance_crew'
 
 export interface UserRoleInfo {
   role: UserRole
@@ -163,6 +163,9 @@ export async function getUserRole(authId: string, authedClient?: any): Promise<U
       .single()
     if (adminRow && adminRow.role === 'front_desk') {
       return { role: 'front_desk', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
+    }
+    if (adminRow && adminRow.role === 'ambulance_crew') {
+      return { role: 'ambulance_crew', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }
     }
     if (adminRow && adminRow.role !== 'specialist') {
       return { role: 'hospital_admin', hospitalId: adminRow.hospital_id, displayName: profile.full_name ?? undefined }

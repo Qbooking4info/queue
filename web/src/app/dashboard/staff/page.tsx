@@ -1,21 +1,23 @@
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Settings, Stethoscope, Headset } from 'lucide-react'
+import { Settings, Stethoscope, Headset, Ambulance } from 'lucide-react'
 import { removeStaff } from './actions'
 import CredentialsBadge from './CredentialsBadge'
 import FrontDeskSetup from './FrontDeskSetup'
 
 const ROLE_BADGE: Record<string, string> = {
-  admin:      'text-green-400 bg-green-500/10 border-green-500/20',
-  specialist: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-  front_desk: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  admin:           'text-green-400 bg-green-500/10 border-green-500/20',
+  specialist:      'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  front_desk:      'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  ambulance_crew:  'text-red-400 bg-red-500/10 border-red-500/20',
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  admin:      'Admin',
-  specialist: 'Specialist',
-  front_desk: 'Front Desk',
+  admin:          'Admin',
+  specialist:     'Specialist',
+  front_desk:     'Front Desk',
+  ambulance_crew: 'Ambulance Crew',
 }
 
 export default async function StaffPage() {
@@ -47,7 +49,7 @@ export default async function StaffPage() {
         </div>
         <Link href="/dashboard/staff/add"
           className="px-4 py-2 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-xl transition-all">
-          + Add Admin
+          + Add Staff
         </Link>
       </div>
 
@@ -58,6 +60,7 @@ export default async function StaffPage() {
           const user = Array.isArray(member.users) ? member.users[0] : member.users
           const isSelf = member.user_id === profile.id
           const isSystemAccount = (member.role === 'specialist' || member.role === 'front_desk')
+          const isAmbulanceCrew = member.role === 'ambulance_crew'
 
           return (
             <div key={member.id} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
@@ -87,17 +90,23 @@ export default async function StaffPage() {
               {isSystemAccount && user?.id && (
                 <CredentialsBadge userId={user.id} email={user.email} />
               )}
+              {isAmbulanceCrew && (
+                <Link href="/dashboard/ambulances/fleet" className="text-xs text-[#7A9089] hover:text-white mt-2 inline-block">
+                  Manage shifts &rarr;
+                </Link>
+              )}
             </div>
           )
         })}
       </div>
 
       {/* Role guide */}
-      <div className="mt-8 grid grid-cols-3 gap-3">
+      <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { role: 'Admin',      icon: <Settings size={20} />,    desc: 'Full access — manage settings, doctors, staff, and all appointments' },
-          { role: 'Specialist', icon: <Stethoscope size={20} />, desc: 'View own schedule, add diagnosis and notes to patient appointments' },
-          { role: 'Front Desk', icon: <Headset size={20} />,     desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
+          { role: 'Admin',          icon: <Settings size={20} />,    desc: 'Full access — manage settings, doctors, staff, and all appointments' },
+          { role: 'Specialist',     icon: <Stethoscope size={20} />, desc: 'View own schedule, add diagnosis and notes to patient appointments' },
+          { role: 'Front Desk',     icon: <Headset size={20} />,     desc: 'Manage the patient queue — confirm, check-in, and track appointments' },
+          { role: 'Ambulance Crew', icon: <Ambulance size={20} />,   desc: 'Work fleet shifts — accept dispatch offers and update job status from the mobile app' },
         ].map(r => (
           <div key={r.role} className="bg-[#111915] border border-white/7 rounded-2xl p-4">
             <div className="mb-2 text-[#7A9089]">{r.icon}</div>

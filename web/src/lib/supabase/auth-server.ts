@@ -4,7 +4,7 @@ import { createClient } from './server'
 import { createAdminClient } from './admin'
 import { NextResponse } from 'next/server'
 
-export type CallerRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'front_desk' | 'doctor'
+export type CallerRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'front_desk' | 'doctor' | 'ambulance_crew'
 
 export interface CallerInfo {
   authId: string
@@ -55,17 +55,20 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
     if (paRow) {
       caller = { authId, role: 'super_admin' }
     } else {
-      // BC1: filter to admin/owner roles only — specialists must not get hospital_admin privileges
+      // BC1: filter to admin/owner/ambulance_crew roles only — specialists must not get
+      // hospital_admin privileges
       // BL2: filter to is_active=true — deactivated admins must not authenticate
       const { data: adminRow } = await db
         .from('hospital_admins')
-        .select('hospital_id')
+        .select('hospital_id, role')
         .eq('user_id', profile.id)
-        .in('role', ['admin', 'owner'])
+        .in('role', ['admin', 'owner', 'ambulance_crew'])
         .eq('is_active', true)
         .limit(1)
         .single()
-      if (adminRow) {
+      if (adminRow && adminRow.role === 'ambulance_crew') {
+        caller = { authId, role: 'ambulance_crew', hospitalId: adminRow.hospital_id }
+      } else if (adminRow) {
         caller = { authId, role: 'hospital_admin', hospitalId: adminRow.hospital_id }
       } else {
         // clinic_admins used to have a second identity column (auth_user_id)
