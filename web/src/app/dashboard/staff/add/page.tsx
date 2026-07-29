@@ -2,78 +2,84 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Stethoscope } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import { addStaff } from '../actions'
 
 const CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
 const CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 
 export default function AddStaffPage() {
+  const { theme: C } = useTheme()
   const [state, action, pending] = useActionState(addStaff, null)
   const [role, setRole] = useState('admin')
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+    marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+    borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+  }
+
   return (
-    <div className="flex-1 p-6 max-w-xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard/staff" className="inline-flex items-center gap-1 text-[#4A6058] hover:text-white transition-colors text-sm">
+    <div style={{ padding: 24, maxWidth: 560, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <Link href="/dashboard/staff" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.textMuted, fontSize: 13, textDecoration: 'none' }}>
           <ArrowLeft size={14} /> Staff
         </Link>
-        <span className="text-[#4A6058]">/</span>
-        <span className="text-sm">Add Staff</span>
+        <span style={{ color: C.textMuted }}>/</span>
+        <span style={{ fontSize: 13, color: C.text }}>Add Staff</span>
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">Add Staff</h1>
-      <p className="text-sm text-[#7A9089] mb-8">
+      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, color: C.text }}>Add Staff</h1>
+      <p style={{ fontSize: 13, color: C.textSub, marginBottom: 32 }}>
         Grant another person access to this hospital portal, or add someone to your ambulance crew.
       </p>
 
       {/* Auto-generated login notes */}
-      <div className="flex flex-col gap-3 mb-8">
-        <div className="flex items-start gap-3 bg-blue-500/8 border border-blue-500/20 rounded-xl p-3">
-          <Stethoscope size={18} className="shrink-0 text-blue-400" />
-          <p className="text-xs text-blue-400 leading-relaxed">
-            <span className="font-semibold">Specialist logins are auto-created when you add a doctor</span> — go to{' '}
-            <Link href="/dashboard/doctors/add" className="underline underline-offset-2">Add Doctor</Link> to register a new specialist under this hospital.
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: C.blueLight, border: `1px solid ${C.blue}33`, borderRadius: 12, padding: 12 }}>
+          <Stethoscope size={18} color={C.blue} style={{ flexShrink: 0 }} />
+          <p style={{ fontSize: 12, color: C.blue, lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 600 }}>Specialist logins are auto-created when you add a doctor</span> — go to{' '}
+            <Link href="/dashboard/doctors/add" style={{ textDecoration: 'underline' }}>Add Doctor</Link> to register a new specialist under this hospital.
           </p>
         </div>
-        <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl p-3">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <p className="text-xs text-amber-400 leading-relaxed">
-            <span className="font-semibold">Front Desk login was auto-created at signup</span> — find the credentials on the{' '}
-            <Link href="/dashboard/staff" className="underline underline-offset-2">Staff page</Link>.
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: C.amberLight, border: `1px solid ${C.amber}33`, borderRadius: 12, padding: 12 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2" style={{ flexShrink: 0 }}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <p style={{ fontSize: 12, color: C.amber, lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 600 }}>Front Desk login was auto-created at signup</span> — find the credentials on the{' '}
+            <Link href="/dashboard/staff" style={{ textDecoration: 'underline' }}>Staff page</Link>.
           </p>
         </div>
       </div>
 
       {state?.error && (
-        <div className="mb-6 p-4 rounded-2xl border border-red-500/30 bg-red-500/8 text-sm text-red-400">
+        <div style={{ marginBottom: 24, padding: 16, borderRadius: 16, border: `1px solid ${C.red}4d`, background: C.redLight, fontSize: 13, color: C.red }}>
           {state.error}
         </div>
       )}
 
-      <form action={action} className="flex flex-col gap-6">
+      <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div>
-          <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
-            Role *
-          </label>
-          <select
-            name="role" value={role} onChange={e => setRole(e.target.value)}
-            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
-          >
+          <label style={labelStyle}>Role *</label>
+          <select name="role" value={role} onChange={e => setRole(e.target.value)} style={inputStyle}>
             <option value="admin">Admin</option>
             <option value="ambulance_crew">Ambulance Crew</option>
           </select>
         </div>
 
         <div>
-          <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
-            Email Address *
-          </label>
+          <label style={labelStyle}>Email Address *</label>
           <input
             name="email" type="email" required
             placeholder={role === 'ambulance_crew' ? 'crew@hospital.com' : 'admin@hospital.com'}
-            className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
+            style={inputStyle}
           />
-          <p className="text-xs text-[#4A6058] mt-1.5">
+          <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
             An invite email will be sent if they don&apos;t have an account yet.
           </p>
         </div>
@@ -81,11 +87,8 @@ export default function AddStaffPage() {
         {role === 'ambulance_crew' && (
           <>
             <div>
-              <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
-                Crew Role *
-              </label>
-              <select name="crew_role" required defaultValue=""
-                className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+              <label style={labelStyle}>Crew Role *</label>
+              <select name="crew_role" required defaultValue="" style={inputStyle}>
                 <option value="" disabled>Select a role</option>
                 {CREW_ROLES.map(r => (
                   <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
@@ -93,28 +96,25 @@ export default function AddStaffPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-[#7A9089] mb-1.5 block font-semibold uppercase tracking-wide">
-                Care Tier *
-              </label>
-              <select name="crew_tier" required defaultValue=""
-                className="w-full bg-[#111915] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+              <label style={labelStyle}>Care Tier *</label>
+              <select name="crew_tier" required defaultValue="" style={inputStyle}>
                 <option value="" disabled>Select a tier</option>
                 {CREW_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <p className="text-xs text-[#4A6058] mt-1.5">
+              <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
                 Determines which triage levels this crew member can be dispatched for.
               </p>
             </div>
           </>
         )}
 
-        <div className="flex gap-3 pt-2">
+        <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
           <Link href="/dashboard/staff"
-            className="flex-1 text-center py-2.5 rounded-xl border border-white/10 text-sm text-[#7A9089] hover:text-white hover:border-white/20 transition-all">
+            style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
             Cancel
           </Link>
           <button type="submit" disabled={pending}
-            className="flex-1 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
+            style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1, fontFamily: 'inherit' }}>
             {pending ? 'Sending Invite…' : 'Send Invite'}
           </button>
         </div>

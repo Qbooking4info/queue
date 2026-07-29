@@ -1,6 +1,7 @@
 'use client'
 import { useActionState, useState } from 'react'
 import { Check } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import { resetStaffPassword } from './actions'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function CredentialsBadge({ userId, email }: Props) {
+  const { theme: C } = useTheme()
   const [result, action, pending] = useActionState(resetStaffPassword, null)
   const [copied, setCopied] = useState<'email' | 'password' | null>(null)
   const [open, setOpen] = useState(false)
@@ -25,50 +27,50 @@ export default function CredentialsBadge({ userId, email }: Props) {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)}
-        className="text-xs text-[#7A9089] hover:text-green-400 px-2.5 py-1 rounded-lg border border-white/10 hover:border-green-500/30 transition-all shrink-0">
+        style={{ fontSize: 11, color: C.textSub, padding: '4px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
         View Login
       </button>
     )
   }
 
   return (
-    <div className="w-full mt-3 bg-[#060A07] border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+    <div style={{ width: '100%', marginTop: 12, background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Email row — always visible */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[10px] text-[#4A6058] mb-0.5">Login Email</div>
-          <div className="text-xs font-mono text-white truncate">{email}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>Login Email</div>
+          <div style={{ fontSize: 12, fontFamily: 'monospace', color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email}</div>
         </div>
         <button onClick={() => copy(email, 'email')}
-          className="text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
-          {copied === 'email' ? <Check size={11} className="inline" /> : 'Copy'}
+          style={{ fontSize: 10, color: C.textSub, flexShrink: 0, padding: '2px 6px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+          {copied === 'email' ? <Check size={11} style={{ display: 'inline' }} /> : 'Copy'}
         </button>
       </div>
 
       {/* Password row — only after reset */}
       {creds && (
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-[10px] text-[#4A6058] mb-0.5">New Password</div>
-            <div className="text-xs font-mono text-white tracking-widest">{creds.password}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>New Password</div>
+            <div style={{ fontSize: 12, fontFamily: 'monospace', color: C.text, letterSpacing: '.1em' }}>{creds.password}</div>
           </div>
           <button onClick={() => copy(creds.password, 'password')}
-            className="text-[10px] text-[#7A9089] hover:text-green-400 shrink-0 px-1.5 py-0.5 rounded transition-colors">
-            {copied === 'password' ? <Check size={11} className="inline" /> : 'Copy'}
+            style={{ fontSize: 10, color: C.textSub, flexShrink: 0, padding: '2px 6px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+            {copied === 'password' ? <Check size={11} style={{ display: 'inline' }} /> : 'Copy'}
           </button>
         </div>
       )}
 
-      {err && <p className="text-[10px] text-red-400">{err}</p>}
+      {err && <p style={{ fontSize: 10, color: C.red }}>{err}</p>}
 
-      <form action={action} className="flex items-center justify-between mt-1">
+      <form action={action} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
         <input type="hidden" name="user_id" value={userId} />
         <button type="submit" disabled={pending}
-          className="text-[10px] text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors">
+          style={{ fontSize: 10, color: C.amber, border: 'none', background: 'transparent', cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1, fontFamily: 'inherit' }}>
           {pending ? 'Resetting…' : creds ? 'Reset Again' : 'Reset Password'}
         </button>
         <button type="button" onClick={() => setOpen(false)}
-          className="text-[10px] text-[#4A6058] hover:text-[#7A9089] transition-colors">
+          style={{ fontSize: 10, color: C.textMuted, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
           Hide
         </button>
       </form>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Ambulance, Plus, Trash2, Users } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 
 const VEHICLE_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 const CAPABILITIES = ['oxygen', 'ventilator', 'incubator', 'bariatric', 'wheelchair']
@@ -57,6 +58,7 @@ function toFormShift(m: CrewMember) {
 }
 
 export default function FleetPage() {
+  const { theme: C } = useTheme()
   const [provider, setProvider]   = useState<Provider | null>(null)
   const [ambulances, setAmbulances] = useState<AmbulanceUnit[]>([])
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>([])
@@ -176,41 +178,51 @@ export default function FleetPage() {
     await load()
   }
 
-  if (loading) return <div className="flex-1 p-6 text-[#7A9089]">Loading…</div>
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+    borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20,
+  }
+
+  if (loading) return <div style={{ padding: 24, color: C.textMuted }}>Loading…</div>
 
   return (
-    <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/ambulances" className="inline-flex items-center gap-1 text-[#4A6058] hover:text-white transition-colors text-sm">
+    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <Link href="/dashboard/ambulances" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.textMuted, fontSize: 13, textDecoration: 'none' }}>
           <ArrowLeft size={14} /> Ambulances
         </Link>
-        <span className="text-[#4A6058]">/</span>
-        <span className="text-sm">Fleet</span>
+        <span style={{ color: C.textMuted }}>/</span>
+        <span style={{ fontSize: 13, color: C.text }}>Fleet</span>
       </div>
 
-      <h1 className="text-2xl font-bold flex items-center gap-2 mb-2">
-        <Ambulance size={22} className="text-red-400" /> Your Fleet
+      <h1 style={{ fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: C.text }}>
+        <Ambulance size={22} color={C.red} /> Your Fleet
       </h1>
-      <p className="text-sm text-[#7A9089] mb-6">
+      <p style={{ fontSize: 13, color: C.textSub, marginBottom: 24 }}>
         Manage your hospital&apos;s own ambulances, shifts, and crew. Invite crew members from the{' '}
-        <Link href="/dashboard/staff/add" className="underline underline-offset-2">Staff page</Link> first.
+        <Link href="/dashboard/staff/add" style={{ color: C.accent, textDecoration: 'underline' }}>Staff page</Link> first.
       </p>
 
       {error && (
-        <div className="mb-6 p-4 rounded-2xl border border-red-500/30 bg-red-500/8 text-sm text-red-400">{error}</div>
+        <div style={{ marginBottom: 24, padding: 14, borderRadius: 16, border: `1px solid ${C.red}4d`, background: C.redLight, fontSize: 13, color: C.red }}>
+          {error}
+        </div>
       )}
 
       {!provider ? (
-        <div className="bg-[#111915] border border-white/7 rounded-2xl p-6 max-w-md">
-          <h2 className="font-semibold mb-1">Set up your fleet</h2>
-          <p className="text-xs text-[#7A9089] mb-4">This creates your hospital&apos;s own ambulance provider record.</p>
-          <div className="flex flex-col gap-3">
-            <input value={setupPhone} onChange={e => setSetupPhone(e.target.value)} placeholder="Contact phone *"
-              className="bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
-            <input value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="Contact email (optional)"
-              className="bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+        <div style={{ ...cardStyle, maxWidth: 420 }}>
+          <h2 style={{ fontWeight: 600, marginBottom: 4, color: C.text }}>Set up your fleet</h2>
+          <p style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>This creates your hospital&apos;s own ambulance provider record.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input value={setupPhone} onChange={e => setSetupPhone(e.target.value)} placeholder="Contact phone *" style={inputStyle} />
+            <input value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="Contact email (optional)" style={inputStyle} />
             <button onClick={handleSetup} disabled={settingUp}
-              className="py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
+              style={{ padding: 12, borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: settingUp ? 'not-allowed' : 'pointer', opacity: settingUp ? 0.6 : 1, fontFamily: 'inherit' }}>
               {settingUp ? 'Setting up…' : 'Set up fleet'}
             </button>
           </div>
@@ -218,53 +230,55 @@ export default function FleetPage() {
       ) : (
         <>
           {/* Add ambulance */}
-          <div className="bg-[#111915] border border-white/7 rounded-2xl p-5 mb-6">
-            <h2 className="font-semibold mb-4 flex items-center gap-2"><Plus size={16} /> Add an ambulance</h2>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <input value={plateNumber} onChange={e => setPlateNumber(e.target.value)} placeholder="Plate number *"
-                className="bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
-              <input value={callSign} onChange={e => setCallSign(e.target.value)} placeholder="Call sign"
-                className="bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+          <div style={{ ...cardStyle, marginBottom: 24 }}>
+            <h2 style={{ fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, color: C.text }}><Plus size={16} /> Add an ambulance</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <input value={plateNumber} onChange={e => setPlateNumber(e.target.value)} placeholder="Plate number *" style={inputStyle} />
+              <input value={callSign} onChange={e => setCallSign(e.target.value)} placeholder="Call sign" style={inputStyle} />
             </div>
-            <select value={vehicleTier} onChange={e => setVehicleTier(e.target.value)}
-              className="w-full mb-3 bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+            <select value={vehicleTier} onChange={e => setVehicleTier(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
               {VEHICLE_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {CAPABILITIES.map(c => (
-                <button key={c} type="button"
-                  onClick={() => setCaps(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c])}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                    caps.includes(c) ? 'bg-green-500/15 border-green-500/40 text-green-400' : 'bg-white/5 border-white/10 text-[#7A9089]'
-                  }`}>
-                  {c}
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {CAPABILITIES.map(c => {
+                const active = caps.includes(c)
+                return (
+                  <button key={c} type="button"
+                    onClick={() => setCaps(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c])}
+                    style={{
+                      fontSize: 12, padding: '6px 12px', borderRadius: 99, cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${active ? C.accentBorder : C.border}`,
+                      background: active ? C.accentLight : C.bgAlt,
+                      color: active ? C.accent : C.textSub,
+                    }}>
+                    {c}
+                  </button>
+                )
+              })}
             </div>
-            <div className="flex gap-2 mb-3">
-              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Home base address"
-                className="flex-1 bg-[#0b0f0d] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Home base address" style={{ ...inputStyle, flex: 1 }} />
               <button onClick={geocodeAddress} disabled={geocoding}
-                className="px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-[#7A9089] hover:text-white transition-all">
+                style={{ padding: '0 16px', borderRadius: 10, border: `1px solid ${C.borderMed}`, background: C.bgAlt, fontSize: 13, color: C.textSub, cursor: geocoding ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                 {geocoding ? '…' : 'Find'}
               </button>
             </div>
             {lat != null && lng != null && (
-              <p className="text-xs text-[#4A6058] mb-3">Location found: {lat.toFixed(4)}, {lng.toFixed(4)}</p>
+              <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Location found: {lat.toFixed(4)}, {lng.toFixed(4)}</p>
             )}
             <button onClick={handleAddUnit} disabled={addingUnit}
-              className="w-full py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white text-sm font-bold transition-all">
+              style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: addingUnit ? 'not-allowed' : 'pointer', opacity: addingUnit ? 0.6 : 1, fontFamily: 'inherit' }}>
               {addingUnit ? 'Adding…' : 'Add ambulance'}
             </button>
           </div>
 
           {/* Units */}
           {ambulances.length === 0 ? (
-            <div className="bg-[#111915] border border-white/7 rounded-2xl p-10 text-center text-[#4A6058]">
+            <div style={{ ...cardStyle, padding: 40, textAlign: 'center', color: C.textMuted }}>
               No ambulances yet — add your first one above.
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {ambulances.map(a => (
                 <UnitCard key={a.id} unit={a} crewOptions={crewOptions}
                   onRemoveUnit={removeUnit} onAddShift={addShift} onRemoveShift={removeShift}
@@ -287,46 +301,55 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
   onAssignCrew: (shiftId: string, hospitalAdminId: string) => void
   onUnassignCrew: (shiftId: string, hospitalAdminId: string) => void
 }) {
+  const { theme: C } = useTheme()
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt]     = useState('')
   const [shiftTier, setShiftTier] = useState(unit.vehicle_tier)
 
+  const smallInputStyle: React.CSSProperties = {
+    background: C.bgAlt, border: `1px solid ${C.borderMed}`, borderRadius: 10,
+    padding: '8px 10px', fontSize: 12, color: C.text, outline: 'none', fontFamily: 'inherit',
+  }
+
   return (
-    <div className="bg-[#111915] border border-white/7 rounded-2xl p-5">
-      <div className="flex items-start justify-between gap-2 mb-3">
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
         <div>
-          <div className="font-semibold">{unit.call_sign || unit.plate_number}</div>
-          <div className="text-xs text-[#7A9089]">{unit.plate_number} · {unit.vehicle_tier} · {unit.status}</div>
+          <div style={{ fontWeight: 600, color: C.text }}>{unit.call_sign || unit.plate_number}</div>
+          <div style={{ fontSize: 12, color: C.textSub }}>{unit.plate_number} · {unit.vehicle_tier} · {unit.status}</div>
           {unit.capabilities.length > 0 && (
-            <div className="text-xs text-[#4A6058] mt-1">{unit.capabilities.join(', ')}</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{unit.capabilities.join(', ')}</div>
           )}
         </div>
-        <button onClick={() => onRemoveUnit(unit.id)} className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10">
+        <button onClick={() => onRemoveUnit(unit.id)}
+          style={{ color: C.red, padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
           <Trash2 size={14} />
         </button>
       </div>
 
-      <div className="border-t border-white/7 pt-3 mt-3">
-        <div className="text-xs font-semibold text-[#7A9089] uppercase tracking-wide mb-2">Shifts</div>
-        {unit.ambulance_shifts.length === 0 && <div className="text-xs text-[#4A6058] mb-3">No shifts scheduled.</div>}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Shifts</div>
+        {unit.ambulance_shifts.length === 0 && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>No shifts scheduled.</div>}
         {unit.ambulance_shifts.map(shift => (
-          <div key={shift.id} className="bg-[#0b0f0d] border border-white/7 rounded-xl p-3 mb-2">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs">
+          <div key={shift.id} style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: C.text }}>
                 {new Date(shift.starts_at).toLocaleString()} &rarr; {new Date(shift.ends_at).toLocaleString()}
-                <span className="text-[#4A6058]"> · {shift.crew_tier}</span>
+                <span style={{ color: C.textMuted }}> · {shift.crew_tier}</span>
               </div>
-              <button onClick={() => onRemoveShift(shift.id)} className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10">
+              <button onClick={() => onRemoveShift(shift.id)}
+                style={{ color: C.red, padding: 4, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}>
                 <Trash2 size={12} />
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
               {shift.ambulance_shift_crew.map(m => {
                 const f = toFormShift(m)
                 return (
-                  <span key={m.id} className="text-xs bg-white/5 border border-white/10 rounded-full px-2.5 py-1 inline-flex items-center gap-1.5">
+                  <span key={m.id} style={{ fontSize: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 99, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6, color: C.text }}>
                     {f.name}
-                    <button onClick={() => onUnassignCrew(shift.id, f.hospitalAdminId)} className="text-red-400 hover:text-red-300">&times;</button>
+                    <button onClick={() => onUnassignCrew(shift.id, f.hospitalAdminId)}
+                      style={{ color: C.red, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>&times;</button>
                   </span>
                 )
               })}
@@ -335,18 +358,15 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
           </div>
         ))}
 
-        <div className="flex gap-2 mt-2">
-          <input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)}
-            className="flex-1 bg-[#0b0f0d] border border-white/10 rounded-xl px-2 py-2 text-xs focus:outline-none focus:border-green-500/50" />
-          <input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)}
-            className="flex-1 bg-[#0b0f0d] border border-white/10 rounded-xl px-2 py-2 text-xs focus:outline-none focus:border-green-500/50" />
-          <select value={shiftTier} onChange={e => setShiftTier(e.target.value)}
-            className="bg-[#0b0f0d] border border-white/10 rounded-xl px-2 py-2 text-xs focus:outline-none focus:border-green-500/50">
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)} style={{ ...smallInputStyle, flex: 1 }} />
+          <input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)} style={{ ...smallInputStyle, flex: 1 }} />
+          <select value={shiftTier} onChange={e => setShiftTier(e.target.value)} style={smallInputStyle}>
             {VEHICLE_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <button
             onClick={() => { if (startsAt && endsAt) { onAddShift(unit.id, new Date(startsAt).toISOString(), new Date(endsAt).toISOString(), shiftTier); setStartsAt(''); setEndsAt('') } }}
-            className="px-3 rounded-xl bg-white/5 border border-white/10 text-xs text-[#7A9089] hover:text-white whitespace-nowrap">
+            style={{ padding: '0 12px', borderRadius: 10, border: `1px solid ${C.borderMed}`, background: C.bgAlt, fontSize: 12, color: C.textSub, whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit' }}>
             + Shift
           </button>
         </div>
@@ -356,19 +376,25 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
 }
 
 function AssignCrewRow({ crewOptions, onAssign }: { crewOptions: CrewOption[]; onAssign: (hospitalAdminId: string) => void }) {
+  const { theme: C } = useTheme()
   const [selected, setSelected] = useState('')
+
+  const smallInputStyle: React.CSSProperties = {
+    background: C.card, border: `1px solid ${C.borderMed}`, borderRadius: 10,
+    padding: '6px 10px', fontSize: 12, color: C.text, outline: 'none', fontFamily: 'inherit',
+  }
+
   if (crewOptions.length === 0) {
-    return <div className="text-xs text-[#4A6058] flex items-center gap-1"><Users size={11} /> No crew invited yet</div>
+    return <div style={{ fontSize: 12, color: C.textMuted, display: 'flex', alignItems: 'center', gap: 4 }}><Users size={11} /> No crew invited yet</div>
   }
   return (
-    <div className="flex gap-2">
-      <select value={selected} onChange={e => setSelected(e.target.value)}
-        className="flex-1 bg-[#0b0f0d] border border-white/10 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:border-green-500/50">
+    <div style={{ display: 'flex', gap: 8 }}>
+      <select value={selected} onChange={e => setSelected(e.target.value)} style={{ ...smallInputStyle, flex: 1 }}>
         <option value="">Assign crew…</option>
         {crewOptions.map(c => <option key={c.id} value={c.id}>{crewName(c)} ({c.crew_tier})</option>)}
       </select>
       <button onClick={() => { if (selected) { onAssign(selected); setSelected('') } }}
-        className="px-3 rounded-xl bg-white/5 border border-white/10 text-xs text-[#7A9089] hover:text-white">
+        style={{ padding: '0 12px', borderRadius: 10, border: `1px solid ${C.borderMed}`, background: C.card, fontSize: 12, color: C.textSub, cursor: 'pointer', fontFamily: 'inherit' }}>
         Assign
       </button>
     </div>
