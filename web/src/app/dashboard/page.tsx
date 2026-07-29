@@ -8,10 +8,12 @@ import { ViewPatientModal } from '@/components/dashboard/ViewPatientModal'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
+import { BedSpaceCard } from '@/components/dashboard/BedSpaceCard'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useEmergencyAccess } from '@/lib/useEmergencyAccess'
 import {
   CalendarDays, CheckCircle2, Users, Star, Clock, Stethoscope,
   Tag, Settings, Video, Building2, Calendar, ClipboardList,
@@ -89,6 +91,7 @@ export default function OverviewPage() {
   const [savingAvail, setSavingAvail] = useState(false)
   const [availError,  setAvailError]  = useState('')
   const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
+  const { canManageBedSpace } = useEmergencyAccess()
 
   useEffect(() => { if (doctorAvailability) setAvail(doctorAvailability) }, [doctorAvailability])
 
@@ -319,6 +322,9 @@ export default function OverviewPage() {
     return (
       <div>
         <Header />
+        {canManageBedSpace && hospital && (
+          <BedSpaceCard hospitalId={hospital.id} status={hospital.bed_space_status ?? 'unknown'} updatedAt={hospital.bed_space_updated_at ?? null} />
+        )}
         <div className="dash-stat-grid-3" style={{ marginBottom: SPACE.xl }}>
           <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
             value={loading ? '…' : rangeStats.total}
@@ -403,6 +409,10 @@ export default function OverviewPage() {
   return (
     <div>
       <Header />
+
+      {canManageBedSpace && hospital && (
+        <BedSpaceCard hospitalId={hospital.id} status={hospital.bed_space_status ?? 'unknown'} updatedAt={hospital.bed_space_updated_at ?? null} />
+      )}
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
         padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg }}>

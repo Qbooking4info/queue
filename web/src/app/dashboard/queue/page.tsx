@@ -9,6 +9,7 @@ import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { BedSpaceWidget } from '@/components/dashboard/BedSpaceWidget'
 import type { AdminAppointment } from '@/lib/admin-api'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
+import { useEmergencyAccess } from '@/lib/useEmergencyAccess'
 
 const QUEUE_STATUSES = ['confirmed', 'checked_in', 'in_progress', 'completed', 'no_show', 'cancelled']
 
@@ -58,20 +59,7 @@ export default function QueuePage() {
   const [updating, setUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('active')
   const [actionError, setActionError] = useState('')
-
-  // Multi-clinic hospitals designate one clinic as their Emergency Department (same
-  // is_emergency flag used throughout booking); single-clinic hospitals use their own
-  // emergency_hours flag instead, since there's no separate clinic to check.
-  const [emergencyCapable, setEmergencyCapable] = useState(false)
-  useEffect(() => {
-    if (!hospital?.id) { setEmergencyCapable(false); return }
-    if (hospital.clinic_model !== 'multi') { setEmergencyCapable(hospital.emergency_hours === true); return }
-    let cancelled = false
-    fetch(`/api/clinics?hospitalId=${hospital.id}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(list => { if (!cancelled) setEmergencyCapable(((list ?? []) as any[]).some(c => c.is_emergency)) })
-    return () => { cancelled = true }
-  }, [hospital?.id, hospital?.clinic_model, hospital?.emergency_hours])
+  const { canManageBedSpace } = useEmergencyAccess()
 
   const fetchQueue = useCallback(async () => {
     if (!hospital?.id) { setAppts(todayAppointments); setLoading(false); return }
@@ -184,7 +172,7 @@ export default function QueuePage() {
         </div>
       </div>
 
-      {role !== 'doctor' && emergencyCapable && hospital && (
+      {canManageBedSpace && hospital && (
         <BedSpaceWidget
           hospitalId={hospital.id}
           initialStatus={hospital.bed_space_status ?? 'unknown'}

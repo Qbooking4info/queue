@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, BedDouble } from 'lucide-react'
 
-const OPTIONS = ['enough', 'limited', 'very_limited', 'none'] as const
-type Status = typeof OPTIONS[number] | 'unknown'
+export const OPTIONS = ['enough', 'limited', 'very_limited', 'none'] as const
+export type BedSpaceStatus = typeof OPTIONS[number] | 'unknown'
 
-const STATUS_META: Record<Status, { label: string; color: string }> = {
+export const STATUS_META: Record<BedSpaceStatus, { label: string; color: string }> = {
   enough:       { label: 'Enough space',  color: 'text-green-400 border-green-500/30 bg-green-500/10' },
   limited:      { label: 'Limited',       color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
   very_limited: { label: 'Very limited',  color: 'text-orange-400 border-orange-500/30 bg-orange-500/10' },
@@ -13,29 +13,31 @@ const STATUS_META: Record<Status, { label: string; color: string }> = {
   unknown:      { label: 'Not set yet',   color: 'text-gray-400 border-white/15 bg-white/5' },
 }
 
-const STALE_MINUTES = 30
+export const STALE_MINUTES = 2
 
-function minutesAgo(iso: string | null): number | null {
+export function minutesAgo(iso: string | null): number | null {
   if (!iso) return null
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
 }
 
 // Patients decide whether to travel here based on this number, so it needs to stay
-// current -- the "please refresh" reminder pulses once it's more than 30 minutes old,
-// nudging whoever's at the desk without requiring a page reload to notice.
-export function BedSpaceWidget({ hospitalId, initialStatus, initialUpdatedAt }: {
+// current -- the "please refresh" reminder pulses once it's more than 2 minutes old
+// (kept aggressive for now while the feature is new), nudging whoever's at the desk
+// without requiring a page reload to notice.
+export function BedSpaceWidget({ hospitalId, initialStatus, initialUpdatedAt, onChange }: {
   hospitalId: string
   initialStatus: string
   initialUpdatedAt: string | null
+  onChange?: (status: BedSpaceStatus, updatedAt: string) => void
 }) {
-  const [status,    setStatus]    = useState<Status>((initialStatus as Status) ?? 'unknown')
+  const [status,    setStatus]    = useState<BedSpaceStatus>((initialStatus as BedSpaceStatus) ?? 'unknown')
   const [updatedAt, setUpdatedAt] = useState(initialUpdatedAt)
   const [saving,    setSaving]    = useState<string | null>(null)
   const [error,     setError]     = useState<string | null>(null)
   const [, forceTick] = useState(0)
 
   useEffect(() => {
-    const t = setInterval(() => forceTick(n => n + 1), 30000)
+    const t = setInterval(() => forceTick(n => n + 1), 15000)
     return () => clearInterval(t)
   }, [])
 
@@ -54,6 +56,7 @@ export function BedSpaceWidget({ hospitalId, initialStatus, initialUpdatedAt }: 
     const body = await res.json()
     setStatus(body.bed_space_status)
     setUpdatedAt(body.bed_space_updated_at)
+    onChange?.(body.bed_space_status, body.bed_space_updated_at)
   }
 
   const meta = STATUS_META[status] ?? STATUS_META.unknown
