@@ -70,7 +70,7 @@ export function triageForSymptom(symptom: string): { triageLevel: number; requir
   return SYMPTOM_TRIAGE_MAP[symptom] ?? { triageLevel: 3, requiredTier: 'BLS' }
 }
 
-async function authedFetch(path: string, body: unknown) {
+export async function authedFetch(path: string, body: unknown) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in')
 

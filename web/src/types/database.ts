@@ -3111,6 +3111,10 @@ export type Database = {
             }
             Returns: string
           }
+      crew_update_job_status: {
+        Args: { p_new_status: string; p_request_id: string }
+        Returns: boolean
+      }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
@@ -3288,6 +3292,49 @@ export type Database = {
       get_hospital_staff_roster: {
         Args: { p_hospital_id: string }
         Returns: Json
+      }
+      get_my_active_job: {
+        Args: never
+        Returns: {
+          assigned_unit_id: string
+          booking_ref: string
+          contact_phone: string
+          destination_hospital_id: string
+          destination_hospital_name: string
+          pickup_address: string
+          pickup_lat: number
+          pickup_lng: number
+          request_id: string
+          status: string
+          symptom_description: string
+          triage_level: number
+        }[]
+      }
+      get_my_crew_profile: {
+        Args: never
+        Returns: {
+          crew_id: string
+          crew_role: string
+          crew_tier: string
+          provider_id: string
+          provider_name: string
+        }[]
+      }
+      get_my_pending_offers: {
+        Args: never
+        Returns: {
+          ambulance_id: string
+          eta_seconds: number
+          expires_at: string
+          offer_id: string
+          pickup_address: string
+          pickup_lat: number
+          pickup_lng: number
+          request_id: string
+          score: number
+          symptom_description: string
+          triage_level: number
+        }[]
       }
       get_my_staff_profile: {
         Args: never

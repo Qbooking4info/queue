@@ -17,11 +17,20 @@ export interface StaffProfile {
   name:       string
 }
 
+export interface CrewProfile {
+  crewId:       string
+  providerId:   string
+  providerName: string
+  crewRole:     string
+  crewTier:     string
+}
+
 interface AuthState {
   session:       Session       | null
   user:          User          | null
   doctorProfile: DoctorProfile | null
   staffProfile:  StaffProfile  | null
+  crewProfile:   CrewProfile   | null
   loading:       boolean
   staffMode:     boolean
   setStaffMode:  (v: boolean) => void
@@ -38,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user,          setUser]          = useState<User | null>(null)
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
   const [staffProfile,  setStaffProfile]  = useState<StaffProfile  | null>(null)
+  const [crewProfile,   setCrewProfile]   = useState<CrewProfile   | null>(null)
   const [loading,       setLoading]       = useState(true)
   const [staffMode,     setStaffMode]     = useState(false)
 
@@ -98,6 +108,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
+  async function fetchCrewProfile(): Promise<boolean> {
+    // Same SECURITY DEFINER pattern as fetchStaffProfile — ambulance_crew has
+    // no self-read RLS policy, so this must go through an RPC, not a direct query.
+    const { data, error } = await supabase.rpc('get_my_crew_profile')
+
+    if (error || !data || data.length === 0) {
+      setCrewProfile(null)
+      return false
+    }
+
+    const row = data[0]
+    setCrewProfile({
+      crewId:       row.crew_id,
+      providerId:   row.provider_id,
+      providerName: row.provider_name,
+      crewRole:     row.crew_role,
+      crewTier:     row.crew_tier,
+    })
+    return true
+  }
+
   async function fetchProfile(authId: string) {
     const { data } = await supabase
       .from('users')
@@ -111,10 +142,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '')
     if (!isDoctor) {
       const isStaff = await fetchStaffProfile(data?.full_name ?? '')
-      // Auto-enable staff mode on first login for staff accounts that have no patient booking history
-      if (isStaff) setStaffMode(true)
+      if (!isStaff) {
+        const isCrew = await fetchCrewProfile()
+        // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
+        if (isCrew) setStaffMode(true)
+      } else {
+        setCrewProfile(null)
+        setStaffMode(true)
+      }
     } else {
       // Doctors auto-enter specialist mode
+      setCrewProfile(null)
       setStaffMode(true)
     }
   }
@@ -148,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'INITIAL_SESSION' && initialLoadDone.current) return
       setSession(session)
       if (session) fetchProfile(session.user.id)
-      else { setUser(null); setDoctorProfile(null); setStaffProfile(null) }
+      else { setUser(null); setDoctorProfile(null); setStaffProfile(null); setCrewProfile(null) }
     })
 
     return () => subscription.unsubscribe()
@@ -180,13 +218,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStaffMode(false)
     setDoctorProfile(null)
     setStaffProfile(null)
+    setCrewProfile(null)
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, doctorProfile, staffProfile, loading, staffMode, setStaffMode, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, doctorProfile, staffProfile, crewProfile, loading, staffMode, setStaffMode, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

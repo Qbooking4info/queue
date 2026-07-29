@@ -76,6 +76,10 @@ import { FrontDeskQueueScreen }   from './screens/frontdesk/FrontDeskQueueScreen
 import { FrontDeskProfileScreen } from './screens/frontdesk/FrontDeskProfileScreen'
 import { AdminDashboardScreen }   from './screens/admin/AdminDashboardScreen'
 
+// Ambulance crew screens
+import { CrewHomeScreen }    from './screens/crew/CrewHomeScreen'
+import { CrewProfileScreen } from './screens/crew/CrewProfileScreen'
+
 // New staff screens
 import { StaffAppointmentsScreen } from './screens/staff/StaffAppointmentsScreen'
 import { WalkInBookingScreen }     from './screens/staff/WalkInBookingScreen'
@@ -96,6 +100,7 @@ const DocTab     = createBottomTabNavigator()
 const DocStack   = createNativeStackNavigator()
 const FDTab      = createBottomTabNavigator()
 const FDStack    = createNativeStackNavigator()
+const CrewTab    = createBottomTabNavigator()
 const AuthNav    = createNativeStackNavigator()
 const PatientNav = createNativeStackNavigator()
 const HospitalNav = createNativeStackNavigator()
@@ -237,6 +242,24 @@ function StaffStack() {
   )
 }
 
+// ── Ambulance crew navigator ──────────────────────────────────────────────────
+
+function CrewTabs() {
+  const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  return (
+    <CrewTab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+    }}>
+      <CrewTab.Screen name="CrewHome"    component={CrewHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'medkit' : 'medkit-outline'} {...p} />,   tabBarLabel: 'Jobs' }} />
+      <CrewTab.Screen name="CrewProfile" component={CrewProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    </CrewTab.Navigator>
+  )
+}
+
 // ── Auth navigators ───────────────────────────────────────────────────────────
 
 function PatientAuthStack() {
@@ -271,7 +294,7 @@ function RootAuthNavigator() {
 
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user, doctorProfile, staffProfile, staffMode } = useAuth()
+  const { session, loading, user, doctorProfile, staffProfile, crewProfile, staffMode } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
@@ -291,6 +314,8 @@ function AppNavigator() {
       content = <SpecialistStack />
     } else if (staffMode && staffProfile) {
       content = <StaffStack />
+    } else if (staffMode && crewProfile) {
+      content = <CrewTabs />
     } else {
       content = <AppStack />
     }
