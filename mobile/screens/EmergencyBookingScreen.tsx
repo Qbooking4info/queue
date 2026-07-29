@@ -79,6 +79,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const [loadingHospitals,  setLoadingHospitals] = useState(false)
   const [selectedHospital,  setSelectedHospital] = useState<DisplayHospital | null>(null)
   const [erClinicId,        setErClinicId]       = useState<string | undefined>(undefined)
+  const [bedSpaceAck,       setBedSpaceAck]      = useState(false)
   const [arrival,           setArrival]          = useState<string | null>(null)
   const [paymentMethod,     setPaymentMethod]    = useState('card')
   const [submitting,        setSubmitting]       = useState(false)
@@ -130,9 +131,15 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     return () => { cancelled = true }
   }, [selectedHospital?.id])
 
+  // Bed space "None"/"Very limited" doesn't block booking -- the hospital may still give
+  // basic first aid as capacity allows -- but the patient must actively acknowledge the
+  // risk before Continue unlocks, rather than a static disclaimer they can scroll past.
+  const needsBedSpaceAck = selectedHospital?.bed_space_status === 'none' || selectedHospital?.bed_space_status === 'very_limited'
+  useEffect(() => { setBedSpaceAck(false) }, [selectedHospital?.id])
+
   const canProceed = () => {
     if (step === 0) return !!(symptom || customSymptom.trim())
-    if (step === 1) return !!(selectedHospital && arrival)
+    if (step === 1) return !!(selectedHospital && arrival) && (!needsBedSpaceAck || bedSpaceAck)
     return true
   }
 
@@ -172,14 +179,15 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
     if (result.ok) {
       navigation.navigate('EmergencyConfirmation', {
-        urgency:      u.id,
-        urgencyLabel: u.label,
-        urgencyColor: u.color,
-        symptom:      symptom || customSymptom,
-        hospital:     selectedHospital,
-        slot:         arrival,
+        urgency:        u.id,
+        urgencyLabel:   u.label,
+        urgencyColor:   u.color,
+        symptom:        symptom || customSymptom,
+        hospital:       selectedHospital,
+        slot:           arrival,
         total,
-        bookingRef:   result.bookingRef,
+        bookingRef:     result.bookingRef,
+        bedSpaceStatus: selectedHospital.bed_space_status ?? null,
       })
     } else {
       setSubmitError(`Booking failed: ${result.error}`)
@@ -350,6 +358,36 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 </View>
               </TouchableOpacity>
             ))
+          )}
+
+          {/* Bed space acknowledgment -- only for the hospital actually selected, only when
+              its real-time status is None/Very limited. Continue stays locked until ticked. */}
+          {selectedHospital && needsBedSpaceAck && (
+            <View style={[s.bedSpaceWarnBox, {
+              borderColor:     selectedHospital.bed_space_status === 'none' ? '#FF5C5C' : '#FF8C42',
+              backgroundColor: selectedHospital.bed_space_status === 'none' ? 'rgba(255,92,92,0.08)' : 'rgba(255,140,66,0.08)',
+            }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                <Ionicons name="warning-outline" size={17} color={selectedHospital.bed_space_status === 'none' ? '#FF5C5C' : '#FF8C42'} />
+                <Text style={[s.bedSpaceWarnTitle, { color: selectedHospital.bed_space_status === 'none' ? '#FF5C5C' : '#FF8C42' }]}>
+                  {selectedHospital.bed_space_status === 'none' ? 'No bed space right now' : 'Very limited bed space right now'}
+                </Text>
+              </View>
+              <Text style={[s.bedSpaceWarnText, { color: t.textSecondary }]}>
+                {selectedHospital.name} cannot guarantee a bed on arrival. Other emergencies who arrive first —
+                especially those triaged as more urgent — will be seen first. Basic first aid may still be given
+                as the hospital's capacity allows.
+              </Text>
+              <TouchableOpacity onPress={() => setBedSpaceAck(a => !a)} style={s.ackRow}>
+                <View style={[s.ackCheckbox, {
+                  borderColor:     bedSpaceAck ? (selectedHospital.bed_space_status === 'none' ? '#FF5C5C' : '#FF8C42') : t.cardBorder,
+                  backgroundColor: bedSpaceAck ? (selectedHospital.bed_space_status === 'none' ? '#FF5C5C' : '#FF8C42') : 'transparent',
+                }]}>
+                  {bedSpaceAck && <Ionicons name="checkmark" size={12} color="#fff" />}
+                </View>
+                <Text style={[s.ackText, { color: t.textPrimary }]}>I understand and wish to proceed anyway</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Arrival time */}
@@ -528,6 +566,13 @@ const s = StyleSheet.create({
   hospitalMeta:      { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   metaChip:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   metaText:          { fontSize: 11 },
+  // Bed space warning
+  bedSpaceWarnBox:   { borderRadius: 14, borderWidth: 1.5, padding: 13, marginTop: 12 },
+  bedSpaceWarnTitle: { fontSize: 13, fontWeight: '800' },
+  bedSpaceWarnText:  { fontSize: 12, lineHeight: 17, marginTop: 6 },
+  ackRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  ackCheckbox:       { width: 20, height: 20, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  ackText:           { fontSize: 12, fontWeight: '600', flex: 1 },
   // Arrival
   slotRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   slotChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5 },

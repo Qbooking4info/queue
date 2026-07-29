@@ -12,8 +12,10 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const {
     urgency, urgencyLabel, urgencyColor,
-    symptom, hospital, slot, total, bookingRef,
+    symptom, hospital, slot, total, bookingRef, bedSpaceStatus,
   } = route.params
+
+  const bedSpaceRisk = bedSpaceStatus === 'none' || bedSpaceStatus === 'very_limited'
 
   const [show, setShow] = useState(false)
   const [queuePos] = useState(1)           // emergency = top of queue
@@ -122,6 +124,28 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        {/* Bed space reminder -- repeated here since this is what the patient actually
+            walks away with; the warning on the booking screen is easy to forget by the
+            time they're in transit. */}
+        {bedSpaceRisk && (
+          <View style={[st.bedSpaceCard, {
+            borderColor: bedSpaceStatus === 'none' ? 'rgba(255,92,92,0.4)' : 'rgba(255,140,66,0.4)',
+            backgroundColor: bedSpaceStatus === 'none' ? 'rgba(255,92,92,0.1)' : 'rgba(255,140,66,0.1)',
+            opacity: show ? 1 : 0,
+          }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Ionicons name="warning-outline" size={16} color={bedSpaceStatus === 'none' ? '#FF5C5C' : '#FF8C42'} />
+              <Text style={[st.bedSpaceTitle, { color: bedSpaceStatus === 'none' ? '#FF5C5C' : '#FF8C42' }]}>
+                {bedSpaceStatus === 'none' ? 'Reminder: no bed space confirmed' : 'Reminder: very limited bed space'}
+              </Text>
+            </View>
+            <Text style={st.bedSpaceText}>
+              This isn't guaranteed to change by the time you arrive. Emergencies who arrive first — especially
+              those triaged as more urgent — are seen first. Basic first aid may still be given as capacity allows.
+            </Text>
+          </View>
+        )}
+
         {/* Instructions */}
         <View style={[st.instructCard, { borderColor: `${urgencyColor}30`, backgroundColor: `${urgencyColor}0A`, opacity: show ? 1 : 0 }]}>
           <Text style={[st.instructTitle, { color: urgencyColor }]}>What to do now</Text>
@@ -209,6 +233,10 @@ const st = StyleSheet.create({
   detailLabel:      { fontSize: 12, color: 'rgba(255,255,255,0.4)', flexShrink: 0 },
   detailValue:      { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '500',
                       textAlign: 'right', flex: 1 },
+  // Bed space reminder
+  bedSpaceCard:     { width: '100%', borderRadius: 14, borderWidth: 1.5, padding: 13, marginBottom: 14 },
+  bedSpaceTitle:    { fontSize: 12.5, fontWeight: '800' },
+  bedSpaceText:     { fontSize: 11.5, lineHeight: 16, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
   // Instructions
   instructCard:     { width: '100%', borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 16 },
   instructTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase',
