@@ -69,6 +69,43 @@ function arrivalToTime(arrival: string): string {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
+// Shared between the walk-in hospital pick and the ambulance "preferred hospital" pick --
+// bed space "None"/"Very limited" doesn't block booking (basic first aid may still be
+// given as capacity allows), but the patient must actively acknowledge the risk before
+// Continue unlocks, rather than a static disclaimer they can scroll past.
+function BedSpaceAck({ selectedHospital, needsAck, acked, onToggle, t }: {
+  selectedHospital: DisplayHospital | null
+  needsAck: boolean
+  acked: boolean
+  onToggle: () => void
+  t: any
+}) {
+  if (!selectedHospital || !needsAck) return null
+  const isNone = selectedHospital.bed_space_status === 'none'
+  const color = isNone ? '#FF5C5C' : '#FF8C42'
+  return (
+    <View style={[s.bedSpaceWarnBox, { borderColor: color, backgroundColor: isNone ? 'rgba(255,92,92,0.08)' : 'rgba(255,140,66,0.08)' }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <Ionicons name="warning-outline" size={17} color={color} />
+        <Text style={[s.bedSpaceWarnTitle, { color }]}>
+          {isNone ? 'No bed space right now' : 'Very limited bed space right now'}
+        </Text>
+      </View>
+      <Text style={[s.bedSpaceWarnText, { color: t.textSecondary }]}>
+        {selectedHospital.name} cannot guarantee a bed on arrival. Other emergencies who arrive first —
+        especially those triaged as more urgent — will be seen first. Basic first aid may still be given
+        as the hospital's capacity allows.
+      </Text>
+      <TouchableOpacity onPress={onToggle} style={s.ackRow}>
+        <View style={[s.ackCheckbox, { borderColor: acked ? color : t.cardBorder, backgroundColor: acked ? color : 'transparent' }]}>
+          {acked && <Ionicons name="checkmark" size={12} color="#fff" />}
+        </View>
+        <Text style={[s.ackText, { color: t.textPrimary }]}>I understand and wish to proceed anyway</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
 export function EmergencyBookingScreen({ navigation }: Props) {
   const { theme: t }  = useTheme()
   const { user }      = useAuth()
@@ -85,6 +122,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const [loadingHospitals,  setLoadingHospitals] = useState(false)
   const [selectedHospital,  setSelectedHospital] = useState<DisplayHospital | null>(null)
   const [erClinicId,        setErClinicId]       = useState<string | undefined>(undefined)
+  const [bedSpaceAck,       setBedSpaceAck]      = useState(false)
   const [arrival,           setArrival]          = useState<string | null>(null)
   const [paymentMethod,     setPaymentMethod]    = useState('card')
   const [submitting,        setSubmitting]       = useState(false)
@@ -143,11 +181,20 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     if (arrival === AMBULANCE_ARRIVAL && !coords) requestLocation()
   }, [arrival])
 
+  // Bed space "None"/"Very limited" doesn't block booking -- the hospital may still give
+  // basic first aid as capacity allows -- but the patient must actively acknowledge the
+  // risk before Continue unlocks, rather than a static disclaimer they can scroll past.
+  // Applies to the preferred-hospital pick in ambulance mode too, for the same reason;
+  // it's a no-op whenever no hospital is selected, which needsBedSpaceAck already covers.
+  const needsBedSpaceAck = selectedHospital?.bed_space_status === 'none' || selectedHospital?.bed_space_status === 'very_limited'
+  useEffect(() => { setBedSpaceAck(false) }, [selectedHospital?.id])
+
   const canProceed = () => {
     if (step === 0) return !!(symptom || customSymptom.trim())
     if (step === 1) {
-      if (arrival === AMBULANCE_ARRIVAL) return !!coords
-      return !!(selectedHospital && arrival)
+      const bedSpaceOk = !needsBedSpaceAck || bedSpaceAck
+      if (arrival === AMBULANCE_ARRIVAL) return !!coords && bedSpaceOk
+      return !!(selectedHospital && arrival) && bedSpaceOk
     }
     return true
   }
@@ -216,14 +263,15 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
     if (result.ok) {
       navigation.navigate('EmergencyConfirmation', {
-        urgency:      u.id,
-        urgencyLabel: u.label,
-        urgencyColor: u.color,
-        symptom:      symptom || customSymptom,
-        hospital:     selectedHospital,
-        slot:         arrival,
+        urgency:        u.id,
+        urgencyLabel:   u.label,
+        urgencyColor:   u.color,
+        symptom:        symptom || customSymptom,
+        hospital:       selectedHospital,
+        slot:           arrival,
         total,
-        bookingRef:   result.bookingRef,
+        bookingRef:     result.bookingRef,
+        bedSpaceStatus: selectedHospital.bed_space_status ?? null,
       })
     } else {
       setSubmitError(`Booking failed: ${result.error}`)
@@ -415,6 +463,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 ))
               )}
+              <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck} acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
               <View style={{ height: 20 }} />
             </>
           ) : arrival ? (
@@ -479,6 +528,11 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))
           )}
+
+          {/* Bed space acknowledgment -- only for the hospital actually selected, only when
+              its real-time status is None/Very limited. Continue stays locked until ticked. */}
+          <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck} acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
+
           {selectedHospital && (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
               <Ionicons name="medical-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
@@ -657,6 +711,13 @@ const s = StyleSheet.create({
   hospitalMeta:      { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   metaChip:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   metaText:          { fontSize: 11 },
+  // Bed space warning
+  bedSpaceWarnBox:   { borderRadius: 14, borderWidth: 1.5, padding: 13, marginTop: 12 },
+  bedSpaceWarnTitle: { fontSize: 13, fontWeight: '800' },
+  bedSpaceWarnText:  { fontSize: 12, lineHeight: 17, marginTop: 6 },
+  ackRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  ackCheckbox:       { width: 20, height: 20, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  ackText:           { fontSize: 12, fontWeight: '600', flex: 1 },
   // Arrival
   slotRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   slotChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5 },
