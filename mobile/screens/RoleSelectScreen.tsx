@@ -48,9 +48,9 @@ export function RoleSelectScreen({ navigation }: Props) {
             <Ionicons name="business-outline" size={28} color="#5B9EFF" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.cardTitle, { color: t.textPrimary }]}>I'm a Hospital / Staff</Text>
+            <Text style={[s.cardTitle, { color: t.textPrimary }]}>I'm Hospital / Fleet Staff</Text>
             <Text style={[s.cardSub, { color: t.textMuted }]}>
-              Register your hospital or sign in to manage queues, staff, and appointments
+              Register your hospital, or sign in to manage queues, staff, or ambulance dispatch
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={t.textMuted} />

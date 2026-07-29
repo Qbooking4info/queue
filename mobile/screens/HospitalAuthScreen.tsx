@@ -51,9 +51,9 @@ export function HospitalAuthScreen({ navigation }: Props) {
             <View style={[s.iconWrap, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: 'rgba(91,158,255,0.3)' }]}>
               <Ionicons name="business-outline" size={30} color="#5B9EFF" />
             </View>
-            <Text style={[s.title, { color: t.textPrimary }]}>Hospital Portal</Text>
+            <Text style={[s.title, { color: t.textPrimary }]}>Staff Portal</Text>
             <Text style={[s.sub, { color: t.textMuted }]}>
-              Sign in to access your hospital dashboard, queue, and staff tools.
+              Sign in to your hospital, clinic, or ambulance crew account.
             </Text>
 
             {/* Login form */}
