@@ -26,6 +26,7 @@ export interface TransportRequestRow {
   assigned_unit_id: string | null
   destination_hospital_id: string | null
   pickup_address: string | null
+  symptom_description: string | null
   created_at: string
 }
 
@@ -118,6 +119,39 @@ export async function getActiveTransport(): Promise<TransportRequestRow | null> 
     .maybeSingle()
 
   return (data as TransportRequestRow | null) ?? null
+}
+
+export async function getTransportRequestById(requestId: string): Promise<TransportRequestRow | null> {
+  const { data } = await supabase
+    .from('transport_requests')
+    .select('*')
+    .eq('id', requestId)
+    .maybeSingle()
+
+  return (data as TransportRequestRow | null) ?? null
+}
+
+export async function getRequestPickupPoint(requestId: string): Promise<{ lat: number; lng: number } | null> {
+  const { data } = await supabase
+    .from('transport_requests')
+    .select('pickup_point')
+    .eq('id', requestId)
+    .maybeSingle()
+
+  const raw = (data as { pickup_point: unknown } | null)?.pickup_point
+  return typeof raw === 'string' ? parsePoint(raw) : null
+}
+
+export async function getUnitLocation(ambulanceId: string): Promise<{ lat: number; lng: number; recordedAt: string } | null> {
+  const { data } = await supabase
+    .from('ambulance_current_location')
+    .select('location, recorded_at')
+    .eq('ambulance_id', ambulanceId)
+    .maybeSingle()
+
+  if (!data) return null
+  const pos = parsePoint(data.location as unknown as string)
+  return pos ? { ...pos, recordedAt: data.recorded_at } : null
 }
 
 /**

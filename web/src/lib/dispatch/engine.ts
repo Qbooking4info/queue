@@ -238,7 +238,7 @@ async function notifyCrews(
   const rows: Array<{ user_id: string; title: string; body: string; type: string; data: Record<string, string | number> }> = []
 
   for (const offer of offers) {
-    const shift = (crew ?? []).find((s: any) => s.ambulance_id === offer.ambulance_id)
+    const shift = (crew ?? []).find((s) => s.ambulance_id === offer.ambulance_id)
     for (const sc of shift?.ambulance_shift_crew ?? []) {
       const userId = sc?.ambulance_crew?.user_id
       if (!userId) continue

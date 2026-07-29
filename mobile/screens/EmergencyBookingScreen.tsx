@@ -6,7 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import { useLocation } from '../contexts/LocationContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents, findEmergencyClinic } from '../lib/api'
+import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
@@ -35,7 +37,10 @@ const BED_SPACE_META: Partial<Record<string, { icon: 'checkmark-circle-outline' 
   none:         { icon: 'close-circle-outline',       label: 'Bed space: None',         color: '#FF5C5C' },
 }
 
-const ARRIVAL_OPTIONS = ['Now (walk-in)', '15 min', '30 min', '45 min', '1 hr']
+// Branches to requestAmbulance() in handleConfirm instead of createHospitalAppointment.
+const AMBULANCE_ARRIVAL = 'I need an ambulance'
+
+const ARRIVAL_OPTIONS = ['Now (walk-in)', AMBULANCE_ARRIVAL, '15 min', '30 min', '45 min', '1 hr']
 
 const SYMPTOMS = [
   'Chest pain / difficulty breathing',
@@ -67,6 +72,7 @@ function arrivalToTime(arrival: string): string {
 export function EmergencyBookingScreen({ navigation }: Props) {
   const { theme: t }  = useTheme()
   const { user }      = useAuth()
+  const { coords, granted: locationGranted, loading: locationLoading, request: requestLocation } = useLocation()
 
   const [step,              setStep]             = useState(0)
   const [symptom,           setSymptom]          = useState('')
@@ -88,6 +94,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const baseFee   = selectedHospital?.opd_fee ?? 15000
   const premium   = Math.round(baseFee * (u.multiplier - 1))
   const total     = baseFee + premium + 500
+  const isAmbulance = arrival === AMBULANCE_ARRIVAL
 
   // Load hospitals genuinely available right now — 24/7 emergency_hours hospitals always
   // qualify; everyone else only if they're actually open at this moment. A closed hospital
@@ -130,15 +137,52 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     return () => { cancelled = true }
   }, [selectedHospital?.id])
 
+  // Only ask for location once the patient actually picks the ambulance option —
+  // no reason to prompt for permission on a screen most people use for a walk-in.
+  useEffect(() => {
+    if (arrival === AMBULANCE_ARRIVAL && !coords) requestLocation()
+  }, [arrival])
+
   const canProceed = () => {
     if (step === 0) return !!(symptom || customSymptom.trim())
-    if (step === 1) return !!(selectedHospital && arrival)
+    if (step === 1) {
+      if (arrival === AMBULANCE_ARRIVAL) return !!coords
+      return !!(selectedHospital && arrival)
+    }
     return true
   }
 
   async function handleConfirm() {
-    if (!user || !selectedHospital) return
+    if (!user) return
     setSubmitError('')
+
+    if (arrival === AMBULANCE_ARRIVAL) {
+      if (!coords) { setSubmitError('Location is required to dispatch an ambulance.'); return }
+      setSubmitting(true)
+      const { triageLevel, requiredTier } = triageForSymptom(symptom || customSymptom)
+      try {
+        const { request } = await requestAmbulance({
+          requestType:           'emergency',
+          triageLevel,
+          requiredTier,
+          lat:                   coords.latitude,
+          lng:                   coords.longitude,
+          contactPhone:          user.phone ?? undefined,
+          symptomDescription:    symptom || customSymptom,
+          dependentId:           forDependent && selectedDependentId ? selectedDependentId : undefined,
+          destinationHospitalId: selectedHospital ? String(selectedHospital.id) : undefined,
+          paymentMethod,
+        })
+        setSubmitting(false)
+        navigation.navigate('AmbulanceTracking', { requestId: request.id })
+      } catch (err) {
+        setSubmitting(false)
+        setSubmitError(`Ambulance request failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+      return
+    }
+
+    if (!selectedHospital) return
     setSubmitting(true)
 
     const today     = fmtLocalDate(new Date())
@@ -291,6 +335,90 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {/* ── Step 1: Hospital & Doctor ─────────────────────────── */}
       {step === 1 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
+          <Text style={[s.label, { color: t.textMuted, marginTop: 0 }]}>How will you get there?</Text>
+          <View style={s.slotRow}>
+            {ARRIVAL_OPTIONS.map(opt => (
+              <TouchableOpacity key={opt} onPress={() => setArrival(opt)}
+                style={[s.slotChip, {
+                  borderColor:     arrival === opt ? '#FF5C5C' : t.cardBorder,
+                  backgroundColor: arrival === opt ? 'rgba(255,92,92,0.1)' : t.cardBg,
+                }]}>
+                <Text style={[s.slotText, { color: arrival === opt ? '#FF5C5C' : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {arrival === AMBULANCE_ARRIVAL ? (
+            <>
+              <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+                <Text style={[s.noteText, { color: '#FF5C5C' }]}>
+                  An ambulance will be dispatched to your current location immediately after you confirm.
+                  The nearest available crew decides the receiving hospital based on your condition and
+                  bed capacity — a preference below is used only when it doesn't conflict with that.
+                </Text>
+              </View>
+
+              <Text style={[s.label, { color: t.textMuted }]}>Pickup location</Text>
+              {locationLoading ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color="#FF5C5C" />
+                  <Text style={[s.noteInline, { color: t.textMuted }]}>Getting your location…</Text>
+                </View>
+              ) : coords ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="location" size={14} color="#00C265" />
+                  <Text style={[s.noteInline, { color: t.textSecondary, marginTop: 0 }]}>
+                    Location found ({coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)})
+                  </Text>
+                </View>
+              ) : (
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#FF5C5C" />
+                    <Text style={[s.noteInline, { color: '#FF5C5C', marginTop: 0 }]}>
+                      {locationGranted ? 'Could not get a location fix.' : 'Location permission is required.'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={requestLocation} style={[s.forBtn, { marginTop: 8, alignItems: 'center' }]}>
+                    <Text style={[s.forBtnText, { color: t.accent }]}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <Text style={[s.label, { color: t.textMuted }]}>Preferred hospital (optional)</Text>
+              {loadingHospitals ? (
+                <ActivityIndicator color="#FF5C5C" style={{ marginTop: 8 }} />
+              ) : (
+                hospitals.map(h => (
+                  <TouchableOpacity key={h.id}
+                    onPress={() => setSelectedHospital(selectedHospital?.id === h.id ? null : h)}
+                    style={[s.hospitalCard, {
+                      borderColor:     selectedHospital?.id === h.id ? '#FF5C5C' : t.cardBorder,
+                      backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
+                    }]}>
+                    <View style={s.hospitalTop}>
+                      <View style={[s.hospitalAvatar, { backgroundColor: h.avatarBg }]}>
+                        <Text style={[s.hospitalAvatarText]}>{h.avatar}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
+                        <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
+                      </View>
+                      {selectedHospital?.id === h.id && (
+                        <View style={[s.selectedCheck, { backgroundColor: '#FF5C5C' }]}>
+                          <Ionicons name="checkmark" size={12} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+              <View style={{ height: 20 }} />
+            </>
+          ) : arrival ? (
+          <>
           <Text style={[s.label, { color: t.textMuted }]}>Select hospital</Text>
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', marginTop: 0, marginBottom: 12 }]}>
             <Text style={[s.noteText, { color: '#FFB547' }]}>
@@ -351,33 +479,17 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))
           )}
-
-          {/* Arrival time */}
           {selectedHospital && (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
-                <Ionicons name="medical-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
-                <Text style={[s.noteInline, { color: t.textMuted, marginTop: 0, flex: 1 }]}>
-                  A doctor will be assigned by the hospital's front desk when you arrive.
-                </Text>
-              </View>
-              <Text style={[s.label, { color: t.textMuted }]}>When can you arrive?</Text>
-              <View style={s.slotRow}>
-                {ARRIVAL_OPTIONS.map(opt => (
-                  <TouchableOpacity key={opt} onPress={() => setArrival(opt)}
-                    style={[s.slotChip, {
-                      borderColor:     arrival === opt ? '#FF5C5C' : t.cardBorder,
-                      backgroundColor: arrival === opt ? 'rgba(255,92,92,0.1)' : t.cardBg,
-                    }]}>
-                    <Text style={[s.slotText, { color: arrival === opt ? '#FF5C5C' : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
-                      {opt}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+              <Ionicons name="medical-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
+              <Text style={[s.noteInline, { color: t.textMuted, marginTop: 0, flex: 1 }]}>
+                A doctor will be assigned by the hospital's front desk when you arrive.
+              </Text>
+            </View>
           )}
           <View style={{ height: 20 }} />
+          </>
+          ) : null}
         </ScrollView>
       )}
 
@@ -386,15 +498,21 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
           {/* Summary */}
           <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Booking summary</Text>
-            {[
+            <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>
+              {isAmbulance ? 'Ambulance request summary' : 'Booking summary'}
+            </Text>
+            {(isAmbulance ? [
+              { label: 'Preferred hospital', value: selectedHospital?.name ?? 'Nearest crew decides' },
+              { label: 'Condition',          value: symptom || customSymptom || '—' },
+              { label: 'Pickup location',    value: coords ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : '—' },
+            ] : [
               { label: 'Hospital',       value: selectedHospital?.name ?? '—' },
               { label: 'Doctor',         value: 'Assigned on arrival' },
               { label: 'Arrival',        value: arrival ?? '—' },
               { label: 'Urgency',        value: u.label },
               { label: 'Condition',      value: symptom || customSymptom || '—' },
               { label: 'Queue priority', value: 'Top of queue' },
-            ].map(row => (
+            ]).map(row => (
               <View key={row.label} style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
                 <Text style={[s.summaryLabel, { color: t.textMuted }]}>{row.label}</Text>
                 <Text style={[s.summaryValue, { color: t.textPrimary }]} numberOfLines={2}>{row.value}</Text>
@@ -403,25 +521,34 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           </View>
 
           {/* Fee breakdown */}
-          <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Fee breakdown</Text>
-            <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-              <Text style={[s.summaryLabel, { color: t.textMuted }]}>Base consultation</Text>
-              <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦{baseFee.toLocaleString()}</Text>
+          {isAmbulance ? (
+            <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)' }]}>
+              <Text style={[s.noteText, { color: '#FFB547' }]}>
+                Ambulance fees are billed after the trip completes, based on distance and time on scene —
+                there's nothing to pay now. Your payment method below is used for that final charge.
+              </Text>
             </View>
-            <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-              <Text style={[s.summaryLabel, { color: t.textMuted }]}>Emergency premium ({u.badge})</Text>
-              <Text style={[s.summaryValue, { color: u.color }]}>+₦{premium.toLocaleString()}</Text>
+          ) : (
+            <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Fee breakdown</Text>
+              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Base consultation</Text>
+                <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦{baseFee.toLocaleString()}</Text>
+              </View>
+              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Emergency premium ({u.badge})</Text>
+                <Text style={[s.summaryValue, { color: u.color }]}>+₦{premium.toLocaleString()}</Text>
+              </View>
+              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Platform fee</Text>
+                <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦500</Text>
+              </View>
+              <View style={s.totalRow}>
+                <Text style={[s.totalLabel, { color: t.textPrimary }]}>Total</Text>
+                <Text style={[s.totalValue, { color: u.color }]}>₦{total.toLocaleString()}</Text>
+              </View>
             </View>
-            <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-              <Text style={[s.summaryLabel, { color: t.textMuted }]}>Platform fee</Text>
-              <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦500</Text>
-            </View>
-            <View style={s.totalRow}>
-              <Text style={[s.totalLabel, { color: t.textPrimary }]}>Total</Text>
-              <Text style={[s.totalValue, { color: u.color }]}>₦{total.toLocaleString()}</Text>
-            </View>
-          </View>
+          )}
 
           {/* Payment method */}
           <Text style={[s.label, { color: t.textMuted }]}>Payment method</Text>
@@ -448,7 +575,9 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
             <Ionicons name="flash-outline" size={14} color="#FFB547" style={{ marginTop: 1 }} />
             <Text style={[s.noteText, { color: '#FFB547', flex: 1 }]}>
-              Emergency bookings are placed at the top of the queue immediately after payment.
+              {isAmbulance
+                ? 'Dispatch starts the moment you confirm — the nearest available crew is notified immediately.'
+                : 'Emergency bookings are placed at the top of the queue immediately after payment.'}
             </Text>
           </View>
           <View style={{ height: 20 }} />
@@ -479,7 +608,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             style={[s.nextBtn, { backgroundColor: '#FF5C5C', flex: 1, opacity: submitting ? 0.6 : 1 }]}>
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>Confirm & Pay</Text></View>}
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm & Pay'}</Text></View>}
           </TouchableOpacity>
         )}
       </View>

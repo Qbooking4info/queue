@@ -34,19 +34,42 @@ import { NotificationsScreen }      from './screens/NotificationsScreen'
 import { AppointmentDetailScreen }  from './screens/AppointmentDetailScreen'
 import { EmergencyBookingScreen }      from './screens/EmergencyBookingScreen'
 import { EmergencyConfirmationScreen } from './screens/EmergencyConfirmationScreen'
+import { AmbulanceTrackingScreen }     from './screens/AmbulanceTrackingScreen'
 import { MedicalHistoryScreen }        from './screens/MedicalHistoryScreen'
 import { DependentsScreen }            from './screens/DependentsScreen'
 import { PrescriptionsScreen }         from './screens/PrescriptionsScreen'
 import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
 import { InsuranceScreen }             from './screens/InsuranceScreen'
 import { SupportScreen }               from './screens/SupportScreen'
-import { VideoCallScreen }             from './screens/VideoCallScreen'
 
 // Specialist screens
 import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScreen'
 import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
-import { DoctorVideoCallScreen }   from './screens/specialist/DoctorVideoCallScreen'
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+
+// react-native-agora is a native module Expo Go can't load at all -- lazy-load
+// these two screens so the rest of the app still runs under Expo Go in dev,
+// and only the video call screens themselves need a real dev build.
+const VideoCallScreenLazy = React.lazy(() =>
+  import('./screens/VideoCallScreen').then(m => ({ default: m.VideoCallScreen }))
+)
+function VideoCallScreen(props: any) {
+  return (
+    <React.Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>}>
+      <VideoCallScreenLazy {...props} />
+    </React.Suspense>
+  )
+}
+const DoctorVideoCallScreenLazy = React.lazy(() =>
+  import('./screens/specialist/DoctorVideoCallScreen').then(m => ({ default: m.DoctorVideoCallScreen }))
+)
+function DoctorVideoCallScreen(props: any) {
+  return (
+    <React.Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>}>
+      <DoctorVideoCallScreenLazy {...props} />
+    </React.Suspense>
+  )
+}
 
 // Front desk / Admin screens
 import { FrontDeskQueueScreen }   from './screens/frontdesk/FrontDeskQueueScreen'
@@ -112,6 +135,7 @@ function AppStack() {
       <Stack.Screen name="AppointmentDetail"    component={AppointmentDetailScreen} />
       <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
       <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="AmbulanceTracking"     component={AmbulanceTrackingScreen} options={{ animation: 'fade', gestureEnabled: false }} />
       <Stack.Screen name="MedicalHistory"       component={MedicalHistoryScreen} />
       <Stack.Screen name="Dependents"           component={DependentsScreen} />
       <Stack.Screen name="Prescriptions"        component={PrescriptionsScreen} />

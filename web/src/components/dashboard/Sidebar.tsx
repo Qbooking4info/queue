@@ -7,7 +7,7 @@ import type { UserRole } from '@/lib/admin-api'
 import {
   LayoutDashboard, CalendarDays, ListOrdered, CalendarRange,
   Stethoscope, Users, Settings, BarChart2, Tag, Building2,
-  Hospital, Monitor, LogOut, ArrowLeft, type LucideIcon,
+  Hospital, Monitor, LogOut, ArrowLeft, Ambulance, type LucideIcon,
 } from 'lucide-react'
 
 type NavItem = { href: string; icon: LucideIcon; label: string }
@@ -34,6 +34,7 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulances'    },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
     { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics'     },
@@ -44,6 +45,7 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulances'    },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
   ],
@@ -56,6 +58,7 @@ const NAV: Record<UserRole, NavItem[]> = {
   front_desk: [
     { href: '/dashboard',              icon: Monitor,         label: 'Overview'      },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulances'    },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
   ],
 }

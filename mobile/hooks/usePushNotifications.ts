@@ -1,23 +1,29 @@
 import { useEffect, useRef } from 'react'
-import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { savePushToken } from '../lib/api'
 
-// Show alerts for foreground notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge:  true,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-  }),
-})
+// Expo Go dropped Android remote-push support in SDK 53+ -- merely importing
+// expo-notifications there throws as soon as the module evaluates. Load it
+// dynamically, and only outside Expo Go, so the rest of the app still works
+// when running in Expo Go during development.
+const isExpoGo = Constants.appOwnership === 'expo'
 
 async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) return null  // won't work in simulator
+  if (isExpoGo || !Device.isDevice) return null  // won't work in Expo Go or simulator
+
+  const Notifications = await import('expo-notifications')
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge:  true,
+      shouldShowBanner: true,
+      shouldShowList:   true,
+    }),
+  })
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('queue-notifications', {
@@ -46,24 +52,26 @@ async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export function usePushNotifications(userId: string | undefined) {
-  const listenerRef     = useRef<Notifications.EventSubscription | null>(null)
-  const responseRef     = useRef<Notifications.EventSubscription | null>(null)
+  const listenerRef     = useRef<import('expo-notifications').EventSubscription | null>(null)
+  const responseRef     = useRef<import('expo-notifications').EventSubscription | null>(null)
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || isExpoGo) return
 
     registerForPushNotifications().then(token => {
       if (token) savePushToken(userId, token)
     })
 
-    // Listener for notifications received while app is in foreground
-    listenerRef.current = Notifications.addNotificationReceivedListener(_notif => {
-      // in-app banner is shown automatically via setNotificationHandler
-    })
+    import('expo-notifications').then(Notifications => {
+      // Listener for notifications received while app is in foreground
+      listenerRef.current = Notifications.addNotificationReceivedListener(_notif => {
+        // in-app banner is shown automatically via setNotificationHandler
+      })
 
-    // Listener for user tapping a notification
-    responseRef.current = Notifications.addNotificationResponseReceivedListener(_response => {
-      // Could navigate to AppointmentDetail here based on response.notification.request.content.data
+      // Listener for user tapping a notification
+      responseRef.current = Notifications.addNotificationResponseReceivedListener(_response => {
+        // Could navigate to AppointmentDetail here based on response.notification.request.content.data
+      })
     })
 
     return () => {

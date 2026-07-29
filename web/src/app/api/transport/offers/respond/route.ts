@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
     .gte('ends_at', new Date().toISOString())
     .limit(1)
 
-  const authorised = (onShift ?? []).some((s: any) =>
+  const authorised = (onShift ?? []).some((s) =>
     (s.ambulance_shift_crew ?? []).some(
-      (sc: any) => sc?.ambulance_crew?.is_active && sc?.ambulance_crew?.users?.auth_id === userRes.user!.id,
+      (sc) => sc?.ambulance_crew?.is_active && sc?.ambulance_crew?.users?.auth_id === userRes.user!.id,
     ),
   )
 

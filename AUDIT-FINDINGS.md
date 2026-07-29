@@ -58,7 +58,23 @@ needed for `authenticated`, gate it the same way as `get_doctor_queue` (caller m
 at `p_hospital_id` or the patient booking flow calling it pre-auth needs a narrower
 justification documented).
 
-## 2026-07-26 — Vercel exposure of `NEXT_PUBLIC_SUPABASE_SERVICE_KEY` (Task 1a) — unresolved
+## 2026-07-26 — Vercel exposure of `NEXT_PUBLIC_SUPABASE_SERVICE_KEY` (Task 1a) — resolved 2026-07-27
+
+Checked directly via `vercel env ls` (queue-web, linked with `vercel link --yes --project
+queue-web --scope qbooking4infos-projects`) once Vercel CLI access was available: no
+`NEXT_PUBLIC_SUPABASE_SERVICE_KEY` exists in Production, Preview, or Development. The
+service-role key is stored only as `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_` prefix,
+so Next.js never inlines it into the client bundle), set in Development and Production. The
+only `NEXT_PUBLIC_*` variables on the project are `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, both intended to be public. No rotation needed.
+
+Side observation, not a security issue: most server-only vars (`SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`'s Production entry, all `POSTGRES_*`)
+are set for Production only, not Preview. If Preview deployments call any admin-client
+code path, they'd fail as configured today — untested here, flagging in case Preview
+builds are ever relied on for QA.
+
+<details><summary>Original unresolved finding (2026-07-26)</summary>
 
 Local `.env.local` does not set this variable (it correctly uses `SUPABASE_SERVICE_ROLE_KEY`).
 Whether it was ever set in the Vercel dashboard (Production/Preview/Development) is unknown —
@@ -69,6 +85,8 @@ verified via the Supabase or Vercel CLI available in this environment (no `verce
 across all three environments. If it was ever set, rotate the Supabase `service_role` key
 (Settings → API) and check Supabase API logs for anomalous service-role usage before
 concluding no access occurred, per the NDPC 72-hour reporting window noted in the review.
+
+</details>
 
 ## 2026-07-26 — Task 7: RLS row policies don't restrict columns; fixed doctors/hospitals, flagging the rest
 
