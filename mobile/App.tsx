@@ -130,9 +130,14 @@ function MainTabs() {
 }
 
 function AppStack() {
+  const { pendingHospitalOnboarding } = useAuth()
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      initialRouteName={pendingHospitalOnboarding ? 'HospitalOnboarding' : 'MainTabs'}
+    >
       <Stack.Screen name="MainTabs"             component={MainTabs} />
+      <Stack.Screen name="HospitalOnboarding"   component={HospitalOnboardingScreen} />
       <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
       <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
       <Stack.Screen name="Confirmation"         component={ConfirmationScreen}         options={{ animation: 'fade' }} />
@@ -274,8 +279,8 @@ function PatientAuthStack() {
 function HospitalAuthStack() {
   return (
     <HospitalNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <HospitalNav.Screen name="HospitalPortal"   component={HospitalAuthScreen} />
-      <HospitalNav.Screen name="HospitalRegister" component={HospitalRegisterScreen} />
+      <HospitalNav.Screen name="HospitalPortal"     component={HospitalAuthScreen} />
+      <HospitalNav.Screen name="HospitalRegister"   component={HospitalRegisterScreen} />
     </HospitalNav.Navigator>
   )
 }

@@ -30,7 +30,7 @@ interface Props { navigation: any }
 
 export function HospitalOnboardingScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user, refreshProfile } = useAuth()
+  const { user, refreshProfile, setPendingHospitalOnboarding } = useAuth()
 
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -90,8 +90,13 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   }
 
   function goBack() {
-    if (step > 0) setStep(s => s - 1)
-    else navigation.goBack()
+    if (step > 0) { setStep(s => s - 1); return }
+    // This screen is the initial route when reached straight after sign-up
+    // (see pendingHospitalOnboarding), so there's nothing to go back to —
+    // bail out to the main app instead of a dead-end back press.
+    setPendingHospitalOnboarding(false)
+    if (navigation.canGoBack()) navigation.goBack()
+    else navigation.navigate('MainTabs')
   }
 
   async function handleSubmit() {
@@ -135,6 +140,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
       if (!res.ok) throw new Error(body?.error ?? 'Onboarding failed')
 
       haptics.success()
+      setPendingHospitalOnboarding(false)
       await refreshProfile()
       setDone(true)
     } catch (e) {
@@ -152,9 +158,11 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
           <Ionicons name="checkmark-circle" size={72} color="#00C265" style={{ marginBottom: 20 }} />
           <Text style={[s.doneTitle, { color: t.textPrimary }]}>Hospital registered!</Text>
           <Text style={[s.doneSub, { color: t.textMuted }]}>
-            {name} is now on Queue. Sign out and sign back in to access your dashboard.
+            {name} is now on Queue.
           </Text>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={[s.doneBtn, { backgroundColor: t.accent }]}>
+          <TouchableOpacity
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('MainTabs')}
+            style={[s.doneBtn, { backgroundColor: t.accent }]}>
             <Text style={s.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </View>

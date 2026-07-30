@@ -36,6 +36,12 @@ interface AuthState {
   loading:       boolean
   staffMode:     boolean
   setStaffMode:  (v: boolean) => void
+  // Set right after sign-up on the "Register a new hospital" flow — the auth
+  // state change mounts the authenticated app tree before that screen's own
+  // navigation call would take effect, so AppNavigator reads this to open
+  // straight into HospitalOnboardingScreen instead of the default patient home.
+  pendingHospitalOnboarding:    boolean
+  setPendingHospitalOnboarding: (v: boolean) => void
   signIn:        (email: string, password: string) => Promise<string | null>
   signUp:        (email: string, password: string, fullName: string, phone: string) => Promise<string | null>
   signOut:       () => Promise<void>
@@ -52,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [crewProfile,   setCrewProfile]   = useState<CrewProfile   | null>(null)
   const [loading,       setLoading]       = useState(true)
   const [staffMode,     setStaffMode]     = useState(false)
+  const [pendingHospitalOnboarding, setPendingHospitalOnboarding] = useState(false)
 
   const initialLoadDone = useRef(false)
 
@@ -221,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     setStaffMode(false)
+    setPendingHospitalOnboarding(false)
     setDoctorProfile(null)
     setStaffProfile(null)
     setCrewProfile(null)
@@ -230,7 +238,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, doctorProfile, staffProfile, crewProfile, loading, staffMode, setStaffMode, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{
+      session, user, doctorProfile, staffProfile, crewProfile, loading,
+      staffMode, setStaffMode,
+      pendingHospitalOnboarding, setPendingHospitalOnboarding,
+      signIn, signUp, signOut, refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   )
