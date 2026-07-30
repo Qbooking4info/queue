@@ -65,7 +65,7 @@ export function StaffList({ staff, hasFrontDesk, profileId }: {
         {staff.map(member => {
           const user = Array.isArray(member.users) ? member.users[0] : member.users
           const isSelf = member.user_id === profileId
-          const isSystemAccount = (member.role === 'specialist' || member.role === 'front_desk')
+          const isSystemAccount = (member.role === 'specialist' || member.role === 'front_desk' || member.role === 'ambulance_crew')
           const isAmbulanceCrew = member.role === 'ambulance_crew'
           const roleColor = colorFor(member.role ?? '')
 

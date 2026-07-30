@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 
-const VALID_ROLES = ['specialist', 'front_desk', 'admin', 'ambulance_crew']
+const VALID_ROLES = ['specialist', 'front_desk', 'admin']
 const VALID_CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
 const VALID_CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 
@@ -104,6 +104,60 @@ export async function setupFrontDeskLogin(
   return { email: fdEmail, password: newPassword }
 }
 
+// Create an ambulance crew login — auto-generated portal credentials,
+// same pattern as setupFrontDeskLogin (front desk) and /api/doctors (specialist),
+// since crew members typically don't have a hospital email address to invite.
+export async function addCrewMember(
+  _prev: { email: string; password: string } | { error: string } | null,
+  formData: FormData,
+): Promise<{ email: string; password: string } | { error: string } | null> {
+  const { adminRecord } = await getHospitalContext()
+  if (adminRecord.role !== 'admin' && adminRecord.role !== 'owner') return { error: 'Unauthorized' }
+
+  const fullName = (formData.get('full_name') as string ?? '').trim()
+  const crewRole = (formData.get('crew_role') as string ?? '').trim()
+  const crewTier = (formData.get('crew_tier') as string ?? '').trim()
+
+  if (!fullName) return { error: 'Full name is required.' }
+  if (!VALID_CREW_ROLES.includes(crewRole)) return { error: 'Please select a crew role.' }
+  if (!VALID_CREW_TIERS.includes(crewTier)) return { error: 'Please select a care tier.' }
+
+  const db = createAdminClient()
+  const nameSlug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '.')
+  const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map((b: number) => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('')
+  const loginEmail = `crew.${nameSlug}.${suffix}@portal.queueapp.co`
+  const newPassword = genPassword()
+
+  const { data: authUser, error: authErr } = await db.auth.admin.createUser({
+    email: loginEmail, password: newPassword, email_confirm: true,
+  })
+  if (authErr || !authUser.user) return { error: authErr?.message ?? 'Failed to create auth user' }
+
+  const { data: profile, error: profileErr } = await db.from('users').insert({
+    auth_id: authUser.user.id, email: loginEmail, full_name: fullName,
+  }).select('id').single()
+  if (profileErr || !profile) {
+    await db.auth.admin.deleteUser(authUser.user.id)
+    return { error: profileErr?.message ?? 'Failed to create profile' }
+  }
+
+  const { error: adminErr } = await db.from('hospital_admins').insert({
+    hospital_id: adminRecord.hospital_id,
+    user_id: profile.id,
+    role: 'ambulance_crew',
+    crew_role: crewRole,
+    crew_tier: crewTier,
+  })
+  if (adminErr) {
+    await db.auth.admin.deleteUser(authUser.user.id)
+    return { error: adminErr.message }
+  }
+
+  revalidatePath('/dashboard/staff')
+  return { email: loginEmail, password: newPassword }
+}
+
 export async function addStaff(
   _prev: { error: string } | null,
   formData: FormData,
@@ -115,15 +169,9 @@ export async function addStaff(
     const email    = (formData.get('email') as string ?? '').trim().toLowerCase()
     const role     = (formData.get('role')  as string ?? '').trim()
     const doctorId = (formData.get('doctor_id') as string ?? '') || null
-    const crewRole = (formData.get('crew_role') as string ?? '').trim() || null
-    const crewTier = (formData.get('crew_tier') as string ?? '').trim() || null
 
     if (!email) return { error: 'Email is required.' }
     if (!VALID_ROLES.includes(role)) return { error: 'Please select a role.' }
-    if (role === 'ambulance_crew') {
-      if (!crewRole || !VALID_CREW_ROLES.includes(crewRole)) return { error: 'Please select a crew role.' }
-      if (!crewTier || !VALID_CREW_TIERS.includes(crewTier)) return { error: 'Please select a care tier.' }
-    }
 
     const db = createAdminClient()
 
@@ -177,7 +225,6 @@ export async function addStaff(
       hospital_id: adminRecord.hospital_id,
       user_id:     userId,
       role,
-      ...(role === 'ambulance_crew' ? { crew_role: crewRole, crew_tier: crewTier } : {}),
     })
 
     if (error) return { error: error.message }

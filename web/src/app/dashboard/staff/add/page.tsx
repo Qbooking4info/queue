@@ -1,17 +1,26 @@
 'use client'
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Stethoscope } from 'lucide-react'
+import { ArrowLeft, Stethoscope, Check } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
-import { addStaff } from '../actions'
+import { addStaff, addCrewMember } from '../actions'
 
 const CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
 const CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 
 export default function AddStaffPage() {
   const { theme: C } = useTheme()
-  const [state, action, pending] = useActionState(addStaff, null)
-  const [role, setRole] = useState('admin')
+  const [role, setRole] = useState<'admin' | 'ambulance_crew'>('admin')
+
+  const [adminState, adminAction, adminPending] = useActionState(addStaff, null)
+  const [crewState, crewAction, crewPending] = useActionState(addCrewMember, null)
+  const [copied, setCopied] = useState<'email' | 'password' | null>(null)
+
+  async function copy(text: string, field: 'email' | 'password') {
+    await navigator.clipboard.writeText(text)
+    setCopied(field)
+    setTimeout(() => setCopied(null), 2000)
+  }
 
   const labelStyle: React.CSSProperties = {
     fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
@@ -23,6 +32,9 @@ export default function AddStaffPage() {
     borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text,
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
   }
+
+  const crewCreds = crewState && 'email' in crewState ? crewState : null
+  const crewErr   = crewState && 'error' in crewState ? crewState.error : null
 
   return (
     <div style={{ padding: 24, maxWidth: 560, margin: '0 auto', width: '100%' }}>
@@ -57,68 +69,121 @@ export default function AddStaffPage() {
         </div>
       </div>
 
-      {state?.error && (
-        <div style={{ marginBottom: 24, padding: 16, borderRadius: 16, border: `1px solid ${C.red}4d`, background: C.redLight, fontSize: 13, color: C.red }}>
-          {state.error}
-        </div>
-      )}
+      <div style={{ marginBottom: 24 }}>
+        <label style={labelStyle}>Role *</label>
+        <select value={role} onChange={e => setRole(e.target.value as 'admin' | 'ambulance_crew')} style={inputStyle}>
+          <option value="admin">Admin</option>
+          <option value="ambulance_crew">Ambulance Crew</option>
+        </select>
+      </div>
 
-      <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div>
-          <label style={labelStyle}>Role *</label>
-          <select name="role" value={role} onChange={e => setRole(e.target.value)} style={inputStyle}>
-            <option value="admin">Admin</option>
-            <option value="ambulance_crew">Ambulance Crew</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={labelStyle}>Email Address *</label>
-          <input
-            name="email" type="email" required
-            placeholder={role === 'ambulance_crew' ? 'crew@hospital.com' : 'admin@hospital.com'}
-            style={inputStyle}
-          />
-          <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
-            An invite email will be sent if they don&apos;t have an account yet.
-          </p>
-        </div>
-
-        {role === 'ambulance_crew' && (
-          <>
-            <div>
-              <label style={labelStyle}>Crew Role *</label>
-              <select name="crew_role" required defaultValue="" style={inputStyle}>
-                <option value="" disabled>Select a role</option>
-                {CREW_ROLES.map(r => (
-                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-                ))}
-              </select>
+      {role === 'admin' && (
+        <>
+          {adminState?.error && (
+            <div style={{ marginBottom: 24, padding: 16, borderRadius: 16, border: `1px solid ${C.red}4d`, background: C.redLight, fontSize: 13, color: C.red }}>
+              {adminState.error}
             </div>
+          )}
+          <form action={adminAction} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <input type="hidden" name="role" value="admin" />
             <div>
-              <label style={labelStyle}>Care Tier *</label>
-              <select name="crew_tier" required defaultValue="" style={inputStyle}>
-                <option value="" disabled>Select a tier</option>
-                {CREW_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <label style={labelStyle}>Email Address *</label>
+              <input name="email" type="email" required placeholder="admin@hospital.com" style={inputStyle} />
               <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
-                Determines which triage levels this crew member can be dispatched for.
+                An invite email will be sent if they don&apos;t have an account yet.
               </p>
             </div>
-          </>
-        )}
+            <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
+              <Link href="/dashboard/staff"
+                style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
+                Cancel
+              </Link>
+              <button type="submit" disabled={adminPending}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: adminPending ? 'not-allowed' : 'pointer', opacity: adminPending ? 0.6 : 1, fontFamily: 'inherit' }}>
+                {adminPending ? 'Sending Invite…' : 'Send Invite'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
 
-        <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
-          <Link href="/dashboard/staff"
-            style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
-            Cancel
-          </Link>
-          <button type="submit" disabled={pending}
-            style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1, fontFamily: 'inherit' }}>
-            {pending ? 'Sending Invite…' : 'Send Invite'}
-          </button>
-        </div>
-      </form>
+      {role === 'ambulance_crew' && (
+        <>
+          {crewCreds ? (
+            <div style={{ background: C.card, border: `1px solid ${C.amber}33`, borderRadius: 16, padding: 20, marginBottom: 16 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>Crew Login Ready</div>
+                <div style={{ fontSize: 12, color: C.textSub }}>Share these credentials with the crew member.</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {[{ label: 'Email', value: crewCreds.email, field: 'email' as const }, { label: 'Password', value: crewCreds.password, field: 'password' as const }].map(r => (
+                  <div key={r.field} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 12px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: C.textMuted }}>{r.label}</div>
+                      <div style={{ fontSize: 12, fontFamily: 'monospace', color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.value}</div>
+                    </div>
+                    <button onClick={() => copy(r.value, r.field)}
+                      style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, color: C.textSub, flexShrink: 0, padding: '2px 6px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {copied === r.field ? <Check size={11} /> : 'Copy'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: C.amber, marginBottom: 16 }}>Password will not be shown again — save it now.</p>
+              <Link href="/dashboard/staff"
+                style={{ display: 'inline-block', padding: '9px 16px', borderRadius: 10, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.text, textDecoration: 'none' }}>
+                Back to Staff
+              </Link>
+            </div>
+          ) : (
+            <>
+              {crewErr && (
+                <div style={{ marginBottom: 24, padding: 16, borderRadius: 16, border: `1px solid ${C.red}4d`, background: C.redLight, fontSize: 13, color: C.red }}>
+                  {crewErr}
+                </div>
+              )}
+              <form action={crewAction} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <div>
+                  <label style={labelStyle}>Full Name *</label>
+                  <input name="full_name" required placeholder="e.g. Chidi Nwosu" style={inputStyle} />
+                  <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
+                    A portal login will be generated automatically — crew members don&apos;t need an existing email address.
+                  </p>
+                </div>
+                <div>
+                  <label style={labelStyle}>Crew Role *</label>
+                  <select name="crew_role" required defaultValue="" style={inputStyle}>
+                    <option value="" disabled>Select a role</option>
+                    {CREW_ROLES.map(r => (
+                      <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Care Tier *</label>
+                  <select name="crew_tier" required defaultValue="" style={inputStyle}>
+                    <option value="" disabled>Select a tier</option>
+                    {CREW_TIERS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <p style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
+                    Determines which triage levels this crew member can be dispatched for.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
+                  <Link href="/dashboard/staff"
+                    style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
+                    Cancel
+                  </Link>
+                  <button type="submit" disabled={crewPending}
+                    style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: crewPending ? 'not-allowed' : 'pointer', opacity: crewPending ? 0.6 : 1, fontFamily: 'inherit' }}>
+                    {crewPending ? 'Creating…' : 'Create Crew Login'}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }
