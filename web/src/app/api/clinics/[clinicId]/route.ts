@@ -192,7 +192,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
 
   switch (body.action) {
     case 'update': {
-      const { action, ...updates } = body
+      // Whitelisted, not `const { action, ...updates } = body`. PatchBody is a
+      // compile-time type over a raw req.json() cast, so it constrains nothing at
+      // runtime: the spread previously forwarded whatever keys the client sent
+      // straight into the UPDATE. That let a caller move the clinic to another
+      // hospital by passing hospital_id, or set is_emergency directly and bypass
+      // the "at most one Emergency Department" invariant that the set_emergency
+      // branch below exists to maintain.
+      const updates: Record<string, unknown> = {}
+      if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
+      if (body.description === null || typeof body.description === 'string') updates.description = body.description
+      if (typeof body.is_active === 'boolean') updates.is_active = body.is_active
+      if (Array.isArray(body.service_tags) && body.service_tags.every(t => typeof t === 'string')) {
+        updates.service_tags = body.service_tags
+      }
+      if (body.daily_booking_limit === null) {
+        updates.daily_booking_limit = null
+      } else if (body.daily_booking_limit !== undefined) {
+        // parseInt on the client turns "abc" into NaN, which JSON-serializes to
+        // null (silently "unlimited"); a negative value would mark every day full.
+        const n = body.daily_booking_limit
+        if (!Number.isInteger(n) || n < 0) return Errors.validation('daily_booking_limit must be a non-negative integer')
+        updates.daily_booking_limit = n
+      }
+
+      if (Object.keys(updates).length === 0) return Errors.validation('No valid fields to update')
+
       const { error } = await db.from('hospital_clinics').update(updates as any).eq('id', clinicId)
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
@@ -217,6 +242,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
       return NextResponse.json({ success: true })
     }
     case 'update_hours': {
+      // Same rationale as 'update': body.hours is unvalidated at runtime, and a
+      // day_of_week outside 0-6 inserts rows that fillHours can never read back.
+      const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+      if (!Array.isArray(body.hours) || body.hours.length > 7) {
+        return Errors.validation('hours must be an array of at most 7 days')
+      }
+      const valid = body.hours.every(h =>
+        h && Number.isInteger(h.day) && h.day >= 0 && h.day <= 6 &&
+        typeof h.open === 'string' && HHMM.test(h.open) &&
+        typeof h.close === 'string' && HHMM.test(h.close) &&
+        typeof h.closed === 'boolean',
+      )
+      if (!valid) return Errors.validation('Each day needs day 0-6, HH:MM open/close, and a closed flag')
+
       const rows = body.hours.map(h => ({
         clinic_id: clinicId, day_of_week: h.day, open_time: h.open, close_time: h.close, is_closed: h.closed,
       }))

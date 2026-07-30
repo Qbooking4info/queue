@@ -25,12 +25,24 @@ function assertOwnHospital(caller: { role: string; hospitalId?: string }, hospit
   return caller.role === 'super_admin' || caller.hospitalId === hospitalId
 }
 
+// The settings a hospital admin may edit. Single source of truth for both the
+// GET projection and the PATCH whitelist, so the two can't drift — and so PATCH
+// can never write a column outside this list (it previously spread the request
+// body straight into the UPDATE, which allowed writing *any* hospitals column,
+// including platform-controlled trust flags like is_verified).
+const EDITABLE_SETTINGS = [
+  'accepts_virtual', 'emergency_hours', 'is_24_hours', 'daily_booking_limit',
+  'approval_mode', 'requires_referral', 'opd_fee', 'latitude', 'longitude',
+  'sms_reminders', 'email_reminders', 'ambulance_private_fleet',
+  'ambulance_service_radius_m', 'ambulance_service_hours_247',
+] as const
+
 // GET/PATCH /api/hospitals/[id]/settings -- replaces admin-api.ts's
 // getHospitalSettings/updateHospitalSettings/getHospitalHours/
 // updateHospitalHours (Task 15). Restricted to the roles that actually see
 // the settings page (Sidebar only links to it for super_admin/hospital_admin).
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin'])
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { id } = await params
@@ -39,7 +51,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const [{ data: settings }, { data: hoursRows }] = await Promise.all([
     db.from('hospitals')
-      .select('accepts_virtual, emergency_hours, is_24_hours, daily_booking_limit, approval_mode, requires_referral, opd_fee, latitude, longitude, sms_reminders, email_reminders, ambulance_private_fleet, ambulance_service_radius_m, ambulance_service_hours_247')
+      .select(EDITABLE_SETTINGS.join(', '))
       .eq('id', id)
       .single(),
     db.from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', id),
@@ -52,18 +64,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin'])
+  const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { id } = await params
   if (!assertOwnHospital(caller, id)) return Errors.forbidden()
   const db = createAdminClient()
 
-  const body = await req.json()
-  const { hours, ...settings } = body as { hours?: DayHours[] } & Record<string, unknown>
+  const body = await req.json() as { hours?: DayHours[]; settings?: Record<string, unknown> } & Record<string, unknown>
+  const { hours } = body
 
-  if (Object.keys(settings).length > 0) {
-    const { error } = await db.from('hospitals').update(settings as any).eq('id', id)
+  // Two client shapes in the wild: the web settings page PATCHes the fields flat
+  // at the top level, mobile's HospitalSettingsScreen nests them under `settings`.
+  // The nested form used to land in the UPDATE as a literal `settings` column and
+  // fail outright, so mobile could never save settings at all.
+  const incoming: Record<string, unknown> = {
+    ...(body.settings && typeof body.settings === 'object' ? body.settings : {}),
+    ...body,
+  }
+
+  const updates: Record<string, unknown> = {}
+  for (const key of EDITABLE_SETTINGS) {
+    if (incoming[key] !== undefined) updates[key] = incoming[key]
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error } = await db.from('hospitals').update(updates as any).eq('id', id)
     if (error) return Errors.internal(error.message)
   }
 

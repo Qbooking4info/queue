@@ -25,12 +25,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
 
   if (!(await assertOwnService(db, caller, serviceId))) return Errors.forbidden()
 
-  const body = await req.json() as {
-    name?: string; description?: string | null; specialty_id?: string | null
-    base_price?: number | null; virtual_price?: number | null; duration_mins?: number | null
-    is_active?: boolean
+  const body = await req.json() as Record<string, unknown>
+
+  // Whitelisted rather than passing `body` straight through: the type annotation
+  // is erased at runtime, so any extra key the client sent — hospital_id and
+  // clinic_id in particular — was written verbatim, letting a caller move a
+  // service to a hospital they don't own after the ownership check had passed.
+  const EDITABLE = ['name', 'description', 'specialty_id', 'base_price', 'virtual_price', 'duration_mins', 'is_active'] as const
+  const updates: Record<string, unknown> = {}
+  for (const key of EDITABLE) {
+    if (body[key] !== undefined) updates[key] = body[key]
   }
-  const { error } = await db.from('services').update(body as any).eq('id', serviceId)
+  if (Object.keys(updates).length === 0) return Errors.validation('No valid fields to update')
+
+  const { error } = await db.from('services').update(updates as any).eq('id', serviceId)
   if (error) return Errors.internal(error.message)
   return NextResponse.json({ success: true })
 }
