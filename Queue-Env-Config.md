@@ -12,6 +12,8 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service-role key — **server-only**; never expose to the browser. Used by `createAdminClient()` to bypass RLS in API routes |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry DSN for error monitoring. Unset = Sentry is fully disabled (no-op init, zero overhead) |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | No | Enables source map upload on build. Unset = build skips upload, no functional change |
+| `CRON_SECRET` | Yes (if ambulance dispatch is live) | Shared secret for `/api/transport/sweep`, the dispatch scheduler tick. Vercel Cron sends it automatically as `Authorization: Bearer <CRON_SECRET>`. **The route fails closed** — if this is unset the sweep returns 401 and stranded searches are never advanced and scheduled transport is never promoted |
+| `MAPBOX_ACCESS_TOKEN` | No | Road-ETA matrix for ambulance dispatch ranking. Unset = dispatch degrades to straight-line distance ranking (logged, not fatal) |
 
 **Template:**
 ```bash
@@ -79,3 +81,5 @@ supabase db push
 | Add service-role key to Vercel environment | Mark as **secret** / server-only |
 | Set `EXPO_PUBLIC_*` in EAS secrets for mobile builds | Via `eas secret:create` |
 | Nominatim `User-Agent` in `/api/geocode` | Already set to `QueueApp/1.0 (qbooking4info@gmail.com)` |
+| Set `CRON_SECRET` on Vercel | Required for `/api/transport/sweep`. `web/vercel.json` schedules it every minute; **minute-level cron needs a Vercel Pro plan** (Hobby caps crons at once per day, which is far too coarse for a 30s offer TTL). If you stay on Hobby, drive the same endpoint from an external scheduler instead — the route is trigger-agnostic |
+| Confirm the sweep is actually firing | `GET /api/transport/sweep` with the bearer secret returns `{advanced, promoted, failed}`. If nothing ever advances, ambulance requests strand in `searching` silently |
