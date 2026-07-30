@@ -24,5 +24,9 @@ yarn-error.log*
 # Local build artifacts
 *.apk
 
+# Dev-server launch logs (Expo/Metro startup output) — machine-local, and they
+# capture whichever env vars that run happened to export.
+*.launch.log
+
 # Leftover isolated agent worktrees (Agent tool, isolation: "worktree")
 .claude/worktrees/
