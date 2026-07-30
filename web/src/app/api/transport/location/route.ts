@@ -12,6 +12,8 @@ import { Errors } from '@/lib/api-error'
  * Validation (drift, impossible jumps, stale fixes) lives in
  * record_unit_location() so every client gets identical rules.
  */
+const MAX_PINGS_PER_BATCH = 500
+
 export async function POST(req: NextRequest) {
   const db = createAdminClient()
 
@@ -24,6 +26,11 @@ export async function POST(req: NextRequest) {
   const { ambulanceId, pings } = await req.json()
   if (!ambulanceId || !Array.isArray(pings) || !pings.length) {
     return Errors.validation('ambulanceId and a non-empty pings array are required')
+  }
+  // Each ping costs one sequential RPC below, so an unbounded batch is an
+  // open-ended request. A long dead zone still flushes, just across a few calls.
+  if (pings.length > MAX_PINGS_PER_BATCH) {
+    return Errors.validation(`At most ${MAX_PINGS_PER_BATCH} pings per batch`)
   }
 
   const { data: onShift } = await db.from('ambulance_shifts')

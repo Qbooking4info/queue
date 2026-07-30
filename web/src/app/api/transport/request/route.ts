@@ -47,11 +47,18 @@ export async function POST(req: NextRequest) {
     paymentMethod,
   } = body
 
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    return Errors.validation('Pickup coordinates are required')
+  // Range-checked, not just typeof: NaN and Infinity are both `number`, and
+  // NaN reaches Postgres as POINT(NaN NaN) — a 500 on insert rather than a
+  // useful 400. An out-of-range but finite pair is worse: it inserts fine and
+  // silently produces a pickup point no unit can ever be near.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return Errors.validation('Valid pickup coordinates are required')
   }
   if (requestType === 'emergency' && !triageLevel) {
     return Errors.validation('Triage level is required for emergency transport')
+  }
+  if (triageLevel != null && (!Number.isInteger(triageLevel) || triageLevel < 1 || triageLevel > 5)) {
+    return Errors.validation('Triage level must be between 1 and 5')
   }
   if (requestType === 'scheduled' && !scheduledFor) {
     return Errors.validation('scheduledFor is required for scheduled transport')
