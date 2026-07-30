@@ -95,7 +95,7 @@ function mapRow(a: any, v: VitalsRow | undefined) {
 // client-supplied values, and they're just a date range, not an
 // authorization boundary.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()

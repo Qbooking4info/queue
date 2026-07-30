@@ -7,7 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 const ALLOWED_STAFF_ROLES = ['front_desk', 'clinic_admin'] as const
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
 // Update staff profile (name and/or email)
 export async function PATCH(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
 
 // Deactivate a staff member and immediately revoke their sessions
 export async function DELETE(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()

@@ -3,7 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 
+// Must stay in step with mobile/lib/fees.ts, which quotes the patient at
+// checkout. The two can't share a module across the mobile/web boundary, and
+// they previously disagreed: BookingFlowScreen quoted a 1.5x emergency premium
+// while this booked revenue at 2x, so the patient saw one number and the
+// hospital's reporting recorded another.
 const PLATFORM_FEE = 500
+const EMERGENCY_FEE_MULTIPLIER = 2
 
 // Estimated revenue, not a settled-payments ledger -- the app has no payment
 // processing wired up yet (the `payments` table exists but nothing writes to
@@ -17,7 +23,7 @@ function computeAppointmentFee(
   const base = a.booking_mode === 'doctor'
     ? (a.type === 'virtual' ? (a.doctor?.virtual_fee ?? a.doctor?.consultation_fee ?? 0) : (a.doctor?.consultation_fee ?? 0))
     : opdFee
-  const emergencyMultiplier = a.urgency === 'emergency' ? 2 : 1
+  const emergencyMultiplier = a.urgency === 'emergency' ? EMERGENCY_FEE_MULTIPLIER : 1
   return Math.round(base * emergencyMultiplier) + PLATFORM_FEE
 }
 
@@ -42,7 +48,7 @@ async function computeRevenue(
 // clinic) is derived from the server-verified caller, same as
 // GET /api/appointments.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
