@@ -649,13 +649,21 @@ export default function AppointmentsPage() {
   }
 
   async function handleApprove(appt: AdminAppointment) {
-    setPendingActionId(appt.id)
-    try { await patchAppointment(appt.id, 'approve'); await load() } finally { setPendingActionId(null) }
+    setActionError(''); setPendingActionId(appt.id)
+    try {
+      const error = await patchAppointment(appt.id, 'approve')
+      if (error) { setActionError(error); return }
+      await load()
+    } finally { setPendingActionId(null) }
   }
 
   async function handleNoShow(appt: AdminAppointment) {
-    setPendingActionId(appt.id)
-    try { await patchAppointment(appt.id, 'mark_no_show'); await load() } finally { setPendingActionId(null) }
+    setActionError(''); setPendingActionId(appt.id)
+    try {
+      const error = await patchAppointment(appt.id, 'mark_no_show')
+      if (error) { setActionError(error); return }
+      await load()
+    } finally { setPendingActionId(null) }
   }
 
   async function handleCheckIn(appt: AdminAppointment) {
