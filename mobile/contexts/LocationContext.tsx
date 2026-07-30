@@ -19,20 +19,29 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   async function request() {
     setLoading(true)
-    const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-    if (status !== 'granted') { setLoading(false); return }
-    setGranted(true)
-    const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-    setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
-    setLoading(false)
+    try {
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+      if (status !== 'granted') return
+      setGranted(true)
+      const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+      setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
+    } catch {
+      // leave coords null — callers fall back to their own "no location" UI
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     ExpoLocation.getForegroundPermissionsAsync().then(async ({ status }) => {
       if (status === 'granted') {
         setGranted(true)
-        const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-        setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
+        try {
+          const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+          setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
+        } catch {
+          // leave coords null — callers fall back to their own "no location" UI
+        }
       }
       setLoading(false)
     }).catch(() => setLoading(false))

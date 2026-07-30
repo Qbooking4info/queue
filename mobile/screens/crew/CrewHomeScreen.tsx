@@ -73,17 +73,21 @@ export function CrewHomeScreen() {
 
     async function pingOnce() {
       if (!activeJob) return
-      const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-      if (status !== 'granted') return
-      const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-      await sendLocationPing(activeJob.assigned_unit_id, [{
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        heading: pos.coords.heading ?? undefined,
-        speedKmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined,
-        accuracyM: pos.coords.accuracy ?? undefined,
-        recordedAt: new Date(pos.timestamp).toISOString(),
-      }]).catch(err => console.warn('[crew] location ping failed', err))
+      try {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+        if (status !== 'granted') return
+        const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+        await sendLocationPing(activeJob.assigned_unit_id, [{
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading ?? undefined,
+          speedKmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined,
+          accuracyM: pos.coords.accuracy ?? undefined,
+          recordedAt: new Date(pos.timestamp).toISOString(),
+        }])
+      } catch (err) {
+        console.warn('[crew] location ping failed', err)
+      }
     }
 
     pingOnce()
