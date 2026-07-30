@@ -62,8 +62,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const initialLoadDone = useRef(false)
 
+  // Monotonic token for profile loads. fetchProfile is re-entrant — the cold-start
+  // getSession() and the INITIAL_SESSION auth event both fire it, every
+  // TOKEN_REFRESHED fires it again, and refreshProfile() is called from screens —
+  // so two loads are routinely in flight at once. Without this, whichever query
+  // happens to resolve last wins, which lets a stale load overwrite a newer one
+  // and lets a load started before signOut() repopulate user/session *after* the
+  // sign-out cleared them. Every setter below is gated on still being current.
+  const profileSeq = useRef(0)
+
   // MH1: Try user_id first, fall back to auth_user_id
-  async function fetchDoctorProfile(authUid: string, usersRowId: string): Promise<boolean> {
+  async function fetchDoctorProfile(authUid: string, usersRowId: string, seq: number): Promise<boolean> {
+    const current = () => seq === profileSeq.current
     if (usersRowId) {
       const { data: byUserId } = await supabase
         .from('doctors')
@@ -73,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
 
       if (byUserId) {
-        setDoctorProfile({ doctorId: byUserId.id, hospitalId: byUserId.hospital_id, fullName: byUserId.full_name, specialtyId: byUserId.specialty_id ?? null })
+        if (current()) setDoctorProfile({ doctorId: byUserId.id, hospitalId: byUserId.hospital_id, fullName: byUserId.full_name, specialtyId: byUserId.specialty_id ?? null })
         return true
       }
     }
@@ -86,20 +96,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
 
     if (data) {
-      setDoctorProfile({ doctorId: data.id, hospitalId: data.hospital_id, fullName: data.full_name, specialtyId: data.specialty_id ?? null })
+      if (current()) setDoctorProfile({ doctorId: data.id, hospitalId: data.hospital_id, fullName: data.full_name, specialtyId: data.specialty_id ?? null })
       return true
     }
 
-    setDoctorProfile(null)
+    if (current()) setDoctorProfile(null)
     return false
   }
 
-  async function fetchStaffProfile(name: string): Promise<boolean> {
+  async function fetchStaffProfile(name: string, seq: number): Promise<boolean> {
+    const current = () => seq === profileSeq.current
     // Use a SECURITY DEFINER function to bypass RLS on hospital_admins / clinic_admins.
     const { data, error } = await supabase.rpc('get_my_staff_profile')
 
     if (error || !data || data.length === 0) {
-      setStaffProfile(null)
+      if (current()) setStaffProfile(null)
       return false
     }
 
@@ -109,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAdmin     = role === 'admin' || role === 'owner'
     const isCrew      = role === 'ambulance_crew'
 
+    if (!current()) return true
     setStaffProfile({
       role:       isFrontDesk ? 'front_desk' : isCrew ? 'ambulance_crew' : isAdmin ? 'hospital_admin' : 'clinic_admin',
       hospitalId: row.hospital_id,
@@ -120,17 +132,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
-  async function fetchCrewProfile(): Promise<boolean> {
+  async function fetchCrewProfile(seq: number): Promise<boolean> {
+    const current = () => seq === profileSeq.current
     // Same SECURITY DEFINER pattern as fetchStaffProfile — ambulance_crew has
     // no self-read RLS policy, so this must go through an RPC, not a direct query.
     const { data, error } = await supabase.rpc('get_my_crew_profile')
 
     if (error || !data || data.length === 0) {
-      setCrewProfile(null)
+      if (current()) setCrewProfile(null)
       return false
     }
 
     const row = data[0]
+    if (!current()) return true
     setCrewProfile({
       crewId:       row.crew_id,
       providerId:   row.provider_id,
@@ -142,28 +156,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function fetchProfile(authId: string) {
+    const seq = ++profileSeq.current
+    const current = () => seq === profileSeq.current
+
+    // maybeSingle, not single: doctor accounts may legitimately have no users
+    // row, and single() turns that expected case into a logged error.
     const { data } = await supabase
       .from('users')
       .select('*')
       .eq('auth_id', authId)
-      .single()
+      .maybeSingle()
 
+    if (!current()) return
     setUser(data ?? null)
 
     // Always check doctor first — doctor accounts may not have a users row
-    const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '')
+    const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '', seq)
     if (!isDoctor) {
-      const isStaff = await fetchStaffProfile(data?.full_name ?? '')
+      const isStaff = await fetchStaffProfile(data?.full_name ?? '', seq)
       if (!isStaff) {
-        const isCrew = await fetchCrewProfile()
+        const isCrew = await fetchCrewProfile(seq)
         // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
-        if (isCrew) setStaffMode(true)
-      } else {
+        if (isCrew && current()) setStaffMode(true)
+      } else if (current()) {
         setCrewProfile(null)
         setStaffMode(true)
       }
-    } else {
-      // Doctors auto-enter specialist mode
+    } else if (current()) {
+      // Doctors auto-enter specialist mode. staffProfile is cleared explicitly
+      // here because the staff lookup is skipped on this branch, so a profile
+      // left over from a previously signed-in staff account would survive.
+      setStaffProfile(null)
       setCrewProfile(null)
       setStaffMode(true)
     }
@@ -227,6 +250,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // Invalidate any profile load still in flight before clearing state —
+    // otherwise it resolves after this and repopulates user/staffProfile for
+    // the account that just signed out.
+    profileSeq.current++
     setStaffMode(false)
     setPendingHospitalOnboarding(false)
     setDoctorProfile(null)

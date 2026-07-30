@@ -1,5 +1,6 @@
 import { supabase, publicDb } from './supabase'
 import type { Hospital, Doctor, Appointment, TimeSlot } from '../types/database'
+import { todayLocalDate } from './format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -216,6 +217,25 @@ export async function isDailyBookingLimitReached(
   return (data as boolean) ?? false
 }
 
+// ── Booking references ───────────────────────────────────────────────────────
+
+/**
+ * `${prefix}-${Date.now().toString().slice(-6)}` was the old scheme: the low 6
+ * digits of epoch-ms wrap every 10^6 ms, so any two bookings made ~16m 40s
+ * apart collide outright, and concurrent bookings in the same millisecond
+ * always do. The web walk-in route already moved off this (randomBytes(4));
+ * mobile is the last caller, and it has no `crypto` module, so this uses
+ * Math.random — a booking ref only needs to be collision-resistant, not
+ * unguessable (nothing authorizes off it).
+ *
+ * 8 base36 chars ≈ 2.8e12 values, so a collision needs ~2 million bookings
+ * before it's even likely.
+ */
+function bookingRefFor(prefix: string): string {
+  const rand = () => Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0')
+  return `${prefix}-${(rand() + rand()).toUpperCase()}`
+}
+
 // ── Appointments ─────────────────────────────────────────────────────────────
 
 export type AppointmentWithRelations = Appointment & {
@@ -252,7 +272,7 @@ export async function getAppointmentById(appointmentId: string): Promise<Appoint
 export async function getNextAppointment(
   patientId: string
 ): Promise<AppointmentWithRelations | null> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocalDate()
   const { data } = await supabase
     .from('appointments')
     .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
@@ -288,7 +308,7 @@ export async function createAppointment(payload: {
   approvalMode?:       string    // 'auto' | 'manual' — from hospital settings
   paymentMethod?:      string
 }): Promise<BookingResult> {
-  const bookingRef     = `QUE-${Date.now().toString().slice(-6)}`
+  const bookingRef     = bookingRefFor('QUE')
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
   const status         = approvalStatus === 'auto_approved' ? 'confirmed' : 'pending'
 
@@ -340,7 +360,7 @@ export async function createHospitalAppointment(payload: {
   type?:               'in-person' | 'virtual'
   paymentMethod?:      string
 }): Promise<BookingResult> {
-  const bookingRef     = `OPD-${Date.now().toString().slice(-6)}`
+  const bookingRef     = bookingRefFor('OPD')
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
   const status         = 'pending'
 
@@ -421,7 +441,7 @@ export async function rescheduleAppointment(payload: {
   approvalMode?:  string
   paymentMethod?: string
 }): Promise<BookingResult> {
-  const bookingRef     = `RSC-${Date.now().toString().slice(-6)}`
+  const bookingRef     = bookingRefFor('RSC')
   const approvalStatus = payload.approvalMode === 'manual' ? 'pending_approval' : 'auto_approved'
 
   const { data, error } = await supabase
