@@ -22,7 +22,29 @@ export interface LatLng {
 const MATRIX_TIMEOUT_MS = 2500
 const CACHE_TTL_MS = 90_000
 
+const CACHE_MAX_ENTRIES = 500
+
 const cache = new Map<string, { etas: (number | null)[]; at: number }>()
+
+/**
+ * Bounded, or a long-lived server instance accumulates one entry per distinct
+ * unit-set/pickup pair for the life of the process. Drops expired entries
+ * first, then the oldest, since Map preserves insertion order.
+ */
+function rememberEtas(key: string, etas: (number | null)[]) {
+  if (cache.size >= CACHE_MAX_ENTRIES) {
+    const now = Date.now()
+    for (const [k, v] of cache) {
+      if (now - v.at >= CACHE_TTL_MS) cache.delete(k)
+    }
+    while (cache.size >= CACHE_MAX_ENTRIES) {
+      const oldest = cache.keys().next()
+      if (oldest.done) break
+      cache.delete(oldest.value)
+    }
+  }
+  cache.set(key, { etas, at: Date.now() })
+}
 
 export async function roadEtas(
   origins: LatLng[],
@@ -62,7 +84,7 @@ export async function roadEtas(
       return typeof v === 'number' ? Math.round(v) : null
     })
 
-    cache.set(key, { etas, at: Date.now() })
+    rememberEtas(key, etas)
     return etas
   } catch (err) {
     console.warn('[dispatch] routing matrix failed, degrading to distance', err)
@@ -80,11 +102,18 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   }
 }
 
-/** ~100 m grid. Finer than this and the cache never hits. */
+/**
+ * ~100 m grid. Finer than this and the cache never hits.
+ *
+ * Order sensitive on purpose: the cached value is an ETA array indexed
+ * positionally against `origins`. Sorting here would let a later round with the
+ * same units in a different order hit the entry and hand each unit another
+ * unit's ETA — i.e. dispatch the wrong ambulance.
+ */
 function cacheKey(origins: LatLng[], dest: LatLng): string {
   const q = (n: number) => n.toFixed(3)
   return [
-    ...origins.map((o) => `${q(o.lat)},${q(o.lng)}`).sort(),
+    ...origins.map((o) => `${q(o.lat)},${q(o.lng)}`),
     `>${q(dest.lat)},${q(dest.lng)}`,
   ].join('|')
 }

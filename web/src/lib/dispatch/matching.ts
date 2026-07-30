@@ -122,13 +122,17 @@ export function hardFilter(
     if (!c.capabilities.includes(cap)) return "missing_capability";
   }
 
+  // Checked before the shift math below, which would otherwise substitute a
+  // bogus 0 s ETA for a unit we have no position for and reject it as
+  // "shift_too_short" — the wrong reason, and one that reads as a rota problem
+  // rather than the telemetry gap it actually is.
+  if (c.etaSeconds === null && !(c.straightLineMeters > 0)) return "no_eta";
+
   // A crew timing out mid transport is worse than a slower ETA, so a unit that
   // cannot finish the job inside its shift is excluded outright, not penalized.
   const etaMs = (c.etaSeconds ?? estimateEtaSeconds(c.straightLineMeters)) * 1000;
   const finishesAt = req.referenceTime + etaMs + req.estimatedJobDurationSec * 1000;
   if (finishesAt > c.shiftEndsAt) return "shift_too_short";
-
-  if (c.etaSeconds === null && c.straightLineMeters <= 0) return "no_eta";
 
   return null;
 }

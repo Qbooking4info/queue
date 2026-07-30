@@ -238,10 +238,15 @@ async function notifyCrews(
   const rows: Array<{ user_id: string; title: string; body: string; type: string; data: Record<string, string | number> }> = []
 
   for (const offer of offers) {
-    const shift = (crew ?? []).find((s) => s.ambulance_id === offer.ambulance_id)
-    for (const sc of shift?.ambulance_shift_crew ?? []) {
+    // Every currently-open shift on the unit, not just the first match — a
+    // handover window puts two overlapping shift rows on one ambulance, and
+    // find() would silently page only one of the two crews.
+    const shifts = (crew ?? []).filter((s) => s.ambulance_id === offer.ambulance_id)
+    const notified = new Set<string>()
+    for (const sc of shifts.flatMap((s) => s.ambulance_shift_crew ?? [])) {
       const userId = sc?.ambulance_crew?.user_id
-      if (!userId) continue
+      if (!userId || notified.has(userId)) continue
+      notified.add(userId)
       rows.push({
         user_id: userId,
         title: 'New dispatch offer',
