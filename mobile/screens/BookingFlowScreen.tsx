@@ -14,6 +14,7 @@ import {
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
+import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 import type { Clinic, BookingResult, DayHours } from '../lib/api'
@@ -145,12 +146,16 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   }, [isEmergency, hospital?.id])
 
   // Step 3 — schedule
-  const [selectedDate, setSelectedDate] = useState(DATES[0].iso)
+  // DATES can legitimately come back empty once real hours load (a clinic whose
+  // hours mark every day closed, or misconfigured hours that hit getBookingDates'
+  // maxOffset cap), so every read of DATES[0] has to tolerate undefined rather
+  // than throw mid-flow.
+  const [selectedDate, setSelectedDate] = useState(DATES[0]?.iso ?? '')
 
   // Force today the moment urgency becomes emergency — an emergency booking can't be for
   // a future date, even if the patient had already picked one before switching urgency.
   useEffect(() => {
-    if (isEmergency) setSelectedDate(DATES[0].iso)
+    if (isEmergency && DATES[0]) setSelectedDate(DATES[0].iso)
   }, [isEmergency])
   const [opdSlot,      setOpdSlot]      = useState<typeof ALL_OPD_SLOTS[0] | null>(null)
   const [preferredDoc, setPreferredDoc] = useState<any | null>(null)
@@ -222,8 +227,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const baseFee        = bookingType === 'virtual'
     ? (preferredDoc?.virtual_fee ?? preferredDoc?.consultation_fee ?? 0)
     : (hospital?.opd_fee ?? 0)
-  const emergencyExtra = urgency === 'emergency' ? Math.round(baseFee * 0.5) : 0
-  const totalFee       = baseFee + emergencyExtra + 500
+  const emergencyExtra = isEmergency ? emergencyPremium(baseFee) : 0
+  const totalFee       = totalBookingFee(baseFee, isEmergency)
 
   // Once emergency is flagged at a multi-clinic hospital, only the hospital's designated
   // Emergency Department clinic is selectable — every other clinic (specialist or OPD) is
@@ -278,6 +283,10 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const effectiveDailyLimit = selectedClinic ? selectedClinic.daily_booking_limit : (hospital?.daily_booking_limit ?? null)
   useEffect(() => {
     if (step !== STEP_SCHEDULE || !hospital) return
+    // Cancellation guard: switching clinic re-fires this before the previous
+    // batch settles, and without it whichever batch resolves last wins — so a
+    // stale clinic's fullness map can overwrite the current one.
+    let cancelled = false
     setCheckingLim(true)
     Promise.all(
       DATES.map(d =>
@@ -287,11 +296,18 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         }))
       )
     ).then(results => {
+      if (cancelled) return
       const map: Record<string, boolean> = {}
       results.forEach(r => { map[r.date] = r.full })
       setDateFullMap(map)
-      setCheckingLim(false)
+    }).catch(err => {
+      // Without this, a single rejected lookup leaves checkingLim stuck true
+      // and the schedule step spinning forever with no way to recover.
+      console.warn('[BookingFlow] daily limit check failed:', err)
+    }).finally(() => {
+      if (!cancelled) setCheckingLim(false)
     })
+    return () => { cancelled = true }
   }, [step, bookingType, hospital?.id, selectedClinic?.id, effectiveDailyLimit])
 
   // Load clinics when entering STEP_DETAILS for multi-clinic hospitals
@@ -383,18 +399,27 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         paymentMethod:      payMethod,
       })
     } else {
-      // Virtual with preferred doctor — queue-based, no DB slot needed
+      // Virtual with preferred doctor — queue-based, no DB slot needed.
+      // clinicId/symptomDescription/clinicApprovalMode are passed here for the
+      // same reasons as the two branches above: without clinicId the booking
+      // loses its clinic association entirely (clinic-scoped staff queries filter
+      // on clinic_id), and using hospital.approval_mode directly skipped the
+      // "specialist clinic forces manual approval" rule that clinicApprovalMode
+      // encodes — so a specialist booking could auto-confirm purely because the
+      // patient also picked a preferred doctor.
       result = await createAppointment({
         patientId:    user.id,
         doctorId:     preferredDoc.id,
         hospitalId:   String(hospital.id),
         slotId:       null,
+        clinicId:     selectedClinic?.id,
         date:         selectedDate,
         startTime:    arrivalTime,
         type:         'virtual',
         reason,
         urgency,
-        approvalMode: hospital.approval_mode ?? 'auto',
+        symptomDescription: referralNote || undefined,
+        approvalMode: clinicApprovalMode,
         paymentMethod: payMethod,
       })
     }
@@ -1060,7 +1085,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 {[
                   { label: bookingType === 'virtual' ? 'Consultation fee' : 'OPD fee', value: `₦${baseFee.toLocaleString()}` },
                   { label: 'Platform fee', value: '₦500' },
-                  ...(emergencyExtra > 0 ? [{ label: 'Emergency premium (0.5×)', value: `₦${emergencyExtra.toLocaleString()}` }] : []),
+                  ...(emergencyExtra > 0 ? [{ label: `Emergency premium (${EMERGENCY_FEE_MULTIPLIER}×)`, value: `₦${emergencyExtra.toLocaleString()}` }] : []),
                 ].map(item => (
                   <View key={item.label} style={[s.cardRow, { borderBottomColor: t.cardBorder }]}>
                     <Text style={[s.cardLabel, { color: t.textMuted }]}>{item.label}</Text>

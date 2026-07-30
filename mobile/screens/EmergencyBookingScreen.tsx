@@ -10,6 +10,7 @@ import { useLocation } from '../contexts/LocationContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents, findEmergencyClinic } from '../lib/api'
 import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
+import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
 interface Props { navigation: any }
@@ -19,9 +20,12 @@ const STEPS = ['Triage', 'Hospital', 'Payment']
 // Every booking made through this screen is, by definition, an emergency — there is no
 // tier to pick. A separate "urgent" tier was removed because patients confused it with
 // emergency and expected the same queue-jump priority, which it never actually granted.
+// multiplier/badge derive from lib/fees so this screen and BookingFlowScreen
+// can't drift apart on price again — they previously disagreed (2x here, 1.5x
+// there) for the same emergency booking.
 const EMERGENCY_TIER = {
   id: 'emergency' as const, label: 'Emergency',
-  multiplier: 2.0, badge: '2× fee', color: '#FF5C5C',
+  multiplier: EMERGENCY_FEE_MULTIPLIER, badge: `${EMERGENCY_FEE_MULTIPLIER}× fee`, color: '#FF5C5C',
 }
 
 function fmtLocalDate(d: Date): string {
@@ -130,8 +134,8 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
   const u = EMERGENCY_TIER
   const baseFee   = selectedHospital?.opd_fee ?? 15000
-  const premium   = Math.round(baseFee * (u.multiplier - 1))
-  const total     = baseFee + premium + 500
+  const premium   = emergencyPremium(baseFee)
+  const total     = totalBookingFee(baseFee, true)
   const isAmbulance = arrival === AMBULANCE_ARRIVAL
 
   // Load hospitals genuinely available right now — 24/7 emergency_hours hospitals always

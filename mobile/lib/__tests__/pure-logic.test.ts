@@ -3,6 +3,7 @@
 jest.mock('../supabase')
 
 import { isOpenNow, findEmergencyClinic, type DayHours, type Clinic } from '../api'
+import { totalBookingFee, emergencyPremium, EMERGENCY_FEE_MULTIPLIER, PLATFORM_FEE } from '../fees'
 
 function hoursAllOpen(): DayHours[] {
   return Array.from({ length: 7 }, (_, day) => ({ day, open: '08:00', close: '18:00', closed: false }))
@@ -74,5 +75,34 @@ describe('findEmergencyClinic', () => {
   it('returns null when no clinic is flagged or named like an emergency department', () => {
     const clinics = [clinic({ id: 'a', name: 'General OPD' }), clinic({ id: 'b', name: 'Pediatrics' })]
     expect(findEmergencyClinic(clinics)).toBeNull()
+  })
+})
+
+// ── Booking fees ─────────────────────────────────────────────────────────────
+// These two screens quoted different prices for the same emergency booking
+// (2x in EmergencyBookingScreen, 1.5x in BookingFlowScreen) while the server
+// booked revenue at 2x. Locked down here because the drift was silent — both
+// numbers looked plausible in isolation.
+
+describe('booking fees', () => {
+  it('charges only the flat platform fee on top of base for a routine booking', () => {
+    expect(totalBookingFee(10000, false)).toBe(10500)
+  })
+
+  it('doubles the base fee for an emergency, matching the server revenue calc', () => {
+    // web/src/app/api/appointments/stats/route.ts: base * 2 + PLATFORM_FEE
+    expect(totalBookingFee(10000, true)).toBe(20500)
+  })
+
+  it('derives the premium from the multiplier rather than a hardcoded fraction', () => {
+    expect(emergencyPremium(10000)).toBe(10000 * (EMERGENCY_FEE_MULTIPLIER - 1))
+  })
+
+  it('rounds the premium to whole naira', () => {
+    expect(Number.isInteger(emergencyPremium(3333))).toBe(true)
+  })
+
+  it('treats a zero base fee as platform-fee-only, even for an emergency', () => {
+    expect(totalBookingFee(0, true)).toBe(PLATFORM_FEE)
   })
 })
