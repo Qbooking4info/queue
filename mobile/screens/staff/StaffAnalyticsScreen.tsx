@@ -8,6 +8,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useTheme }  from '../../contexts/ThemeContext'
 import { useAuth }   from '../../contexts/AuthContext'
 import { supabase }  from '../../lib/supabase'
+import { todayLocalDate } from '../../lib/format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -57,7 +58,7 @@ export function StaffAnalyticsScreen() {
     if (!silent) setLoading(true)
     const { from, to } = getBounds(range)
     const year = new Date().getFullYear()
-    const ytdTo = new Date().toISOString().split('T')[0]
+    const ytdTo = todayLocalDate()
 
     try {
       const { data: { session } } = await supabase.auth.getSession()

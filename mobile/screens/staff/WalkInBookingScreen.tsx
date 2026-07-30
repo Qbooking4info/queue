@@ -8,6 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
+import { todayLocalDate } from '../../lib/format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -98,7 +99,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
       const jwt = session?.access_token
       if (!jwt) throw new Error('Not authenticated')
 
-      const today = new Date().toISOString().split('T')[0]
+      const today = todayLocalDate()
       const now   = new Date()
       const startTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 

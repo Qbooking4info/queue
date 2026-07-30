@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 import { randomBytes } from 'crypto'
 
 // Only auto-links (or surfaces via lookup) a patient who has an existing
@@ -38,7 +39,7 @@ async function findLinkablePatient(
 // super_admin excluded: patient contact details are PHI and super_admin
 // has no operational need to query individual patients.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
+  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
 // POST — front desk creates a walk-in appointment.
 // super_admin excluded: walk-in intake creates patient records (PHI).
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'])
+  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
@@ -138,14 +139,20 @@ export async function POST(req: NextRequest) {
         : null
 
     if (maxMonthly !== null) {
-      // BL4: count by appointment_date in the current month, not created_at
-      const monthStart = new Date()
-      monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-      const monthStartDate = monthStart.toISOString().split('T')[0]
+      // BL4: count by appointment_date in the current month, not created_at.
+      // fmtLocalDate, not toISOString(): the latter converts to UTC first, so in
+      // WAT (UTC+1) the 1st at 00:00 local serializes as the *previous* month's
+      // last day, quietly widening the window by a day.
+      const now = new Date()
+      const monthStartDate = fmtLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
+      // Upper bound too: without it, appointments booked into future months
+      // counted against this month's cap.
+      const nextMonthDate = fmtLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 1))
       const { count } = await db.from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospitalId)
         .gte('appointment_date', monthStartDate)
+        .lt('appointment_date', nextMonthDate)
         .neq('status', 'cancelled')
       if ((count ?? 0) >= maxMonthly) return Errors.planLimitMonthly(maxMonthly)
     }

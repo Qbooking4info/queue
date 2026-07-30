@@ -9,6 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
+import { todayLocalDate } from '../../lib/format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -68,7 +69,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
   const [search,     setSearch]     = useState('')
 
   const hospitalId = staffProfile?.hospitalId
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocalDate()
 
   const load = useCallback(async (silent = false) => {
     if (!hospitalId) return

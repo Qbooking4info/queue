@@ -8,6 +8,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment } from '@/lib/admin-api'
 import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video, Wallet } from 'lucide-react'
+import { todayLocalDate } from '@/lib/dashboard-utils'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -51,7 +52,7 @@ export default function AnalyticsPage() {
     if (!hospital?.id) return
     setLoading(true)
     const year = new Date().getFullYear()
-    const ytdTo = new Date().toISOString().split('T')[0]
+    const ytdTo = todayLocalDate()
     const [statsRes, apptsRes, ytdRes] = await Promise.all([
       fetch(`/api/appointments/stats?from=${bounds.from}&to=${bounds.to}`),
       fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`),

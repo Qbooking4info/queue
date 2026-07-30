@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
+import { todayLocalDate } from '@/lib/dashboard-utils'
 
 // DELETE all unbooked future slots for a doctor.
 // Separated from the main schedule endpoint because it is destructive.
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     .single()
   if (!doctor) return Errors.notFound('Doctor')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocalDate()
 
   const { error, count } = await db.from('time_slots')
     .delete({ count: 'exact' })

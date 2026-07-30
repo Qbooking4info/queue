@@ -9,6 +9,7 @@ import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
+import { todayLocalDate } from '../../lib/format'
 
 interface ApptRow {
   id:               string
@@ -69,7 +70,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     if (!doctorProfile) return
     if (!silent) setLoading(true)
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocalDate()
 
     const { data } = await supabase.rpc('get_doctor_queue', {
       p_doctor_id: doctorProfile.doctorId,

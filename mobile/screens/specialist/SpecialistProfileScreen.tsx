@@ -8,6 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
+import { todayLocalDate } from '../../lib/format'
 
 interface Props { navigation?: any }
 
@@ -50,7 +51,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           .eq('id', doctorProfile!.doctorId)
           .single() as any,
         (async () => {
-          const today   = new Date().toISOString().split('T')[0]
+          const today   = todayLocalDate()
           const monthStart = today.slice(0, 7) + '-01'
 
           const [todayRes, monthRes, completedRes] = await Promise.all([

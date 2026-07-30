@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { fmtLocalDate, todayLocalDate } from '@/lib/dashboard-utils'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
     const openMins = oh * 60 + om
     const closeMins = ch * 60 + cm
 
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = fmtLocalDate(date)
 
     // Clamp the requested [start_time, end_time] to the clinic/hospital's
     // actual open window for this day of week.
@@ -190,7 +191,7 @@ export async function GET(req: NextRequest) {
   const doctor_id = req.nextUrl.searchParams.get('doctor_id')
   if (!doctor_id) return Errors.validation('doctor_id is required')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocalDate()
 
   const { data: slots } = await db.from('time_slots')
     .select('id, slot_date, start_time, end_time, is_virtual, booked_count, max_capacity, is_available')

@@ -9,6 +9,7 @@ import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
+import { todayLocalDate } from '../../lib/format'
 
 interface Appt {
   id:               string
@@ -65,7 +66,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     if (!hospitalId) return
     if (!silent) setLoading(true)
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocalDate()
     let query = supabase
       .from('appointments')
       .select('id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
@@ -149,7 +150,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     }
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocalDate()
 
   // Client-side search filter (no API call)
   const filtered = search.trim()
