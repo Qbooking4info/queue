@@ -4,6 +4,7 @@ import {
   StyleSheet, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -36,6 +37,13 @@ export function LoginScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+
+          {/* Back to role select */}
+          {navigation?.canGoBack?.() && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+              <Ionicons name="arrow-back" size={20} color={t.textMuted} />
+            </TouchableOpacity>
+          )}
 
           {/* Logo */}
           <View style={s.logoWrap}>
@@ -111,6 +119,7 @@ export function LoginScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   safe:       { flex: 1 },
   scroll:     { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
+  backBtn:    { position: 'absolute', top: 16, left: 16, zIndex: 10, padding: 4 },
   logoWrap:   { alignItems: 'center', marginBottom: 32 },
   logoBox:    { width: 64, height: 64, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   logoText:   { fontSize: 28, fontWeight: '900' },
