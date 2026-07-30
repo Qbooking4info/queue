@@ -81,5 +81,6 @@ supabase db push
 | Add service-role key to Vercel environment | Mark as **secret** / server-only |
 | Set `EXPO_PUBLIC_*` in EAS secrets for mobile builds | Via `eas secret:create` |
 | Nominatim `User-Agent` in `/api/geocode` | Already set to `QueueApp/1.0 (qbooking4info@gmail.com)` |
-| Set `CRON_SECRET` on Vercel | Required for `/api/transport/sweep`. `web/vercel.json` schedules it every minute; **minute-level cron needs a Vercel Pro plan** (Hobby caps crons at once per day, which is far too coarse for a 30s offer TTL). If you stay on Hobby, drive the same endpoint from an external scheduler instead — the route is trigger-agnostic |
+| Set `CRON_SECRET` on Vercel | Required for `/api/transport/sweep` |
+| **Schedule `/api/transport/sweep`** | **Nothing drives it yet.** A `web/vercel.json` cron was tried and Vercel **failed the entire deployment** — sub-daily crons are Pro-only and a Hobby project rejects the config outright rather than warning. On Pro, add `web/vercel.json` with `{"crons":[{"path":"/api/transport/sweep","schedule":"* * * * *"}]}`. On Hobby, point an external scheduler at the endpoint every ~60s with the bearer secret. Until one of these is done, ignored dispatch offers strand ambulance requests in `searching` and scheduled transport is never promoted |
 | Confirm the sweep is actually firing | `GET /api/transport/sweep` with the bearer secret returns `{advanced, promoted, failed}`. If nothing ever advances, ambulance requests strand in `searching` silently |

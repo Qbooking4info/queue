@@ -25,6 +25,21 @@ import { runDispatchRound } from '@/lib/dispatch/engine'
  * by the request's own status and by the "already offered" check per unit, so a
  * duplicate tick is a no-op rather than a second fan-out. Nothing here throws on
  * a single request failing — one bad row must not stop the sweep.
+ *
+ * ── DRIVING THIS ENDPOINT ───────────────────────────────────────────────────
+ * Nothing calls this on a schedule yet. It needs an external trigger roughly
+ * every minute, sending `Authorization: Bearer $CRON_SECRET`.
+ *
+ * A web/vercel.json with a `* * * * *` cron was the original plan, but Vercel
+ * rejects sub-daily crons on the Hobby plan and *fails the whole deployment*
+ * when it sees one — it does not warn and carry on. If this project is on Pro,
+ * re-add:
+ *
+ *   { "crons": [{ "path": "/api/transport/sweep", "schedule": "* * * * *" }] }
+ *
+ * Otherwise point any external scheduler at it. Until something does, ignored
+ * dispatch offers still strand requests in 'searching' and scheduled transport
+ * is still never promoted — the two bugs this endpoint exists to fix.
  */
 
 export const dynamic = 'force-dynamic'
