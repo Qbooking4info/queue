@@ -35,10 +35,14 @@ const FULL_SELECT = `
   assigned_doctor_id, no_show_at, reschedule_deadline, clinic_id,
   refund_pct, walkin_patient_name, walkin_patient_phone,
   queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+  referral_reason,
   patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
   doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
   assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
-  clinic:hospital_clinics!appointments_clinic_id_fkey(name)
+  clinic:hospital_clinics!appointments_clinic_id_fkey(name),
+  referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+  referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+  referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
 `
 
 function mapRow(a: any, v: VitalsRow | undefined) {
@@ -85,6 +89,10 @@ function mapRow(a: any, v: VitalsRow | undefined) {
     doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
     doctor_id: a.doctor?.id ?? a.assigned_doctor_id ?? '',
     specialty_name: a.doctor?.specialty?.name ?? null,
+    referral_reason: a.referral_reason ?? null,
+    referred_by_doctor_name: a.referred_by ? [a.referred_by.title, a.referred_by.full_name].filter(Boolean).join(' ') : null,
+    referring_hospital_name: a.referring_hospital?.name ?? null,
+    referring_clinic_name: a.referring_clinic?.name ?? null,
   }
 }
 
@@ -105,15 +113,22 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to')
   if (!from || !to) return Errors.validation('from and to are required')
 
+  // Single-day queries (from === to, e.g. "today") are the live-queue case: a booking
+  // dated for another day that physically checked in on that day belongs in it too --
+  // same convention as get_doctor_queue and GET /api/appointments/queue. A genuine
+  // multi-day range (analytics, browsing a month) stays scoped to appointment_date only,
+  // so a check-in doesn't make a booking appear to move to a different day's totals.
+  const dateFilter = from === to
+    ? (q: any) => q.or(`appointment_date.eq.${from},check_in_date.eq.${from}`)
+    : (q: any) => q.gte('appointment_date', from).lte('appointment_date', to)
+
   // ── Doctor: only their own appointments ────────────────────────────────────
   if (caller.role === 'doctor') {
     if (!caller.doctorId) return Errors.forbidden()
-    const { data } = await db
+    const { data } = await dateFilter(db
       .from('appointments')
       .select(FULL_SELECT)
-      .eq('doctor_id', caller.doctorId)
-      .gte('appointment_date', from)
-      .lte('appointment_date', to)
+      .eq('doctor_id', caller.doctorId))
       .order('appointment_date', { ascending: false })
       .order('start_time')
     const rows = (data ?? []) as any[]
@@ -124,12 +139,10 @@ export async function GET(req: NextRequest) {
   if (!caller.hospitalId) return Errors.forbidden()
 
   // ── Clinic admin / front desk: scoped to their clinic ──────────────────────
-  let query = db
+  let query = dateFilter(db
     .from('appointments')
     .select(FULL_SELECT)
-    .eq('hospital_id', caller.hospitalId)
-    .gte('appointment_date', from)
-    .lte('appointment_date', to)
+    .eq('hospital_id', caller.hospitalId))
     .order('appointment_date', { ascending: false })
     .order('start_time')
 

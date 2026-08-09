@@ -146,12 +146,18 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
           const { data: { session } } = await supabase.auth.getSession()
           const jwt = session?.access_token
           if (!jwt) throw new Error('Not authenticated')
+          // The API requires a non-empty rejection note (it's shown to the patient in
+          // their refund notification) -- mirrors the generic note the web dashboard's
+          // front-desk reject action sends (rejectPendingApprovalAppointment).
           const res = await fetch(`${API_URL}/api/appointments/${appt.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-            body: JSON.stringify({ action: 'reject' }),
+            body: JSON.stringify({ action: 'reject', note: 'Cancelled by hospital staff' }),
           })
-          if (!res.ok) throw new Error('Rejection failed')
+          if (!res.ok) {
+            const body = await res.json().catch(() => null)
+            throw new Error(body?.error ?? 'Rejection failed')
+          }
           haptics.success()
           load(true)
         } catch (e) {

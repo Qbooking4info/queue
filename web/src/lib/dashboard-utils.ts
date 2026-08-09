@@ -17,10 +17,22 @@ export function calcAge(dob: string | null): number | null {
   return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
 }
 
-// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
-// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
+// Nigeria (WAT) calendar date, not UTC and not the server process's own configured
+// timezone. Two failure modes this avoids:
+//   1. Date#toISOString() shifts to UTC first, which silently rolls back to the
+//      previous day in positive-offset timezones (e.g. WAT, UTC+1).
+//   2. Using Date's local getters (getFullYear/getMonth/getDate) assumes the
+//      *server process itself* is running in WAT -- true on a machine physically
+//      configured for it, false by default on Vercel (defaults to UTC). A request
+//      handled between 00:00-01:00 WAT (23:00-00:00 UTC) would then read as
+//      "today" on a WAT-configured machine but "yesterday" on a UTC one, purely
+//      based on server config, not on what day it actually is in Nigeria. This is
+//      exactly what let a patient's check-in be dated a day early. WAT has no DST,
+//      so a fixed +1h offset off the UTC-agnostic instant (Date.now(), not any
+//      local getter) is correct year-round regardless of server configuration.
 export function fmtLocalDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const wat = new Date(d.getTime() + 60 * 60 * 1000)
+  return `${wat.getUTCFullYear()}-${String(wat.getUTCMonth() + 1).padStart(2, '0')}-${String(wat.getUTCDate()).padStart(2, '0')}`
 }
 
 export function todayLocalDate(): string {

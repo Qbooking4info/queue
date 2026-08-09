@@ -23,6 +23,10 @@ interface ApptRow {
   patient_name:     string | null
   patient_phone:    string | null
   patient_gender:   string | null
+  referral_reason?:         string | null
+  referred_by_doctor_name?: string | null
+  referring_hospital_name?: string | null
+  referring_clinic_name?:   string | null
 }
 
 interface Props { navigation: any }
@@ -263,6 +267,16 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         </View>
         {appt.reason && (
           <Text style={[st.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>
+        )}
+        {appt.referred_by_doctor_name && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+            <Ionicons name="arrow-redo-outline" size={10} color="#5B9EFF" />
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#5B9EFF' }} numberOfLines={1}>
+              {appt.referred_by_doctor_name}
+              {appt.referring_clinic_name ? ` · ${appt.referring_clinic_name}` : ''}
+              {appt.referring_hospital_name ? ` · ${appt.referring_hospital_name}` : ''}
+            </Text>
+          </View>
         )}
       </View>
 

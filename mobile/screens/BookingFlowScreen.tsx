@@ -88,10 +88,10 @@ function getAvailableOpdSlots(dateIso: string) {
 }
 
 const PAYMENT_OPTIONS = [
-  { id: 'card',     icon: 'card-outline',            label: 'Debit / Credit Card',  sub: 'Visa, Mastercard, Verve'   },
-  { id: 'transfer', icon: 'business-outline',        label: 'Bank Transfer',        sub: 'Direct bank payment'       },
-  { id: 'ussd',     icon: 'phone-portrait-outline',  label: 'USSD',                 sub: '*737#, *966#, *000#'       },
-  { id: 'hmo',      icon: 'shield-checkmark-outline',label: 'HMO / Insurance',      sub: 'NHIS, AXA Mansard, Hygeia' },
+  { id: 'card',     icon: 'card-outline'             as const, label: 'Debit / Credit Card',  sub: 'Visa, Mastercard, Verve'   },
+  { id: 'transfer', icon: 'business-outline'         as const, label: 'Bank Transfer',        sub: 'Direct bank payment'       },
+  { id: 'ussd',     icon: 'phone-portrait-outline'   as const, label: 'USSD',                 sub: '*737#, *966#, *000#'       },
+  { id: 'hmo',      icon: 'shield-checkmark-outline' as const, label: 'HMO / Insurance',      sub: 'NHIS, AXA Mansard, Hygeia' },
 ]
 
 // ── BookingFlowScreen ─────────────────────────────────────────────────────────
@@ -1124,7 +1124,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       backgroundColor: active ? t.accentBg : t.cardBg,
                       borderColor:     active ? t.accentBorder : t.cardBorder,
                     }]}>
-                    <Text style={{ fontSize: 20 }}>{p.icon}</Text>
+                    <Ionicons name={p.icon} size={20} color={active ? t.accent : t.textSecondary} />
                     <View style={{ flex: 1 }}>
                       <Text style={[s.payLabel, { color: active ? t.accent : t.textPrimary }]}>{p.label}</Text>
                       <Text style={[s.paySub,   { color: t.textMuted }]}>{p.sub}</Text>

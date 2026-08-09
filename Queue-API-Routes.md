@@ -275,6 +275,16 @@ Returns all clinics for a hospital.
 
 ---
 
+### `GET /api/clinics/{clinicId}/hours`
+Returns a single clinic's operating hours. Not ownership-gated (unlike `GET /api/clinics/{clinicId}` itself, which manages a clinic's own settings) — any authenticated user, same as `GET /api/clinics?hospitalId=`, since reading a clinic you don't belong to is inherent to referring a patient there.
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser()` |
+| Returns | `{ hours: DayHours[], isCustom: boolean }` — `isCustom: false` means this clinic never set its own hours; callers should fall back to the hospital's hours (`GET /api/public/hospitals/{id}/hours`) instead of treating the returned defaults as authoritative |
+
+---
+
 ### `POST /api/clinics`
 Creates a new clinic within a hospital. Optionally creates a clinic_admin account at the same time.
 
@@ -338,6 +348,79 @@ unless `super_admin`; `doctorId`/`clinicId`, if given, must belong to that hospi
 **Returns:** `{ id: uuid, bookingRef: "WLK-XXXXXX", linked: boolean }`
 
 > `linked: true` means the walk-in was matched and linked to an existing patient account.
+
+---
+
+## Referrals
+
+### `POST /api/appointments/refer`
+A doctor refers a patient they're seeing to a different hospital (or a specific doctor
+there) — or to another clinic at their *own* hospital. Unlike every other
+appointment-creation route, there is deliberately no `caller.hospitalId === target
+hospital` check — a referral's whole point is (usually) crossing hospitals, though a
+same-hospital referral to a colleague/clinic is allowed too. Mirrors walk-in's plan
+checks (subscription status, monthly booking cap) but against the *receiving* hospital.
+Rate limited: 20/hour per referring doctor.
+
+`appointmentId` identifies both the patient being referred and (implicitly) the doctor
+relationship — there's no separate `patientId` field. This is deliberate: `patient_id` on
+`appointments` is nullable (null = unregistered walk-in, the common case since most
+patients here are registered by front desk rather than self-booked), so a patientId-based
+API would silently have no way to refer a walk-in at all. Identifying by appointment
+instead works for both, pulling `walkin_patient_name`/`walkin_patient_phone` off that row
+onto the new one when there's no linked account.
+
+If that appointment is (still) `in_progress` at submit time, creating the referral also
+marks it `completed` (and ends its `virtual_sessions` row, if any) in the same request —
+one action ("refer and I'm done with this patient") instead of a separate Refer then
+Complete. Best-effort: if it was already completed/changed by someone else in the
+meantime, the referral itself still succeeds and `originalCompleted` comes back `false`.
+
+| Field | Value |
+|---|---|
+| Auth | `requireRole(['doctor'])` — doctors only |
+| Relationship check | `appointmentId` must belong to the caller (`doctor_id` or `assigned_doctor_id`) at their own hospital — otherwise this becomes a way to book on behalf of any patient on the platform |
+
+**Body:**
+```json
+{
+  "appointmentId": "uuid",
+  "receivingHospitalId": "uuid",
+  "receivingDoctorId": "uuid?",
+  "receivingClinicId": "uuid?",
+  "date": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "type": "in-person | virtual",
+  "reason": "string?",
+  "referralReason": "string",
+  "urgency": "routine | urgent | emergency?",
+  "paymentMethod": "string?"
+}
+```
+
+**Returns:** `{ id: uuid, bookingRef: "REF-XXXXXXXX", approvalStatus: string, originalCompleted: boolean }`
+
+The created appointment has `booking_mode: 'referral'`, `hospital_id`/`doctor_id` set to
+the *receiving* side, and `referred_by_doctor_id`/`referring_hospital_id`/`referring_clinic_id`/
+`referral_reason` set from the caller — see `Queue-Database-Schema.md`.
+`referring_clinic_id` is the *referring* doctor's own clinic (denormalised server-side, not
+client-supplied) — separate from `receivingClinicId`, which targets a clinic on the
+receiving side. `approval_status` follows the receiving hospital's own `approval_mode`,
+same as a patient self-booking.
+
+### `GET /api/public/hospitals/{id}/hours`
+Unauthenticated, same as the sibling `GET /api/public/hospitals/{id}` route. Used by the
+referral UI (web and mobile) to restrict the date/time picker to days the receiving
+hospital is actually open, and to warn (non-blocking) when an emergency referral is being
+sent to a hospital that looks closed right now and has no 24/7 or emergency-hours flag.
+
+| Field | Value |
+|---|---|
+| Auth | None |
+| Returns | `{ hours: DayHours[] }`, `DayHours = { day: 0-6, open: "HH:MM", close: "HH:MM", closed: boolean }` |
+
+An emergency referral skips the date/time picker entirely (sent for today, right now) —
+it doesn't skip the hours *check*, just the manual selection.
 
 ---
 

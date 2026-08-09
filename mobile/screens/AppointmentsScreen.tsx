@@ -13,7 +13,7 @@ import { fmtDate, fmt12 } from '../lib/format'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import { haptics } from '../lib/haptics'
 
-const FILTERS = ['upcoming', 'pending review', 'completed', 'cancelled'] as const
+const FILTERS = ['upcoming', 'pending review', 'missed', 'completed', 'cancelled'] as const
 
 function statusColors(status: string, approvalStatus: string, t: any) {
   if (approvalStatus === 'pending_approval')
@@ -30,6 +30,7 @@ function statusLabel(status: string, approvalStatus: string) {
   if (approvalStatus === 'pending_approval') return 'Awaiting Review'
   if (status === 'in_progress') return 'In progress'
   if (status === 'checked_in')  return 'Checked in'
+  if (status === 'no_show')     return 'Missed'
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
@@ -68,6 +69,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
     if (filter === 'upcoming')
       return ['confirmed', 'pending', 'checked_in', 'in_progress'].includes(a.status)
         && approvalStatus !== 'pending_approval'
+    if (filter === 'missed')    return a.status === 'no_show'
     if (filter === 'completed') return a.status === 'completed'
     if (filter === 'cancelled') return a.status === 'cancelled' || approvalStatus === 'rejected'
     return true
@@ -261,6 +263,15 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                           <Text style={s.virtualTagText}>Virtual</Text>
                         </View>
                       )}
+                    </View>
+                  )}
+
+                  {/* Footer — missed appointment */}
+                  {a.status === 'no_show' && (
+                    <View style={[s.cardFooter, { borderTopColor: t.cardBorder }]}>
+                      <Text style={[s.footerHint, { color: '#FF5C5C' }]}>
+                        {((a as any).reschedule_count ?? 0) < 1 ? 'Tap to reschedule for free' : 'Tap to book a new appointment'}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>

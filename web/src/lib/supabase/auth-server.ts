@@ -55,19 +55,30 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
     if (paRow) {
       caller = { authId, role: 'super_admin' }
     } else {
-      // BC1: filter to admin/owner/ambulance_crew roles only — specialists must not get
-      // hospital_admin privileges
+      // BC1: filter to admin/owner/ambulance_crew/front_desk roles only — specialists must
+      // not get hospital_admin privileges (doctor accounts get a 'specialist' row here too;
+      // they resolve via the doctors fallback below instead).
       // BL2: filter to is_active=true — deactivated admins must not authenticate
+      //
+      // front_desk was missing from this list entirely: a hospital-wide front desk account
+      // (created via setupFrontDeskLogin, web/src/app/dashboard/staff/actions.ts -- the
+      // "Add Front Desk" flow that isn't scoped to one clinic) is a hospital_admins row with
+      // role='front_desk', not a clinic_admins row. Excluded here, it matched neither this
+      // branch nor the clinic_admins fallback below, so `caller` stayed null and every
+      // requireRole()-gated route 403'd for that account -- not just approve/reject, every
+      // dashboard page, since a single failed bootstrap call signs the user out entirely.
       const { data: adminRow } = await db
         .from('hospital_admins')
         .select('hospital_id, role')
         .eq('user_id', profile.id)
-        .in('role', ['admin', 'owner', 'ambulance_crew'])
+        .in('role', ['admin', 'owner', 'ambulance_crew', 'front_desk'])
         .eq('is_active', true)
         .limit(1)
         .single()
       if (adminRow && adminRow.role === 'ambulance_crew') {
         caller = { authId, role: 'ambulance_crew', hospitalId: adminRow.hospital_id }
+      } else if (adminRow && adminRow.role === 'front_desk') {
+        caller = { authId, role: 'front_desk', hospitalId: adminRow.hospital_id }
       } else if (adminRow) {
         caller = { authId, role: 'hospital_admin', hospitalId: adminRow.hospital_id }
       } else {

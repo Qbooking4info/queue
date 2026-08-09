@@ -7,7 +7,7 @@
 // booking flow actually renders.
 const DOCTOR_PUBLIC = 'id, full_name, title, qualification, bio, avatar_url, ' +
   'years_experience, consultation_fee, virtual_fee, accepts_virtual, ' +
-  'avg_rating, review_count, availability_status, ' +
+  'avg_rating, review_count, availability_status, clinic_id, ' +
   'specialty:specialties!doctors_specialty_id_fkey(name, icon)'
 
 const HOSPITAL_PUBLIC = 'id, name, slug, address, city, state, country, phone, whatsapp, ' +

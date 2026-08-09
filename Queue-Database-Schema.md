@@ -94,7 +94,7 @@ Core booking record — one row per appointment.
 | `start_time` | time | no | |
 | `type` | text | no | `in-person` or `virtual` |
 | `status` | text | no | See status values below |
-| `booking_mode` | text | yes | `doctor`, `walkin`, `emergency` |
+| `booking_mode` | text | yes | `doctor`, `hospital`, `walkin`, `referral` |
 | `approval_status` | text | yes | `pending_review`, `approved`, `auto_approved`, `rejected` |
 | `urgency` | text | yes | `routine` or `emergency` |
 | `reason` | text | yes | Patient-provided reason |
@@ -103,12 +103,14 @@ Core booking record — one row per appointment.
 | `diagnosis` | text | yes | Doctor-filled post-consult |
 | `doctor_notes` | text | yes | |
 | `prescription_url` | text | yes | |
-| `queue_position` | integer | yes | |
-| `estimated_wait` | integer | yes | Minutes |
+| `queue_position` | integer | yes | Set only by `renumber_doctor_queue()` (trigger-driven, see below) — app code must not write this directly; it's recomputed for the whole doctor+day queue on every relevant change, not assigned per-row |
+| `estimated_wait` | integer | yes | Minutes. Set alongside `queue_position` by the same trigger |
 | `check_in_date` | date | yes | |
+| `checked_in_at` | timestamptz | yes | Exact moment a row entered `checked_in`/`in_progress`, set once by the `set_checked_in_at` trigger (never overwritten on a later touch, e.g. `assign_doctor`). Queue order is `emergency DESC, checked_in_at ASC` — this is what actually determines queue position, not arrival order into the code path |
 | `consult_started_at` | timestamptz | yes | |
 | `consult_ended_at` | timestamptz | yes | |
-| `consult_duration_secs` | integer | yes | |
+| `consult_duration_secs` | integer | yes | **Generated column** (`round(extract(epoch from consult_ended_at - consult_started_at))`) — cannot be set directly; UPDATE errors with `428C9` if attempted. To close out a consult with an unknown/not-meaningfully-measurable duration, set `consult_ended_at` rather than trying to null this out. Feeds `renumber_doctor_queue()`'s live wait estimate and `GET /api/appointments/stats`'s "Avg Consultation Time" (hospital/clinic/per-doctor, date-range scoped) |
+| `waiting_time_secs` | integer | yes | **Generated column**, same shape as `consult_duration_secs` (`round(extract(epoch from consult_started_at - checked_in_at))`) — check-in to being seen, not check-in to booked appointment time. NULL for any row from before `checked_in_at` existed (20260805000001) or that skipped check-in entirely. Feeds `GET /api/appointments/stats`'s "Avg Wait Time" (same scoping as above) |
 | `vitals_weight_kg` | float8 | yes | |
 | `vitals_height_cm` | float8 | yes | |
 | `vitals_bp_systolic` | integer | yes | |
@@ -118,11 +120,19 @@ Core booking record — one row per appointment.
 | `vitals_recorded_at` | timestamptz | yes | |
 | `walkin_patient_name` | text | yes | Unregistered walk-in only |
 | `walkin_patient_phone` | text | yes | |
-| `booked_by_staff_id` | uuid | yes | FK → clinic_admins |
+| `booked_by_staff_id` | uuid | yes | FK → **users** (confirmed live via a `PGRST201` ambiguous-embed error — this doc previously said clinic_admins, which is wrong; no migration in this repo creates this column or constraint, so it was added directly to prod outside tracked migrations). Any `appointments` query embedding `users(...)` without disambiguating (`users!appointments_patient_id_fkey(...)`) is rejected outright by PostgREST because of this second FK — check any new bare `users(...)` embed on this table for the same failure |
 | `assigned_doctor_id` | uuid | yes | Staff-reassigned doctor |
+| `referred_by_doctor_id` | uuid | yes | FK → doctors. Set when `booking_mode = 'referral'` — the doctor who referred this patient, at whatever hospital they belong to (not this appointment's `hospital_id`, which is the *receiving* hospital) |
+| `referring_hospital_id` | uuid | yes | FK → hospitals. Denormalised from `referred_by_doctor_id`'s hospital at referral time, so the referring hospital's name still displays correctly even if that doctor later moves hospitals or is deactivated |
+| `referring_clinic_id` | uuid | yes | FK → hospital_clinics. Denormalised from `referred_by_doctor_id`'s clinic at referral time — set for both same-hospital clinic-to-clinic transfers and cross-hospital referrals where the referring doctor belongs to a clinic |
+| `referral_reason` | text | yes | Doctor-provided reason for the referral, shown to the receiving hospital separately from `reason`/`symptom_description` |
 | `refund_pct` | integer | yes | 0, 50, or 100 |
 | `cancellation_reason` | text | yes | |
 | `cancelled_at` | timestamptz | yes | |
+| `no_show_at` | timestamptz | yes | Set when status transitions to `no_show`, manually (staff) or automatically (`process_missed_appointments` cron, 2+ days past `appointment_date` with no completion) |
+| `reschedule_deadline` | timestamptz | yes | Set alongside `no_show_at` — informational free-reschedule window (48h), shown to staff; not itself enforced anywhere. The actual reschedule cap is `reschedule_count` below |
+| `rescheduled_from` | uuid | yes | Self-FK → appointments. Set on the *new* row created by a reschedule; the original row gets `status = 'cancelled'` (or is left as-is if it's already terminal, e.g. `no_show`) |
+| `reschedule_count` | integer | no | 0 = original booking, 1 = this row is itself the result of one reschedule. `enforce_reschedule_limit` trigger rejects inserting a reschedule (`rescheduled_from` set) of a row where this is already ≥ 1 — one free reschedule per booking chain, enforced at INSERT time regardless of caller |
 | `reminder_sent_24h` | boolean | yes | |
 | `reminder_sent_1h` | boolean | yes | |
 | `emr_record_id` | text | yes | |
@@ -135,6 +145,15 @@ Core booking record — one row per appointment.
 **DB Triggers:**
 - `appointment_status_guard` — blocks status changes FROM `completed`, `cancelled`, or `no_show`
 - `enforce_plan_booking_limit` — blocks INSERT if hospital has reached plan's `max_monthly_bookings`
+- `enforce_no_duplicate_active_booking` — blocks INSERT of a second active (non-`emergency`) booking for the same patient/dependent at the same hospital (or same clinic, for `multi` clinic_model hospitals)
+- `enforce_reschedule_limit` — blocks INSERT of a reschedule (`rescheduled_from` set) whose original already has `reschedule_count >= 1`; otherwise sets `NEW.reschedule_count = original.reschedule_count + 1`
+- `set_checked_in_at` (BEFORE INSERT OR UPDATE) — stamps `checked_in_at = now()` the first time status enters `checked_in`/`in_progress`; never overwrites an existing value
+- `renumber_queue_after_change` (AFTER INSERT OR UPDATE OF `status`, `doctor_id`, `assigned_doctor_id`, `urgency`, `checked_in_at`) — calls `renumber_doctor_queue()` for every doctor+day a row's change could affect (its current doctor(s), and on UPDATE, whichever it previously belonged to if that changed). Deliberately scoped to those specific columns: `renumber_doctor_queue()`'s own UPDATE only touches `queue_position`/`estimated_wait`, which aren't in that list, so its writes don't re-fire this trigger — omitting that scoping would recurse.
+
+`renumber_doctor_queue(hospital_id, doctor_id, check_in_date)` (function, `SECURITY DEFINER`) — takes `pg_advisory_xact_lock` on `(doctor_id, check_in_date)` first, so two concurrent callers for the same doctor+day serialize instead of both reading the same "0 others ahead" state (this is what previously let two check-ins both land on `queue_position = 1`). Then renumbers *every* `checked_in`/`in_progress` row for that doctor+day via `ROW_NUMBER() OVER (ORDER BY (urgency = 'emergency') DESC, checked_in_at ASC NULLS LAST, created_at, id)` and recomputes `estimated_wait` from each doctor's own average `consult_duration_secs`. Renumbering the whole set (not just assigning a slot to whoever just joined) also means a departure (complete/cancel/no-show) closes the gap for everyone behind them, not just arrivals getting a fresh count.
+
+**pg_cron jobs:**
+- `process-missed-appointments` (`process_missed_appointments()`, daily 03:00 UTC) — 1 day past `appointment_date` with no completion: in-app "want to reschedule?" notification (`type: 'reschedule_prompt'`). 2+ days past: auto-transitions `pending`/`confirmed`/`checked_in` → `no_show` and notifies (`type: 'no_show'`). In-app only — no `pg_net`/`http` extension is installed in this project, so it can't call the Expo push endpoint the way `notifyPatient()` (web) does. Also sweeps stale check-ins independent of `appointment_date`, keyed off `check_in_date` instead (check-in is a real-time event, so "still open past the calendar day it happened" needs no grace period): `checked_in` rows past that day with no `consult_started_at` → `no_show` + notified (they physically showed up but were never seen); `in_progress` rows past that day → `completed` with `consult_ended_at` set (no notification — a routine completion isn't actionable for the patient the way a no-show is). Added after a live incident where `checkInAppointment()` checking a future-dated booking in today (by design, so a walk-in for a different day still joins today's queue) left it invisible to every current-day queue view and blocking new bookings for that patient via `enforce_no_duplicate_active_booking`.
 
 ---
 
@@ -589,3 +608,14 @@ Batch hospital payouts.
 | `20260726000005` | `clinic_admins` identity collapse, prep: fix `vitals_audit_log`'s front-desk policy and `get_doctor_queue` to key on `user_id` instead of the dead `auth_user_id`; `user_id` set NOT NULL |
 | `20260726000006` | `clinic_admins`: drop `auth_user_id` column |
 | `20260726000007` | Add `counter_reconciliation_log` table + `recompute_denormalised_counters()` + nightly `pg_cron` schedule |
+| … | *(`20260727000001` through `20260801000001` predate this list and aren't documented here — pre-existing gap, not introduced this session)* |
+| `20260803000001` | Doctor referrals: add `referred_by_doctor_id`, `referring_hospital_id`, `referral_reason` to `appointments` |
+| `20260803000002` | `get_doctor_queue`: return the new referral columns |
+| `20260804000001` | `Doctors can read own appointments` RLS policy: also match doctors linked via `user_id` (previously `auth_user_id` only) |
+| `20260804000002` | Add `reschedule_count` to `appointments` + `enforce_reschedule_limit` trigger (cap at 1 free reschedule per booking chain) |
+| `20260804000003` | `process_missed_appointments()` + daily pg_cron job: auto no-show (2+ days) and reschedule-prompt notification (1 day) |
+| `20260805000001` | Add `checked_in_at`; `renumber_doctor_queue()` + `set_checked_in_at`/`renumber_queue_after_change` triggers — queue position now ordered by actual check-in time and assigned atomically (fixes duplicate `queue_position` values from the old read-then-write JS computation) |
+| `20260806000001` | Add `waiting_time_secs` generated column (check-in to consultation start), same shape as `consult_duration_secs` |
+| `20260807000001` | Add `referring_clinic_id` to `appointments` — supports same-hospital clinic-to-clinic referrals, not just cross-hospital ones |
+| `20260808000001` | `get_doctor_queue`: return `referring_clinic_name` alongside the existing referral columns |
+| `20260809000001` | `process_missed_appointments()`: also sweep stale `checked_in`/`in_progress` rows by `check_in_date` (independent of `appointment_date`) — `checked_in` past that day with no consult started → `no_show`; `in_progress` past that day → `completed` |

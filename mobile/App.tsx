@@ -46,6 +46,7 @@ import { SupportScreen }               from './screens/SupportScreen'
 import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScreen'
 import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+import { ReferPatientScreen }      from './screens/specialist/ReferPatientScreen'
 
 // react-native-agora is a native module Expo Go can't load at all -- lazy-load
 // these two screens so the rest of the app still runs under Expo Go in dev,
@@ -180,6 +181,7 @@ function SpecialistStack() {
     <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
+      <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
     </DocStack.Navigator>
   )

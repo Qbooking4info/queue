@@ -9,10 +9,14 @@ const QUEUE_SELECT = `
   booking_mode, approval_status, urgency, symptom_description, approval_note,
   assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
   queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+  referral_reason,
   patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
   doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
   assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
-  clinic:hospital_clinics!appointments_clinic_id_fkey(name)
+  clinic:hospital_clinics!appointments_clinic_id_fkey(name),
+  referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+  referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+  referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
 `
 
 function mapQueueRow(a: any) {
@@ -47,6 +51,10 @@ function mapQueueRow(a: any) {
     doctor_name: a.doctor?.full_name ?? (a.assigned_doctor?.full_name ?? 'Unassigned'),
     doctor_id: a.doctor?.id ?? a.assigned_doctor_id ?? '',
     specialty_name: a.doctor?.specialty?.name ?? null,
+    referral_reason: a.referral_reason ?? null,
+    referred_by_doctor_name: a.referred_by ? [a.referred_by.title, a.referred_by.full_name].filter(Boolean).join(' ') : null,
+    referring_hospital_name: a.referring_hospital?.name ?? null,
+    referring_clinic_name: a.referring_clinic?.name ?? null,
   }
 }
 

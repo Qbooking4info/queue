@@ -465,9 +465,14 @@ export type Database = {
           prescription_url: string | null
           queue_position: number | null
           reason: string | null
+          referral_reason: string | null
+          referred_by_doctor_id: string | null
+          referring_clinic_id: string | null
+          referring_hospital_id: string | null
           refund_pct: number | null
           reminder_sent_1h: boolean | null
           reminder_sent_24h: boolean | null
+          reschedule_count: number
           reschedule_deadline: string | null
           rescheduled_from: string | null
           service_id: string | null
@@ -513,9 +518,14 @@ export type Database = {
           prescription_url?: string | null
           queue_position?: number | null
           reason?: string | null
+          referral_reason?: string | null
+          referred_by_doctor_id?: string | null
+          referring_clinic_id?: string | null
+          referring_hospital_id?: string | null
           refund_pct?: number | null
           reminder_sent_1h?: boolean | null
           reminder_sent_24h?: boolean | null
+          reschedule_count?: number
           reschedule_deadline?: string | null
           rescheduled_from?: string | null
           service_id?: string | null
@@ -561,9 +571,14 @@ export type Database = {
           prescription_url?: string | null
           queue_position?: number | null
           reason?: string | null
+          referral_reason?: string | null
+          referred_by_doctor_id?: string | null
+          referring_clinic_id?: string | null
+          referring_hospital_id?: string | null
           refund_pct?: number | null
           reminder_sent_1h?: boolean | null
           reminder_sent_24h?: boolean | null
+          reschedule_count?: number
           reschedule_deadline?: string | null
           rescheduled_from?: string | null
           service_id?: string | null
@@ -625,6 +640,27 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referred_by_doctor_id_fkey"
+            columns: ["referred_by_doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referring_clinic_id_fkey"
+            columns: ["referring_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referring_hospital_id_fkey"
+            columns: ["referring_hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
             referencedColumns: ["id"]
           },
           {
@@ -2860,9 +2896,14 @@ export type Database = {
           prescription_url: string | null
           queue_position: number | null
           reason: string | null
+          referral_reason: string | null
+          referred_by_doctor_id: string | null
+          referring_clinic_id: string | null
+          referring_hospital_id: string | null
           refund_pct: number | null
           reminder_sent_1h: boolean | null
           reminder_sent_24h: boolean | null
+          reschedule_count: number
           reschedule_deadline: string | null
           rescheduled_from: string | null
           service_id: string | null
@@ -2932,6 +2973,27 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referred_by_doctor_id_fkey"
+            columns: ["referred_by_doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referring_clinic_id_fkey"
+            columns: ["referring_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_referring_hospital_id_fkey"
+            columns: ["referring_hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
             referencedColumns: ["id"]
           },
           {

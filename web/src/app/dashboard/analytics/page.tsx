@@ -7,7 +7,7 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import type { AdminAppointment } from '@/lib/admin-api'
-import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video, Wallet } from 'lucide-react'
+import { CalendarDays, CheckCircle2, XCircle, Star, Building2, Video, Wallet, Clock, Stethoscope } from 'lucide-react'
 import { todayLocalDate } from '@/lib/dashboard-utils'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -31,6 +31,20 @@ function computeTypeBreakdown(appts: AdminAppointment[]) {
   return { virtual, inperson }
 }
 
+interface DoctorWaitConsultStats {
+  doctorId: string
+  doctorName: string
+  avgWaitMinutes: number | null
+  avgConsultMinutes: number | null
+  sampleSize: number
+}
+
+function fmtMinutes(m: number | null): string {
+  if (m == null) return '—'
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
+
 export default function AnalyticsPage() {
   const { theme: C } = useTheme()
   const { hospital, stats, role } = useAdmin()
@@ -42,7 +56,11 @@ export default function AnalyticsPage() {
 
   const [range, setRange]       = useState<DateRangeKey>('this_month')
   const [bounds, setBounds]     = useState<DateBounds>(getDateBounds('this_month'))
-  const [rangeStats, setRangeStats] = useState({ total: 0, completed: 0, cancelled: 0, pending: 0, revenue: 0 })
+  const [rangeStats, setRangeStats] = useState({
+    total: 0, completed: 0, cancelled: 0, pending: 0, revenue: 0,
+    avgWaitMinutes: null as number | null, avgConsultMinutes: null as number | null,
+    doctorStats: [] as DoctorWaitConsultStats[],
+  })
   const [appts, setAppts]           = useState<AdminAppointment[]>([])
   const [loading, setLoading]       = useState(true)
   const [ytdMonths, setYtdMonths]   = useState<string[]>([])
@@ -123,6 +141,17 @@ export default function AnalyticsPage() {
         <StatCard icon={<Wallet size={18} />} label="Est. Revenue"
           value={loading ? '…' : `₦${rangeStats.revenue.toLocaleString()}`}
           sub="From completed visits" colorKey="accent" />
+      </div>
+
+      {/* Wait time / consultation time — checked_in_at -> consult_started_at -> consult_ended_at.
+          Same numbers that drive each doctor's live queue wait estimate (renumber_doctor_queue). */}
+      <div className="dash-half-grid" style={{ marginBottom: 22 }}>
+        <StatCard icon={<Clock size={18} />} label="Avg Wait Time"
+          value={loading ? '…' : fmtMinutes(rangeStats.avgWaitMinutes)}
+          sub="Check-in to consultation start" colorKey="blue" />
+        <StatCard icon={<Stethoscope size={18} />} label="Avg Consultation Time"
+          value={loading ? '…' : fmtMinutes(rangeStats.avgConsultMinutes)}
+          sub="Start to end of consultation" colorKey="accent" />
       </div>
 
       {/* Breakdown + charts */}
@@ -218,6 +247,44 @@ export default function AnalyticsPage() {
             </div>
           )
         })()}
+      </div>
+
+      {/* Wait time / consultation time by doctor — same source data as the KPI tiles above,
+          broken out per doctor so a hospital/clinic admin can see which doctors run long
+          consults or keep patients waiting, not just the aggregate. */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Wait &amp; Consultation Time by Doctor</div>
+        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 18 }}>Selected period · averaged per doctor</div>
+        {loading ? (
+          <div style={{ color: C.textMuted, fontSize: 13 }}>Loading…</div>
+        ) : rangeStats.doctorStats.length === 0 ? (
+          <div style={{ color: C.textMuted, fontSize: 13 }}>No completed consultations with timing data for this period yet</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  {['Doctor', 'Avg Wait', 'Avg Consultation', 'Visits'].map((h, i) => (
+                    <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: '8px 10px',
+                      fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rangeStats.doctorStats.map(d => (
+                  <tr key={d.doctorId} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '10px', color: C.text, fontWeight: 600 }}>{d.doctorName}</td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: C.textSub }}>{fmtMinutes(d.avgWaitMinutes)}</td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: C.textSub }}>{fmtMinutes(d.avgConsultMinutes)}</td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: C.textMuted }}>{d.sampleSize}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { notifyPatient } from '@/lib/notify-patient'
+import { checkInAppointment } from '@/lib/appointment-checkin'
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:     ['confirmed', 'cancelled'],
@@ -30,15 +31,23 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
   const allowed = VALID_TRANSITIONS[appt.status] ?? []
   if (!allowed.includes(newStatus)) throw new Error(`Cannot transition from ${appt.status} to ${newStatus}`)
 
-  const { error, data: updated } = await db
-    .from('appointments')
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', appointmentId)
-    .eq('status', appt.status)
-    .select('id')
+  if (newStatus === 'checked_in') {
+    // Sets check_in_date (and queue_position/estimated_wait if a doctor is already
+    // known) so this joins today's queue regardless of the booked appointment_date --
+    // the bare status flip below used to skip all of that.
+    const result = await checkInAppointment(db, appointmentId)
+    if (!result.ok) throw new Error(result.error)
+  } else {
+    const { error, data: updated } = await db
+      .from('appointments')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', appointmentId)
+      .eq('status', appt.status)
+      .select('id')
 
-  if (error) throw new Error(error.message)
-  if (!updated?.length) throw new Error('Appointment status changed by someone else. Please refresh.')
+    if (error) throw new Error(error.message)
+    if (!updated?.length) throw new Error('Appointment status changed by someone else. Please refresh.')
+  }
 
   revalidatePath('/dashboard/appointments')
   revalidatePath('/dashboard/frontdesk')

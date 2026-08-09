@@ -13,7 +13,7 @@ import { T, SPACE } from '@/lib/typography'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 import {
   CheckCircle2, ClipboardList, X, AlertTriangle, Zap, RefreshCw, Search as SearchIcon,
-  Check, Clock, Video, Building2, Footprints, Stethoscope, type LucideIcon,
+  Check, Clock, Video, Building2, Footprints, Stethoscope, ArrowUpRight, type LucideIcon,
 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -533,10 +533,16 @@ function DetailPanel({
             { label: 'Date / Time',   value: `${appt.appointment_date} · ${appt.start_time}` },
             { label: 'Doctor',        value: appt.doctor_name || (appt.assigned_doctor_name ? `Assigned: ${appt.assigned_doctor_name}` : 'Unassigned') },
             { label: 'Type',          value: appt.type === 'virtual' ? <IconLabel icon={Video}>Virtual</IconLabel> : <IconLabel icon={Building2}>In-person</IconLabel> },
-            { label: 'Mode',          value: appt.booking_mode === 'walkin' ? <IconLabel icon={Footprints}>Walk-in</IconLabel> : appt.booking_mode === 'hospital' ? <IconLabel icon={Building2}>Hospital (OPD)</IconLabel> : <IconLabel icon={Stethoscope}>Doctor-specific</IconLabel> },
+            { label: 'Mode',          value: appt.booking_mode === 'referral' ? <IconLabel icon={ArrowUpRight}>Referral</IconLabel> : appt.booking_mode === 'walkin' ? <IconLabel icon={Footprints}>Walk-in</IconLabel> : appt.booking_mode === 'hospital' ? <IconLabel icon={Building2}>Hospital (OPD)</IconLabel> : <IconLabel icon={Stethoscope}>Doctor-specific</IconLabel> },
             { label: 'Urgency',       value: appt.urgency ?? 'Routine' },
             { label: 'Reason',        value: appt.reason ?? '—' },
             { label: 'Clinic',        value: appt.clinic_name ?? 'Main Hospital' },
+            ...(appt.booking_mode === 'referral' ? [
+              { label: 'Referred by', value: appt.referred_by_doctor_name ?? '—' },
+              { label: 'From clinic', value: appt.referring_clinic_name ?? '—' },
+              { label: 'From',        value: appt.referring_hospital_name ?? '—' },
+              { label: 'Referral reason', value: appt.referral_reason ?? '—' },
+            ] : []),
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', gap: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, width: 90, flexShrink: 0,
@@ -941,8 +947,15 @@ export default function AppointmentsPage() {
                           {needsAssign ? <IconLabel icon={AlertTriangle} size={11}>Unassigned</IconLabel> : a.assigned_doctor_name ?? a.doctor_name}
                         </div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>
-                          {a.booking_mode === 'walkin' ? <IconLabel icon={Footprints} size={10}>Walk-in</IconLabel> : a.booking_mode === 'hospital' ? <IconLabel icon={Building2} size={10}>OPD</IconLabel> : <IconLabel icon={Stethoscope} size={10}>Direct</IconLabel>}
+                          {a.booking_mode === 'referral' ? <IconLabel icon={ArrowUpRight} size={10}>Referral</IconLabel> : a.booking_mode === 'walkin' ? <IconLabel icon={Footprints} size={10}>Walk-in</IconLabel> : a.booking_mode === 'hospital' ? <IconLabel icon={Building2} size={10}>OPD</IconLabel> : <IconLabel icon={Stethoscope} size={10}>Direct</IconLabel>}
                         </div>
+                        {a.booking_mode === 'referral' && a.referred_by_doctor_name && (
+                          <div style={{ fontSize: 10, color: '#5B9EFF', marginTop: 2 }}>
+                            {a.referred_by_doctor_name}
+                            {a.referring_clinic_name ? ` · ${a.referring_clinic_name}` : ''}
+                            {a.referring_hospital_name ? ` · ${a.referring_hospital_name}` : ''}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -1132,6 +1145,11 @@ export default function AppointmentsPage() {
                 <span style={{ fontSize: 11, color: C.textSub }}>
                   {needsAssign ? <span style={{ color: '#EF9F27' }}>Unassigned</span> : docName}
                 </span>
+                {a.booking_mode === 'referral' && (
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#5B9EFF', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                    <ArrowUpRight size={10} /> Referral
+                  </span>
+                )}
               </div>
 
               {/* Actions row */}

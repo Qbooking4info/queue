@@ -37,14 +37,14 @@ export default async function SpecialistPage() {
 
   const [{ data: todayApptsRaw }, { data: upcomingAppts }, { count: completedCount }] = await Promise.all([
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, urgency, walkin_patient_name, users(full_name, phone, date_of_birth, gender)')
+      .select('id, booking_ref, start_time, type, status, urgency, walkin_patient_name, users!appointments_patient_id_fkey(full_name, phone, date_of_birth, gender)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .eq('appointment_date', today)
       .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
       .order('start_time'),
     db.from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, urgency, walkin_patient_name, users(full_name)')
+      .select('id, booking_ref, appointment_date, start_time, type, status, urgency, walkin_patient_name, users!appointments_patient_id_fkey(full_name)')
       .eq('hospital_id', adminRecord.hospital_id)
       .eq('doctor_id', doctor?.id ?? '')
       .gt('appointment_date', today)

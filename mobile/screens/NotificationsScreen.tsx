@@ -9,7 +9,7 @@ import { getNotifications, markNotificationRead, markAllNotificationsRead, getAp
 import { SkeletonRow } from '../components/ui/Skeleton'
 import { haptics } from '../lib/haptics'
 
-type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescription' | 'lab' | 'payment' | 'waitlist' | 'review' | 'system'
+type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescription' | 'lab' | 'payment' | 'waitlist' | 'review' | 'system' | 'no_show' | 'reschedule_prompt'
 
 const ACCENT: Record<string, string> = {
   reminder:    '#EF9F27',
@@ -22,16 +22,19 @@ const ACCENT: Record<string, string> = {
   waitlist:    '#EF9F27',
   review:      '#FBBF24',
   system:      '#94A3B8',
+  no_show:     '#FF5C5C',
+  reschedule_prompt: '#EF9F27',
 }
 const ICON_BG: Record<string, string> = {
   reminder:'#1A3A28', confirmed:'#0D2A1F', cancelled:'#2A0D0D', virtual:'#0D1A3A',
   prescription:'#1E1040', lab:'#101A3A', payment:'#0D280D', waitlist:'#2A2010',
-  review:'#2A1A00', system:'#1A1A1A',
+  review:'#2A1A00', system:'#1A1A1A', no_show:'#2A0D0D', reschedule_prompt:'#2A2010',
 }
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   reminder:'alarm-outline', confirmed:'checkmark-circle-outline', cancelled:'close-circle-outline', virtual:'videocam-outline',
   prescription:'medkit-outline', lab:'flask-outline', payment:'card-outline', waitlist:'hourglass-outline',
   review:'star-outline', system:'business-outline',
+  no_show:'alert-circle-outline', reschedule_prompt:'calendar-outline',
 }
 
 function relativeTime(iso: string): string {
@@ -90,7 +93,7 @@ export function NotificationsScreen({ navigation }: Props) {
   }
 
   // Types that carry an appointment_id we can navigate to
-  const APPT_TYPES = new Set(['confirmed', 'pending', 'cancelled', 'reminder', 'virtual', 'payment', 'waitlist', 'review'])
+  const APPT_TYPES = new Set(['confirmed', 'pending', 'cancelled', 'reminder', 'virtual', 'payment', 'waitlist', 'review', 'no_show', 'reschedule_prompt'])
 
   async function handleTap(n: any) {
     // Always mark read first

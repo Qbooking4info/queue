@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
@@ -11,6 +12,7 @@ import { haptics }  from '../../lib/haptics'
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
 interface PatientRow { id: string; full_name: string; phone: string | null; date_of_birth: string | null; gender: string | null; blood_group: string | null }
+interface DoctorRow { full_name: string; title: string | null }
 interface ApptFull {
   id:               string
   appointment_date: string
@@ -25,6 +27,13 @@ interface ApptFull {
   queue_position:   number | null
   patient_id:       string
   patient:          PatientRow | null
+  referral_reason?:  string | null
+  referred_by?:      DoctorRow | null
+  referring_hospital?: { name: string } | null
+  referring_clinic?:   { name: string } | null
+  hospital_id:       string
+  doctor_id?:        string | null
+  assigned_doctor_id?: string | null
   vitals_weight_kg?:    number | null
   vitals_height_cm?:    number | null
   vitals_bp_systolic?:  number | null
@@ -102,7 +111,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   async function fetchAppt() {
     const { data } = await supabase
       .from('appointments')
-      .select('*, patient:users!appointments_patient_id_fkey(id, full_name, phone, date_of_birth, gender, blood_group)')
+      .select(`
+        *, patient:users!appointments_patient_id_fkey(id, full_name, phone, date_of_birth, gender, blood_group),
+        referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+        referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+        referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
+      `)
       .eq('id', appointmentId)
       .single()
 
@@ -119,7 +133,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
     setLoading(false)
   }
 
-  useEffect(() => { fetchAppt() }, [appointmentId])
+  // useFocusEffect (not a plain mount-only effect) so returning from the referral
+  // screen re-fetches -- a referral sent from an in-progress consult completes it
+  // server-side, and this screen needs to pick that status change up.
+  useFocusEffect(useCallback(() => { fetchAppt() }, [appointmentId]))
 
   async function saveVitalsAndNotes() {
     setSaving(true)
@@ -316,7 +333,39 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 <Text style={st.reasonText}>{appt.symptom_description}</Text>
               </View>
             )}
+            {appt.referred_by && (
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                <Text style={st.reasonLabel}>REFERRED BY</Text>
+                <Text style={st.reasonText}>
+                  {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
+                  {appt.referring_clinic?.name ? ` · ${appt.referring_clinic.name}` : ''}
+                  {appt.referring_hospital?.name ? ` · ${appt.referring_hospital.name}` : ''}
+                </Text>
+                {appt.referral_reason && (
+                  <Text style={[st.reasonText, { marginTop: 4, opacity: 0.85 }]}>{appt.referral_reason}</Text>
+                )}
+              </View>
+            )}
           </View>
+
+          {/* Refer to another clinic/hospital */}
+          {!isDone && (
+            <View style={st.pad}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ReferPatient', {
+                  appointmentId: appt.id,
+                  patientName: patient?.full_name ?? 'Patient',
+                  ownHospitalId: appt.hospital_id,
+                  isInProgress,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                <Ionicons name="arrow-redo-outline" size={15} color={t.textPrimary} />
+                <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                  {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Actions */}
           {!isDone && (
@@ -517,6 +566,7 @@ const st = StyleSheet.create({
   reasonText:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
   pad:           { paddingHorizontal: 16, marginBottom: 0 },
   actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
+  referBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
   doneTxt:       { fontSize: 14, fontWeight: '700' },
   section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },

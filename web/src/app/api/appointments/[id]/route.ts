@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { todayLocalDate } from '@/lib/dashboard-utils'
 import { notifyPatient } from '@/lib/notify-patient'
+import { checkInAppointment } from '@/lib/appointment-checkin'
 
 type Action =
   | { action: 'assign_doctor'; doctorId: string }
@@ -14,57 +15,6 @@ type Action =
   | { action: 'start_consultation' }
   | { action: 'end_consultation' }
   | { action: 'set_status'; status: string }
-
-async function getDoctorAvgConsultDuration(db: ReturnType<typeof createAdminClient>, doctorId: string): Promise<number | null> {
-  const { data } = await db
-    .from('appointments')
-    .select('consult_duration_secs')
-    .eq('doctor_id', doctorId)
-    .not('consult_duration_secs', 'is', null)
-  if (!data || data.length === 0) return null
-  const total = (data as { consult_duration_secs: number }[]).reduce((sum: number, r) => sum + r.consult_duration_secs, 0)
-  return total / data.length
-}
-
-// Shared by check_in (when a doctor is already known, e.g. doctor-mode bookings) and
-// assign_doctor (when a hospital-mode booking gets its doctor assigned after check-in,
-// once staff actually know who's on duty) -- queue scope is "checked in today," not the
-// originally booked appointment_date, so a future-dated booking that walks in today
-// joins today's physical queue, per doctor.
-async function computeQueuePosition(
-  db: ReturnType<typeof createAdminClient>, hospitalId: string, checkInDate: string,
-  doctorId: string, isEmergency: boolean, excludeApptId: string,
-): Promise<{ queuePosition: number; estimatedWait: number | null }> {
-  const [byDoctor, byAssigned] = await Promise.all([
-    (db as any).from('appointments').select('id, queue_position')
-      .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
-      .in('status', ['checked_in', 'in_progress']).eq('doctor_id', doctorId).neq('id', excludeApptId),
-    (db as any).from('appointments').select('id, queue_position')
-      .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
-      .in('status', ['checked_in', 'in_progress']).eq('assigned_doctor_id', doctorId).neq('id', excludeApptId),
-  ])
-  // Deduped by id: assign_doctor writes both doctor_id and assigned_doctor_id,
-  // so a normally-assigned appointment matches BOTH queries and would otherwise
-  // be counted twice — roughly doubling every queue position and wait estimate.
-  // (start_consultation below already dedupes its equivalent pair.)
-  const byId = new Map<string, { id: string; queue_position: number | null }>()
-  for (const row of [...(byDoctor.data ?? []), ...(byAssigned.data ?? [])] as { id: string; queue_position: number | null }[]) {
-    byId.set(row.id, row)
-  }
-  const others = [...byId.values()]
-  const ahead = others.length
-
-  if (isEmergency) {
-    // Emergency jumps straight to the front -- shift everyone already in this
-    // doctor's queue today back by one instead of just appending to the end.
-    await Promise.all(others.map(o =>
-      (db as any).from('appointments').update({ queue_position: (o.queue_position ?? ahead) + 1 }).eq('id', o.id)
-    ))
-    return { queuePosition: 1, estimatedWait: 0 }
-  }
-  const avgSecs = await getDoctorAvgConsultDuration(db, doctorId)
-  return { queuePosition: ahead + 1, estimatedWait: avgSecs != null ? Math.round((ahead * avgSecs) / 60) : null }
-}
 
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
@@ -98,8 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       // Assignment can only happen at check-in -- that's the first point staff actually
       // know who's on duty right now. Assigning earlier (while still pending/confirmed)
-      // can't reflect real-time availability, and queue_position is computed per-doctor
-      // right here, so doing it before check-in would leave a stale slot regardless.
+      // can't reflect real-time availability.
       if (appt.status !== 'checked_in') {
         return Errors.validation('Doctor can only be assigned at check-in')
       }
@@ -112,15 +61,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return Errors.validation('Doctor is on break or off duty and cannot be assigned patients')
       }
 
-      const checkInDate = appt.check_in_date ?? todayLocalDate()
-      const isEmergency = appt.urgency === 'emergency'
-      const { queuePosition, estimatedWait } = await computeQueuePosition(db, appt.hospital_id, checkInDate, body.doctorId, isEmergency, id)
-
+      // queue_position/estimated_wait aren't set here -- assigning doctor_id triggers
+      // renumber_queue_after_change (supabase/migrations/20260805000001_atomic_queue_renumbering.sql),
+      // which atomically recomputes this doctor's whole queue off checked_in_at.
       const { data: updated, error } = await db.from('appointments').update({
         assigned_doctor_id: body.doctorId,
         doctor_id: body.doctorId,
-        queue_position: queuePosition,
-        estimated_wait: estimatedWait,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id).eq('status', 'checked_in').select('id')
       if (error) return Errors.internal(error.message)
@@ -201,27 +147,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     case 'check_in': {
-      const checkInDate = todayLocalDate()
-      const doctorId = appt.doctor_id ?? appt.assigned_doctor_id
-      const isEmergency = appt.urgency === 'emergency'
-      let queuePosition: number | null = null
-      let estimatedWait: number | null = null
-
-      // Only doctor-mode bookings (patient picked a specific doctor) already have one at
-      // check-in -- hospital-mode/OPD bookings check in with no doctor and no queue
-      // position at all until staff assign one (see assign_doctor), since that's now the
-      // only point a doctor's real-time on-duty status is known.
-      if (doctorId) {
-        ({ queuePosition, estimatedWait } = await computeQueuePosition(db, appt.hospital_id, checkInDate, doctorId, isEmergency, id))
-      }
-
-      // BH6: enforce SOP -- only 'confirmed' appointments may be checked in
-      const { data: updated, error } = await db.from('appointments').update({
-        status: 'checked_in', check_in_date: checkInDate,
-        queue_position: queuePosition, estimated_wait: estimatedWait, updated_at: new Date().toISOString(),
-      }).eq('id', id).in('status', ['confirmed']).select('id')
-      if (error) return Errors.internal(error.message)
-      if (!updated?.length) return Errors.validation(`Only a confirmed appointment can be checked in (this one is ${appt.status})`)
+      const result = await checkInAppointment(db, id)
+      if (!result.ok) return Errors.validation(result.error)
       return NextResponse.json({ success: true })
     }
 
@@ -281,13 +208,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     case 'set_status': {
-      // Bare status flip, no transition guard -- matches admin-api.ts's
-      // updateAppointmentStatus exactly (used by clinics/[clinicId]/page.tsx
-      // for its own check-in/complete buttons, which historically bypassed
-      // the queue-position logic the main queue/appointments pages use).
-      // Preserved as-is rather than silently rerouting it through
-      // check_in/end_consultation's extra logic, which would change
-      // behavior beyond adding the authorization check this task is about.
+      // Bare status flip, no transition guard -- used by clinics/[clinicId]/page.tsx's
+      // "Complete" button. Its "Check In" button used to call this with
+      // status: 'checked_in' too, bypassing check_in_date/queue_position entirely;
+      // it now calls the dedicated 'check_in' action above instead.
       const { error } = await db.from('appointments')
         .update({ status: body.status, updated_at: new Date().toISOString() })
         .eq('id', id)

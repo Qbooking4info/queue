@@ -29,7 +29,7 @@ export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitu
 // the two can't share a module across the mobile/web boundary (see Task 13).
 const DOCTOR_SELECT = 'id, full_name, title, qualification, bio, avatar_url, ' +
   'years_experience, consultation_fee, virtual_fee, accepts_virtual, ' +
-  'avg_rating, review_count, availability_status, ' +
+  'avg_rating, review_count, availability_status, clinic_id, ' +
   'specialty:specialties!doctors_specialty_id_fkey(name, icon)'
 
 const HOSPITAL_SELECT = 'id, name, slug, address, city, state, country, phone, whatsapp, ' +
@@ -250,7 +250,7 @@ export async function getPatientAppointments(
   // Must use the authenticated supabase client so RLS can verify the user session
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
     .eq('patient_id', patientId)
     .order('appointment_date', { ascending: false })
   if (error) {
@@ -263,7 +263,7 @@ export async function getPatientAppointments(
 export async function getAppointmentById(appointmentId: string): Promise<AppointmentWithRelations | null> {
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
     .eq('id', appointmentId)
     .single()
   return (data as any) ?? null
@@ -275,7 +275,7 @@ export async function getNextAppointment(
   const today = todayLocalDate()
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
     .eq('patient_id', patientId)
     .gte('appointment_date', today)
     .in('status', ['confirmed', 'pending'])
@@ -289,7 +289,7 @@ export async function getNextAppointment(
 // ── Create appointment (doctor-specific / virtual) ────────────────────────────
 
 export type BookingResult =
-  | { ok: true; id: string; bookingRef: string; approvalStatus: string }
+  | { ok: true; id: string; bookingRef: string; approvalStatus: string; originalCompleted?: boolean }
   | { ok: false; error: string }
 
 export async function createAppointment(payload: {
@@ -394,6 +394,45 @@ export async function createHospitalAppointment(payload: {
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
+// ── Refer a patient to another hospital (doctor-only) ─────────────────────────
+// Goes through the server -- not a raw table insert like the patient booking
+// functions above -- because this writes an appointment at a hospital the
+// caller doesn't belong to, which RLS wouldn't allow directly, and the server
+// verifies the caller actually owns `appointmentId` before creating it. Identifying
+// the patient by the appointment (not a patientId) is deliberate -- it's what lets a
+// walk-in with no linked account (common here) be referred at all, and it doubles as
+// the "original consultation" the server auto-completes if it's still in progress.
+export async function createReferral(payload: {
+  appointmentId:       string
+  receivingHospitalId: string
+  receivingDoctorId?:  string
+  receivingClinicId?:  string
+  date:                string
+  startTime:           string
+  type?:               'in-person' | 'virtual'
+  reason?:             string
+  referralReason:      string
+  urgency?:            'routine' | 'urgent' | 'emergency'
+  paymentMethod?:      string
+}): Promise<BookingResult> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const jwt = session?.access_token
+  if (!jwt) return { ok: false, error: 'Not authenticated' }
+
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/refer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify(payload),
+    })
+    const body = await res.json()
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Referral failed' }
+    return { ok: true, id: body.id, bookingRef: body.bookingRef, approvalStatus: body.approvalStatus, originalCompleted: !!body.originalCompleted }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Referral failed' }
+  }
+}
+
 // ── Cancel appointment (with refund policy) ───────────────────────────────────
 
 export async function cancelAppointment(
@@ -471,7 +510,11 @@ export async function rescheduleAppointment(payload: {
   }
 
   // Close out the original booking so the patient isn't left holding two active appointments
-  // for the same visit — the new row links back to it via rescheduled_from.
+  // for the same visit — the new row links back to it via rescheduled_from. Scoped to
+  // non-terminal statuses only: a reschedule can now also happen from a 'no_show' original
+  // (the day-after prompt), and appointment_status_guard permanently blocks any change away
+  // from completed/cancelled/no_show — trying to flip no_show -> cancelled here would just
+  // throw. If the original is already terminal there's nothing to close; leave it as-is.
   const { error: closeErr } = await supabase
     .from('appointments')
     .update({
@@ -480,6 +523,7 @@ export async function rescheduleAppointment(payload: {
       cancelled_at: new Date().toISOString(),
     })
     .eq('id', payload.originalId)
+    .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
   if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
 
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
@@ -620,7 +664,7 @@ export async function deleteDependent(id: string) {
 export async function getCompletedAppointments(patientId: string) {
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
     .eq('patient_id', patientId)
     .eq('status', 'completed')
     .order('appointment_date', { ascending: false })

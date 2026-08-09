@@ -27,7 +27,18 @@ export async function GET(req: NextRequest) {
     .select('full_name')
     .eq('auth_id', caller.authId)
     .maybeSingle()
-  const displayName = profile?.full_name ?? undefined
+  let displayName = profile?.full_name ?? undefined
+
+  // Doctor accounts created through the live Add Doctor flow link via
+  // doctors.auth_user_id and never get a `users` row at all (only the older,
+  // now-unused creation path did) -- for those, `profile` above is always
+  // null, so displayName silently stayed empty and the dashboard fell back
+  // to a bare "Doctor" greeting no matter who was logged in. Same fallback
+  // /api/me/role already uses for this identical case.
+  if (!displayName && caller.role === 'doctor' && caller.doctorId) {
+    const { data: doc } = await db.from('doctors').select('full_name').eq('id', caller.doctorId).single()
+    displayName = doc?.full_name ?? undefined
+  }
 
   const requestedHospitalId = new URL(req.url).searchParams.get('hospitalId')
 

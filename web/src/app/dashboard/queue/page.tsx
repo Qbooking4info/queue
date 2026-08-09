@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/dashboard/Badge'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { BedSpaceWidget } from '@/components/dashboard/BedSpaceWidget'
+import { ReferPatientModal } from '../specialist/ReferPatientModal'
 import type { AdminAppointment } from '@/lib/admin-api'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 import { useEmergencyAccess } from '@/lib/useEmergencyAccess'
@@ -300,6 +301,13 @@ export default function QueuePage() {
                       </span>
                     )}
                   </div>
+                  {appt.booking_mode === 'referral' && appt.referred_by_doctor_name && (
+                    <div style={{ fontSize: 11, color: '#5B9EFF', marginTop: 2 }}>
+                      Referred by {appt.referred_by_doctor_name}
+                      {appt.referring_clinic_name ? ` · ${appt.referring_clinic_name}` : ''}
+                      {appt.referring_hospital_name ? ` · ${appt.referring_hospital_name}` : ''}
+                    </div>
+                  )}
                 </div>
 
                 {/* Status badge */}
@@ -308,6 +316,28 @@ export default function QueuePage() {
                   whiteSpace: 'nowrap' }}>
                   {statusLabel(dispStatus)}
                 </span>
+
+                {/* Refer -- doctors only, once they've actually started seeing this patient.
+                    Sits beside Complete rather than replacing it: referring mid-consult still
+                    goes through the same "refer & end consultation" flow as the appointment
+                    detail page, just reachable without leaving the live queue. */}
+                {role === 'doctor' && dispStatus === 'in_progress' && hospital && (
+                  <ReferPatientModal
+                    appointmentId={appt.id}
+                    patientName={appt.patient_name}
+                    ownHospitalId={hospital.id}
+                    isInProgress
+                    renderTrigger={open => (
+                      <button onClick={open} disabled={isUpdating}
+                        style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                          cursor: isUpdating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                          background: 'rgba(91,158,255,0.12)', color: '#5B9EFF', border: '1px solid rgba(91,158,255,0.3)',
+                          fontFamily: 'inherit', opacity: isUpdating ? 0.6 : 1, transition: 'opacity .15s' }}>
+                        Refer
+                      </button>
+                    )}
+                  />
+                )}
 
                 {/* Action button */}
                 {action && (role === 'front_desk' || role === 'clinic_admin' || role === 'hospital_admin' || role === 'doctor') && (

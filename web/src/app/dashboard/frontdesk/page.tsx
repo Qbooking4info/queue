@@ -43,11 +43,25 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
   const selectedDate = (params.date && isValidDate(params.date)) ? params.date : today
 
+  // Matches get_doctor_queue's own convention: a booking dated for another day that
+  // physically checked in on selectedDate belongs on that day's list too, not just
+  // whatever day it was originally booked for.
+  const dateFilter = `appointment_date.eq.${selectedDate},check_in_date.eq.${selectedDate}`
+
   const [{ data: appointmentsRaw }, { count: pending }, { count: checkedIn }, { data: hospital }] = await Promise.all([
+    // referred_by is aliased -- a bare second `doctors!...` embed would collide with the
+    // treating doctor's embed under the same `doctors` JSON key.
     db.from('appointments')
-      .select('id, booking_ref, start_time, type, status, approval_status, queue_position, urgency, walkin_patient_name, walkin_patient_phone, users(full_name, phone), doctors(full_name, title)')
+      .select(`
+        id, booking_ref, start_time, type, status, approval_status, queue_position, urgency,
+        walkin_patient_name, walkin_patient_phone, booking_mode, referral_reason,
+        users!appointments_patient_id_fkey(full_name, phone), doctors!appointments_doctor_id_fkey(full_name, title),
+        referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+        referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+        referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
+      `)
       .eq('hospital_id', adminRecord.hospital_id)
-      .eq('appointment_date', selectedDate)
+      .or(dateFilter)
       .in('status', QUEUE_STATUSES)
       .order('queue_position', { ascending: true, nullsFirst: false })
       .order('start_time'),
@@ -59,7 +73,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
     db.from('appointments')
       .select('*', { count: 'exact', head: true })
       .eq('hospital_id', adminRecord.hospital_id)
-      .eq('appointment_date', selectedDate)
+      .or(dateFilter)
       .eq('status', 'checked_in'),
     db.from('hospitals')
       .select('clinic_model, emergency_hours, bed_space_status, bed_space_updated_at')
@@ -136,6 +150,9 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
           {appointments.map((a, idx) => {
             const patient = Array.isArray(a.users)  ? a.users[0]  : a.users
             const doctor  = Array.isArray(a.doctors) ? a.doctors[0] : a.doctors
+            const referredBy = Array.isArray((a as any).referred_by) ? (a as any).referred_by[0] : (a as any).referred_by
+            const referringHospital = Array.isArray((a as any).referring_hospital) ? (a as any).referring_hospital[0] : (a as any).referring_hospital
+            const referringClinic = Array.isArray((a as any).referring_clinic) ? (a as any).referring_clinic[0] : (a as any).referring_clinic
             const patientName  = patient?.full_name ?? a.walkin_patient_name ?? 'Walk-in Patient'
             const patientPhone = patient?.phone ?? a.walkin_patient_phone
             const statusClass = STATUS_COLOR[a.status] ?? 'text-gray-400 bg-white/5 border-white/10'
@@ -167,6 +184,14 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                         </div>
                         {patientPhone && (
                           <div className="text-xs text-[#4A6058] mt-0.5 flex items-center gap-1"><Phone size={11} /> {patientPhone}</div>
+                        )}
+                        {referredBy && (
+                          <div className="text-xs text-blue-400 mt-1">
+                            Referred by {[referredBy.title, referredBy.full_name].filter(Boolean).join(' ')}
+                            {referringClinic?.name ? ` · ${referringClinic.name}` : ''}
+                            {referringHospital?.name ? ` · ${referringHospital.name}` : ''}
+                            {(a as any).referral_reason ? ` — ${(a as any).referral_reason}` : ''}
+                          </div>
                         )}
                       </div>
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusClass}`}>

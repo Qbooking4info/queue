@@ -17,6 +17,10 @@ export interface AdminAppointment {
   doctor_name: string
   doctor_id: string
   specialty_name: string | null
+  referral_reason?: string | null
+  referred_by_doctor_name?: string | null
+  referring_hospital_name?: string | null
+  referring_clinic_name?: string | null
   booking_mode?: string
   approval_status?: string
   urgency?: string

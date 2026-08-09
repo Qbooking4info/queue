@@ -9,6 +9,7 @@ import type { ScheduleSlot, DayHours } from '@/lib/admin-api'
 import { Badge } from '@/components/dashboard/Badge'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
+import { fmtLocalDate } from '@/lib/dashboard-utils'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // Display order Mon->Sun
@@ -32,12 +33,6 @@ function mondayOf(dateStr: string): Date {
   const dow = d.getDay() || 7
   d.setDate(d.getDate() - dow + 1)
   return d
-}
-
-// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which
-// silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
-function fmtLocalDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function toMinutes(hhmm: string): number {

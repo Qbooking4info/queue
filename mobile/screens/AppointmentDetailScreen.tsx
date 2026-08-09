@@ -100,6 +100,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     vitals_bmi:          (raw as any).vitals_bmi          ?? null,
     urgency:             (raw as any).urgency ?? 'routine',
     paymentMethod:       (raw as any).payment_method ?? null,
+    rescheduleCount:     (raw as any).reschedule_count ?? 0,
   }
 
   const hasVitals = appt.vitals_weight_kg != null || appt.vitals_height_cm != null
@@ -110,6 +111,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const isInPerson  = !isVirtual
   const isUpcoming  = ['confirmed', 'pending', 'checked_in', 'in_progress'].includes(appt.status)
   const isConfirmed = ['confirmed', 'checked_in'].includes(appt.status)
+  const isMissed    = appt.status === 'no_show'
+  const canReschedule = (isUpcoming || isMissed) && appt.rescheduleCount < 1
   const showPass    = isUpcoming && !cancelled && !isPendingReview && !isRejected
 
   const statusColor = {
@@ -119,11 +122,13 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     cancelled:   { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
     checked_in:  { bg: '#E8F4FE',   text: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' },
     in_progress: { bg: '#FEF0E6',   text: '#7A3A00',   border: 'rgba(122,58,0,0.3)' },
+    no_show:     { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
   }[cancelled ? 'cancelled' : appt.status as string] ?? { bg: t.accentBg, text: t.accent, border: t.accentBorder }
 
   const displayStatus = isPendingReview ? 'Pending Review'
     : isRejected ? 'Rejected'
     : cancelled ? 'Cancelled'
+    : isMissed ? 'Missed'
     : appt.status.charAt(0).toUpperCase() + appt.status.slice(1)
 
   const displayStatusColor = isPendingReview
@@ -512,16 +517,18 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Actions */}
           {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
-              <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
-                style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
-                {rescheduleLoading
-                  ? <ActivityIndicator size="small" color={t.textPrimary} />
-                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
-                      <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
-                    </View>
-                }
-              </TouchableOpacity>
+              {canReschedule && (
+                <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
+                  style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
+                  {rescheduleLoading
+                    ? <ActivityIndicator size="small" color={t.textPrimary} />
+                    : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
+                        <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
+                      </View>
+                  }
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
                 style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', opacity: cancelling ? 0.5 : 1 }]}>
                 {cancelling
@@ -532,6 +539,44 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                     </View>
                 }
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Missed appointment (no_show) — reschedule once for free, or book fresh if already used */}
+          {isMissed && (
+            <View style={[st.refundNote, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.2)', marginBottom: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: canReschedule || raw.hospital ? 10 : 0 }}>
+                <Ionicons name="alert-circle-outline" size={14} color="#FF5C5C" style={{ marginTop: 1 }} />
+                <Text style={[st.refundText, { color: '#FF5C5C', flex: 1 }]}>
+                  {canReschedule
+                    ? 'This appointment was marked as missed. You can reschedule it once for free.'
+                    : "This appointment was marked as missed and you've already used your free reschedule. Book a new appointment to continue."}
+                </Text>
+              </View>
+              {canReschedule ? (
+                <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
+                  style={[st.rescheduleBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
+                  {rescheduleLoading
+                    ? <ActivityIndicator size="small" color={t.textPrimary} />
+                    : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
+                        <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
+                      </View>
+                  }
+                </TouchableOpacity>
+              ) : raw.hospital ? (
+                <TouchableOpacity
+                  onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {
+                    hospital:    toDisplayHospital(raw.hospital),
+                    bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
+                  }) }}
+                  style={[st.rescheduleBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: t.cardBg }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="add-circle-outline" size={15} color={t.textPrimary} />
+                    <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Book a New Appointment</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : null}
             </View>
           )}
 

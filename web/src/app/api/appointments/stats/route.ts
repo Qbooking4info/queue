@@ -43,6 +43,82 @@ async function computeRevenue(
   return ((rows ?? []) as any[]).reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
 }
 
+interface DoctorWaitConsultStats {
+  doctorId: string
+  doctorName: string
+  avgWaitMinutes: number | null
+  avgConsultMinutes: number | null
+  sampleSize: number
+}
+
+function avgMinutes(secs: number[]): number | null {
+  if (secs.length === 0) return null
+  return Math.round((secs.reduce((sum, v) => sum + v, 0) / secs.length) / 60)
+}
+
+// waiting_time_secs (check-in -> consult start) and consult_duration_secs (consult
+// start -> end) are both Postgres GENERATED columns -- NULL until their inputs exist,
+// so no status filter is needed here beyond the existing date-range/scope: a pending
+// or cancelled appointment just contributes nothing to either average. Aggregated in
+// JS rather than a DB-side avg()/group by, matching computeRevenue's existing pattern
+// in this same file -- there's no per-hospital/date-range RPC for this, and volumes
+// here don't warrant adding one.
+//
+// Queried as two separate selects, not one combined select -- PostgREST rejects a
+// query's *entire* select list if even one column in it doesn't exist yet, and
+// waiting_time_secs (supabase/migrations/20260806000001_waiting_time_column.sql) may
+// land after this code does. Splitting them means consult-duration stats (already-existing
+// column, real data today) keep working even before that migration is applied, instead
+// of a single missing column silently zeroing out both.
+async function computeWaitConsultStats(
+  db: ReturnType<typeof createAdminClient>, hospitalId: string, from: string, to: string, orFilter?: string,
+): Promise<{ avgWaitMinutes: number | null; avgConsultMinutes: number | null; doctorStats: DoctorWaitConsultStats[] }> {
+  const scoped = (select: string) => {
+    let q = (db as any).from('appointments').select(select)
+      .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to)
+    return orFilter ? q.or(orFilter) : q
+  }
+
+  const [{ data: waitData }, { data: consultData }] = await Promise.all([
+    scoped('doctor_id, assigned_doctor_id, waiting_time_secs, doctor:doctors!appointments_doctor_id_fkey(full_name)'),
+    scoped('doctor_id, assigned_doctor_id, consult_duration_secs, doctor:doctors!appointments_doctor_id_fkey(full_name)'),
+  ])
+  const waitRows = (waitData ?? []) as any[]
+  const consultRows = (consultData ?? []) as any[]
+
+  const byDoctor = new Map<string, { name: string; wait: number[]; consult: number[] }>()
+  const get = (r: any) => {
+    // assign_doctor writes both doctor_id and assigned_doctor_id to the same value, so
+    // this only diverges if they somehow disagree -- fall back to whichever is set.
+    const doctorId: string | null = r.doctor_id ?? r.assigned_doctor_id
+    if (!doctorId) return null
+    if (!byDoctor.has(doctorId)) byDoctor.set(doctorId, { name: r.doctor?.full_name ?? 'Unknown', wait: [], consult: [] })
+    return byDoctor.get(doctorId)!
+  }
+  for (const r of waitRows) {
+    if (r.waiting_time_secs != null) get(r)?.wait.push(r.waiting_time_secs)
+  }
+  for (const r of consultRows) {
+    if (r.consult_duration_secs != null) get(r)?.consult.push(r.consult_duration_secs)
+  }
+
+  const doctorStats = [...byDoctor.entries()]
+    .map(([doctorId, v]) => ({
+      doctorId, doctorName: v.name,
+      avgWaitMinutes: avgMinutes(v.wait),
+      avgConsultMinutes: avgMinutes(v.consult),
+      sampleSize: Math.max(v.wait.length, v.consult.length),
+    }))
+    .filter(d => d.sampleSize > 0)
+    .sort((a, b) => b.sampleSize - a.sampleSize)
+
+  return {
+    avgWaitMinutes: avgMinutes(waitRows.map(r => r.waiting_time_secs).filter((v): v is number => v != null)),
+    avgConsultMinutes: avgMinutes(consultRows.map(r => r.consult_duration_secs).filter((v): v is number => v != null)),
+    doctorStats,
+  }
+}
+
 // GET /api/appointments/stats?from&to -- replaces admin-api.ts's
 // getRangeStats/getClinicRangeStats (Task 15). Scope (whole hospital / one
 // clinic) is derived from the server-verified caller, same as
@@ -72,17 +148,22 @@ export async function GET(req: NextRequest) {
     const base = () => db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).or(orFilter)
 
-    const [totalRes, completedRes, cancelledRes, revenue] = await Promise.all([
+    const [totalRes, completedRes, cancelledRes, revenue, waitConsult] = await Promise.all([
       base(), base().eq('status', 'completed'), base().eq('status', 'cancelled'),
       computeRevenue(db, hospitalId, from, to, orFilter),
+      computeWaitConsultStats(db, hospitalId, from, to, orFilter),
     ])
     const total = totalRes.count ?? 0
     const completed = completedRes.count ?? 0
     const cancelled = cancelledRes.count ?? 0
-    return NextResponse.json({ total, completed, cancelled, pending: total - completed - cancelled, revenue })
+    return NextResponse.json({
+      total, completed, cancelled, pending: total - completed - cancelled, revenue,
+      avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
+      doctorStats: waitConsult.doctorStats,
+    })
   }
 
-  const [totalRes, completedRes, cancelledRes, revenue] = await Promise.all([
+  const [totalRes, completedRes, cancelledRes, revenue, waitConsult] = await Promise.all([
     db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to),
     db.from('appointments').select('id', { count: 'exact', head: true })
@@ -90,9 +171,14 @@ export async function GET(req: NextRequest) {
     db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).eq('status', 'cancelled'),
     computeRevenue(db, hospitalId, from, to),
+    computeWaitConsultStats(db, hospitalId, from, to),
   ])
   const total = totalRes.count ?? 0
   const completed = completedRes.count ?? 0
   const cancelled = cancelledRes.count ?? 0
-  return NextResponse.json({ total, completed, cancelled, pending: total - completed - cancelled, revenue })
+  return NextResponse.json({
+    total, completed, cancelled, pending: total - completed - cancelled, revenue,
+    avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
+    doctorStats: waitConsult.doctorStats,
+  })
 }

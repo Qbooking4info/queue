@@ -24,8 +24,12 @@ interface Appt {
   queue_position:   number | null
   walkin_patient_name:  string | null
   walkin_patient_phone: string | null
+  referral_reason?:  string | null
   patient:          { id: string; full_name: string; phone: string | null } | null
   doctor:           { full_name: string } | null
+  referred_by?:      { full_name: string; title: string | null } | null
+  referring_hospital?: { name: string } | null
+  referring_clinic?: { name: string } | null
 }
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -69,12 +73,23 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     const today = todayLocalDate()
     let query = supabase
       .from('appointments')
-      .select('id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency, queue_position, walkin_patient_name, walkin_patient_phone, patient:users!appointments_patient_id_fkey(id, full_name, phone), doctor:doctors!appointments_doctor_id_fkey(full_name)')
+      .select(`
+        id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency,
+        queue_position, walkin_patient_name, walkin_patient_phone, referral_reason,
+        patient:users!appointments_patient_id_fkey(id, full_name, phone),
+        doctor:doctors!appointments_doctor_id_fkey(full_name),
+        referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+        referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+        referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
+      `)
       .eq('hospital_id', hospitalId)
       .order('appointment_date', { ascending: true })
       .order('start_time',       { ascending: true })
 
-    if (tab === 'today') query = query.eq('appointment_date', today)
+    // Matches get_doctor_queue's own convention: a booking dated for another day that
+    // physically checked in today belongs on today's list too, not just whatever day
+    // it was originally booked for.
+    if (tab === 'today') query = query.or(`appointment_date.eq.${today},check_in_date.eq.${today}`)
 
     const { data } = await query
     // Supabase's generated types model the patient/doctor FK joins below as
@@ -108,17 +123,30 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       return
     }
     setActioning(appt.id)
-    const { error } = await supabase
-      .from('appointments')
-      .update({ status: 'checked_in' })
-      .eq('id', appt.id)
-    setActioning(null)
-    if (error) {
-      haptics.error()
-      Alert.alert('Error', error.message)
-    } else {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) throw new Error('Not authenticated')
+      // Routed through the same PATCH /api/appointments/[id] endpoint the web dashboard
+      // uses (not a raw table update) so check_in_date/queue_position get set -- a direct
+      // update here left check_in_date null, so a future- or past-dated booking that
+      // walked in today never actually joined today's queue.
+      const res = await fetch(`${API_URL}/api/appointments/${appt.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ action: 'check_in' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? 'Check-in failed')
+      }
       haptics.success()
       load(true)
+    } catch (e) {
+      haptics.error()
+      Alert.alert('Error', e instanceof Error ? e.message : 'Check-in failed')
+    } finally {
+      setActioning(null)
     }
   }
 
@@ -148,6 +176,39 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     } finally {
       setActioning(null)
     }
+  }
+
+  function handleReject(appt: Appt) {
+    Alert.alert('Reject Booking', 'The patient will receive a full refund.', [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Reject', style: 'destructive', onPress: async () => {
+        setActioning(appt.id)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const jwt = session?.access_token
+          if (!jwt) throw new Error('Not authenticated')
+          // The API requires a non-empty rejection note (it's shown to the patient in
+          // their refund notification) -- mirrors the generic note the web dashboard's
+          // front-desk reject action sends (rejectPendingApprovalAppointment).
+          const res = await fetch(`${API_URL}/api/appointments/${appt.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+            body: JSON.stringify({ action: 'reject', note: 'Cancelled by front desk' }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => null)
+            throw new Error(body?.error ?? 'Rejection failed')
+          }
+          haptics.success()
+          load(true)
+        } catch (e) {
+          haptics.error()
+          Alert.alert('Error', e instanceof Error ? e.message : 'Rejection failed')
+        } finally {
+          setActioning(null)
+        }
+      }}
+    ])
   }
 
   const today = todayLocalDate()
@@ -246,7 +307,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
               {active.map(a => (
                 <ApptCard
                   key={a.id} appt={a} theme={t} actioning={actioning}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} today={today}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject} today={today}
                 />
               ))}
             </>
@@ -258,7 +319,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
               {done.map(a => (
                 <ApptCard
                   key={a.id} appt={a} theme={t} actioning={actioning}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} today={today}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject} today={today}
                 />
               ))}
             </>
@@ -269,9 +330,9 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   )
 }
 
-function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
+function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, onReject, today }: {
   appt: Appt; theme: any; actioning: string | null
-  onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; today: string
+  onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; onReject: (a: Appt) => void; today: string
 }) {
   // `status` and `approval_status` are independent columns -- a booking awaiting manual
   // review has status='pending', approval_status='pending_approval'; status itself never
@@ -305,6 +366,16 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
             {' · '}<Ionicons name={appt.type === 'virtual' ? 'videocam-outline' : 'business-outline'} size={10} color={t.textMuted} />{appt.type === 'virtual' ? ' Virtual' : ' In-person'}
           </Text>
           {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
+          {appt.referred_by && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+              <Ionicons name="arrow-redo-outline" size={10} color="#5B9EFF" />
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#5B9EFF' }} numberOfLines={1}>
+                {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
+                {appt.referring_clinic?.name ? ` · ${appt.referring_clinic.name}` : ''}
+                {appt.referring_hospital?.name ? ` · ${appt.referring_hospital.name}` : ''}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={{ gap: 6, alignItems: 'flex-end' }}>
           <View style={[s.badge, { backgroundColor: meta.bg }]}>
@@ -333,6 +404,16 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, today }: {
                 : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="checkmark" size={13} color="#00C265" />
                     <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
+                  </View>}
+            </TouchableOpacity>
+          )}
+          {canApprove && (
+            <TouchableOpacity onPress={() => onReject(appt)} disabled={!!actioning}
+              style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+              {isLoading ? <ActivityIndicator size="small" color="#FF5C5C" />
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="close" size={13} color="#FF5C5C" />
+                    <Text style={[s.actionText, { color: '#FF5C5C' }]}>Reject</Text>
                   </View>}
             </TouchableOpacity>
           )}

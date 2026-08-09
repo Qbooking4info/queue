@@ -1792,7 +1792,7 @@ export default function ClinicDetailPage() {
                               await fetch(`/api/appointments/${a.id}`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'set_status', status: 'checked_in' }),
+                                body: JSON.stringify({ action: 'check_in' }),
                               })
                               setAppts(prev => prev.map(x => x.id === a.id ? { ...x, status: 'checked_in' } : x))
                             }}

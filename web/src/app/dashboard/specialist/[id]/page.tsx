@@ -3,9 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { saveAppointmentNotes } from '../actions'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ArrowUpRight } from 'lucide-react'
 import { VideoCallPanel } from '@/components/video/VideoCallPanel'
 import { SubmitNotesButton } from '../SubmitNotesButton'
+import { ReferPatientModal } from '../ReferPatientModal'
 
 const STATUS_OPTS = ['in_progress', 'completed', 'no_show']
 
@@ -16,9 +17,24 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
   if (adminRecord.role !== 'doctor' && adminRecord.role !== 'admin' && adminRecord.role !== 'owner') redirect('/dashboard')
 
   const db = createAdminClient()
+  // users(...) below is explicitly disambiguated to appointments_patient_id_fkey:
+  // appointments has a second FK to users (booked_by_staff_id, added directly to
+  // prod outside tracked migrations -- Queue-Database-Schema.md still says that column
+  // FKs to clinic_admins). A bare `users(...)` embed made PostgREST reject this whole
+  // query with "more than one relationship was found" once that second FK existed.
+  //
+  // referred_by is aliased (rather than a bare `doctors!...` embed like the treating
+  // doctor below) because there are now two FKs to doctors on this table -- an unaliased
+  // second embed would collide with the first under the same `doctors` JSON key.
   const { data: appt } = await db
     .from('appointments')
-    .select('*, users(full_name, phone, email, date_of_birth, gender, blood_group, address), doctors(full_name, title), hospitals(name)')
+    .select(`
+      *, users!appointments_patient_id_fkey(full_name, phone, email, date_of_birth, gender, blood_group, address),
+      doctors!appointments_doctor_id_fkey(full_name, title), hospitals!appointments_hospital_id_fkey(name),
+      referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+      referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+      referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
+    `)
     .eq('id', id)
     .eq('hospital_id', adminRecord.hospital_id)
     .single()
@@ -27,6 +43,9 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
 
   const patient = Array.isArray(appt.users) ? appt.users[0] : appt.users
   const doctor  = Array.isArray(appt.doctors) ? appt.doctors[0] : appt.doctors
+  const referredBy = (Array.isArray(appt.referred_by) ? appt.referred_by[0] : appt.referred_by) as { full_name: string; title: string | null } | null
+  const referringHospital = (Array.isArray(appt.referring_hospital) ? appt.referring_hospital[0] : appt.referring_hospital) as { name: string } | null
+  const referringClinic = (Array.isArray(appt.referring_clinic) ? appt.referring_clinic[0] : appt.referring_clinic) as { name: string } | null
   const patientName = patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in Patient'
 
   const age = patient?.date_of_birth
@@ -41,6 +60,22 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
         <span className="text-[#4A6058]">/</span>
         <span className="text-sm font-mono text-[#7A9089]">{appt.booking_ref}</span>
       </div>
+
+      {referredBy && (
+        <div className="bg-blue-500/8 border border-blue-500/25 rounded-2xl p-4 mb-6 flex items-start gap-3">
+          <ArrowUpRight size={22} className="text-blue-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-blue-400 text-sm">
+              Referred by {[referredBy.title, referredBy.full_name].filter(Boolean).join(' ')}
+              {referringClinic?.name ? ` · ${referringClinic.name}` : ''}
+              {referringHospital?.name ? ` · ${referringHospital.name}` : ''}
+            </div>
+            {appt.referral_reason && (
+              <div className="text-xs text-[#7A9089] mt-1">{appt.referral_reason}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isEmergency && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-6 flex items-center gap-3">
@@ -76,6 +111,14 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
               {patient?.email && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>{patient.email}</div>}
               {patient?.blood_group && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L6 8a6 6 0 009 8 6 6 0 009-8l-6-6z"/></svg>{patient.blood_group}</div>}
               {patient?.address && <div className="flex items-center gap-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>{patient.address}</div>}
+            </div>
+            <div className="mt-3">
+              <ReferPatientModal
+                appointmentId={appt.id}
+                patientName={patientName}
+                ownHospitalId={adminRecord.hospital_id}
+                isInProgress={appt.status === 'in_progress'}
+              />
             </div>
           </div>
 
