@@ -95,7 +95,9 @@ export async function POST(req: NextRequest) {
     currency: 'NGN',
     status: 'pending',
     paystack_ref: reference,
-    method: 'paystack',
+    // method is left NULL: the channel the patient actually uses is unknown
+    // until the charge succeeds, and writing a placeholder conflates the
+    // processor with the instrument.
     metadata: { booking_ref: appt.booking_ref },
   } as never)
   if (insertErr) return Errors.internal(insertErr.message)

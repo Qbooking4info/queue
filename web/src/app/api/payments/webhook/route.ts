@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       status: 'success',
       paid_at: paidAt ?? new Date().toISOString(),
       verified_at: new Date().toISOString(),
-      method: channel ?? 'paystack',
+      method: channel,
       webhook_event: event.event,
     } as never)
     .eq('id', payment.id)
