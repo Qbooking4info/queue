@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { HospitalsMap } from '../components/map/HospitalsMap'
+import { FallbackPanel } from '../components/emergency/FallbackPanel'
 import {
   getTransportRequestById, getRequestPickupPoint, getUnitLocation,
   subscribeToTransport, subscribeToUnitLocation, cancelTransport,
@@ -15,6 +16,21 @@ interface Props { navigation: any; route: any }
 
 const TERMINAL: TransportStatus[] = ['completed', 'cancelled_by_requester', 'cancelled_by_provider', 'no_unit_available']
 const CANCELLABLE: TransportStatus[] = ['requested', 'scheduled', 'searching', 'matched', 'en_route_to_patient']
+
+/** Statuses that mean nobody has taken the job yet. */
+const STILL_SEARCHING: TransportStatus[] = ['requested', 'scheduled', 'searching']
+
+/**
+ * Layer C of the 60s deadline (Queue-Ambulance-Stage1-Scope.md).
+ *
+ * The server enforces the same budget in SQL on pg_cron, but this timer is
+ * deliberately independent of it: the phone knows when it sent the request and
+ * does not need the backend's permission to conclude a minute has passed. If
+ * realtime drops, the API 500s, or the sweeper never runs, the patient is still
+ * told at 60 seconds. For a life-safety path, never rely on the failing system
+ * to report its own failure.
+ */
+const SEARCH_DEADLINE_MS = 60_000
 
 const STATUS_ICON: Partial<Record<TransportStatus, keyof typeof Ionicons.glyphMap>> = {
   requested: 'time-outline',
@@ -40,6 +56,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   const [unitPos,    setUnitPos]  = useState<{ lat: number; lng: number; recordedAt: string } | null>(null)
   const [loading,    setLoading]  = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const [elapsedMs,  setElapsedMs] = useState(0)
 
   const unitChannelRef = useRef<{ unsubscribe: () => void } | null>(null)
 
@@ -79,6 +96,28 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
     return () => { cancelled = true; channel.unsubscribe() }
   }, [request?.assigned_unit_id])
+
+  // Layer C. Anchored to the request's created_at rather than a mount timestamp,
+  // so backgrounding the app or re-entering this screen can't quietly restart
+  // the clock and hide the deadline from someone who has already waited.
+  const searching = request ? STILL_SEARCHING.includes(request.status) : false
+
+  useEffect(() => {
+    if (!request || !searching) return
+
+    const startedAt = Date.parse(request.created_at)
+    const tick = () => setElapsedMs(Number.isNaN(startedAt) ? 0 : Date.now() - startedAt)
+
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [request?.created_at, searching])
+
+  // True when we've blown the budget but the server hasn't said so yet — either
+  // it's about to, or something upstream is broken. Either way the patient is
+  // told now.
+  const deadlinePassed = searching && elapsedMs >= SEARCH_DEADLINE_MS
+  const secondsLeft = Math.max(0, Math.ceil((SEARCH_DEADLINE_MS - elapsedMs) / 1000))
 
   function handleCancel() {
     Alert.alert(
@@ -139,18 +178,33 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
         <View style={[s.statusCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Ionicons name={STATUS_ICON[status] ?? 'help-circle-outline'} size={32} color={statusColor} />
           <Text style={[s.statusText, { color: t.textPrimary }]}>{TRANSPORT_STATUS_LABEL[status]}</Text>
-          {!isTerminal && (
+          {!isTerminal && !searching && (
             <Text style={[s.etaText, { color: t.textMuted }]}>ETA: {formatEta(request.eta_seconds)}</Text>
+          )}
+          {searching && !deadlinePassed && (
+            <Text style={[s.etaText, { color: t.textMuted }]}>
+              Finding you an ambulance · {secondsLeft}s
+            </Text>
           )}
         </View>
 
-        {status === 'no_unit_available' && (
+        {(status === 'no_unit_available' || deadlinePassed) && (
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
             <Text style={[s.noteText, { color: '#FF5C5C' }]}>
-              No ambulance could be reached. If this is life-threatening, call{' '}
-              <Text style={{ fontWeight: '800' }}>112</Text> directly instead of waiting on this request.
+              {status === 'no_unit_available'
+                ? 'No ambulance could be reached.'
+                : "We haven't been able to reach an ambulance yet."}
+              {' '}Don't keep waiting on this request — call one of the numbers below now.
             </Text>
           </View>
+        )}
+
+        {/* Always mounted while the outcome is still open, not gated behind
+            failure: someone watching a countdown is someone not dialling, and
+            both paths can run at once. It only changes tone at the deadline.
+            The number list is device-cached, so it renders with no network. */}
+        {(searching || status === 'no_unit_available') && (
+          <FallbackPanel variant={deadlinePassed || status === 'no_unit_available' ? 'urgent' : 'calm'} />
         )}
 
         {markers.length > 0 && (

@@ -11,6 +11,7 @@ import { getHospitals, createHospitalAppointment, addNotification, getHospitalHo
 import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
+import { FallbackPanel } from '../components/emergency/FallbackPanel'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
 interface Props { navigation: any }
@@ -638,6 +639,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 : 'Emergency bookings are placed at the top of the queue immediately after payment.'}
             </Text>
           </View>
+
+          {/* Available before anything is confirmed. If someone opens this screen
+              and decides they can't wait on the flow at all, the numbers are
+              already in front of them rather than three taps away. */}
+          <FallbackPanel />
+
           <View style={{ height: 20 }} />
         </ScrollView>
       )}

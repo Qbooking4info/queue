@@ -129,8 +129,17 @@ Needs Vercel Pro cron or any external scheduler. **Not a stage-one blocker.**
 
 ### Layer C — client, guaranteed: the app's own countdown
 
-A local timer in `EmergencyConfirmationScreen`, started when the request is created.
-At T+60s it escalates the UI to the failure state **regardless of server state**.
+A local timer in `AmbulanceTrackingScreen`, anchored to the request's
+`created_at`. At T+60s it escalates the UI to the failure state **regardless of
+server state**.
+
+*(Corrected from an earlier draft that named `EmergencyConfirmationScreen` —
+that screen is the hospital walk-in flow. The ambulance request navigates from
+`EmergencyBookingScreen` straight to `AmbulanceTracking`.)*
+
+Anchoring to `created_at` rather than a mount timestamp matters: backgrounding
+the app or re-entering the screen must not restart the clock and hide the
+deadline from someone who has already been waiting.
 
 The phone knows when it pressed the button. It does not need permission from the
 backend to conclude that a minute has passed. If Supabase is slow, if realtime drops,
@@ -152,7 +161,7 @@ reads from the on-device cache first. Renders with no network and no session.
 **`EmergencyBookingScreen`** — surface the fallback panel from the first frame,
 before any request exists.
 
-**`EmergencyConfirmationScreen`** — the heart of stage one. Owns Layer C. Two states:
+**`AmbulanceTrackingScreen`** — the heart of stage one. Owns Layer C. Two states:
 
 - `t < 60s` — *"Finding you an ambulance… 0:12"*, fallback panel visible and
   dialable **the entire time**
