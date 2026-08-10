@@ -28,5 +28,15 @@ yarn-error.log*
 # capture whichever env vars that run happened to export.
 *.launch.log
 
+# Generated whole-repo source dumps.
+#
+# PROJECT_SOURCE.md was one of these, and it published the live service_role key
+# — the credential that bypasses RLS on every table, including patient medical
+# history — to this public repo on 2026-07-26. Anything that concatenates the
+# whole tree will sweep up a .env value sooner or later, so these stay untracked.
+PROJECT_SOURCE.md
+*_SOURCE.md
+project-source.*
+
 # Leftover isolated agent worktrees (Agent tool, isolation: "worktree")
 .claude/worktrees/
