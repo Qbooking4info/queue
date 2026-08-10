@@ -4,24 +4,16 @@ import * as SecureStore from 'expo-secure-store'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl      = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey  = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 const supabasePublicKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLIC_KEY!
 
 /**
- * Prefer the publishable key; fall back to the legacy anon key.
- *
- * The legacy anon and legacy service_role keys are both JWTs signed by the same
- * project JWT secret, so the leaked service_role key (published in a public repo
- * on 2026-07-26) cannot be revoked without also invalidating legacy anon — which
- * is compiled into every shipped build. Until enough installs are on a build
- * that uses sb_publishable_, disabling legacy keys would sign every user out and
- * break the app.
- *
- * The fallback keeps this build working either way, so it can ship before the
- * legacy keys are turned off rather than having to land in the same instant.
- * Once the legacy keys are disabled the fallback is dead weight and should go.
+ * The publishable key. Legacy keys were disabled on 2026-08-10 — the step that
+ * finally killed the service_role key leaked to a public repo in July — so the
+ * legacy anon fallback that carried this through the migration is gone with it.
+ * A build without this variable should fail loudly rather than quietly ship a
+ * key the server rejects.
  */
-const supabaseClientKey = supabasePublicKey || supabaseAnonKey
+const supabaseClientKey = supabasePublicKey
 
 // Supabase session tokens can exceed the 2 KB keychain limit on iOS.
 // This adapter chunks large values across multiple SecureStore keys.

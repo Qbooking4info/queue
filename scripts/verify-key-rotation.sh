@@ -76,18 +76,26 @@ else
   fail=1
 fi
 
-# 4. Sessions and shipped apps: the anon key must be untouched.
+# 4. Legacy anon status.
+#
+# Probing users/ was ambiguous and reported a false [ok]: anon legitimately gets
+# 401 there under RLS, and a DISABLED key returns 401 too — indistinguishable.
+# hospitals is readable by anon by design, so it separates "key works" from
+# "key is dead" unambiguously.
 if [ -n "$ANON" ]; then
-  code=$(probe "$ANON")
-  if [ "$code" = "200" ] || [ "$code" = "401" ]; then
-    # anon legitimately gets 401 on users/ under RLS; what matters is that the
-    # key itself is still recognised rather than failing signature verification.
-    echo "  [ ok ] anon key still recognised — installed apps and sessions unaffected"
-  else
-    echo "  [WARN] anon key returned HTTP $code — if the JWT secret was rotated,"
-    echo "         every installed APK is broken until a new build ships"
-    fail=1
-  fi
+  body=$(curl -s -m 20 "$URL/rest/v1/hospitals?select=id&limit=1" \
+           -H "apikey: $ANON" -H "Authorization: Bearer $ANON")
+  case "$body" in
+    *"Legacy API keys are disabled"*)
+      echo "  [ ok ] legacy anon key is DISABLED — the leaked key's signing path is dead"
+      echo "         (any build still shipping the legacy anon key will not work)" ;;
+    \[*)
+      echo "  [WARN] legacy anon key STILL WORKS — legacy keys are not disabled yet."
+      echo "         The leaked service_role key shares their signing secret."
+      fail=1 ;;
+    *)
+      echo "  [WARN] legacy anon probe inconclusive: $(printf '%s' "$body" | head -c 80)" ;;
+  esac
 fi
 
 echo
