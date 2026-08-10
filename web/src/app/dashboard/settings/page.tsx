@@ -5,7 +5,7 @@ import { PayoutAccount } from './PayoutAccount'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
-import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle } from 'lucide-react'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
