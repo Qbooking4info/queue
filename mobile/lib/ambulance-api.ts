@@ -28,6 +28,14 @@ export interface TransportRequestRow {
   pickup_address: string | null
   symptom_description: string | null
   created_at: string
+  /**
+   * When the server stops searching and declares no unit available. Stamped by
+   * the transport_search_deadline trigger on insert (emergency only, hence
+   * nullable). The client reads it so the countdown shown to the patient and
+   * the server-side sweeper agree on one number instead of each hardcoding 60s
+   * and silently drifting apart.
+   */
+  search_deadline_at: string | null
 }
 
 export interface CreateTransportInput {

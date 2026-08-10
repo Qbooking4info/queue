@@ -1,6 +1,6 @@
 # Queue — Ambulance Stage One Scope
 
-**Status:** proposal, not started
+**Status:** steps 1-2 shipped; step 3 next
 **Date:** 2026-08-10
 
 ## The promise
@@ -208,9 +208,12 @@ Without it there is no proximity anything, ever.
 
 ## 5. Sequence
 
-1. **Directory + Layer C.** Ships the promise with **zero supply and zero backend
-   work**. Independently life-saving on day one.
-2. **Layer A.** The 60s deadline becomes real server-side. Failure stops being silent.
+1. ~~**Directory + Layer C.**~~ **Done** — `20260810000001`, applied. Table ships
+   empty by design; the app shows no number until a human verifies one.
+2. ~~**Layer A.**~~ **Done** — `20260810000002`, applied. Verified in production:
+   a request created at 12:03:25 with a 60s budget was swept at 12:04:34
+   (9s overshoot, within the 10s cron tick), with the status flip, dispatcher
+   alert, patient notification and `transport_events` audit row all landing.
 3. **Break the deadlock.** Duty toggle, idle heartbeat, operator console. Dispatch can
    now actually find a unit.
 4. **`dispatch_attempts`.** Start collecting the coverage-gap dataset immediately —
@@ -233,5 +236,4 @@ Steps 1–2 are shippable without a single ambulance onboarded.
 - **Anonymous access.** Should someone be able to press the button without an
   account? The directory must work logged-out. Dispatch probably needs identity for
   callback. Undecided.
-- **Migration `20260730000002`** (ambulance double-assignment guard) is committed but
-  still unapplied.
+- ~~Migration `20260730000002`~~ — already applied to production.

@@ -102,21 +102,31 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   // the clock and hide the deadline from someone who has already waited.
   const searching = request ? STILL_SEARCHING.includes(request.status) : false
 
+  // Prefer the deadline the server stamped, so the countdown the patient sees
+  // and the sweeper that fails the request agree on one number. Falls back to
+  // created_at + the local budget if it's missing — the timer must still fire
+  // for a row written before this column existed.
+  const deadlineAt = (() => {
+    const stamped = request?.search_deadline_at ? Date.parse(request.search_deadline_at) : NaN
+    if (!Number.isNaN(stamped)) return stamped
+    const created = request ? Date.parse(request.created_at) : NaN
+    return Number.isNaN(created) ? NaN : created + SEARCH_DEADLINE_MS
+  })()
+
   useEffect(() => {
-    if (!request || !searching) return
+    if (!request || !searching || Number.isNaN(deadlineAt)) return
 
-    const startedAt = Date.parse(request.created_at)
-    const tick = () => setElapsedMs(Number.isNaN(startedAt) ? 0 : Date.now() - startedAt)
-
+    const tick = () => setElapsedMs(Date.now() - (deadlineAt - SEARCH_DEADLINE_MS))
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [request?.created_at, searching])
+  }, [deadlineAt, searching])
 
   // True when we've blown the budget but the server hasn't said so yet — either
-  // it's about to, or something upstream is broken. Either way the patient is
-  // told now.
-  const deadlinePassed = searching && elapsedMs >= SEARCH_DEADLINE_MS
+  // it's about to (the sweeper runs on a 10s tick, so a few seconds of overshoot
+  // is normal), or something upstream is broken. Either way the patient is told
+  // at the deadline rather than whenever the backend gets around to it.
+  const deadlinePassed = searching && !Number.isNaN(deadlineAt) && Date.now() >= deadlineAt
   const secondsLeft = Math.max(0, Math.ceil((SEARCH_DEADLINE_MS - elapsedMs) / 1000))
 
   function handleCancel() {
