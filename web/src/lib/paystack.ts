@@ -81,9 +81,14 @@ export async function initializeTransaction(args: {
   if (args.callbackUrl) payload.callback_url = args.callbackUrl
   if (args.subaccount) {
     payload.subaccount = args.subaccount
-    // bearer 'account' = Queue pays the Paystack transaction fee out of its own
-    // cut rather than deducting it from the hospital's consultation fee.
-    payload.bearer = 'account'
+    // Who absorbs Paystack's cut.
+    //   'account'    — Queue pays it out of the platform fee (default)
+    //   'subaccount' — the hospital pays it out of the consultation fee
+    // This is a margin decision, not a technical one, so it is configurable
+    // without a deploy. At Paystack's local-card pricing the fee on a large
+    // emergency booking can approach or exceed a flat ₦500 platform fee, at
+    // which point 'account' means Queue is subsidising the transaction.
+    payload.bearer = process.env.PAYSTACK_FEE_BEARER === 'subaccount' ? 'subaccount' : 'account'
     if (args.platformFeeKobo != null) payload.transaction_charge = args.platformFeeKobo
   }
 
@@ -139,11 +144,26 @@ export function buildReference(appointmentId: string): string {
 // Subaccount onboarding
 // ---------------------------------------------------------------------------
 
-export interface Bank { name: string; code: string; slug: string }
+export interface Bank {
+  name: string; code: string; slug: string
+  active?: boolean; is_deleted?: boolean; supports_transfer?: boolean
+}
 
-/** Nigerian banks Paystack can settle to. */
+/**
+ * Nigerian banks Paystack can actually settle to.
+ *
+ * Filtered, not raw: the endpoint returns 279 institutions, 23 of which do not
+ * support transfers. Offering those in the dropdown lets an admin pick a bank
+ * that cannot receive settlements and only discover it when subaccount creation
+ * fails — with no indication that the bank, rather than their account number,
+ * was the problem. perPage is high enough to get them all in one call; the
+ * default page size would silently truncate the list.
+ */
 export async function listBanks(): Promise<Bank[]> {
-  return call<Bank[]>('/bank?country=nigeria&perPage=100')
+  const all = await call<Bank[]>('/bank?country=nigeria&perPage=300')
+  return all
+    .filter(b => b.active !== false && !b.is_deleted && b.supports_transfer !== false)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**

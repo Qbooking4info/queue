@@ -14,6 +14,8 @@
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | No | Enables source map upload on build. Unset = build skips upload, no functional change |
 | `CRON_SECRET` | Yes (ambulance dispatch) | Shared secret for `/api/transport/sweep`. **Not driven by Vercel Cron** — this project is on the Hobby plan, which caps crons at once daily and fails the whole deployment on a sub-daily schedule. The tick comes from Postgres instead: `invoke_transport_sweep()` on pg_cron every 30s via pg_net. The same value must be stored in the `app_config` table (`key='cron_secret'`), or the sweep 401s silently. Check with `select * from transport_sweep_health()` |
 | `NEXT_PUBLIC_SUPABASE_PUBLIC_KEY` | Yes | The `sb_publishable_` key. Preferred over `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which is the legacy JWT kept only as a fallback until legacy keys are disabled |
+| `PAYSTACK_SECRET_KEY` | No | Enables online payment. **Unset = payment is entirely off**: `/api/payments/*` return 503 `PAYMENTS_DISABLED` and the app stays on pay-at-hospital. Use test keys first |
+| `PAYSTACK_FEE_BEARER` | No | Who absorbs Paystack's transaction fee — `account` (Queue, default) or `subaccount` (the hospital). See the margin note below; this is a pricing decision, not a technical one |
 | `MAPBOX_ACCESS_TOKEN` | No | Road-ETA matrix for ambulance dispatch ranking. Unset = dispatch degrades to straight-line distance ranking (logged, not fatal) |
 
 **Template:**
@@ -112,3 +114,35 @@ was very nearly reused during the August key rotation because the name looked
 right — it would have pointed the app at the wrong database. If you delete them,
 confirm nothing else in the team's Vercel projects depends on that other project
 first; the values are encrypted and cannot be recovered afterwards.
+
+
+---
+
+## Paystack — margin warning
+
+Queue's platform fee is a **flat ₦500**, while Paystack's fee scales with the
+transaction. With `PAYSTACK_FEE_BEARER=account` (the default, where Queue absorbs
+the processing cost) the ₦500 is progressively eaten and eventually goes negative:
+
+| Booking | Patient charged | Paystack takes | Queue nets |
+|---|---|---|---|
+| Free OPD | ₦500 | ₦8 | ₦492 |
+| OPD ₦10,000 | ₦10,500 | ₦258 | ₦242 |
+| Specialist ₦25,000 | ₦25,500 | ₦482 | ₦18 |
+| Emergency ₦25,000 (2×) | ₦50,500 | ₦858 | **−₦358** |
+
+**Queue's ₦500 is fully consumed at around ₦26,700** — every booking above that
+costs Queue money to process. Emergency bookings hit it fastest because the fee
+doubles.
+
+Three ways out, none of them code changes:
+
+1. `PAYSTACK_FEE_BEARER=subaccount` — the hospital absorbs it. Simplest, but the
+   hospital then receives slightly less than the consultation fee it set, which
+   needs saying out loud in their onboarding.
+2. Make the platform fee a percentage rather than flat (`PLATFORM_FEE` in both
+   `web/src/lib/fees.ts` and `mobile/lib/fees.ts`).
+3. Flat fee plus a percentage above a threshold.
+
+*Figures assume 1.5% + ₦100 (waived under ₦2,500), capped at ₦2,000. **Verify
+against your own Paystack pricing** — rates are negotiable and change.*
