@@ -158,10 +158,14 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
   // MH7: load dependents when user selects "A dependent"
   useEffect(() => {
+    let cancelled = false
     if (forDependent && user && dependentsList.length === 0) {
-      getDependents(user.id).then(setDependentsList)
+      getDependents(user.id)
+        .then(rows => { if (!cancelled) setDependentsList(rows) })
+        .catch(err => console.warn('[emergency] failed to load dependents', err))
     }
     if (!forDependent) setSelectedDependentId(null)
+    return () => { cancelled = true }
   }, [forDependent, user])
 
   // Best-effort: if this is a multi-clinic hospital and it has a designated Emergency
