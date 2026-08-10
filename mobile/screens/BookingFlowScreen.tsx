@@ -12,8 +12,10 @@ import {
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
+  getAvailableSlots,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
+import { fmt12 } from '../lib/format'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
@@ -159,6 +161,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   }, [isEmergency])
   const [opdSlot,      setOpdSlot]      = useState<typeof ALL_OPD_SLOTS[0] | null>(null)
   const [preferredDoc, setPreferredDoc] = useState<any | null>(null)
+  // A doctor's real configured slots, when they have any. The web dashboard's
+  // schedule generator writes these to time_slots; until now nothing read them,
+  // so an admin could configure a doctor's hours and the app would keep offering
+  // the same hardcoded 08:00-17:00 grid regardless.
+  const [doctorSlots,  setDoctorSlots]  = useState<{ id: string; label: string; time: string }[] | null>(null)
   const [dateFullMap,  setDateFullMap]  = useState<Record<string, boolean>>({})
   const [checkingLim,  setCheckingLim]  = useState(false)
 
@@ -220,8 +227,39 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     return () => clearInterval(id)
   }, [])
 
+  // Load the selected doctor's configured slots for the chosen date. Cancellation
+  // guarded so switching doctor quickly can't let a stale response overwrite a
+  // newer one.
+  useEffect(() => {
+    if (!preferredDoc?.id || !selectedDate) { setDoctorSlots(null); return }
+    let cancelled = false
+    getAvailableSlots(String(preferredDoc.id), selectedDate, bookingType === 'virtual')
+      .then(rows => {
+        if (cancelled) return
+        setDoctorSlots(rows.map(r => ({
+          id: r.id,
+          time: String(r.start_time).slice(0, 5),
+          label: fmt12(String(r.start_time).slice(0, 5)),
+        })))
+      })
+      .catch(() => { if (!cancelled) setDoctorSlots(null) })
+    return () => { cancelled = true }
+  }, [preferredDoc?.id, selectedDate, bookingType])
+
   // ── Derived ───────────────────────────────────────────────────────────────
-  const opdSlots       = getAvailableOpdSlots(selectedDate)
+  // A doctor's configured schedule governs when they have one. Falling back to
+  // the default grid otherwise keeps hospitals that never set schedules working
+  // exactly as before, rather than showing them an empty picker.
+  const usingRealSlots = !!preferredDoc && doctorSlots !== null && doctorSlots.length > 0
+  const opdSlots       = usingRealSlots
+    ? (selectedDate === fmtLocalDate(new Date())
+        ? doctorSlots!.filter(sl => {
+            const [h, m] = sl.time.split(':').map(Number)
+            const now = new Date()
+            return h * 60 + m > now.getHours() * 60 + now.getMinutes() + 30
+          })
+        : doctorSlots!)
+    : getAvailableOpdSlots(selectedDate)
   const virtualDoctors = (hospital?.doctors ?? []).filter((d: any) => d.accepts_virtual)
   const isManual       = hospital?.approval_mode === 'manual' || (selectedClinic != null && !selectedClinic.is_opd)
   const baseFee        = bookingType === 'virtual'
@@ -411,7 +449,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         patientId:    user.id,
         doctorId:     preferredDoc.id,
         hospitalId:   String(hospital.id),
-        slotId:       null,
+        slotId:       usingRealSlots ? (opdSlot?.id ?? null) : null,
         clinicId:     selectedClinic?.id,
         date:         selectedDate,
         startTime:    arrivalTime,
@@ -1052,7 +1090,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginBottom: 14 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color="#EF9F27" /><Text style={{ fontSize: 13, fontWeight: '700', color: '#EF9F27' }}>Pending hospital review</Text></View>
                   <Text style={{ fontSize: 12, color: '#EF9F27', lineHeight: 18 }}>
-                    Payment is held until the hospital approves your request. Rejected bookings receive a full refund.
+                    Nothing is charged now — you pay at the hospital. If the hospital rejects the request, there is nothing to pay.
                   </Text>
                 </View>
               )}
@@ -1102,10 +1140,10 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               <View style={[s.policyCard, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
                 <Text style={[s.policyTitle, { color: t.textPrimary }]}>Cancellation Policy</Text>
                 {[
-                  { icon: 'checkmark-circle-outline' as const, text: 'Cancel >24 hrs before appointment – Full refund' },
-                  { icon: 'warning-outline'           as const, text: 'Cancel within 24 hrs – 50% refund' },
+                  { icon: 'checkmark-circle-outline' as const, text: 'Cancel any time before your appointment – no charge' },
+                  { icon: 'warning-outline'           as const, text: 'Repeated late cancellations may affect future bookings' },
                   { icon: 'repeat-outline'            as const, text: 'No-show – 48-hour window to reschedule free' },
-                  { icon: 'close-circle-outline'      as const, text: 'Booking rejected by hospital – Full refund' },
+                  { icon: 'close-circle-outline'      as const, text: 'Booking rejected by hospital – no charge' },
                 ].map((p, i) => (
                   <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 7 }}>
                     <Ionicons name={p.icon} size={13} color={t.textSecondary} />
@@ -1176,7 +1214,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               {submitting
                 ? <ActivityIndicator color="#fff" />
                 : <Text style={[s.ctaBtnText, { color: '#fff' }]}>
-                    {isManual ? 'Submit for Review' : 'Confirm & Pay'}
+                    {isManual ? 'Submit for Review' : 'Confirm booking'}
                   </Text>}
             </TouchableOpacity>
           )}

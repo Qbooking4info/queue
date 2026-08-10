@@ -146,7 +146,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const handleCancel = () => {
     Alert.alert(
       'Cancel appointment?',
-      'A refund will be processed based on our cancellation policy.\n\n• More than 24h before: 100% refund\n• Less than 24h before: 50% refund',
+      'Nothing has been charged for this booking — payment is made at the hospital, so there is nothing to refund.\n\nCancelling frees your slot for another patient.',
       [
         { text: 'Keep appointment', style: 'cancel' },
         {
@@ -632,7 +632,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <View style={[st.refundNote, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.2)', flexDirection: 'row', alignItems: 'flex-start', gap: 6 }]}>
               <Ionicons name="checkmark-circle" size={14} color="#FF5C5C" style={{ marginTop: 1 }} />
               <Text style={[st.refundText, { color: '#FF5C5C', flex: 1 }]}>
-                Appointment cancelled. {refundPct === 100 ? 'Full refund' : `${refundPct}% refund`} will arrive in 2–3 business days.
+                Appointment cancelled. Nothing was charged for this booking, so there is nothing to refund.
               </Text>
             </View>
           )}

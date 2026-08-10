@@ -673,7 +673,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             style={[s.nextBtn, { backgroundColor: '#FF5C5C', flex: 1, opacity: submitting ? 0.6 : 1 }]}>
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm & Pay'}</Text></View>}
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm booking'}</Text></View>}
           </TouchableOpacity>
         )}
       </View>

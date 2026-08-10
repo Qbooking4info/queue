@@ -124,7 +124,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
               requests. You may be asked to describe your symptoms or upload a referral letter.
-              Rejected bookings receive a full refund.
+              Nothing is charged until you are seen at the hospital.
             </Text>
           </View>
         )}

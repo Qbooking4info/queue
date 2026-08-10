@@ -1,6 +1,6 @@
 # Queue — Product Requirements Document
-**Version:** 2.0  
-**Updated:** July 2026  
+**Version:** 2.1  
+**Updated:** August 2026  
 **Market:** Nigeria (₦ / WAT)  
 **Status:** Live
 
@@ -117,7 +117,7 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Emergency quick-access button
 
 ### Search / Find Care
-- Filter chips: All, Virtual, Open Now, HMO Accepted, Emergency
+- Filter chips: All, Virtual, Open Now, Emergency *(HMO Accepted is specified but not implemented)*
 - List view sorted by GPS distance (nearest first)
 - Map view with green pin markers and callouts
 - Toggle between list and map view
@@ -146,7 +146,7 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Upcoming and past tabs
 - Detail: doctor, time, location, status
 - Reschedule appointment
-- Cancel with refund policy shown
+- Cancel at any time (nothing is charged at booking — see §06)
 
 ### Profile
 - Medical history
@@ -169,7 +169,7 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 | Feature | Detail |
 |---|---|
 | Location permission | expo-location — foreground permission; stored in LocationContext |
-| Distance calculation | Haversine formula; outputs "350 m" or "2.3 km"; list sorted nearest-first |
+| Distance calculation | Haversine formula; outputs "350 m" or "2.3 km"; list sorted nearest-first. **Inert in production — no hospital has coordinates, so the card falls back to showing the city name** |
 | Map view (Search) | react-native-maps; green pins; Callout with name, specialty, tap-to-view; Lagos fallback (6.5244, 3.3792) |
 | Map preview (Profile) | 180px embedded MapView on Info tab; scroll/zoom disabled; single marker |
 | Get Directions | Coords → `maps/dir/?destination=LAT,LNG`; address fallback → `maps/search/?query=ADDRESS` |
@@ -186,10 +186,29 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 | Referral requirement | Optional per hospital — patients attach referral or describe symptoms |
 | Daily booking limit | Configurable; patients prompted to book next available day when reached. Blank = unlimited |
 | OPD / walk-in fee | Set in ₦ per hospital; ₦0 for free OPD. Specialist fees set per doctor separately |
-| Cancellation > 24 hrs | 100% refund |
-| Cancellation ≤ 24 hrs | 50% refund |
+| **Payment collection** | **Queue does not process payments.** Fees shown in the app are the amount payable *to the hospital, at the hospital*. The `payments` table exists but nothing writes to it and no processor is integrated |
+| **Refunds** | **Not applicable while Queue takes no money.** `appointments.refund_pct` is still computed and stored for when payment is integrated, but no refund can be issued and the app no longer promises one |
 | No-show | Patient has 48 hours to reschedule at no extra charge |
-| Rejected booking | 100% refund always |
+| Cancellation | Free at any time — nothing has been charged |
+
+---
+
+## 06b · Ambulance & Emergency Transport
+
+Not present in v2.0 of this document despite being the largest subsystem added
+since. 13 tables, a dispatch engine, a crew app, an operator console and four
+pg_cron jobs.
+
+| Area | Detail |
+|---|---|
+| Promise | "We find you an ambulance, and if we can't, we tell you instantly and hand you the numbers that will" |
+| Supply model | Two supplier types — hospital fleets and independent certified operators. Both are organisations; there is no gig supply |
+| Duty state | `set_unit_duty()` puts a unit on duty by writing an `ambulance_shifts` row and setting `status='available'`. On duty ≠ dispatchable: a position fresher than 120s is also required |
+| Matching | Pure scoring in `web/src/lib/dispatch/matching.ts` — effective tier is `least(vehicle, crew)`, plus capability fit, shift headroom, road ETA |
+| 60s deadline | Three independent layers: pure-SQL pg_cron (no HTTP dependency), the `/api/transport/sweep` endpoint driven by pg_net, and a client-side timer in the app |
+| Fallback directory | `emergency_directory` with enforced verification and a 90-day decay window. **Currently empty — patients see no numbers on failure** |
+| Instrumentation | `dispatch_attempts` records nearest-unit distance even when nothing was dispatchable, which distinguishes a coverage gap from an adoption gap from a capacity gap |
+| Status | Dispatch works end-to-end. **No real ambulance is on duty**, so there is no supply to dispatch |
 
 ---
 
@@ -244,20 +263,22 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Hospital profile embedded map + Get Directions
 - Web settings location picker (Nominatim geocoding)
 - Push notifications (Expo)
-- Dependents, medical history, prescriptions
+- Dependents, medical history, prescriptions *(prescriptions are derived from completed appointments; there is no `prescriptions` table)*
 - Date filter with 14 ranges including future dates
 - Subscription plan selection during onboarding
 - Server-side role API (RLS-safe login on Vercel)
 
 ### In Progress ⚙
-- HMO / insurance verification flow
-- In-app payment integration (₦)
+- HMO / insurance verification flow *(the Search filter chip described in §04 is not built)*
+- In-app payment integration (₦) — **nothing is collected today; see §06**
 - EMR integration (Growth+ plans)
-- Hospital coordinate population (admins setting lat/lng)
+- Hospital coordinate population — **0 of 2 live hospitals have lat/lng**, which
+  silently degrades distance sorting, map pins and ambulance dispatch ranking
 
 ### Planned ○
-- Telemedicine / video consultation
-- Patient review & rating system
+- ~~Telemedicine / video consultation~~ — **built** (Agora token route, 4 video
+  screens, `virtual_sessions`); unused in production so far
+- Patient review & rating system — `reviews` table exists, 0 rows
 - Lab results upload & sharing
 - Repeat prescription reminders
 - iOS app (currently Android-only)
@@ -265,5 +286,5 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 
 ---
 
-*Queue · Product Requirements Document · v2.0 · July 2026*  
+*Queue · Product Requirements Document · v2.1 · August 2026*  
 *Confidential — Internal Use Only*

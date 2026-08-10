@@ -148,7 +148,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const hospitalName = (full as any)?.hospital?.name ?? 'the hospital'
       await notifyPatient(
         db, id, 'cancelled', 'Booking Not Approved',
-        `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${body.note}. A full refund has been issued.`,
+        `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${body.note}. No payment was taken for this booking.`,
       )
       return NextResponse.json({ success: true })
     }
