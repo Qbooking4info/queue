@@ -7,6 +7,22 @@ const supabaseUrl      = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey  = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 const supabasePublicKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLIC_KEY!
 
+/**
+ * Prefer the publishable key; fall back to the legacy anon key.
+ *
+ * The legacy anon and legacy service_role keys are both JWTs signed by the same
+ * project JWT secret, so the leaked service_role key (published in a public repo
+ * on 2026-07-26) cannot be revoked without also invalidating legacy anon — which
+ * is compiled into every shipped build. Until enough installs are on a build
+ * that uses sb_publishable_, disabling legacy keys would sign every user out and
+ * break the app.
+ *
+ * The fallback keeps this build working either way, so it can ship before the
+ * legacy keys are turned off rather than having to land in the same instant.
+ * Once the legacy keys are disabled the fallback is dead weight and should go.
+ */
+const supabaseClientKey = supabasePublicKey || supabaseAnonKey
+
 // Supabase session tokens can exceed the 2 KB keychain limit on iOS.
 // This adapter chunks large values across multiple SecureStore keys.
 const CHUNK = 1800
@@ -63,7 +79,7 @@ const WebStorageAdapter = {
 
 // Auth client — session stored encrypted in the device keychain/keystore on native,
 // localStorage on web.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseClientKey, {
   auth: {
     storage: Platform.OS === 'web' ? WebStorageAdapter : SecureStoreAdapter,
     autoRefreshToken: true,
@@ -73,6 +89,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 // Public read-only client — no session needed
-export const publicDb = createClient(supabaseUrl, supabasePublicKey || supabaseAnonKey, {
+export const publicDb = createClient(supabaseUrl, supabaseClientKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
