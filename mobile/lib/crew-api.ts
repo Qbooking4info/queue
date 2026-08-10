@@ -50,6 +50,50 @@ export interface ActiveJob {
  *  requires an actor from the receiving facility, not the crew. */
 export type CrewJobStatus = 'en_route_to_patient' | 'on_scene' | 'transporting' | 'arrived_at_destination'
 
+export interface MyUnit {
+  ambulance_id: string
+  plate_number: string
+  call_sign: string | null
+  vehicle_tier: string
+  capabilities: string[]
+  status: 'offline' | 'available' | 'assigned' | 'busy' | 'out_of_service'
+  provider_id: string
+  provider_name: string
+  on_duty: boolean
+  shift_ends_at: string | null
+  last_ping_at: string | null
+  seconds_since_ping: number | null
+  /**
+   * The distinction that matters: being on duty is not the same as being
+   * dispatchable. find_candidate_units also needs a position fresher than
+   * unit_location_ttl_seconds(), so a crew whose app has been backgrounded is
+   * invisible however green their duty toggle looks. The server computes this
+   * with the same threshold dispatch uses, so the crew is never told they are
+   * covering an area they are not.
+   */
+  visible_to_dispatch: boolean
+}
+
+export async function getMyUnits(): Promise<MyUnit[]> {
+  const { data, error } = await supabase.rpc('get_my_units')
+  if (error) throw error
+  return (data ?? []) as MyUnit[]
+}
+
+export async function setUnitDuty(
+  ambulanceId: string, onDuty: boolean, opts?: { crewTier?: string; hours?: number },
+): Promise<void> {
+  const { error } = await supabase.rpc('set_unit_duty', {
+    p_ambulance_id: ambulanceId,
+    p_on_duty: onDuty,
+    p_crew_tier: opts?.crewTier ?? null,
+    p_hours: opts?.hours ?? 12,
+  })
+  // Surfaced, not swallowed: "you must finish the active job first" and "unit is
+  // out of service" are both things the crew needs to read.
+  if (error) throw new Error(error.message)
+}
+
 export async function getMyPendingOffers(): Promise<PendingOffer[]> {
   const { data, error } = await supabase.rpc('get_my_pending_offers')
   if (error) throw error

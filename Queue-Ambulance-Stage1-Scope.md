@@ -1,6 +1,6 @@
 # Queue — Ambulance Stage One Scope
 
-**Status:** steps 1-2 shipped; step 3 next
+**Status:** steps 1-4 shipped; step 5 (scheduling the sweep) outstanding
 **Date:** 2026-08-10
 
 ## The promise
@@ -214,8 +214,16 @@ Without it there is no proximity anything, ever.
    a request created at 12:03:25 with a 60s budget was swept at 12:04:34
    (9s overshoot, within the 10s cron tick), with the status flip, dispatcher
    alert, patient notification and `transport_events` audit row all landing.
-3. **Break the deadlock.** Duty toggle, idle heartbeat, operator console. Dispatch can
-   now actually find a unit.
+3. ~~**Break the deadlock.**~~ **Done** — `20260810000003`, applied. `set_unit_duty`
+   is the missing writer for `ambulances.status`; the crew heartbeat now follows
+   *duty* rather than an active job. Proved end to end against production with a
+   throwaway crew/provider/unit: offline+no-ping -> on duty (still invisible, no
+   position) -> heartbeat -> `visible_to_dispatch`, and `find_candidate_units`
+   then returned the rig at 156m. All test data removed.
+   **Remaining gap:** the heartbeat is foreground-only, so a backgrounded app
+   goes stale after `unit_location_ttl_seconds()` (120s) and the unit drops out
+   of dispatch. The crew card says so explicitly rather than showing a green
+   light that lies. Background location is a separate piece of work.
 4. **`dispatch_attempts`.** Start collecting the coverage-gap dataset immediately —
    it is the input to every supply conversation.
 5. **Layer B.** Schedule the sweep once the plan/scheduler question is settled.

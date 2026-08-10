@@ -7,7 +7,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import {
   getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus,
   sendLocationPing, nextJobStatus, CREW_STATUS_LABEL,
-  type PendingOffer, type ActiveJob,
+  getMyUnits, setUnitDuty,
+  type PendingOffer, type ActiveJob, type MyUnit,
 } from '../../lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '../../lib/ambulance-api'
 
@@ -37,13 +38,21 @@ export function CrewHomeScreen() {
   const [respondingId, setRespondingId] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const [units, setUnits] = useState<MyUnit[]>([])
+  const [dutyBusy, setDutyBusy] = useState<string | null>(null)
+  const [locationDenied, setLocationDenied] = useState(false)
 
   const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // A crew member is normally attached to one rig. If they can operate several,
+  // the on-duty one wins — that's the unit dispatch will actually offer jobs to.
+  const onDutyUnit = units.find(u => u.on_duty) ?? null
+
   const load = useCallback(async () => {
     try {
-      const job = await getMyActiveJob()
+      const [job, myUnits] = await Promise.all([getMyActiveJob(), getMyUnits().catch(() => [])])
       setActiveJob(job)
+      setUnits(myUnits)
       setOffers(job ? [] : await getMyPendingOffers())
     } catch (err) {
       console.warn('[crew] load failed', err)
@@ -52,6 +61,18 @@ export function CrewHomeScreen() {
       setRefreshing(false)
     }
   }, [])
+
+  async function handleToggleDuty(unit: MyUnit) {
+    setDutyBusy(unit.ambulance_id)
+    try {
+      await setUnitDuty(unit.ambulance_id, !unit.on_duty)
+      await load()
+    } catch (err) {
+      Alert.alert('Could not change duty status', err instanceof Error ? err.message : 'Please try again.')
+    } finally {
+      setDutyBusy(null)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -65,19 +86,35 @@ export function CrewHomeScreen() {
     return () => clearInterval(tick)
   }, [])
 
-  // Send a location ping on an interval while there's an active job. Stops
-  // cleanly whenever the job clears (completed, cancelled, or reassigned).
+  // Heartbeat.
+  //
+  // This used to be `if (!activeJob) return`, which was the supply-side half of
+  // the dispatch deadlock: an idle unit never reported a position, and
+  // find_candidate_units drops any unit whose last fix is older than
+  // unit_location_ttl_seconds(). A unit could only be seen once it already had
+  // a job. Now the ping follows *duty*, so an on-duty idle rig is visible to
+  // dispatch — which is the entire point of being on duty.
+  const pingUnitId = activeJob?.assigned_unit_id ?? onDutyUnit?.ambulance_id ?? null
+
   useEffect(() => {
     if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null }
-    if (!activeJob) return
+    if (!pingUnitId) return
+
+    let stopped = false
 
     async function pingOnce() {
-      if (!activeJob) return
+      if (stopped || !pingUnitId) return
       try {
         const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-        if (status !== 'granted') return
+        if (status !== 'granted') {
+          // Without location the unit is on duty but undispatchable. Surfaced in
+          // the duty card rather than failing silently.
+          setLocationDenied(true)
+          return
+        }
+        setLocationDenied(false)
         const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-        await sendLocationPing(activeJob.assigned_unit_id, [{
+        await sendLocationPing(pingUnitId, [{
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           heading: pos.coords.heading ?? undefined,
@@ -92,8 +129,8 @@ export function CrewHomeScreen() {
 
     pingOnce()
     pingTimer.current = setInterval(pingOnce, PING_INTERVAL_MS)
-    return () => { if (pingTimer.current) clearInterval(pingTimer.current) }
-  }, [activeJob?.request_id, activeJob?.assigned_unit_id])
+    return () => { stopped = true; if (pingTimer.current) clearInterval(pingTimer.current) }
+  }, [pingUnitId])
 
   async function handleRespond(offerId: string, action: 'accept' | 'decline') {
     setRespondingId(offerId)
@@ -145,6 +182,68 @@ export function CrewHomeScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
       >
+        {/* Duty. Above everything else because an off-duty unit receives no
+            offers at all — if this is off, the empty offer list below is not a
+            quiet night, it's the crew being invisible. */}
+        {units.map(unit => {
+          const stale = unit.on_duty && !unit.visible_to_dispatch
+          return (
+            <View key={unit.ambulance_id} style={[s.card, {
+              backgroundColor: t.cardBg,
+              borderColor: unit.on_duty ? (stale ? '#FFB547' : '#00C265') : t.cardBorder,
+              borderWidth: unit.on_duty ? 1.5 : 1,
+            }]}>
+              <View style={[s.row, { alignItems: 'center' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.statusLabel, { color: t.textPrimary }]}>
+                    {unit.call_sign ?? unit.plate_number}
+                  </Text>
+                  <Text style={[s.detailText, { color: t.textMuted, marginTop: 2 }]}>
+                    {unit.vehicle_tier} · {unit.provider_name}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleToggleDuty(unit)}
+                  disabled={dutyBusy === unit.ambulance_id}
+                  style={[s.secondaryBtn, {
+                    borderColor: unit.on_duty ? '#FF5C5C55' : '#00C26555',
+                    backgroundColor: unit.on_duty ? '#FF5C5C14' : '#00C26514',
+                    opacity: dutyBusy === unit.ambulance_id ? 0.5 : 1,
+                    paddingHorizontal: 16,
+                  }]}
+                >
+                  {dutyBusy === unit.ambulance_id
+                    ? <ActivityIndicator size="small" color={t.textMuted} />
+                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? '#FF5C5C' : '#00C265' }}>
+                        {unit.on_duty ? 'Go off duty' : 'Go on duty'}
+                      </Text>}
+                </TouchableOpacity>
+              </View>
+
+              {/* On duty and dispatchable are different things, and the crew has
+                  to be told which one they actually are. */}
+              <View style={[s.detailRow, { marginTop: 10 }]}>
+                <Ionicons
+                  name={unit.visible_to_dispatch ? 'radio-outline' : unit.on_duty ? 'warning-outline' : 'moon-outline'}
+                  size={14}
+                  color={unit.visible_to_dispatch ? '#00C265' : stale ? '#FFB547' : t.textMuted}
+                />
+                <Text style={[s.detailText, {
+                  color: unit.visible_to_dispatch ? '#00C265' : stale ? '#FFB547' : t.textMuted, flex: 1,
+                }]}>
+                  {unit.visible_to_dispatch
+                    ? 'Visible to dispatch — you can receive jobs'
+                    : stale
+                      ? locationDenied
+                        ? 'On duty, but location is off. Dispatch cannot see you.'
+                        : 'On duty, but your position is stale. Keep this screen open to stay dispatchable.'
+                      : 'Off duty — you will not receive any jobs'}
+                </Text>
+              </View>
+            </View>
+          )
+        })}
+
         <Text style={[s.title, { color: t.textPrimary }]}>{activeJob ? 'Active Job' : 'Pending Offers'}</Text>
 
         {activeJob ? (
