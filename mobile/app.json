@@ -12,7 +12,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
         "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -29,7 +32,10 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -54,8 +60,10 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
-          "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances."
+          "locationAlwaysAndWhenInUsePermission": "Queue reports an on-duty ambulance's position so dispatch can send it the nearest emergency. Only while you are on duty.",
+          "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       "expo-secure-store",

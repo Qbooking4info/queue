@@ -11,10 +11,13 @@ import {
   type PendingOffer, type ActiveJob, type MyUnit,
 } from '../../lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '../../lib/ambulance-api'
+import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/location-task'
 
-// Foreground-only pings while this screen has an active job open — background
-// tracking (app minimized) is a separate, larger feature (needs a TaskManager
-// background task + always-allow location permission) not built yet.
+// Foreground pings. These are now a supplement, not the only source: while on
+// duty, lib/location-task.ts reports position via a TaskManager background task
+// so the unit stays dispatchable with the app closed and the phone locked. This
+// interval keeps the position tight while the crew is actually looking at the
+// screen, and covers the case where background permission was declined.
 const PING_INTERVAL_MS = 15_000
 const POLL_INTERVAL_MS = 6_000
 
@@ -65,7 +68,33 @@ export function CrewHomeScreen() {
   async function handleToggleDuty(unit: MyUnit) {
     setDutyBusy(unit.ambulance_id)
     try {
-      await setUnitDuty(unit.ambulance_id, !unit.on_duty)
+      const goingOnDuty = !unit.on_duty
+      await setUnitDuty(unit.ambulance_id, goingOnDuty)
+
+      // Position reporting follows duty, and must survive the screen being
+      // closed: find_candidate_units drops any unit whose last fix is older than
+      // 120s, so a locked phone used to remove the rig from dispatch entirely.
+      if (goingOnDuty) {
+        const started = await startBackgroundLocation(unit.ambulance_id)
+        if (!started.ok) {
+          // On duty but undispatchable is the dangerous state — say so rather
+          // than let the toggle imply coverage that does not exist.
+          setLocationDenied(true)
+          Alert.alert(
+            'Dispatch cannot see you',
+            started.reason === 'background_denied'
+              ? 'You are on duty, but location is not set to "Allow all the time". Dispatch can only send you jobs while this screen is open. Change it in Settings to stay available with your phone locked.'
+              : started.reason === 'foreground_denied'
+                ? 'You are on duty, but location permission is denied. Dispatch cannot see this unit at all.'
+                : 'You are on duty, but background location could not start. Keep this screen open to stay dispatchable.',
+          )
+        } else {
+          setLocationDenied(false)
+        }
+      } else {
+        await stopBackgroundLocation()
+      }
+
       await load()
     } catch (err) {
       Alert.alert('Could not change duty status', err instanceof Error ? err.message : 'Please try again.')

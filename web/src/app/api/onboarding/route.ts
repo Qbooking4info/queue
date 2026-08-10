@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const {
       name, type, description,
       registrationNumber, mdcnNumber,
-      address, city, state, phone, email, whatsapp,
+      address, city, state, phone, email, whatsapp, latitude, longitude,
       clinicModel, clinics,
       accepts_virtual, emergency_hours,
       specialtyIds, hours, planId,
@@ -81,6 +81,14 @@ export async function POST(req: NextRequest) {
       name, slug, type: type ?? 'hospital',
       description: description || null,
       address, city, state,
+      // Captured at onboarding because everything location-aware depends on it:
+      // ambulance dispatch ranks candidates by distance to the destination
+      // hospital, and the patient directory sorts by proximity. Backfilling
+      // later means geocoding a free-text address nobody can verify — the two
+      // hospitals already in production have no coordinates, and their
+      // addresses geocode to the wrong part of Lagos or not at all.
+      latitude:  typeof latitude  === 'number' ? latitude  : null,
+      longitude: typeof longitude === 'number' ? longitude : null,
       phone: phone || null, email: email || null, whatsapp: whatsapp || null,
       accepts_virtual: accepts_virtual ?? false,
       emergency_hours: emergency_hours ?? false,

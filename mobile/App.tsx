@@ -94,6 +94,10 @@ import { HospitalOnboardingScreen } from './screens/onboarding/HospitalOnboardin
 import { RoleSelectScreen }          from './screens/RoleSelectScreen'
 import { HospitalAuthScreen }        from './screens/HospitalAuthScreen'
 import { HospitalRegisterScreen }    from './screens/HospitalRegisterScreen'
+// Registers the crew background-location task. Must be imported at app start:
+// TaskManager needs the task defined before the OS can deliver work to a
+// cold-started process, otherwise on-duty crews silently stop reporting.
+import './lib/location-task'
 
 const Tab        = createBottomTabNavigator()
 const Stack      = createNativeStackNavigator()

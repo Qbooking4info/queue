@@ -27,6 +27,8 @@ yarn-error.log*
 # Dev-server launch logs (Expo/Metro startup output) — machine-local, and they
 # capture whichever env vars that run happened to export.
 *.launch.log
+dev.log
+mobile.log
 
 # Generated whole-repo source dumps.
 #

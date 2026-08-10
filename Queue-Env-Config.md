@@ -12,7 +12,8 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service-role key — **server-only**; never expose to the browser. Used by `createAdminClient()` to bypass RLS in API routes |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry DSN for error monitoring. Unset = Sentry is fully disabled (no-op init, zero overhead) |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | No | Enables source map upload on build. Unset = build skips upload, no functional change |
-| `CRON_SECRET` | Yes (if ambulance dispatch is live) | Shared secret for `/api/transport/sweep`, the dispatch scheduler tick. Vercel Cron sends it automatically as `Authorization: Bearer <CRON_SECRET>`. **The route fails closed** — if this is unset the sweep returns 401 and stranded searches are never advanced and scheduled transport is never promoted |
+| `CRON_SECRET` | Yes (ambulance dispatch) | Shared secret for `/api/transport/sweep`. **Not driven by Vercel Cron** — this project is on the Hobby plan, which caps crons at once daily and fails the whole deployment on a sub-daily schedule. The tick comes from Postgres instead: `invoke_transport_sweep()` on pg_cron every 30s via pg_net. The same value must be stored in the `app_config` table (`key='cron_secret'`), or the sweep 401s silently. Check with `select * from transport_sweep_health()` |
+| `NEXT_PUBLIC_SUPABASE_PUBLIC_KEY` | Yes | The `sb_publishable_` key. Preferred over `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which is the legacy JWT kept only as a fallback until legacy keys are disabled |
 | `MAPBOX_ACCESS_TOKEN` | No | Road-ETA matrix for ambulance dispatch ranking. Unset = dispatch degrades to straight-line distance ranking (logged, not fatal) |
 
 **Template:**
@@ -82,5 +83,32 @@ supabase db push
 | Set `EXPO_PUBLIC_*` in EAS secrets for mobile builds | Via `eas secret:create` |
 | Nominatim `User-Agent` in `/api/geocode` | Already set to `QueueApp/1.0 (qbooking4info@gmail.com)` |
 | Set `CRON_SECRET` on Vercel | Required for `/api/transport/sweep` |
-| **Schedule `/api/transport/sweep`** | **Nothing drives it yet.** A `web/vercel.json` cron was tried and Vercel **failed the entire deployment** — sub-daily crons are Pro-only and a Hobby project rejects the config outright rather than warning. On Pro, add `web/vercel.json` with `{"crons":[{"path":"/api/transport/sweep","schedule":"* * * * *"}]}`. On Hobby, point an external scheduler at the endpoint every ~60s with the bearer secret. Until one of these is done, ignored dispatch offers strand ambulance requests in `searching` and scheduled transport is never promoted |
-| Confirm the sweep is actually firing | `GET /api/transport/sweep` with the bearer secret returns `{advanced, promoted, failed}`. If nothing ever advances, ambulance requests strand in `searching` silently |
+| ~~Schedule `/api/transport/sweep`~~ | **Done.** Driven from Postgres: `invoke-transport-sweep` pg_cron job every 30s via pg_net. Vercel Cron was not viable on the Hobby plan |
+| Confirm the sweep is actually firing | `select * from transport_sweep_health()` — check `last_status_code = 200` and `cron_active`. A 401 means `CRON_SECRET` on Vercel and `app_config.cron_secret` disagree |
+
+---
+
+## Stale variables on Vercel — do not trust these
+
+The Supabase–Vercel integration auto-created a set of variables that point at a
+**different Supabase project** (`hsgynvkclwjllvscacjm`), not the live one
+(`qzodmkgyzguzzyovjpfx`):
+
+```
+SUPABASE_URL                          <- NOT the live project
+SUPABASE_ANON_KEY
+SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY
+SUPABASE_JWT_SECRET
+POSTGRES_URL / POSTGRES_PRISMA_URL / POSTGRES_* 
+```
+
+Verified: **nothing in this codebase reads any of them.** The app uses
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLIC_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY` exclusively.
+
+They are inert, but they are a live footgun: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+was very nearly reused during the August key rotation because the name looked
+right — it would have pointed the app at the wrong database. If you delete them,
+confirm nothing else in the team's Vercel projects depends on that other project
+first; the values are encrypted and cannot be recovered afterwards.

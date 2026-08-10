@@ -21,6 +21,7 @@
     "expo-notifications": "~56.0.21",
     "expo-secure-store": "~56.0.4",
     "expo-status-bar": "~56.0.4",
+    "expo-task-manager": "~56.0.25",
     "expo-updates": "~56.0.22",
     "react": "19.2.3",
     "react-dom": "^19.2.3",
