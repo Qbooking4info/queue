@@ -93,6 +93,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ambulance_crew_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ambulance_crew_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -372,7 +379,32 @@ export type Database = {
             referencedRelation: "ambulance_providers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ambulances_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      app_config: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
       }
       appointment_documents: {
         Row: {
@@ -1675,6 +1707,9 @@ export type Database = {
           mdcn_accreditation: string | null
           name: string
           opd_fee: number | null
+          paystack_account_last4: string | null
+          paystack_bank_name: string | null
+          paystack_subaccount_code: string | null
           phone: string | null
           registration_number: string | null
           requires_referral: boolean | null
@@ -1719,6 +1754,9 @@ export type Database = {
           mdcn_accreditation?: string | null
           name: string
           opd_fee?: number | null
+          paystack_account_last4?: string | null
+          paystack_bank_name?: string | null
+          paystack_subaccount_code?: string | null
           phone?: string | null
           registration_number?: string | null
           requires_referral?: boolean | null
@@ -1763,6 +1801,9 @@ export type Database = {
           mdcn_accreditation?: string | null
           name?: string
           opd_fee?: number | null
+          paystack_account_last4?: string | null
+          paystack_bank_name?: string | null
+          paystack_subaccount_code?: string | null
           phone?: string | null
           registration_number?: string | null
           requires_referral?: boolean | null
@@ -1877,6 +1918,7 @@ export type Database = {
           appointment_id: string | null
           created_at: string | null
           currency: string
+          failure_reason: string | null
           hospital_id: string
           hospital_payout: number | null
           id: string
@@ -1890,12 +1932,15 @@ export type Database = {
           refund_reason: string | null
           refunded_at: string | null
           status: string
+          verified_at: string | null
+          webhook_event: string | null
         }
         Insert: {
           amount: number
           appointment_id?: string | null
           created_at?: string | null
           currency?: string
+          failure_reason?: string | null
           hospital_id: string
           hospital_payout?: number | null
           id?: string
@@ -1909,12 +1954,15 @@ export type Database = {
           refund_reason?: string | null
           refunded_at?: string | null
           status?: string
+          verified_at?: string | null
+          webhook_event?: string | null
         }
         Update: {
           amount?: number
           appointment_id?: string | null
           created_at?: string | null
           currency?: string
+          failure_reason?: string | null
           hospital_id?: string
           hospital_payout?: number | null
           id?: string
@@ -1928,6 +1976,8 @@ export type Database = {
           refund_reason?: string | null
           refunded_at?: string | null
           status?: string
+          verified_at?: string | null
+          webhook_event?: string | null
         }
         Relationships: [
           {
@@ -2536,6 +2586,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transport_invoices_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transport_invoices_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: true
@@ -2584,6 +2641,13 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "ambulance_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_rate_cards_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2992,6 +3056,27 @@ export type Database = {
       }
     }
     Views: {
+      ambulance_providers_public: {
+        Row: {
+          id: string | null
+          is_verified: boolean | null
+          name: string | null
+          provider_type: string | null
+        }
+        Insert: {
+          id?: string | null
+          is_verified?: boolean | null
+          name?: string | null
+          provider_type?: string | null
+        }
+        Update: {
+          id?: string | null
+          is_verified?: boolean | null
+          name?: string | null
+          provider_type?: string | null
+        }
+        Relationships: []
+      }
       appointments_with_vitals: {
         Row: {
           appointment_date: string | null
@@ -3631,6 +3716,7 @@ export type Database = {
         Returns: number
       }
       increment_slot_booking: { Args: { slot_id: string }; Returns: string }
+      invoke_transport_sweep: { Args: never; Returns: undefined }
       is_hospital_admin: { Args: { hospital_uuid: string }; Returns: boolean }
       is_hospital_open_now: {
         Args: { p_hospital_id: string }
@@ -4311,6 +4397,18 @@ export type Database = {
         Returns: unknown
       }
       tier_rank: { Args: { p_tier: string }; Returns: number }
+      transport_sweep_health: {
+        Args: never
+        Returns: {
+          cron_active: boolean
+          failed_last_hour: number
+          is_configured: boolean
+          last_attempt_at: string
+          last_error: string
+          last_status_code: number
+          ok_last_hour: number
+        }[]
+      }
       unaccent: { Args: { "": string }; Returns: string }
       unit_location_ttl_seconds: { Args: never; Returns: number }
       unlockrows: { Args: { "": string }; Returns: number }
