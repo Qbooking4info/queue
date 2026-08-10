@@ -35,6 +35,15 @@ export async function POST(req: NextRequest) {
   const { data: caller } = await db.from('users').select('id, email').eq('auth_id', user.id).single()
   if (!caller) return Errors.notFound('User')
 
+  // Paystack requires a deliverable email — it is the receipt destination and
+  // the transaction's identity. Checked here so a missing or malformed address
+  // gives a fixable message instead of a generic "could not start the payment"
+  // from deep inside the provider call.
+  const email = (caller.email ?? user.email ?? '').trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return Errors.validation('A valid email address is required to pay. Add one to your profile and try again.')
+  }
+
   const resolved = await resolveAppointmentFee(db, appointmentId)
   if (!resolved) return Errors.notFound('Appointment')
 
@@ -104,7 +113,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await initializeTransaction({
-      email: caller.email ?? user.email ?? '',
+      email,
       amountKobo: fee.totalKobo,
       reference,
       subaccount,
@@ -129,7 +138,11 @@ export async function POST(req: NextRequest) {
     await db.from('payments')
       .update({ status: 'failed', failure_reason: err instanceof Error ? err.message : String(err) } as never)
       .eq('paystack_ref', reference)
-    console.error('[payments] initialize failed', reference, err)
-    return Errors.internal('Could not start the payment')
+    // Paystack's messages are user-safe and specific ("Invalid Email Address
+    // Passed", "Subaccount not found"). Swallowing them turned every failure
+    // into an unactionable "could not start the payment".
+    const reason = err instanceof Error ? err.message : 'Could not start the payment'
+    console.error('[payments] initialize failed', reference, reason)
+    return NextResponse.json({ error: reason, code: 'PAYSTACK_ERROR' }, { status: 502 })
   }
 }
