@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
-  StyleSheet, ActivityIndicator } from 'react-native'
+  StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -16,6 +16,7 @@ import {
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { fmt12 } from '../lib/format'
+import { payForAppointment } from '../lib/payments'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
@@ -465,6 +466,25 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     setSubmitting(false)
 
     if (result?.ok) {
+      // Offer online payment if the platform and this hospital support it.
+      // Deliberately AFTER the booking exists: the appointment is the thing the
+      // patient came for, and a payment failure must never lose it. If payment
+      // is unavailable or abandoned, the booking simply stays payable at the
+      // hospital — which is what happens today for every booking.
+      if (result.id) {
+        const outcome = await payForAppointment(result.id)
+        if (outcome.status === 'error') {
+          Alert.alert(
+            'Payment could not be completed',
+            `${outcome.message}\n\nYour booking is confirmed — you can pay at the hospital.`,
+          )
+        } else if (outcome.status === 'pending') {
+          Alert.alert('Payment received', 'We are confirming it with your bank. Your booking is held.')
+        }
+        // 'disabled' and 'cancelled' are silent: pay-at-hospital is the norm,
+        // not an exception worth interrupting the patient about.
+      }
+
       // Notify doctor/staff about new booking (best-effort)
       if (result.id) {
         const apiBase = process.env.EXPO_PUBLIC_API_URL ?? ''

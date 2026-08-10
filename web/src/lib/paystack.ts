@@ -134,3 +134,55 @@ export function buildReference(appointmentId: string): string {
   const rand = randomBytes(5).toString('hex').toUpperCase()
   return `QUE-${appointmentId.slice(0, 8)}-${rand}`
 }
+
+// ---------------------------------------------------------------------------
+// Subaccount onboarding
+// ---------------------------------------------------------------------------
+
+export interface Bank { name: string; code: string; slug: string }
+
+/** Nigerian banks Paystack can settle to. */
+export async function listBanks(): Promise<Bank[]> {
+  return call<Bank[]>('/bank?country=nigeria&perPage=100')
+}
+
+/**
+ * Confirm an account number belongs to a real account, and return the name on
+ * it.
+ *
+ * Shown to the admin for confirmation before the subaccount is created — a
+ * transposed digit here means a hospital's revenue settles to a stranger, and
+ * neither Paystack nor Queue would detect that after the fact.
+ */
+export async function resolveAccount(accountNumber: string, bankCode: string): Promise<{ account_number: string; account_name: string }> {
+  return call<{ account_number: string; account_name: string }>(
+    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+  )
+}
+
+export interface Subaccount { subaccount_code: string; account_number: string; settlement_bank: string }
+
+/**
+ * Create the subaccount a hospital's share settles into.
+ *
+ * percentage_charge is 0 because the split is expressed per-transaction via
+ * transaction_charge (a flat ₦500 platform fee) rather than as a percentage of
+ * every consultation. Setting both would double-charge the hospital.
+ */
+export async function createSubaccount(args: {
+  businessName: string
+  bankCode: string
+  accountNumber: string
+  contactEmail?: string | null
+}): Promise<Subaccount> {
+  return call<Subaccount>('/subaccount', {
+    method: 'POST',
+    body: JSON.stringify({
+      business_name: args.businessName,
+      settlement_bank: args.bankCode,
+      account_number: args.accountNumber,
+      percentage_charge: 0,
+      primary_contact_email: args.contactEmail ?? undefined,
+    }),
+  })
+}

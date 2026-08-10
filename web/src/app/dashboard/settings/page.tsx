@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { PayoutAccount } from './PayoutAccount'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
@@ -71,6 +72,9 @@ export default function SettingsPage() {
   const [ambulanceRadius,     setAmbulanceRadius]      = useState<string>('')
   const [ambulance247,        setAmbulance247]         = useState(true)
 
+  const [payout, setPayout] = useState<{ bankName: string | null; last4: string | null; subaccountCode: string | null }>(
+    { bankName: null, last4: null, subaccountCode: null },
+  )
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -97,6 +101,11 @@ export default function SettingsPage() {
           setAmbulancePrivate(s.ambulance_private_fleet ?? true)
           setAmbulanceRadius(s.ambulance_service_radius_m != null ? String(s.ambulance_service_radius_m) : '')
           setAmbulance247(s.ambulance_service_hours_247 ?? true)
+          setPayout({
+            bankName:       s.paystack_bank_name ?? null,
+            last4:          s.paystack_account_last4 ?? null,
+            subaccountCode: s.paystack_subaccount_code ?? null,
+          })
         }
         setHours(body?.hours ?? [])
         setLoading(false)
@@ -222,6 +231,9 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
+
+          {/* Payout account — where this hospital's share of each payment settles */}
+          <PayoutAccount existing={payout} />
 
           {/* Hospital Location */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>

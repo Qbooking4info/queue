@@ -68,7 +68,8 @@
       ],
       "expo-secure-store",
       "expo-status-bar",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-web-browser"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
