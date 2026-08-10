@@ -170,7 +170,11 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
                 body: JSON.stringify({ appointmentId }),
               })
             }
-          } catch (_) {}
+          } catch (err) {
+            // Teardown is best-effort — the user is leaving either way — but a
+            // silent catch meant a failed session-end was undiagnosable.
+            console.warn('[video] failed to end session on leave', err)
+          }
           navigation.goBack()
         },
       },
