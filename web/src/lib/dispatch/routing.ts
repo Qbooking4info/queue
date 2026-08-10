@@ -46,11 +46,28 @@ function rememberEtas(key: string, etas: (number | null)[]) {
   cache.set(key, { etas, at: Date.now() })
 }
 
+/**
+ * Mapbox caps the driving-traffic matrix at 10 coordinates per request, and the
+ * destination is one of them — so at most 9 origins per call. find_candidate_units
+ * returns up to 12, which silently 422'd the whole batch and dropped EVERY unit to
+ * a null ETA, degrading the round to straight-line ranking with nothing in the logs
+ * beyond a warning. Origins are chunked to stay under the limit.
+ */
+const MAX_ORIGINS_PER_MATRIX_CALL = 9
+
 export async function roadEtas(
   origins: LatLng[],
   destination: LatLng,
 ): Promise<(number | null)[]> {
   if (!origins.length) return []
+
+  if (origins.length > MAX_ORIGINS_PER_MATRIX_CALL) {
+    const chunks: (number | null)[][] = []
+    for (let i = 0; i < origins.length; i += MAX_ORIGINS_PER_MATRIX_CALL) {
+      chunks.push(await roadEtas(origins.slice(i, i + MAX_ORIGINS_PER_MATRIX_CALL), destination))
+    }
+    return chunks.flat()
+  }
 
   const key = cacheKey(origins, destination)
   const hit = cache.get(key)

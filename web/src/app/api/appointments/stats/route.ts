@@ -35,12 +35,23 @@ async function computeRevenue(
     .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).eq('status', 'completed')
   if (orFilter) query = query.or(orFilter)
 
-  const [{ data: rows }, { data: hospital }] = await Promise.all([
-    query,
-    db.from('hospitals').select('opd_fee').eq('id', hospitalId).single(),
-  ])
+  // Paginated. PostgREST caps an unbounded select at 1000 rows and says nothing
+  // about it, so a hospital past 1000 completed appointments in the range was
+  // silently under-reporting its own revenue with no error and no warning — the
+  // most dangerous kind of wrong number, because it looks plausible.
+  const PAGE = 1000
+  const rows: any[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error } = await query.range(from, from + PAGE - 1)
+    if (error) throw error
+    const batch = (page ?? []) as any[]
+    rows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+
+  const { data: hospital } = await db.from('hospitals').select('opd_fee').eq('id', hospitalId).single()
   const opdFee = (hospital as any)?.opd_fee ?? 0
-  return ((rows ?? []) as any[]).reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
+  return rows.reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
 }
 
 interface DoctorWaitConsultStats {
