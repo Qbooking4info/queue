@@ -444,6 +444,7 @@ export type Database = {
           cancellation_reason: string | null
           cancelled_at: string | null
           check_in_date: string | null
+          checked_in_at: string | null
           clinic_id: string | null
           consult_duration_secs: number | null
           consult_ended_at: string | null
@@ -483,6 +484,7 @@ export type Database = {
           type: string
           updated_at: string | null
           urgency: string | null
+          waiting_time_secs: number | null
           walkin_patient_name: string | null
           walkin_patient_phone: string | null
         }
@@ -497,6 +499,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           check_in_date?: string | null
+          checked_in_at?: string | null
           clinic_id?: string | null
           consult_duration_secs?: number | null
           consult_ended_at?: string | null
@@ -536,6 +539,7 @@ export type Database = {
           type: string
           updated_at?: string | null
           urgency?: string | null
+          waiting_time_secs?: number | null
           walkin_patient_name?: string | null
           walkin_patient_phone?: string | null
         }
@@ -550,6 +554,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           check_in_date?: string | null
+          checked_in_at?: string | null
           clinic_id?: string | null
           consult_duration_secs?: number | null
           consult_ended_at?: string | null
@@ -589,6 +594,7 @@ export type Database = {
           type?: string
           updated_at?: string | null
           urgency?: string | null
+          waiting_time_secs?: number | null
           walkin_patient_name?: string | null
           walkin_patient_phone?: string | null
         }
@@ -914,6 +920,59 @@ export type Database = {
           },
         ]
       }
+      dispatch_attempts: {
+        Row: {
+          active_units_total: number | null
+          candidates_after_filter: number
+          candidates_found: number
+          created_at: string
+          id: string
+          nearest_unit_m: number | null
+          offers_made: number
+          on_duty_units_total: number | null
+          radius_m: number
+          reject_reasons: Json
+          request_id: string
+          round: number
+        }
+        Insert: {
+          active_units_total?: number | null
+          candidates_after_filter?: number
+          candidates_found?: number
+          created_at?: string
+          id?: string
+          nearest_unit_m?: number | null
+          offers_made?: number
+          on_duty_units_total?: number | null
+          radius_m: number
+          reject_reasons?: Json
+          request_id: string
+          round: number
+        }
+        Update: {
+          active_units_total?: number | null
+          candidates_after_filter?: number
+          candidates_found?: number
+          created_at?: string
+          id?: string
+          nearest_unit_m?: number | null
+          offers_made?: number
+          on_duty_units_total?: number | null
+          radius_m?: number
+          reject_reasons?: Json
+          request_id?: string
+          round?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_attempts_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "transport_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_offers: {
         Row: {
           ambulance_id: string
@@ -1161,6 +1220,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      emergency_directory: {
+        Row: {
+          alt_phone: string | null
+          city: string | null
+          country: string
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: string
+          last_verified_at: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          phone: string
+          priority: number
+          state: string | null
+          updated_at: string
+          verification_note: string | null
+          verified_by: string
+        }
+        Insert: {
+          alt_phone?: string | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: string
+          last_verified_at: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          phone: string
+          priority?: number
+          state?: string | null
+          updated_at?: string
+          verification_note?: string | null
+          verified_by: string
+        }
+        Update: {
+          alt_phone?: string | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: string
+          last_verified_at?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          phone?: string
+          priority?: number
+          state?: string | null
+          updated_at?: string
+          verification_note?: string | null
+          verified_by?: string
+        }
+        Relationships: []
       }
       emr_integrations: {
         Row: {
@@ -2483,6 +2605,7 @@ export type Database = {
           disposition: string | null
           eta_seconds: number | null
           eta_updated_at: string | null
+          failure_reason: string | null
           id: string
           matched_at: string | null
           origin_hospital_id: string | null
@@ -2498,6 +2621,7 @@ export type Database = {
           required_tier: string
           route_polyline: string | null
           scheduled_for: string | null
+          search_deadline_at: string | null
           status: string
           symptom_description: string | null
           triage_level: number | null
@@ -2519,6 +2643,7 @@ export type Database = {
           disposition?: string | null
           eta_seconds?: number | null
           eta_updated_at?: string | null
+          failure_reason?: string | null
           id?: string
           matched_at?: string | null
           origin_hospital_id?: string | null
@@ -2534,6 +2659,7 @@ export type Database = {
           required_tier?: string
           route_polyline?: string | null
           scheduled_for?: string | null
+          search_deadline_at?: string | null
           status: string
           symptom_description?: string | null
           triage_level?: number | null
@@ -2555,6 +2681,7 @@ export type Database = {
           disposition?: string | null
           eta_seconds?: number | null
           eta_updated_at?: string | null
+          failure_reason?: string | null
           id?: string
           matched_at?: string | null
           origin_hospital_id?: string | null
@@ -2570,6 +2697,7 @@ export type Database = {
           required_tier?: string
           route_polyline?: string | null
           scheduled_for?: string | null
+          search_deadline_at?: string | null
           status?: string
           symptom_description?: string | null
           triage_level?: number | null
@@ -2896,14 +3024,9 @@ export type Database = {
           prescription_url: string | null
           queue_position: number | null
           reason: string | null
-          referral_reason: string | null
-          referred_by_doctor_id: string | null
-          referring_clinic_id: string | null
-          referring_hospital_id: string | null
           refund_pct: number | null
           reminder_sent_1h: boolean | null
           reminder_sent_24h: boolean | null
-          reschedule_count: number
           reschedule_deadline: string | null
           rescheduled_from: string | null
           service_id: string | null
@@ -2976,27 +3099,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "appointments_referred_by_doctor_id_fkey"
-            columns: ["referred_by_doctor_id"]
-            isOneToOne: false
-            referencedRelation: "doctors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_referring_clinic_id_fkey"
-            columns: ["referring_clinic_id"]
-            isOneToOne: false
-            referencedRelation: "hospital_clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_referring_hospital_id_fkey"
-            columns: ["referring_hospital_id"]
-            isOneToOne: false
-            referencedRelation: "hospitals"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "appointments_rescheduled_from_fkey"
             columns: ["rescheduled_from"]
             isOneToOne: false
@@ -3025,6 +3127,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      emergency_directory_public: {
+        Row: {
+          alt_phone: string | null
+          city: string | null
+          country: string | null
+          id: string | null
+          kind: string | null
+          last_verified_at: string | null
+          latitude: number | null
+          longitude: number | null
+          name: string | null
+          notes: string | null
+          phone: string | null
+          priority: number | null
+          state: string | null
+        }
+        Insert: {
+          alt_phone?: string | null
+          city?: string | null
+          country?: string | null
+          id?: string | null
+          kind?: string | null
+          last_verified_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          priority?: number | null
+          state?: string | null
+        }
+        Update: {
+          alt_phone?: string | null
+          city?: string | null
+          country?: string | null
+          id?: string | null
+          kind?: string | null
+          last_verified_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          priority?: number | null
+          state?: string | null
+        }
+        Relationships: []
       }
       geography_columns: {
         Row: {
@@ -3201,6 +3351,14 @@ export type Database = {
             }
             Returns: string
           }
+      assert_can_operate_unit: {
+        Args: { p_ambulance_id: string }
+        Returns: {
+          crew_member_id: string
+          crew_tier: string
+          hospital_admin_id: string
+        }[]
+      }
       crew_update_job_status: {
         Args: { p_new_status: string; p_request_id: string }
         Returns: boolean
@@ -3236,8 +3394,10 @@ export type Database = {
           }
         | { Args: { schema_name: string; table_name: string }; Returns: string }
         | { Args: { table_name: string }; Returns: string }
+      emergency_directory_ttl_days: { Args: never; Returns: number }
       enablelongtransactions: { Args: never; Returns: string }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      expire_overdue_searches: { Args: never; Returns: number }
       expire_stale_offers: { Args: never; Returns: number }
       find_candidate_units: {
         Args: { p_limit?: number; p_radius_m?: number; p_request_id: string }
@@ -3373,6 +3533,10 @@ export type Database = {
           patient_phone: string
           queue_position: number
           reason: string
+          referral_reason: string
+          referred_by_doctor_name: string
+          referring_clinic_name: string
+          referring_hospital_name: string
           start_time: string
           status: string
           type: string
@@ -3436,6 +3600,24 @@ export type Database = {
           staff_role: string
         }[]
       }
+      get_my_units: {
+        Args: never
+        Returns: {
+          ambulance_id: string
+          call_sign: string
+          capabilities: string[]
+          last_ping_at: string
+          on_duty: boolean
+          plate_number: string
+          provider_id: string
+          provider_name: string
+          seconds_since_ping: number
+          shift_ends_at: string
+          status: string
+          vehicle_tier: string
+          visible_to_dispatch: boolean
+        }[]
+      }
       get_request_pickup_latlng: {
         Args: { p_request_id: string }
         Returns: {
@@ -3455,6 +3637,14 @@ export type Database = {
         Returns: boolean
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      nearest_unit_stats: {
+        Args: { p_request_id: string }
+        Returns: {
+          active_units_total: number
+          nearest_unit_m: number
+          on_duty_units_total: number
+        }[]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
@@ -3495,6 +3685,7 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      process_missed_appointments: { Args: never; Returns: undefined }
       rank_destination_hospitals: {
         Args: { p_limit?: number; p_radius_m?: number; p_request_id: string }
         Returns: {
@@ -3518,6 +3709,23 @@ export type Database = {
           p_speed_kmh: number
         }
         Returns: boolean
+      }
+      renumber_doctor_queue: {
+        Args: {
+          p_check_in_date: string
+          p_doctor_id: string
+          p_hospital_id: string
+        }
+        Returns: undefined
+      }
+      set_unit_duty: {
+        Args: {
+          p_ambulance_id: string
+          p_crew_tier?: string
+          p_hours?: number
+          p_on_duty: boolean
+        }
+        Returns: Json
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
@@ -4104,6 +4312,7 @@ export type Database = {
       }
       tier_rank: { Args: { p_tier: string }; Returns: number }
       unaccent: { Args: { "": string }; Returns: string }
+      unit_location_ttl_seconds: { Args: never; Returns: number }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {
         Args: {

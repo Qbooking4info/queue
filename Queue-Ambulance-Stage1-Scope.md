@@ -1,6 +1,6 @@
 # Queue — Ambulance Stage One Scope
 
-**Status:** steps 1-4 shipped; step 5 (scheduling the sweep) outstanding
+**Status:** steps 1-4 shipped + operator console; step 5 (scheduling the sweep) outstanding
 **Date:** 2026-08-10
 
 ## The promise
@@ -224,8 +224,14 @@ Without it there is no proximity anything, ever.
    goes stale after `unit_location_ttl_seconds()` (120s) and the unit drops out
    of dispatch. The crew card says so explicitly rather than showing a green
    light that lies. Background location is a separate piece of work.
-4. **`dispatch_attempts`.** Start collecting the coverage-gap dataset immediately —
-   it is the input to every supply conversation.
+4. ~~**`dispatch_attempts`.**~~ **Done** — `20260810000004`, applied. Every round
+   records candidates found, survivors of `hardFilter`, a tally of *why* the rest
+   were dropped, and `nearest_unit_stats` — which ignores every dispatch filter,
+   so a round that matched nothing still records how far the nearest rig actually
+   was. Instrumentation never blocks a round: every write is wrapped and logged.
+   Operator console duty controls shipped alongside
+   (`/api/ambulances/fleet/units/[unitId]/duty`, user-scoped so `auth.uid()`
+   resolves).
 5. **Layer B.** Schedule the sweep once the plan/scheduler question is settled.
 
 Steps 1–2 are shippable without a single ambulance onboarded.

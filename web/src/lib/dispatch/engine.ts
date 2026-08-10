@@ -17,11 +17,58 @@ import { roadEtas } from './routing'
 import {
   policyFor,
   rankCandidates,
+  rejectionTally,
   selectOffers,
   type Candidate,
   type TransportRequest,
   type UnitTier,
 } from './matching'
+
+/**
+ * Record what this round saw. Never throws and never blocks the round — a
+ * failure to write instrumentation must not be able to stop an ambulance being
+ * dispatched, so every error here is swallowed after logging.
+ *
+ * nearest_unit_stats deliberately ignores the filters find_candidate_units
+ * applies, so a round that found nothing still records how far away the nearest
+ * rig actually was. That distinction is the whole point: "no unit available"
+ * with the nearest rig 400m away and off duty is an adoption problem, and the
+ * same message with the nearest rig 40km away is a coverage problem.
+ */
+async function recordAttempt(
+  db: Db,
+  requestId: string,
+  fields: {
+    round: number
+    radiusMeters: number
+    candidatesFound: number
+    candidatesAfterFilter: number
+    rejectReasons: Record<string, number>
+    offersMade: number
+  },
+): Promise<void> {
+  try {
+    const { data: stats } = await db.rpc('nearest_unit_stats', { p_request_id: requestId })
+    const s = (Array.isArray(stats) ? stats[0] : stats) as
+      | { nearest_unit_m: number | null; active_units_total: number | null; on_duty_units_total: number | null }
+      | null
+
+    await db.from('dispatch_attempts').insert({
+      request_id: requestId,
+      round: fields.round,
+      radius_m: fields.radiusMeters,
+      candidates_found: fields.candidatesFound,
+      candidates_after_filter: fields.candidatesAfterFilter,
+      reject_reasons: fields.rejectReasons,
+      offers_made: fields.offersMade,
+      nearest_unit_m: s?.nearest_unit_m ?? null,
+      active_units_total: s?.active_units_total ?? null,
+      on_duty_units_total: s?.on_duty_units_total ?? null,
+    })
+  } catch (err) {
+    console.warn('[dispatch] failed to record attempt', requestId, fields.round, err)
+  }
+}
 
 type Db = ReturnType<typeof createAdminClient>
 
@@ -88,6 +135,13 @@ export async function runDispatchRound(
   if (rpcError) throw rpcError
 
   if (!rows?.length) {
+    // The most important row to record: nobody was even in range. Awaited, not
+    // fire-and-forget, because advanceOrExhaust may recurse or terminate the
+    // request and this must land first.
+    await recordAttempt(db, requestId, {
+      round, radiusMeters: radius, candidatesFound: 0,
+      candidatesAfterFilter: 0, rejectReasons: {}, offersMade: 0,
+    })
     return advanceOrExhaust(db, request, round, policy.maxRounds, 'no candidates in radius')
   }
 
@@ -133,6 +187,12 @@ export async function runDispatchRound(
 
   const ranked = rankCandidates(req, candidates, policy)
   if (!ranked.length) {
+    // Units were in range but none were usable. The tally says why, which is a
+    // different and more actionable signal than "no ambulance available".
+    await recordAttempt(db, requestId, {
+      round, radiusMeters: radius, candidatesFound: candidates.length,
+      candidatesAfterFilter: 0, rejectReasons: rejectionTally(req, candidates), offersMade: 0,
+    })
     return advanceOrExhaust(db, request, round, policy.maxRounds, 'all candidates failed hard filters')
   }
 
@@ -156,6 +216,14 @@ export async function runDispatchRound(
   if (insertError) throw insertError
 
   await notifyCrews(db, requestId, offers ?? [], policy.offerTtlSeconds)
+
+  // Successful rounds are recorded too — the ratio of offers made to offers
+  // accepted is how you tell a coverage problem from crews ignoring the app.
+  await recordAttempt(db, requestId, {
+    round, radiusMeters: radius, candidatesFound: candidates.length,
+    candidatesAfterFilter: ranked.length,
+    rejectReasons: rejectionTally(req, candidates), offersMade: chosen.length,
+  })
 
   return {
     round,

@@ -64,6 +64,7 @@ export default function FleetPage() {
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [dutyBusyId, setDutyBusyId] = useState<string | null>(null)
 
   // Setup form
   const [setupPhone, setSetupPhone] = useState('')
@@ -96,6 +97,33 @@ export default function FleetPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  async function toggleDuty(unit: AmbulanceUnit) {
+    const now = Date.now()
+    const covering = unit.ambulance_shifts.some(
+      s => new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() > now,
+    )
+    const onDuty = unit.status === 'available' && covering
+
+    setDutyBusyId(unit.id); setError('')
+    try {
+      const res = await fetch(`/api/ambulances/fleet/units/${unit.id}/duty`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onDuty: !onDuty }),
+      })
+      if (!res.ok) {
+        // Carries the RPC's own refusals, e.g. "finish or hand over the active
+        // job before going off duty" — worth showing verbatim.
+        const b = await res.json().catch(() => null)
+        setError(b?.error ?? 'Could not change duty status')
+        return
+      }
+      await load()
+    } finally {
+      setDutyBusyId(null)
+    }
+  }
 
   async function handleSetup() {
     if (!setupPhone.trim()) { setError('Contact phone is required'); return }
@@ -282,7 +310,8 @@ export default function FleetPage() {
               {ambulances.map(a => (
                 <UnitCard key={a.id} unit={a} crewOptions={crewOptions}
                   onRemoveUnit={removeUnit} onAddShift={addShift} onRemoveShift={removeShift}
-                  onAssignCrew={assignCrew} onUnassignCrew={unassignCrew} />
+                  onAssignCrew={assignCrew} onUnassignCrew={unassignCrew}
+                  onToggleDuty={toggleDuty} dutyBusy={dutyBusyId === a.id} />
               ))}
             </div>
           )}
@@ -292,7 +321,7 @@ export default function FleetPage() {
   )
 }
 
-function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, onAssignCrew, onUnassignCrew }: {
+function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, onAssignCrew, onUnassignCrew, onToggleDuty, dutyBusy }: {
   unit: AmbulanceUnit
   crewOptions: CrewOption[]
   onRemoveUnit: (id: string) => void
@@ -300,11 +329,21 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
   onRemoveShift: (shiftId: string) => void
   onAssignCrew: (shiftId: string, hospitalAdminId: string) => void
   onUnassignCrew: (shiftId: string, hospitalAdminId: string) => void
+  onToggleDuty: (unit: AmbulanceUnit) => void
+  dutyBusy: boolean
 }) {
   const { theme: C } = useTheme()
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt]     = useState('')
   const [shiftTier, setShiftTier] = useState(unit.vehicle_tier)
+
+  // On duty means a shift is open right now, which is exactly what
+  // find_candidate_units checks — not merely that a shift row exists.
+  const now = Date.now()
+  const coveringShift = unit.ambulance_shifts.find(
+    s => new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() > now,
+  ) ?? null
+  const onDuty = unit.status === 'available' && coveringShift != null
 
   const smallInputStyle: React.CSSProperties = {
     background: C.bgAlt, border: `1px solid ${C.borderMed}`, borderRadius: 10,
@@ -321,11 +360,43 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{unit.capabilities.join(', ')}</div>
           )}
         </div>
-        <button onClick={() => onRemoveUnit(unit.id)}
-          style={{ color: C.red, padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
-          <Trash2 size={14} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* An 'offline' unit receives no offers at all, so this is the control
+              that decides whether the rig exists as far as dispatch is concerned.
+              set_unit_duty refuses to take a unit off duty mid-job. */}
+          <button
+            onClick={() => onToggleDuty(unit)}
+            disabled={dutyBusy}
+            style={{
+              fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 10, cursor: dutyBusy ? 'default' : 'pointer',
+              opacity: dutyBusy ? 0.5 : 1,
+              color: onDuty ? C.red : '#00A854',
+              background: onDuty ? `${C.red}14` : '#00A85414',
+              border: `1px solid ${onDuty ? `${C.red}55` : '#00A85455'}`,
+            }}
+          >
+            {dutyBusy ? '…' : onDuty ? 'Go off duty' : 'Go on duty'}
+          </button>
+          <button onClick={() => onRemoveUnit(unit.id)}
+            style={{ color: C.red, padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
+
+      {/* Being on duty is not the same as being dispatchable: find_candidate_units
+          also needs a position fresher than two minutes, which only arrives while
+          a crew has the app open. Saying "available" without saying that would
+          leave an operator believing they have coverage they don't. */}
+      {onDuty && (
+        <div style={{
+          fontSize: 12, color: C.textSub, background: C.bgAlt, border: `1px solid ${C.border}`,
+          borderRadius: 10, padding: '8px 10px', marginBottom: 12,
+        }}>
+          On duty until {new Date(coveringShift!.ends_at).toLocaleString()}. Dispatch can only
+          offer jobs while a crew member has the app open and reporting position.
+        </div>
+      )}
 
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Shifts</div>
