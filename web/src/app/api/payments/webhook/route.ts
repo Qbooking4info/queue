@@ -26,6 +26,24 @@ import { notifyPatient } from '@/lib/notify-patient'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Paystack only ever POSTs here, so a GET has no business meaning. Next.js
+ * answers an unhandled method with a bare 405 and no body, which renders as a
+ * blank page — indistinguishable from a broken deployment when someone pastes
+ * the URL into a browser to check it exists. This says what the endpoint is
+ * instead. It exposes nothing: no secrets, no data, and it does not process
+ * anything.
+ */
+export async function GET() {
+  return NextResponse.json({
+    endpoint: 'paystack-webhook',
+    ok: true,
+    message: 'This is a webhook endpoint. Paystack POSTs signed events here; there is nothing to view in a browser.',
+    expects: 'POST with an x-paystack-signature header',
+    configured: paystackConfigured(),
+  })
+}
+
 export async function POST(req: NextRequest) {
   if (!paystackConfigured()) return NextResponse.json({ ignored: true }, { status: 200 })
 
