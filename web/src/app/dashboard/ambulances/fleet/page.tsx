@@ -30,6 +30,13 @@ interface AmbulanceUnit {
   status: string
   is_active: boolean
   ambulance_shifts: Shift[]
+  // Computed server-side. on_duty is status+shift; visible_to_dispatch also
+  // requires a fresh position, which is the difference between "we think we
+  // have coverage" and "dispatch can actually offer this rig a job".
+  on_duty?: boolean
+  visible_to_dispatch?: boolean
+  last_ping_at?: string | null
+  seconds_since_ping?: number | null
 }
 
 interface Provider {
@@ -343,7 +350,9 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
   const coveringShift = unit.ambulance_shifts.find(
     s => new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() > now,
   ) ?? null
-  const onDuty = unit.status === 'available' && coveringShift != null
+  const onDuty = unit.on_duty ?? (unit.status === 'available' && coveringShift != null)
+  const dispatchable = unit.visible_to_dispatch ?? false
+  const pingAge = unit.seconds_since_ping ?? null
 
   const smallInputStyle: React.CSSProperties = {
     background: C.bgAlt, border: `1px solid ${C.borderMed}`, borderRadius: 10,
@@ -388,13 +397,33 @@ function UnitCard({ unit, crewOptions, onRemoveUnit, onAddShift, onRemoveShift, 
           also needs a position fresher than two minutes, which only arrives while
           a crew has the app open. Saying "available" without saying that would
           leave an operator believing they have coverage they don't. */}
+      {/* On duty and dispatchable are different states, and conflating them is
+          how an operator ends up believing they have coverage they don't.
+          find_candidate_units also requires a position fresher than the TTL, so
+          a backgrounded crew app silently removes the rig from dispatch. */}
       {onDuty && (
         <div style={{
-          fontSize: 12, color: C.textSub, background: C.bgAlt, border: `1px solid ${C.border}`,
+          fontSize: 12,
+          color: dispatchable ? '#00A854' : '#B45309',
+          background: dispatchable ? '#00A85410' : '#B4530910',
+          border: `1px solid ${dispatchable ? '#00A85444' : '#B4530944'}`,
           borderRadius: 10, padding: '8px 10px', marginBottom: 12,
         }}>
-          On duty until {new Date(coveringShift!.ends_at).toLocaleString()}. Dispatch can only
-          offer jobs while a crew member has the app open and reporting position.
+          {dispatchable ? (
+            <>
+              <strong>Visible to dispatch</strong> — can receive jobs.
+              {pingAge != null && <> Last position {pingAge}s ago.</>}
+              {coveringShift && <> On duty until {new Date(coveringShift.ends_at).toLocaleString()}.</>}
+            </>
+          ) : (
+            <>
+              <strong>On duty but NOT dispatchable</strong> —{' '}
+              {pingAge == null
+                ? 'this unit has never reported a position.'
+                : `last position was ${pingAge}s ago and is too stale.`}
+              {' '}A crew member must have the app open for dispatch to see it.
+            </>
+          )}
         </div>
       )}
 

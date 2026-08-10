@@ -37,7 +37,42 @@ export async function GET(req: NextRequest) {
     .eq('provider_id', provider.id)
     .order('created_at')
 
-  return NextResponse.json({ provider, ambulances: ambulances ?? [] })
+  // Dispatchability, not just duty status.
+  //
+  // find_candidate_units requires BOTH status='available' AND a position fresher
+  // than unit_location_ttl_seconds(). A rig can be on duty and still invisible to
+  // dispatch because its crew backgrounded the app and the position went stale.
+  // Showing only "available" would let an operator believe they have coverage
+  // they do not actually have, which on this product means a patient waiting on
+  // an ambulance that was never dispatchable.
+  const ids = (ambulances ?? []).map(a => a.id)
+  const [{ data: locs }, { data: ttlRaw }] = await Promise.all([
+    ids.length
+      ? db.from('ambulance_current_location').select('ambulance_id, recorded_at').in('ambulance_id', ids)
+      : Promise.resolve({ data: [] as { ambulance_id: string; recorded_at: string }[] }),
+    db.rpc('unit_location_ttl_seconds'),
+  ])
+
+  const ttl = typeof ttlRaw === 'number' ? ttlRaw : 120
+  const lastPing = new Map((locs ?? []).map(l => [l.ambulance_id, l.recorded_at]))
+  const now = Date.now()
+
+  const enriched = (ambulances ?? []).map(a => {
+    const shifts = (a.ambulance_shifts ?? []) as { starts_at: string; ends_at: string }[]
+    const onShift = shifts.some(s => Date.parse(s.starts_at) <= now && Date.parse(s.ends_at) > now)
+    const ping = lastPing.get(a.id) ?? null
+    const ageSec = ping ? Math.round((now - Date.parse(ping)) / 1000) : null
+    const fresh = ageSec !== null && ageSec <= ttl
+    return {
+      ...a,
+      last_ping_at: ping,
+      seconds_since_ping: ageSec,
+      on_duty: a.status === 'available' && onShift,
+      visible_to_dispatch: a.status === 'available' && onShift && fresh,
+    }
+  })
+
+  return NextResponse.json({ provider, ambulances: enriched, locationTtlSeconds: ttl })
 }
 
 export async function POST(req: NextRequest) {

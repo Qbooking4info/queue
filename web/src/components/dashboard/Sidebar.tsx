@@ -27,6 +27,7 @@ const NAV: Record<UserRole, NavItem[]> = {
   super_admin: [
     { href: '/dashboard',           icon: LayoutDashboard, label: 'Platform Overview'  },
     { href: '/dashboard/hospitals', icon: Hospital,        label: 'All Hospitals'       },
+    { href: '/dashboard/directory', icon: Ambulance,       label: 'Emergency Directory' },
     { href: '/dashboard/analytics', icon: BarChart2,       label: 'Analytics'           },
     { href: '/dashboard/settings',  icon: Settings,        label: 'Platform Settings'   },
   ],
