@@ -9,6 +9,7 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
 
 import { NavigationContainer } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from './lib/navigation'
+import { OfflineBanner } from './components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -333,7 +334,12 @@ function AppNavigator() {
     }
     return (
       <SafeAreaProvider>
-        <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+        <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+          <OfflineBanner />
+          <SafeAreaProvider style={{ flex: 1 }}>
+            <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+          </SafeAreaProvider>
+        </View>
       </SafeAreaProvider>
     )
   }
@@ -351,9 +357,17 @@ function AppNavigator() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
-        <RootAuthNavigator />
-      </NavigationContainer>
+      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <OfflineBanner />
+        {/* Nested provider so the banner's height is subtracted from the insets
+            the screens below see. Without it every screen would add the full top
+            inset again and sit in a gap under the banner. */}
+        <SafeAreaProvider style={{ flex: 1 }}>
+          <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
+            <RootAuthNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </View>
     </SafeAreaProvider>
   )
 }

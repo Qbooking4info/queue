@@ -18,6 +18,7 @@
     "expo-device": "~56.0.4",
     "expo-haptics": "~56.0.3",
     "expo-location": "~56.0.21",
+    "expo-network": "~56.0.5",
     "expo-notifications": "~56.0.21",
     "expo-secure-store": "~56.0.4",
     "expo-status-bar": "~56.0.4",

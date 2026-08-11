@@ -12,6 +12,7 @@ import type { AppointmentWithRelations } from '../lib/api'
 import { fmtDate, fmt12 } from '../lib/format'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import { haptics } from '../lib/haptics'
+import { useIsOffline } from '../hooks/useIsOffline'
 
 const FILTERS = ['upcoming', 'pending review', 'missed', 'completed', 'cancelled'] as const
 
@@ -36,6 +37,9 @@ function statusLabel(status: string, approvalStatus: string) {
 
 export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   const { theme: t } = useTheme()
+  // Lets the failure state say "no signal" instead of "couldn't load", which
+  // is the difference between retrying pointlessly and waiting for coverage.
+  const offline = useIsOffline()
   const { user }     = useAuth()
 
   const [filter,     setFilter]     = useState<typeof FILTERS[number]>('upcoming')
@@ -145,10 +149,16 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 
             {loadError && (
               <View style={s.empty}>
-                <Ionicons name="alert-circle-outline" size={52} color="#FF5C5C" style={{ marginBottom: 10, opacity: 0.6 }} />
-                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>Couldn't load your bookings</Text>
+                <Ionicons
+                  name={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
+                  size={52} color="#FF5C5C" style={{ marginBottom: 10, opacity: 0.6 }} />
+                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
+                  {offline ? "You're offline" : "Couldn't load your bookings"}
+                </Text>
                 <Text style={[s.emptySubtitle, { color: t.textMuted }]}>
-                  Pull down to try again.
+                  {offline
+                    ? 'Your bookings will appear once you have a connection.'
+                    : 'Pull down to try again.'}
                 </Text>
               </View>
             )}
