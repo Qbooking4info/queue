@@ -13,6 +13,7 @@
 
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { onShiftCrewUserIds } from './crew-identity'
 import { roadEtas } from './routing'
 import {
   policyFor,
@@ -296,24 +297,18 @@ async function notifyCrews(
   if (!offers.length) return
 
   // Resolve on-shift crew for each offered unit so the push lands on a person,
-  // not a vehicle.
-  const { data: crew } = await db.from('ambulance_shifts')
-    .select('ambulance_id, ambulance_shift_crew(ambulance_crew(user_id))')
-    .in('ambulance_id', offers.map((o) => o.ambulance_id))
-    .lte('starts_at', new Date().toISOString())
-    .gte('ends_at', new Date().toISOString())
+  // not a vehicle. Goes through the shared helper because this used to read
+  // `ambulance_shift_crew(ambulance_crew(user_id))` only — which resolves to
+  // null for hospital-fleet crew, so no offer notification was ever written
+  // for them and the unit sat silent through the whole 60s deadline.
+  const byUnit = await onShiftCrewUserIds(db, offers.map((o) => o.ambulance_id))
 
   const rows: Array<{ user_id: string; title: string; body: string; type: string; data: Record<string, string | number> }> = []
 
   for (const offer of offers) {
-    // Every currently-open shift on the unit, not just the first match — a
-    // handover window puts two overlapping shift rows on one ambulance, and
-    // find() would silently page only one of the two crews.
-    const shifts = (crew ?? []).filter((s) => s.ambulance_id === offer.ambulance_id)
     const notified = new Set<string>()
-    for (const sc of shifts.flatMap((s) => s.ambulance_shift_crew ?? [])) {
-      const userId = sc?.ambulance_crew?.user_id
-      if (!userId || notified.has(userId)) continue
+    for (const userId of byUnit.get(offer.ambulance_id) ?? []) {
+      if (notified.has(userId)) continue
       notified.add(userId)
       rows.push({
         user_id: userId,

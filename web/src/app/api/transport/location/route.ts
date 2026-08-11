@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { isOnShiftCrew } from '@/lib/dispatch/crew-identity'
 
 /**
  * POST /api/transport/location   { ambulanceId, pings: [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }] }
@@ -33,20 +34,12 @@ export async function POST(req: NextRequest) {
     return Errors.validation(`At most ${MAX_PINGS_PER_BATCH} pings per batch`)
   }
 
-  const { data: onShift } = await db.from('ambulance_shifts')
-    .select('id, ambulance_shift_crew!inner(ambulance_crew!inner(is_active, users!inner(auth_id)))')
-    .eq('ambulance_id', ambulanceId)
-    .lte('starts_at', new Date().toISOString())
-    .gte('ends_at', new Date().toISOString())
-    .limit(1)
-
-  const authorised = (onShift ?? []).some((s) =>
-    (s.ambulance_shift_crew ?? []).some(
-      (sc) => sc?.ambulance_crew?.is_active && sc?.ambulance_crew?.users?.auth_id === userRes.user!.id,
-    ),
-  )
-
-  if (!authorised) return Errors.forbidden('You are not on the crew for this unit')
+  // Both crew identity paths — the previous `ambulance_crew!inner` embed
+  // rejected hospital-fleet crew, so their unit never sent a ping and never
+  // became visible to dispatch at all.
+  if (!(await isOnShiftCrew(db, ambulanceId, userRes.user.id))) {
+    return Errors.forbidden('You are not on the crew for this unit')
+  }
 
   const ordered = [...pings].sort(
     (a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt),

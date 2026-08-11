@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { runDispatchRound } from '@/lib/dispatch/engine'
+import { isOnShiftCrew } from '@/lib/dispatch/crew-identity'
 
 /**
  * POST /api/transport/offers/respond   { offerId, action: 'accept' | 'decline', reason? }
@@ -32,20 +33,12 @@ export async function POST(req: NextRequest) {
   if (!offer) return Errors.notFound('Offer')
 
   // The responder must be on the shift crew of the offered unit right now.
-  const { data: onShift } = await db.from('ambulance_shifts')
-    .select('id, ambulance_shift_crew!inner(ambulance_crew!inner(user_id, is_active, users!inner(auth_id)))')
-    .eq('ambulance_id', offer.ambulance_id)
-    .lte('starts_at', new Date().toISOString())
-    .gte('ends_at', new Date().toISOString())
-    .limit(1)
-
-  const authorised = (onShift ?? []).some((s) =>
-    (s.ambulance_shift_crew ?? []).some(
-      (sc) => sc?.ambulance_crew?.is_active && sc?.ambulance_crew?.users?.auth_id === userRes.user!.id,
-    ),
-  )
-
-  if (!authorised) return Errors.forbidden('You are not on the crew for this unit')
+  // This used to embed `ambulance_crew!inner`, which silently excluded every
+  // hospital-fleet crew member (they are named by hospital_admin_id instead)
+  // and answered "You are not on the crew for this unit" to the whole feature.
+  if (!(await isOnShiftCrew(db, offer.ambulance_id, userRes.user.id))) {
+    return Errors.forbidden('You are not on the crew for this unit')
+  }
 
   if (offer.response !== 'pending' || new Date(offer.expires_at) <= new Date()) {
     return NextResponse.json({ accepted: false, reason: 'offer_no_longer_open' })

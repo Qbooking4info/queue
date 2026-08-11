@@ -127,6 +127,22 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
     }
   }
 
+  if (!caller && profile) {
+    // Third-party (marketplace) crew are not hospital staff, so they have no
+    // hospital_admins row -- they are identified by ambulance_crew(user_id,
+    // provider_id). Without this they resolved to no role at all, which made
+    // every response about them indistinguishable from "unknown account".
+    // Granting the role here changes no permissions: ambulance_crew still has
+    // to appear in a route's `allowed` list to reach anything.
+    const { data: crewRow } = await db
+      .from('ambulance_crew')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (crewRow) caller = { authId, role: 'ambulance_crew' }
+  }
+
   if (!caller || !allowed.includes(caller.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

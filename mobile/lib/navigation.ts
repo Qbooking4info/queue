@@ -19,8 +19,31 @@ export const navigationRef = createNavigationContainerRef()
  */
 let pending: { name: string; params?: object } | null = null
 
+/**
+ * Which navigator is mounted depends on who is signed in: a patient gets
+ * AppStack, a crew member CrewTabs, a doctor SpecialistStack. `AppointmentDetail`
+ * and `AmbulanceTracking` exist only in the patient stack, `CrewHome` only in
+ * the crew one — so a notification aimed at a screen the current user's
+ * navigator does not contain would make React Navigation log a warning and do
+ * nothing visible. Checking first means the app simply opens where it was,
+ * which is the honest outcome, rather than appearing to swallow the tap.
+ */
+function hasRoute(name: string): boolean {
+  const state = navigationRef.getRootState?.()
+  if (!state) return true   // unknown — try anyway rather than refuse
+  const names: string[] = []
+  const walk = (s: { routeNames?: string[]; routes?: Array<{ state?: object }> } | undefined) => {
+    if (!s) return
+    if (s.routeNames) names.push(...s.routeNames)
+    for (const r of s.routes ?? []) walk(r.state as never)
+  }
+  walk(state as never)
+  return names.includes(name)
+}
+
 export function navigateWhenReady(name: string, params?: object) {
   if (navigationRef.isReady()) {
+    if (!hasRoute(name)) return
     // The app's navigators are untyped (no ParamList), so the generic navigate
     // signature cannot be satisfied without a cast here.
     ;(navigationRef.navigate as (n: string, p?: object) => void)(name, params)
@@ -34,5 +57,6 @@ export function flushPendingNavigation() {
   if (!pending || !navigationRef.isReady()) return
   const { name, params } = pending
   pending = null
+  if (!hasRoute(name)) return
   ;(navigationRef.navigate as (n: string, p?: object) => void)(name, params)
 }
