@@ -15,6 +15,7 @@ import {
   getAvailableSlots,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
+import { supabase } from '../lib/supabase'
 import { fmt12 } from '../lib/format'
 import { payForAppointment } from '../lib/payments'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
@@ -488,14 +489,17 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       // Notify doctor/staff about new booking (best-effort)
       if (result.id) {
         const apiBase = process.env.EXPO_PUBLIC_API_URL ?? ''
-        fetch(`${apiBase}/api/appointments/notify-staff`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointmentId: result.id,
-            patientName: user.full_name ?? undefined,
-            hospitalName: hospital.name,
-          }),
+        // Bearer token required: this endpoint is no longer open, and the
+        // notification text is composed server-side from the appointment rather
+        // than from anything sent here.
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          const jwt = session?.access_token
+          if (!jwt) return
+          return fetch(`${apiBase}/api/appointments/notify-staff`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+            body: JSON.stringify({ appointmentId: result.id }),
+          })
         }).catch(() => {/* best-effort */})
       }
 
