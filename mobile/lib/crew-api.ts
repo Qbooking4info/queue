@@ -44,6 +44,10 @@ export interface ActiveJob {
   pickup_lng: number | null
   destination_hospital_id: string | null
   destination_hospital_name: string | null
+  /** Road ETA to the patient (or to the hospital once transporting), refreshed
+   *  server-side on every location ping. Same number the patient is shown. */
+  eta_seconds: number | null
+  eta_updated_at: string | null
 }
 
 /** Crew-drivable subset of the state machine — arrived_at_destination -> completed

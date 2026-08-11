@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { isOnShiftCrew } from '@/lib/dispatch/crew-identity'
+import { refreshEtaForUnit } from '@/lib/dispatch/live-eta'
 
 /**
  * POST /api/transport/location   { ambulanceId, pings: [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }] }
@@ -57,6 +58,16 @@ export async function POST(req: NextRequest) {
       p_recorded_at: p.recordedAt,
     })
     if (ok) accepted++
+  }
+
+  // A moved unit is the only moment new ETA information exists, so recompute
+  // here rather than on a timer. Throttled inside refreshEtaForUnit, and it
+  // never throws — a routing provider having a bad minute must not turn into a
+  // failed location ping, which would make the unit invisible to dispatch.
+  if (accepted > 0) {
+    const latest = ordered[ordered.length - 1]
+    await refreshEtaForUnit(db, ambulanceId, { lat: latest.lat, lng: latest.lng })
+      .catch(err => console.warn('[transport] eta refresh failed', err))
   }
 
   // Rejected pings are normal (drift, duplicates after a reconnect) — the crew

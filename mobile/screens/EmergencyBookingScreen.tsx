@@ -12,6 +12,7 @@ import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import { FallbackPanel } from '../components/emergency/FallbackPanel'
+import { NearbyAmbulances } from '../components/emergency/NearbyAmbulances'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
 interface Props { navigation: any }
@@ -443,6 +444,11 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 </View>
               )}
+
+              {/* Shown before anything is committed: whether help is actually
+                  near, which is the question someone in this flow is really
+                  asking. */}
+              <NearbyAmbulances coords={coords} style={{ marginTop: 16 }} />
 
               <Text style={[s.label, { color: t.textMuted }]}>Preferred hospital (optional)</Text>
               {loadingHospitals ? (

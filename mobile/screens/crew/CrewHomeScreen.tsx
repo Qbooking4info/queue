@@ -12,6 +12,7 @@ import {
 } from '../../lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '../../lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/location-task'
+import { JobPatientMap } from '../../components/emergency/JobPatientMap'
 
 // Foreground pings. These are now a supplement, not the only source: while on
 // duty, lib/location-task.ts reports position via a TaskManager background task
@@ -301,6 +302,17 @@ export function CrewHomeScreen() {
                 <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.destination_hospital_name}</Text>
               </View>
             )}
+
+            {/* Where the patient actually is, and how long until we're there.
+                Both come from the server, so the crew and the patient are
+                reading the same number rather than two guesses. */}
+            <JobPatientMap
+              requestId={activeJob.request_id}
+              pickup={activeJob.pickup_lat != null && activeJob.pickup_lng != null
+                ? { lat: activeJob.pickup_lat, lng: activeJob.pickup_lng }
+                : null}
+              etaSeconds={activeJob.eta_seconds}
+            />
 
             <TouchableOpacity onPress={callPatient} style={[s.secondaryBtn, { borderColor: t.cardBorder, marginTop: 14 }]}>
               <Ionicons name="call-outline" size={16} color={t.textPrimary} />

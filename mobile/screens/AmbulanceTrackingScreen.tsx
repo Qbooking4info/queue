@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import * as ExpoLocation from 'expo-location'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,7 +9,7 @@ import { FallbackPanel } from '../components/emergency/FallbackPanel'
 import {
   getTransportRequestById, getRequestPickupPoint, getUnitLocation,
   subscribeToTransport, subscribeToUnitLocation, cancelTransport,
-  formatEta, TRANSPORT_STATUS_LABEL,
+  sharePatientLocation, formatEta, TRANSPORT_STATUS_LABEL,
   type TransportRequestRow, type TransportStatus,
 } from '../lib/ambulance-api'
 
@@ -19,6 +20,11 @@ const CANCELLABLE: TransportStatus[] = ['requested', 'scheduled', 'searching', '
 
 /** Statuses that mean nobody has taken the job yet. */
 const STILL_SEARCHING: TransportStatus[] = ['requested', 'scheduled', 'searching']
+
+// While the job is live the crew needs to know where the patient actually is.
+// Sharing starts when a unit is assigned — not before, since there is nobody to
+// share with — and stops the moment the job ends.
+const SHARING_STATUSES: TransportStatus[] = ['matched', 'en_route_to_patient', 'on_scene', 'transporting']
 
 /**
  * Layer C of the 60s deadline (Queue-Ambulance-Stage1-Scope.md).
@@ -96,6 +102,48 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
     return () => { cancelled = true; channel.unsubscribe() }
   }, [request?.assigned_unit_id])
+
+  // ── Share position with the crew driving to us ────────────────────────────
+  //
+  // The pickup point captured at booking is a pin dropped once. People move:
+  // out of a building to the roadside, to a landmark the driver can actually
+  // find, or because someone drove them partway. Without this the crew is
+  // navigating to where the caller was when they tapped, and the last hundred
+  // metres — the part that costs minutes — is guesswork.
+  //
+  // Foreground only, and only while the job is live. record_patient_location()
+  // refuses writes once the request is terminal, so the window closes
+  // server-side too rather than depending on this screen unmounting cleanly.
+  useEffect(() => {
+    const status = request?.status
+    if (!status || !SHARING_STATUSES.includes(status)) return
+
+    let cancelled = false
+    let sub: { remove: () => void } | null = null
+
+    ;(async () => {
+      const { status: perm } = await ExpoLocation.getForegroundPermissionsAsync()
+      if (perm !== 'granted' || cancelled) return
+
+      sub = await ExpoLocation.watchPositionAsync(
+        // Distance filter rather than a tight interval: a stationary patient
+        // should not be spending battery, and record_patient_location()
+        // discards sub-10m movement anyway.
+        { accuracy: ExpoLocation.Accuracy.Balanced, timeInterval: 10_000, distanceInterval: 15 },
+        (loc) => {
+          if (cancelled) return
+          sharePatientLocation(requestId, {
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+            accuracyM: loc.coords.accuracy ?? undefined,
+            recordedAt: new Date(loc.timestamp).toISOString(),
+          }).catch(() => {/* best-effort; the static pickup point still stands */})
+        },
+      )
+    })().catch(err => console.warn('[tracking] location share failed to start', err))
+
+    return () => { cancelled = true; sub?.remove() }
+  }, [requestId, request?.status])
 
   // Layer C. Anchored to the request's created_at rather than a mount timestamp,
   // so backgrounding the app or re-entering this screen can't quietly restart

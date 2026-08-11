@@ -2601,6 +2601,38 @@ export type Database = {
           },
         ]
       }
+      transport_patient_location: {
+        Row: {
+          accuracy_m: number | null
+          location: unknown
+          received_at: string
+          recorded_at: string
+          request_id: string
+        }
+        Insert: {
+          accuracy_m?: number | null
+          location: unknown
+          received_at?: string
+          recorded_at: string
+          request_id: string
+        }
+        Update: {
+          accuracy_m?: number | null
+          location?: unknown
+          received_at?: string
+          recorded_at?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transport_patient_location_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "transport_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transport_rate_cards: {
         Row: {
           base_fee: number
@@ -3448,6 +3480,7 @@ export type Database = {
         Args: { p_new_status: string; p_request_id: string }
         Returns: boolean
       }
+      current_doctor_ids: { Args: never; Returns: string[] }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
@@ -3632,6 +3665,15 @@ export type Database = {
         Args: { p_hospital_id: string }
         Returns: Json
       }
+      get_job_patient_location: {
+        Args: { p_request_id: string }
+        Returns: {
+          accuracy_m: number
+          lat: number
+          lng: number
+          recorded_at: string
+        }[]
+      }
       get_my_active_job: {
         Args: never
         Returns: {
@@ -3640,6 +3682,8 @@ export type Database = {
           contact_phone: string
           destination_hospital_id: string
           destination_hospital_name: string
+          eta_seconds: number
+          eta_updated_at: string
           pickup_address: string
           pickup_lat: number
           pickup_lng: number
@@ -3703,6 +3747,14 @@ export type Database = {
           visible_to_dispatch: boolean
         }[]
       }
+      get_request_patient_latlng: {
+        Args: { p_request_id: string }
+        Returns: {
+          lat: number
+          lng: number
+          recorded_at: string
+        }[]
+      }
       get_request_pickup_latlng: {
         Args: { p_request_id: string }
         Returns: {
@@ -3723,6 +3775,20 @@ export type Database = {
         Returns: boolean
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      nearby_available_units: {
+        Args: {
+          p_lat: number
+          p_limit?: number
+          p_lng: number
+          p_radius_m?: number
+        }
+        Returns: {
+          distance_m: number
+          lat: number
+          lng: number
+          tier: string
+        }[]
+      }
       nearest_unit_stats: {
         Args: { p_request_id: string }
         Returns: {
@@ -3784,6 +3850,16 @@ export type Database = {
         }[]
       }
       recompute_denormalised_counters: { Args: never; Returns: undefined }
+      record_patient_location: {
+        Args: {
+          p_accuracy_m?: number
+          p_lat: number
+          p_lng: number
+          p_recorded_at?: string
+          p_request_id: string
+        }
+        Returns: boolean
+      }
       record_unit_location: {
         Args: {
           p_accuracy_m: number
