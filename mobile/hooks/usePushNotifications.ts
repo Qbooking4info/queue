@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import * as Device from 'expo-device'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
-import { savePushToken } from '../lib/api'
+import { savePushToken, getAppointmentById } from '../lib/api'
+import { navigateWhenReady } from '../lib/navigation'
 
 // Expo Go dropped Android remote-push support in SDK 53+ -- merely importing
 // expo-notifications there throws as soon as the module evaluates. Load it
@@ -51,6 +52,48 @@ async function registerForPushNotifications(): Promise<string | null> {
   return token.data
 }
 
+/**
+ * Send the user where the notification is about.
+ *
+ * The server already puts routing data in every push it sends — an
+ * appointment_id from web/src/lib/notify-patient.ts and notify-staff.ts, an
+ * offer_id / request_id from the dispatch engine. It was being thrown away, so
+ * a crew member tapping "New dispatch offer — 30s to accept" landed on whatever
+ * screen they had left the app on and had to find the job themselves, against
+ * the timer. That is the tap this exists for.
+ *
+ * Best-effort by design: an unknown payload opens the app normally rather than
+ * erroring. Nothing here should ever be able to stop the app from starting.
+ */
+async function routeFromNotificationData(data: Record<string, unknown> | undefined) {
+  if (!data) return
+
+  try {
+    // Ambulance dispatch — the time-critical one. Offers live on the crew's
+    // jobs tab; the request id routes the patient to live tracking instead.
+    if (data.offer_id) {
+      navigateWhenReady('CrewHome')
+      return
+    }
+    if (data.request_id) {
+      navigateWhenReady('AmbulanceTracking', { requestId: String(data.request_id) })
+      return
+    }
+
+    // AppointmentDetail takes the whole appointment rather than an id, matching
+    // how NotificationsScreen and HomeScreen navigate to it.
+    if (data.appointment_id) {
+      const appointment = await getAppointmentById(String(data.appointment_id))
+      if (appointment) navigateWhenReady('AppointmentDetail', { appointment })
+      else navigateWhenReady('Notifications')
+      return
+    }
+  } catch {
+    // A failed lookup (offline, deleted row) should still land somewhere useful.
+    navigateWhenReady('Notifications')
+  }
+}
+
 export function usePushNotifications(userId: string | undefined) {
   const listenerRef     = useRef<import('expo-notifications').EventSubscription | null>(null)
   const responseRef     = useRef<import('expo-notifications').EventSubscription | null>(null)
@@ -68,10 +111,18 @@ export function usePushNotifications(userId: string | undefined) {
         // in-app banner is shown automatically via setNotificationHandler
       })
 
-      // Listener for user tapping a notification
-      responseRef.current = Notifications.addNotificationResponseReceivedListener(_response => {
-        // Could navigate to AppointmentDetail here based on response.notification.request.content.data
+      // Listener for user tapping a notification while the app is running
+      responseRef.current = Notifications.addNotificationResponseReceivedListener(response => {
+        routeFromNotificationData(response.notification.request.content.data as Record<string, unknown>)
       })
+
+      // A tap that launched the app from cold has already happened by the time
+      // this effect runs, so the listener above never sees it. This is the case
+      // that matters most: the app was closed, and the notification is the only
+      // reason it is open.
+      Notifications.getLastNotificationResponseAsync().then(last => {
+        if (last) routeFromNotificationData(last.notification.request.content.data as Record<string, unknown>)
+      }).catch(() => {/* nothing to route to */})
     })
 
     return () => {

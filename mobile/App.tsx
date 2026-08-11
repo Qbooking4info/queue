@@ -8,6 +8,7 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
 }
 
 import { NavigationContainer } from '@react-navigation/native'
+import { navigationRef, flushPendingNavigation } from './lib/navigation'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -332,7 +333,7 @@ function AppNavigator() {
     }
     return (
       <SafeAreaProvider>
-        <NavigationContainer>{content}</NavigationContainer>
+        <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
       </SafeAreaProvider>
     )
   }
@@ -350,7 +351,7 @@ function AppNavigator() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
         <RootAuthNavigator />
       </NavigationContainer>
     </SafeAreaProvider>
