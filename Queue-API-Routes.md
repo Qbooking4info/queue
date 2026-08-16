@@ -148,6 +148,25 @@ Creates a doctor **with auto-generated portal credentials** (email + password). 
 
 ---
 
+### `POST /api/doctors/link`
+Links an existing, independent doctor account (self-registered via the `doctors/` app — see
+`users.active_hospital_id` in the schema doc) to the caller's hospital, by inserting a new
+`doctors` row that shares that account's `user_id`. Added Aug 2026 alongside multi-hospital
+doctor identity. If the doctor was previously linked to this same hospital and later
+deactivated, re-activates that row instead of inserting a duplicate. Copies profile fields
+(`title`, `qualification`, `bio`, `years_experience`, `mdcn_number`, `specialty_id`,
+`avatar_url`) from the doctor's oldest existing `doctors` row, if any, so they don't have to
+re-enter them per hospital. Subject to the same `max_doctors` plan-seat check as
+`POST /api/doctors/create`.
+
+| Field | Value |
+|---|---|
+| Auth | `requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])` |
+| Body | `{ doctorAccountId: uuid, clinicId?: uuid }` — `doctorAccountId` is the target doctor's `users.id`, shown to them as their "Doctor ID" in the `doctors/` app |
+| Returns | `{ id: uuid, relinked: boolean }` |
+
+---
+
 ### `PATCH /api/doctors/[id]`
 Updates an existing doctor's profile fields. If `email` is changed, also updates the Supabase Auth account.
 
@@ -421,6 +440,92 @@ sent to a hospital that looks closed right now and has no 24/7 or emergency-hour
 
 An emergency referral skips the date/time picker entirely (sent for today, right now) —
 it doesn't skip the hours *check*, just the manual selection.
+
+---
+
+## Direct Booking *(added Aug 2026, migration `20260817000001`)*
+
+A patient booking a doctor **directly** — virtual consult or home visit, no hospital
+involved at all. See `Queue-Database-Schema.md`'s `appointments` and `doctor_profiles`
+sections for the underlying `doctor_user_id`/`hospital_id IS NULL` shape. Creation itself
+isn't a route — it's a direct authenticated-client insert into `appointments`
+(`mobile/lib/api.ts`'s `createDirectAppointment()`), same pattern as every other
+patient-initiated booking in this app; the existing `"Patients can create their own
+appointments"` RLS policy already permits it unmodified (keyed only on `patient_id`, no
+`hospital_id` involved).
+
+The routes below are all called **cross-origin** by the `doctors/` app (and, for the
+public ones, `mobile/`) running in a browser at a different port than this Next.js app —
+unlike the public hospital routes (`Access-Control-Allow-Origin`-only), the authenticated
+ones here carry a non-simple `Authorization` header and use non-GET methods, so they need
+full CORS handling: a real `OPTIONS` preflight response and the same headers on every
+response including errors. See `web/src/lib/cors.ts`.
+
+### `GET/PATCH /api/doctors/profile`
+The caller's own `doctor_profiles` row — fee, direct-booking opt-ins, phone visibility,
+and public-profile fields (title/specialty/bio/qualification/years). Any signed-in account
+may read/write its own row; PATCH upserts (`onConflict: 'user_id'`), so the first save
+creates the row.
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser()` — any authenticated user |
+| PATCH Body | Partial: `{ title?, specialty_id?, bio?, qualification?, years_experience?, virtual_fee?, home_visit_fee?, accepts_direct_virtual?, accepts_direct_home_visit?, show_phone_to_patients? }` |
+| Returns | `{ profile: DoctorProfileRow | null }` |
+
+### `GET/POST /api/doctors/qualifications`, `DELETE /api/doctors/qualifications/{id}`
+The caller's own uploaded credential documents, stored in the private `doctor-credentials`
+Storage bucket. GET/POST responses include a signed URL (5-minute TTL) per document, not a
+raw storage path — the bucket is never read directly by a client.
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser()` — any authenticated user; DELETE also checks the document belongs to the caller |
+| POST Body | `multipart/form-data`: `file` (PDF/JPEG/PNG/WEBP, max 10MB), `title` (string) |
+| Returns | GET: `{ documents: [{ id, title, uploadedAt, url }] }`. POST: `{ document: { id, title, uploaded_at, url } }`. DELETE: `{ success: true }` |
+
+### `GET /api/public/doctors/search`
+Unauthenticated directory of doctors who opted into direct bookings
+(`accepts_direct_virtual` or `accepts_direct_home_visit`). Phone number is redacted
+server-side unless `show_phone_to_patients` is set — never left to the client to decide.
+
+| Field | Value |
+|---|---|
+| Auth | None |
+| Query | `q?` (name/specialty substring), `specialtyId?`, `visitType?` (`virtual` \| `home_visit`, omit for either) |
+| Returns | `{ doctors: IndependentDoctor[] }` — safe fields only, `phone` possibly `null` |
+
+### `GET /api/public/doctors/{id}`
+Full public profile for one doctor (`{id}` is their `users.id`, i.e. their "Doctor ID").
+404s if the doctor hasn't opted into any direct-booking mode. Includes qualification
+documents as signed URLs.
+
+| Field | Value |
+|---|---|
+| Auth | None |
+| Returns | `{ doctor: IndependentDoctorProfile }` (adds `documents: [{ id, title, url }]` to the search shape) or 404 |
+
+### `PATCH /api/appointments/direct/{id}`
+Doctor-side review actions on their own direct bookings — approve/reject/start/complete/
+cancel. Cannot reuse `PATCH /api/appointments/[id]`: that route gates every action on
+`caller.hospitalId === appt.hospital_id`, which a direct booking's `NULL hospital_id`
+never satisfies. Scoped instead by `doctor_user_id === caller's own users.id`, and 404s
+for any appointment that isn't a direct booking (`hospital_id IS NOT NULL`).
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser()`; caller must be the appointment's `doctor_user_id` |
+| Body | `{ action: 'approve' }` \| `{ action: 'reject', reason }` \| `{ action: 'start' }` (home-visit only — virtual consults start via `POST /api/virtual/token`, unchanged) \| `{ action: 'complete', diagnosis?, doctorNotes? }` \| `{ action: 'cancel', reason }` |
+| Returns | `{ success: true }` |
+
+Reading a doctor's own direct bookings is a direct RLS-scoped client query, not a route —
+`"Doctors can read own direct appointments"` policy (`doctor_user_id = caller`).
+
+`POST /api/virtual/token` and `POST /api/virtual/end` (pre-existing, undocumented here
+before now) needed no new routes for direct virtual consults — both already resolved the
+caller by looking up the appointment's doctor and checking identity, and now check
+`doctor_user_id` first (falling back to the `doctors`-row path for hospital-mediated
+appointments), so the same Agora-token flow works for both booking shapes unchanged.
 
 ---
 

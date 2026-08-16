@@ -34,6 +34,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq('id', id)
     .single()
   if (apptErr || !appt) return Errors.notFound('Appointment')
+  // Direct (hospital-less) bookings never come through here -- they go through
+  // PATCH /api/appointments/direct/[id], scoped by doctor_user_id instead of
+  // hospital_id (see 20260817000001_direct_doctor_booking.sql). Guarding this
+  // early also lets TS narrow appt.hospital_id to `string` below.
+  if (appt.hospital_id === null) return Errors.notFound('Appointment')
   if (caller.role !== 'super_admin' && caller.hospitalId !== appt.hospital_id) {
     return Errors.forbidden("Cannot modify another hospital's appointment")
   }

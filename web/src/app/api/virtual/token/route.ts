@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await db
     .from('appointments')
-    .select('id, type, status, doctor_id, patient_id')
+    .select('id, type, status, doctor_id, doctor_user_id, patient_id')
     .eq('id', appointmentId)
     .single()
 
@@ -30,17 +30,26 @@ export async function POST(req: NextRequest) {
     return Errors.validation(`Appointment status '${appt.status}' does not permit a virtual session`)
   }
 
-  // Verify caller is the doctor for this appointment
-  const { data: doctor } = await db
-    .from('doctors')
-    .select('id, auth_user_id, user_id')
-    .eq('id', appt.doctor_id ?? '')
-    .maybeSingle() as { data: { id: string; auth_user_id: string | null; user_id: string | null } | null }
-
-  let callerIsDoctor = doctor?.auth_user_id === user.id
-  if (!callerIsDoctor && doctor?.user_id) {
-    const { data: docUser } = await db.from('users').select('auth_id').eq('id', doctor.user_id).single()
+  // Verify caller is the doctor for this appointment. A direct (hospital-less)
+  // booking has no `doctors` row to check at all -- doctor_user_id points
+  // straight at the doctor's own users.id instead (see
+  // 20260817000001_direct_doctor_booking.sql).
+  let callerIsDoctor = false
+  if (appt.doctor_user_id) {
+    const { data: docUser } = await db.from('users').select('auth_id').eq('id', appt.doctor_user_id).single()
     callerIsDoctor = docUser?.auth_id === user.id
+  } else {
+    const { data: doctor } = await db
+      .from('doctors')
+      .select('id, auth_user_id, user_id')
+      .eq('id', appt.doctor_id ?? '')
+      .maybeSingle() as { data: { id: string; auth_user_id: string | null; user_id: string | null } | null }
+
+    callerIsDoctor = doctor?.auth_user_id === user.id
+    if (!callerIsDoctor && doctor?.user_id) {
+      const { data: docUser } = await db.from('users').select('auth_id').eq('id', doctor.user_id).single()
+      callerIsDoctor = docUser?.auth_id === user.id
+    }
   }
 
   if (!callerIsDoctor) return Errors.forbidden('Only the assigned doctor can start this call')

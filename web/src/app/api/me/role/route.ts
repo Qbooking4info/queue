@@ -14,9 +14,9 @@ export async function GET() {
   // 2. Look up users row
   const { data: profile } = await db
     .from('users')
-    .select('id, full_name')
+    .select('id, full_name, active_hospital_id')
     .eq('auth_id', authId)
-    .single() as { data: { id: string; full_name: string | null } | null; error: unknown }
+    .single() as { data: { id: string; full_name: string | null; active_hospital_id: string | null } | null; error: unknown }
 
   if (profile) {
     const { data: paRow } = await db
@@ -64,24 +64,23 @@ export async function GET() {
     }
   }
 
-  // 3. Doctor — portal-created accounts link via doctors.user_id; self-registered via auth_user_id.
-  if (profile) {
-    const { data: byUserId } = await db
-      .from('doctors')
-      .select('id, hospital_id, full_name')
-      .eq('user_id', profile.id)
-      .maybeSingle()
-    if (byUserId) {
-      return NextResponse.json({ role: 'doctor', hospitalId: byUserId.hospital_id, doctorId: byUserId.id, displayName: byUserId.full_name })
-    }
-  }
+  // 3. Doctor — portal-created accounts link via doctors.user_id; self-registered via
+  // auth_user_id. One person can have multiple doctors rows (one per linked hospital,
+  // see doctors/ app) -- active_hospital_id picks which; falls back to the earliest-
+  // linked row if unset or stale.
+  const orConditions = [`auth_user_id.eq.${authId}`]
+  if (profile) orConditions.push(`user_id.eq.${profile.id}`)
 
-  const { data: doctorRow } = await db
+  const { data: doctorRows } = await db
     .from('doctors')
     .select('id, hospital_id, full_name')
-    .eq('auth_user_id', authId)
-    .single()
-  if (doctorRow) {
+    .or(orConditions.join(','))
+    .order('created_at', { ascending: true })
+  if (doctorRows && doctorRows.length > 0) {
+    const active = profile?.active_hospital_id
+      ? doctorRows.find(d => d.hospital_id === profile.active_hospital_id)
+      : undefined
+    const doctorRow = active ?? doctorRows[0]
     return NextResponse.json({ role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id, displayName: doctorRow.full_name })
   }
 

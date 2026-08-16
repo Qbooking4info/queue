@@ -29,6 +29,11 @@ import { AppointmentsScreen }       from './screens/AppointmentsScreen'
 import { ProfileScreen }            from './screens/ProfileScreen'
 import { HospitalProfileScreen }    from './screens/HospitalProfileScreen'
 import { BookingFlowScreen }        from './screens/BookingFlowScreen'
+import { DoctorSearchScreen }       from './screens/DoctorSearchScreen'
+import { DoctorProfileScreen }      from './screens/DoctorProfileScreen'
+import { DirectBookingScreen }      from './screens/DirectBookingScreen'
+import { SpecialtyBrowseScreen }    from './screens/SpecialtyBrowseScreen'
+import { SpecialtyResultsScreen }   from './screens/SpecialtyResultsScreen'
 import { ConfirmationScreen }       from './screens/ConfirmationScreen'
 import { NotificationsScreen }      from './screens/NotificationsScreen'
 import { AppointmentDetailScreen }  from './screens/AppointmentDetailScreen'
@@ -141,6 +146,11 @@ function AppStack() {
       <Stack.Screen name="HospitalOnboarding"   component={HospitalOnboardingScreen} />
       <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
       <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
+      <Stack.Screen name="DoctorSearch"         component={DoctorSearchScreen} />
+      <Stack.Screen name="DoctorProfile"        component={DoctorProfileScreen} />
+      <Stack.Screen name="DirectBooking"        component={DirectBookingScreen} />
+      <Stack.Screen name="SpecialtyBrowse"      component={SpecialtyBrowseScreen} />
+      <Stack.Screen name="SpecialtyResults"     component={SpecialtyResultsScreen} />
       <Stack.Screen name="Confirmation"         component={ConfirmationScreen}         options={{ animation: 'fade' }} />
       <Stack.Screen name="Notifications"        component={NotificationsScreen} />
       <Stack.Screen name="AppointmentDetail"    component={AppointmentDetailScreen} />

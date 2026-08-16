@@ -16,12 +16,15 @@ export function ConfirmationScreen({ navigation, route }: Props) {
     approvalStatus,  // 'auto_approved' | 'pending_approval'
     selectedDate,
     urgency,
-    bookingType,     // 'virtual' | 'physical'
+    bookingType,     // 'virtual' | 'physical' | 'home_visit'
+    directBooking,   // true for a direct-to-doctor booking (no hospital involved)
   } = route.params ?? {}
 
   const isPending  = approvalStatus === 'pending_approval'
   const isVirtual  = bookingType === 'virtual'
+  const isHomeVisit = bookingType === 'home_visit'
   const doctorName = doctor?.full_name ?? doctor?.name ?? null
+  const reviewerLabel = directBooking ? 'the doctor' : 'the hospital'
 
   const scale   = useRef(new Animated.Value(0.3)).current
   const opacity = useRef(new Animated.Value(0)).current
@@ -59,7 +62,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
           </Text>
           <Text style={st.sub}>
             {isPending
-              ? 'The hospital will review your request and notify you once approved.'
+              ? `${directBooking ? 'The doctor' : 'The hospital'} will review your request and notify you once approved.`
               : 'We\'ll send you a reminder before your appointment.'}
           </Text>
         </Animated.View>
@@ -69,10 +72,12 @@ export function ConfirmationScreen({ navigation, route }: Props) {
           <Animated.View style={[st.pendingBanner, { opacity }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
               <Ionicons name="hourglass-outline" size={14} color="#EF9F27" />
-              <Text style={[st.pendingTitle, { marginBottom: 0 }]}>Awaiting hospital approval</Text>
+              <Text style={[st.pendingTitle, { marginBottom: 0 }]}>
+                {directBooking ? "Awaiting the doctor's confirmation" : 'Awaiting hospital approval'}
+              </Text>
             </View>
             <Text style={st.pendingText}>
-              Your payment will only be charged once the hospital approves your booking.
+              Your payment will only be charged once {reviewerLabel} approves your booking.
               If rejected, you'll receive a full refund.
             </Text>
           </Animated.View>
@@ -97,9 +102,9 @@ export function ConfirmationScreen({ navigation, route }: Props) {
 
           {[
             {
-              icon: isVirtual ? 'videocam-outline' as const : 'walk-outline' as const,
+              icon: isVirtual ? 'videocam-outline' as const : isHomeVisit ? 'home-outline' as const : 'walk-outline' as const,
               label: 'Visit type',
-              value: isVirtual ? 'Virtual consultation' : 'Physical visit',
+              value: isVirtual ? 'Virtual consultation' : isHomeVisit ? 'Home visit' : 'Physical visit',
             },
             {
               icon: 'person-outline' as const,
@@ -107,11 +112,11 @@ export function ConfirmationScreen({ navigation, route }: Props) {
               value: doctorName
                 ?? (isVirtual ? 'Hospital will assign' : 'Assigned when you arrive'),
             },
-            {
+            ...(directBooking ? [] : [{
               icon: 'business-outline' as const,
               label: 'Hospital',
               value: hospital?.name ?? '—',
-            },
+            }]),
             {
               icon: 'calendar-outline' as const,
               label: 'Date',
@@ -138,7 +143,15 @@ export function ConfirmationScreen({ navigation, route }: Props) {
         {/* What happens next */}
         <Animated.View style={[st.noteBox, { opacity }]}>
           <Text style={st.noteTitle}>What happens next</Text>
-          {isVirtual ? (
+          {directBooking ? (
+            <Text style={st.noteText}>
+              1. {doctorName ?? 'The doctor'} reviews your request{'\n'}
+              2. You'll receive a notification once they confirm (or suggest another time){'\n'}
+              {isVirtual
+                ? "3. Check your Bookings tab for the meeting link when your appointment time approaches"
+                : "3. They'll arrive at the address you provided at the confirmed time"}
+            </Text>
+          ) : isVirtual ? (
             isPending ? (
               <Text style={st.noteText}>
                 1. Hospital reviews your booking request{'\n'}

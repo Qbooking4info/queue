@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { fmtLocalDate, todayLocalDate } from '@/lib/dashboard-utils'
+import { requireRole } from '@/lib/supabase/auth-server'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -181,15 +182,23 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, inserted, skippedForHours })
 }
 
-// GET — return existing upcoming slots for a doctor
+// GET — return existing upcoming slots for a doctor. Scoped to staff at the doctor's
+// own hospital (super_admin exempt) -- previously any authenticated caller (any role,
+// any hospital, even a patient) could pull any doctor's full schedule and booking
+// capacity by passing any doctor_id, with no ownership check at all.
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return Errors.unauthenticated()
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
+  if (auth instanceof NextResponse) return auth
+  const { caller } = auth
 
   const db = createAdminClient()
   const doctor_id = req.nextUrl.searchParams.get('doctor_id')
   if (!doctor_id) return Errors.validation('doctor_id is required')
+
+  if (caller.role !== 'super_admin') {
+    const { data: doctor } = await db.from('doctors').select('hospital_id').eq('id', doctor_id).single()
+    if (!doctor || doctor.hospital_id !== caller.hospitalId) return Errors.notFound('Doctor')
+  }
 
   const today = todayLocalDate()
 

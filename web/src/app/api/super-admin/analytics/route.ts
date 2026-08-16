@@ -21,15 +21,18 @@ export async function GET() {
     // BL6: filter to active hospitals only so deactivated/offboarded hospitals don't inflate totals
     db.from('hospitals').select('id, name, city, state, type, is_verified, created_at').eq('is_active', true),
 
-    // Monthly booking count per hospital (excluding cancelled)
+    // Monthly booking count per hospital (excluding cancelled). Direct (hospital-less)
+    // bookings are excluded -- they don't belong to any hospital's count.
     db.from('appointments')
       .select('hospital_id')
+      .not('hospital_id', 'is', null)
       .gte('created_at', monthStart.toISOString())
       .neq('status', 'cancelled'),
 
     // All-time completed count per hospital
     db.from('appointments')
       .select('hospital_id')
+      .not('hospital_id', 'is', null)
       .eq('status', 'completed'),
 
     // Active doctor count per hospital
@@ -38,10 +41,10 @@ export async function GET() {
 
   // Build lookup maps
   const monthlyMap: Record<string, number> = {}
-  for (const r of monthly ?? []) monthlyMap[r.hospital_id] = (monthlyMap[r.hospital_id] ?? 0) + 1
+  for (const r of monthly ?? []) { if (r.hospital_id) monthlyMap[r.hospital_id] = (monthlyMap[r.hospital_id] ?? 0) + 1 }
 
   const completedMap: Record<string, number> = {}
-  for (const r of allTime ?? []) completedMap[r.hospital_id] = (completedMap[r.hospital_id] ?? 0) + 1
+  for (const r of allTime ?? []) { if (r.hospital_id) completedMap[r.hospital_id] = (completedMap[r.hospital_id] ?? 0) + 1 }
 
   const doctorMap: Record<string, number> = {}
   for (const r of doctors ?? []) doctorMap[r.hospital_id] = (doctorMap[r.hospital_id] ?? 0) + 1

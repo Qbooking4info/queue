@@ -39,9 +39,9 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
 
   const { data: profile } = await db
     .from('users')
-    .select('id')
+    .select('id, active_hospital_id')
     .eq('auth_id', authId)
-    .single() as { data: { id: string } | null; error: unknown }
+    .single() as { data: { id: string; active_hospital_id: string | null } | null; error: unknown }
 
   let caller: CallerInfo | null = null
 
@@ -114,15 +114,25 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
     // used to only check auth_user_id -- doctors linked via user_id could
     // never authenticate to a requireRole(['doctor']) route at all. Checked
     // live: 6 of 92 doctor rows use user_id with no auth_user_id set.
+    //
+    // One person can now have MULTIPLE doctors rows -- one per hospital they've
+    // linked their independent account to (see doctors/ app) -- so this can no
+    // longer assume a single match. users.active_hospital_id picks which one is
+    // "current"; falls back to the earliest-linked row if unset or stale (e.g.
+    // points at a hospital the doctor has since unlinked from).
     const orConditions = [`auth_user_id.eq.${authId}`]
     if (profile) orConditions.push(`user_id.eq.${profile.id}`)
 
-    const { data: doctorRow } = await db
+    const { data: doctorRows } = await db
       .from('doctors')
       .select('id, hospital_id')
       .or(orConditions.join(','))
-      .single()
-    if (doctorRow) {
+      .order('created_at', { ascending: true })
+    if (doctorRows && doctorRows.length > 0) {
+      const active = profile?.active_hospital_id
+        ? doctorRows.find(d => d.hospital_id === profile.active_hospital_id)
+        : undefined
+      const doctorRow = active ?? doctorRows[0]
       caller = { authId, role: 'doctor', hospitalId: doctorRow.hospital_id, doctorId: doctorRow.id }
     }
   }

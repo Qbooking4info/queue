@@ -71,32 +71,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // sign-out cleared them. Every setter below is gated on still being current.
   const profileSeq = useRef(0)
 
-  // MH1: Try user_id first, fall back to auth_user_id
-  async function fetchDoctorProfile(authUid: string, usersRowId: string, seq: number): Promise<boolean> {
+  // MH1: matches on user_id OR auth_user_id (portal-created vs self-registered doctors).
+  // One person can now have MULTIPLE doctors rows -- one per hospital they've linked
+  // their independent account to (see the doctors/ app) -- so this can return more than
+  // one match. activeHospitalId (users.active_hospital_id) picks which is "current" for
+  // this app; falls back to the earliest-linked row if unset or stale. The mobile app
+  // doesn't offer a hospital switcher itself (that lives in doctors/) -- it just needs to
+  // not crash and to show a sensible default when a doctor has multiple links.
+  async function fetchDoctorProfile(authUid: string, usersRowId: string, activeHospitalId: string | null, seq: number): Promise<boolean> {
     const current = () => seq === profileSeq.current
-    if (usersRowId) {
-      const { data: byUserId } = await supabase
-        .from('doctors')
-        .select('id, hospital_id, full_name, specialty_id')
-        .eq('is_active', true)
-        .eq('user_id', usersRowId)
-        .maybeSingle()
+    const orConditions = [`auth_user_id.eq.${authUid}`]
+    if (usersRowId) orConditions.push(`user_id.eq.${usersRowId}`)
 
-      if (byUserId) {
-        if (current()) setDoctorProfile({ doctorId: byUserId.id, hospitalId: byUserId.hospital_id, fullName: byUserId.full_name, specialtyId: byUserId.specialty_id ?? null })
-        return true
-      }
-    }
-
-    const { data } = await supabase
+    const { data: rows } = await supabase
       .from('doctors')
       .select('id, hospital_id, full_name, specialty_id')
       .eq('is_active', true)
-      .eq('auth_user_id', authUid)
-      .maybeSingle()
+      .or(orConditions.join(','))
+      .order('created_at', { ascending: true })
 
-    if (data) {
-      if (current()) setDoctorProfile({ doctorId: data.id, hospitalId: data.hospital_id, fullName: data.full_name, specialtyId: data.specialty_id ?? null })
+    if (rows && rows.length > 0) {
+      const active = activeHospitalId ? rows.find(d => d.hospital_id === activeHospitalId) : undefined
+      const row = active ?? rows[0]
+      if (current()) setDoctorProfile({ doctorId: row.id, hospitalId: row.hospital_id, fullName: row.full_name, specialtyId: row.specialty_id ?? null })
       return true
     }
 
@@ -171,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data ?? null)
 
     // Always check doctor first — doctor accounts may not have a users row
-    const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '', seq)
+    const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '', data?.active_hospital_id ?? null, seq)
     if (!isDoctor) {
       const isStaff = await fetchStaffProfile(data?.full_name ?? '', seq)
       if (!isStaff) {

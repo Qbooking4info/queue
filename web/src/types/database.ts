@@ -453,11 +453,13 @@ export type Database = {
           diagnosis: string | null
           doctor_id: string | null
           doctor_notes: string | null
+          doctor_user_id: string | null
           emr_record_id: string | null
           emr_synced: boolean | null
           estimated_wait: number | null
           evidence_url: string | null
-          hospital_id: string
+          home_visit_address: string | null
+          hospital_id: string | null
           id: string
           no_show_at: string | null
           patient_id: string | null
@@ -506,11 +508,13 @@ export type Database = {
           diagnosis?: string | null
           doctor_id?: string | null
           doctor_notes?: string | null
+          doctor_user_id?: string | null
           emr_record_id?: string | null
           emr_synced?: boolean | null
           estimated_wait?: number | null
           evidence_url?: string | null
-          hospital_id: string
+          home_visit_address?: string | null
+          hospital_id?: string | null
           id?: string
           no_show_at?: string | null
           patient_id?: string | null
@@ -559,11 +563,13 @@ export type Database = {
           diagnosis?: string | null
           doctor_id?: string | null
           doctor_notes?: string | null
+          doctor_user_id?: string | null
           emr_record_id?: string | null
           emr_synced?: boolean | null
           estimated_wait?: number | null
           evidence_url?: string | null
-          hospital_id?: string
+          home_visit_address?: string | null
+          hospital_id?: string | null
           id?: string
           no_show_at?: string | null
           patient_id?: string | null
@@ -626,6 +632,13 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_doctor_user_id_fkey"
+            columns: ["doctor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -1018,6 +1031,101 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "transport_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctor_profiles: {
+        Row: {
+          accepts_direct_home_visit: boolean
+          accepts_direct_virtual: boolean
+          bio: string | null
+          created_at: string
+          home_visit_fee: number | null
+          qualification: string | null
+          show_phone_to_patients: boolean
+          specialty_id: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          virtual_fee: number | null
+          years_experience: number | null
+        }
+        Insert: {
+          accepts_direct_home_visit?: boolean
+          accepts_direct_virtual?: boolean
+          bio?: string | null
+          created_at?: string
+          home_visit_fee?: number | null
+          qualification?: string | null
+          show_phone_to_patients?: boolean
+          specialty_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          virtual_fee?: number | null
+          years_experience?: number | null
+        }
+        Update: {
+          accepts_direct_home_visit?: boolean
+          accepts_direct_virtual?: boolean
+          bio?: string | null
+          created_at?: string
+          home_visit_fee?: number | null
+          qualification?: string | null
+          show_phone_to_patients?: boolean
+          specialty_id?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          virtual_fee?: number | null
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_profiles_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "specialties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctor_qualification_documents: {
+        Row: {
+          file_path: string
+          id: string
+          title: string
+          uploaded_at: string
+          user_id: string
+        }
+        Insert: {
+          file_path: string
+          id?: string
+          title: string
+          uploaded_at?: string
+          user_id: string
+        }
+        Update: {
+          file_path?: string
+          id?: string
+          title?: string
+          uploaded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_qualification_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2684,6 +2792,7 @@ export type Database = {
       }
       users: {
         Row: {
+          active_hospital_id: string | null
           address: string | null
           auth_id: string | null
           avatar_url: string | null
@@ -2705,6 +2814,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          active_hospital_id?: string | null
           address?: string | null
           auth_id?: string | null
           avatar_url?: string | null
@@ -2726,6 +2836,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          active_hospital_id?: string | null
           address?: string | null
           auth_id?: string | null
           avatar_url?: string | null
@@ -2746,7 +2857,15 @@ export type Database = {
           state?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_active_hospital_id_fkey"
+            columns: ["active_hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       virtual_sessions: {
         Row: {
@@ -2959,6 +3078,13 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_doctor_user_id_fkey"
+            columns: ["doctor_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {

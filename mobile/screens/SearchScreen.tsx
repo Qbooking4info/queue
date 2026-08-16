@@ -94,6 +94,13 @@ export function SearchScreen({ navigation }: Props) {
           )}
         </View>
 
+        <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('SpecialtyBrowse') }}
+          style={[styles.specialtyBanner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Ionicons name="grid-outline" size={15} color={t.accent} />
+          <Text style={[styles.specialtyBannerText, { color: t.textPrimary }]}>Browse by Specialty</Text>
+          <Text style={{ color: t.accent, fontSize: 16, marginLeft: 'auto' }}>›</Text>
+        </TouchableOpacity>
+
         {/* Filter chips + list/map toggle */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, height: 38 }}
@@ -170,6 +177,8 @@ const styles = StyleSheet.create({
   title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
   inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
   input:       { flex: 1, fontSize: 13 },
+  specialtyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
+  specialtyBannerText: { fontSize: 13, fontWeight: '700' },
   filterPill:  { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, alignSelf: 'center' },
   filterText:  { fontSize: 11, fontWeight: '600' },
   resultCount: { fontSize: 11, marginBottom: 10, paddingHorizontal: 20 },

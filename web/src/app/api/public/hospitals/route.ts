@@ -14,16 +14,32 @@ export async function OPTIONS() {
 // seconds; this takes the highest-volume read off Postgres/PostgREST.
 export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get('search')?.trim()
+  const specialtyId = req.nextUrl.searchParams.get('specialtyId')?.trim()
 
   const db = createAdminClient()
+
+  // specialtyId turns the hospital_specialties embed into an INNER join
+  // (PostgREST's `!inner` modifier) filtered on that specialty -- restricts
+  // to hospitals that have *explicitly registered* the specialty via their
+  // dashboard's Services > Specialties tab (hospital_specialties), not any
+  // hospital that merely happens to employ a doctor with that specialty --
+  // "hospitals that offer X" reads as a hospital-level declaration, not an
+  // incidental staffing fact.
+  const select = specialtyId
+    ? HOSPITAL_SELECT.replace('hospital_specialties(', 'hospital_specialties!inner(')
+    : HOSPITAL_SELECT
+
   let query = db
     .from('hospitals')
-    .select(HOSPITAL_SELECT)
+    .select(select)
     .eq('is_active', true)
     .order('avg_rating', { ascending: false })
 
   if (search) {
     query = query.ilike('name', `%${search}%`)
+  }
+  if (specialtyId) {
+    query = query.eq('hospital_specialties.specialty_id', specialtyId)
   }
 
   const { data, error } = await query

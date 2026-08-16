@@ -339,6 +339,19 @@ export function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
+        {/* Book a doctor directly, bypassing any hospital */}
+        <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('DoctorSearch') }}
+          style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 16 }]}>
+          <View style={[s.bookIcon, { backgroundColor: 'rgba(0,232,122,0.12)' }]}>
+            <Ionicons name="medkit-outline" size={20} color={t.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Book a Doctor Directly</Text>
+            <Text style={[s.bookCardSub, { color: t.textMuted }]}>Independent doctors — virtual consult or home visit</Text>
+          </View>
+          <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+        </TouchableOpacity>
+
         {/* Emergency CTA */}
         <View style={s.emergency}>
           <Ionicons name="alert-circle-outline" size={22} color="#fff" />

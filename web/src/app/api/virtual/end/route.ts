@@ -16,23 +16,30 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await db
     .from('appointments')
-    .select('id, doctor_id')
+    .select('id, doctor_id, doctor_user_id')
     .eq('id', appointmentId)
     .single()
 
   if (!appt) return Errors.notFound('Appointment')
 
-  // Verify caller is the doctor
-  const { data: doctor } = await db
-    .from('doctors')
-    .select('id, auth_user_id, user_id')
-    .eq('id', appt.doctor_id ?? '')
-    .maybeSingle() as { data: { id: string; auth_user_id: string | null; user_id: string | null } | null }
-
-  let callerIsDoctor = doctor?.auth_user_id === user.id
-  if (!callerIsDoctor && doctor?.user_id) {
-    const { data: docUser } = await db.from('users').select('auth_id').eq('id', doctor.user_id).single()
+  // Verify caller is the doctor. Direct (hospital-less) bookings have no
+  // `doctors` row -- doctor_user_id points straight at users.id instead.
+  let callerIsDoctor = false
+  if (appt.doctor_user_id) {
+    const { data: docUser } = await db.from('users').select('auth_id').eq('id', appt.doctor_user_id).single()
     callerIsDoctor = docUser?.auth_id === user.id
+  } else {
+    const { data: doctor } = await db
+      .from('doctors')
+      .select('id, auth_user_id, user_id')
+      .eq('id', appt.doctor_id ?? '')
+      .maybeSingle() as { data: { id: string; auth_user_id: string | null; user_id: string | null } | null }
+
+    callerIsDoctor = doctor?.auth_user_id === user.id
+    if (!callerIsDoctor && doctor?.user_id) {
+      const { data: docUser } = await db.from('users').select('auth_id').eq('id', doctor.user_id).single()
+      callerIsDoctor = docUser?.auth_id === user.id
+    }
   }
 
   if (!callerIsDoctor) return Errors.forbidden()

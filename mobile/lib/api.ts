@@ -41,30 +41,54 @@ const HOSPITAL_SELECT = 'id, name, slug, address, city, state, country, phone, w
   'hospital_specialties(specialty:specialties!hospital_specialties_specialty_id_fkey(name, icon)), ' +
   'services(name, is_active)'
 
+// For embedding a hospital under an appointment row -- deliberately not the fuller
+// HOSPITAL_SELECT above (which nests the hospital's entire doctor roster/specialties/
+// services, wasteful here) and deliberately not '*' (this is queried via the
+// *authenticated* client, not publicDb -- '*' would still pull hospitals.email/
+// registration_number/mdcn_accreditation for the caller's own device even though the
+// anon-key path already excludes them; see 20260726000004_column_privacy_doctors_hospitals_v2.sql).
+const APPOINTMENT_HOSPITAL_SELECT = 'id, name, slug, address, city, state, phone, whatsapp, ' +
+  'latitude, longitude, opd_fee, is_24_hours, emergency_hours'
+
 // Routed through a cached Next.js API route (60s edge cache) instead of
 // querying Supabase directly — this is the highest-volume read in the app
 // (every screen that shows the hospital directory), and the underlying data
 // changes on the order of hours, not seconds. Falls back to a direct
 // Supabase query if the API route is unreachable.
-export async function getHospitals(search?: string): Promise<HospitalWithDoctors[]> {
+export async function getHospitals(search?: string, opts?: { specialtyId?: string }): Promise<HospitalWithDoctors[]> {
+  const specialtyId = opts?.specialtyId
   if (API_URL) {
     try {
-      const qs = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
-      const res = await fetch(`${API_URL}/api/public/hospitals${qs}`)
+      const qs = new URLSearchParams()
+      if (search?.trim()) qs.set('search', search.trim())
+      if (specialtyId) qs.set('specialtyId', specialtyId)
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      const res = await fetch(`${API_URL}/api/public/hospitals${suffix}`)
       if (res.ok) return (await res.json()) as HospitalWithDoctors[]
     } catch {
       // fall through to direct query below
     }
   }
 
+  // specialtyId turns the hospital_specialties embed into an inner join filtered
+  // on that specialty -- only hospitals that explicitly registered it, same
+  // reasoning as web/src/app/api/public/hospitals/route.ts (this is the
+  // direct-query fallback for when API_URL is unreachable).
+  const select = specialtyId
+    ? HOSPITAL_SELECT.replace('hospital_specialties(', 'hospital_specialties!inner(')
+    : HOSPITAL_SELECT
+
   let query = publicDb
     .from('hospitals')
-    .select(HOSPITAL_SELECT)
+    .select(select)
     .eq('is_active', true)
     .order('avg_rating', { ascending: false })
 
   if (search?.trim()) {
     query = query.ilike('name', `%${search.trim()}%`)
+  }
+  if (specialtyId) {
+    query = query.eq('hospital_specialties.specialty_id', specialtyId)
   }
 
   const { data } = await query
@@ -87,6 +111,23 @@ export async function getHospitalById(id: string): Promise<HospitalWithDoctors |
     .eq('id', id)
     .single()
   return data as any
+}
+
+// ── Specialties ──────────────────────────────────────────────────────────────
+// The real specialties table -- distinct from the static, hand-picked array in
+// data/index.ts that drives HomeScreen's existing quick-pick grid (icons/labels
+// that don't map 1:1 to real specialty rows/ids). Used for real ID-based
+// filtering (hospitals-by-specialty, doctors-by-specialty), not that grid.
+
+export interface SpecialtyRow { id: string; name: string; icon: string | null; slug: string }
+
+export async function getSpecialties(): Promise<SpecialtyRow[]> {
+  const { data } = await publicDb
+    .from('specialties')
+    .select('id, name, icon, slug')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  return (data as SpecialtyRow[]) ?? []
 }
 
 // ── Clinics ──────────────────────────────────────────────────────────────────
@@ -238,11 +279,54 @@ function bookingRefFor(prefix: string): string {
 
 // ── Appointments ─────────────────────────────────────────────────────────────
 
-export type AppointmentWithRelations = Appointment & {
-  doctor:   Doctor   | null
-  hospital: Hospital | null
-  clinic:   Clinic   | null
+export interface AppointmentDoctor {
+  id: string
+  full_name: string
+  title: string | null
+  qualification: string | null
+  bio: string | null
+  avatar_url: string | null
+  years_experience: number | null
+  consultation_fee: number | null
+  virtual_fee: number | null
+  accepts_virtual: boolean | null
+  avg_rating: number | null
+  review_count: number | null
+  availability_status: string | null
+  clinic_id: string | null
+  specialty: { name: string; icon: string | null } | null
 }
+
+export interface AppointmentHospital {
+  id: string
+  name: string
+  slug: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  phone: string | null
+  whatsapp: string | null
+  latitude: number | null
+  longitude: number | null
+  opd_fee: number | null
+  is_24_hours: boolean | null
+  emergency_hours: boolean | null
+}
+
+export type AppointmentWithRelations = Appointment & {
+  doctor:   AppointmentDoctor   | null
+  hospital: AppointmentHospital | null
+  clinic:   Clinic              | null
+}
+
+// Same column-privacy reasoning as DOCTOR_SELECT/APPOINTMENT_HOSPITAL_SELECT above --
+// queried via the authenticated client (RLS already scopes the *row* to the caller's
+// own appointments), but the embedded doctor/hospital columns still need their own
+// allowlist so a patient's device doesn't receive staff login emails/MDCN numbers/
+// hospital registration numbers for every doctor and hospital on their appointments.
+const APPOINTMENT_SELECT = `*, doctor:doctors!appointments_doctor_id_fkey(${DOCTOR_SELECT}), ` +
+  `hospital:hospitals!appointments_hospital_id_fkey(${APPOINTMENT_HOSPITAL_SELECT}), ` +
+  'clinic:hospital_clinics!appointments_clinic_id_fkey(*)'
 
 export async function getPatientAppointments(
   patientId: string
@@ -250,7 +334,7 @@ export async function getPatientAppointments(
   // Must use the authenticated supabase client so RLS can verify the user session
   const { data, error } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select(APPOINTMENT_SELECT)
     .eq('patient_id', patientId)
     .order('appointment_date', { ascending: false })
   if (error) {
@@ -263,7 +347,7 @@ export async function getPatientAppointments(
 export async function getAppointmentById(appointmentId: string): Promise<AppointmentWithRelations | null> {
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select(APPOINTMENT_SELECT)
     .eq('id', appointmentId)
     .single()
   return (data as any) ?? null
@@ -275,7 +359,7 @@ export async function getNextAppointment(
   const today = todayLocalDate()
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select(APPOINTMENT_SELECT)
     .eq('patient_id', patientId)
     .gte('appointment_date', today)
     .in('status', ['confirmed', 'pending'])
@@ -392,6 +476,115 @@ export async function createHospitalAppointment(payload: {
 
   if (error) { console.warn('[createHospitalAppointment]', error.message, error.code); return { ok: false, error: error.message } }
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
+}
+
+// ── Direct-to-doctor booking (no hospital involved) ───────────────────────────
+// A patient books a doctor's own independent practice directly -- virtual
+// consult or home visit -- bypassing any hospital. `doctorUserId` is the
+// doctor's users.id (their "Doctor ID"), not a doctors.id: a fully
+// independent doctor with zero hospital links has no doctors row to point
+// at (see 20260817000001_direct_doctor_booking.sql). Always starts 'pending'
+// / 'pending_review' -- the doctor reviews and approves/rejects it
+// themselves (PATCH /api/appointments/direct/[id]), there's no
+// approval_mode/auto-approve concept for direct bookings.
+
+export interface IndependentDoctor {
+  userId: string
+  fullName: string
+  avatarUrl: string | null
+  title: string | null
+  specialty: { name: string; icon: string | null } | null
+  bio: string | null
+  qualification: string | null
+  yearsExperience: number | null
+  virtualFee: number | null
+  homeVisitFee: number | null
+  acceptsDirectVirtual: boolean
+  acceptsDirectHomeVisit: boolean
+  phone: string | null
+}
+
+export interface IndependentDoctorProfile extends IndependentDoctor {
+  documents: { id: string; title: string; url: string | null }[]
+}
+
+// Redaction (phone visibility) only happens server-side in the API route --
+// deliberately no client-side Supabase-query fallback here, unlike the other
+// public-data getters in this file, since replicating that check client-side
+// would mean shipping the raw phone column to any anon-key holder regardless
+// of the doctor's show_phone_to_patients setting.
+export async function searchIndependentDoctors(params?: {
+  q?: string
+  specialtyId?: string
+  visitType?: 'virtual' | 'home_visit'
+}): Promise<IndependentDoctor[]> {
+  if (!API_URL) return []
+  try {
+    const qs = new URLSearchParams()
+    if (params?.q) qs.set('q', params.q)
+    if (params?.specialtyId) qs.set('specialtyId', params.specialtyId)
+    if (params?.visitType) qs.set('visitType', params.visitType)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    const res = await fetch(`${API_URL}/api/public/doctors/search${suffix}`)
+    if (!res.ok) return []
+    const { doctors } = await res.json()
+    return doctors as IndependentDoctor[]
+  } catch {
+    return []
+  }
+}
+
+export async function getIndependentDoctorProfile(userId: string): Promise<IndependentDoctorProfile | null> {
+  if (!API_URL) return null
+  try {
+    const res = await fetch(`${API_URL}/api/public/doctors/${userId}`)
+    if (!res.ok) return null
+    const { doctor } = await res.json()
+    return doctor as IndependentDoctorProfile
+  } catch {
+    return null
+  }
+}
+
+export async function createDirectAppointment(payload: {
+  patientId:      string
+  doctorUserId:   string
+  date:           string
+  startTime:      string
+  type:           'virtual' | 'home_visit'
+  reason:         string
+  homeVisitAddress?: string
+  dependentId?:   string
+  paymentMethod?: string
+}): Promise<BookingResult> {
+  const bookingRef = bookingRefFor('DIR')
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .insert({
+      patient_id:           payload.patientId,
+      doctor_id:            null,
+      hospital_id:          null,
+      doctor_user_id:       payload.doctorUserId,
+      clinic_id:            null,
+      appointment_date:     payload.date,
+      start_time:           payload.startTime,
+      type:                 payload.type,
+      reason:               payload.reason,
+      home_visit_address:   payload.type === 'home_visit' ? (payload.homeVisitAddress ?? null) : null,
+      dependent_id:         payload.dependentId ?? null,
+      status:               'pending',
+      approval_status:      'pending_review',
+      booking_mode:         'direct',
+      booking_ref:          bookingRef,
+      refund_pct:           100,
+      payment_method:       payload.paymentMethod ?? 'card',
+    } as any)
+    .select('id, booking_ref')
+    .single()
+
+  if (error) { console.warn('[createDirectAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus: 'pending_review' }
 }
 
 // ── Refer a patient to another hospital (doctor-only) ─────────────────────────
@@ -664,7 +857,7 @@ export async function deleteDependent(id: string) {
 export async function getCompletedAppointments(patientId: string) {
   const { data } = await supabase
     .from('appointments')
-    .select('*, doctor:doctors!appointments_doctor_id_fkey(*, specialty:specialties!doctors_specialty_id_fkey(name, icon)), hospital:hospitals!appointments_hospital_id_fkey(*), clinic:hospital_clinics!appointments_clinic_id_fkey(*)')
+    .select(APPOINTMENT_SELECT)
     .eq('patient_id', patientId)
     .eq('status', 'completed')
     .order('appointment_date', { ascending: false })

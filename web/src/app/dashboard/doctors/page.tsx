@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
+import { LinkDoctorModal } from '@/components/dashboard/LinkDoctorModal'
 
 const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
   on_duty:  { label: 'On Duty',   dot: '#22c55e', bg: 'rgba(34,197,94,0.12)',  text: '#16a34a' },
@@ -16,9 +17,10 @@ const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: 
 
 export default function DoctorsPage() {
   const { theme: C } = useTheme()
-  const { doctors, stats, loading, reload, role } = useAdmin()
+  const { doctors, stats, loading, reload, role, clinicId } = useAdmin()
   const router = useRouter()
   const [managingDoctor, setManagingDoctor] = useState<AdminDoctor | null>(null)
+  const [linking, setLinking] = useState(false)
 
   const isFrontDesk = role === 'front_desk'
 
@@ -51,12 +53,20 @@ export default function DoctorsPage() {
           </div>
         </div>
         {!isFrontDesk && (
-          <Link href="/dashboard/doctors/add"
-            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-              border: 'none', borderRadius: 10, padding: '10px 18px',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
-            + Invite Doctor
-          </Link>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setLinking(true)}
+              style={{ background: C.card, color: C.textSub,
+                border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Link Existing Doctor
+            </button>
+            <Link href="/dashboard/doctors/add"
+              style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+                border: 'none', borderRadius: 10, padding: '10px 18px',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
+              + Invite Doctor
+            </Link>
+          </div>
         )}
       </div>
 
@@ -159,6 +169,15 @@ export default function DoctorsPage() {
           C={C}
           onClose={() => setManagingDoctor(null)}
           onUpdated={() => { reload(); setManagingDoctor(null) }}
+        />
+      )}
+
+      {linking && (
+        <LinkDoctorModal
+          clinicId={clinicId ?? null}
+          C={C}
+          onClose={() => setLinking(false)}
+          onLinked={() => { reload(); setLinking(false) }}
         />
       )}
     </div>

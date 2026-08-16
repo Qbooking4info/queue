@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Queue Doctors",
+    "slug": "doctors",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "queuedoctors",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.qbooking.queuedoctors",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Queue Doctors uses your camera for video consultations with patients.",
+        "NSMicrophoneUsageDescription": "Queue Doctors uses your microphone for video consultations with patients.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.qbooking.doctors",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0070F3",
+          "defaultChannel": "queue-doctors-notifications",
+          "androidMode": "default"
+        }
+      ],
+      "expo-secure-store",
+      "expo-status-bar",
+      "@sentry/react-native"
+    ],
+    "owner": "qbooking"
+  }
+}

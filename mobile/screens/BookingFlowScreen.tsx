@@ -433,11 +433,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         fetch(`${apiBase}/api/appointments/notify-staff`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appointmentId: result.id,
-            patientName: user.full_name ?? undefined,
-            hospitalName: hospital.name,
-          }),
+          body: JSON.stringify({ appointmentId: result.id }),
         }).catch(() => {/* best-effort */})
       }
 

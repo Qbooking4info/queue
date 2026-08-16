@@ -6,7 +6,15 @@
 ## Core Tables
 
 ### `users`
-Patient and staff profiles. One row per registered account.
+Patient and staff profiles. One row per registered account. Most field edits go through
+service-role API routes, but three onboarding flows (`/register`, `/staff/accept`, the
+`doctors/` app's sign-up) do a direct client-side insert/upsert of their own row — so
+`authenticated` keeps a narrow, explicit self-service `INSERT`/`UPDATE` column allowlist
+(`full_name`, `phone`, `date_of_birth`, `gender`, `blood_group`, `address`, `city`,
+`state`, `country`, `avatar_url`, `active_hospital_id`, plus `auth_id`/`email` — the latter
+two pinned by RLS `WITH CHECK` to the caller's own session, never freely settable) rather
+than the unrestricted table-level grant Supabase creates by default. `anon` has neither.
+See migration `20260816000002`.
 
 | Column | Type | Nullable | Notes |
 |---|---|---|---|
@@ -26,6 +34,7 @@ Patient and staff profiles. One row per registered account.
 | `avatar_url` | text | yes | |
 | `is_verified` | boolean | yes | |
 | `is_super_admin` | boolean | yes | Platform-wide admin flag |
+| `active_hospital_id` | uuid | yes | FK → hospitals. Added Aug 2026. Disambiguates which of a doctor's linked `doctors` rows (see below) is "current" when they have more than one; ignored for patients. Self-service update is RLS-gated to hospitals the caller actually has an active `doctors` row at |
 | `created_at` | timestamptz | yes | |
 | `updated_at` | timestamptz | yes | |
 
@@ -82,19 +91,21 @@ Core booking record — one row per appointment.
 | Column | Type | Nullable | Notes |
 |---|---|---|---|
 | `id` | uuid | no | Primary key |
-| `booking_ref` | text | no | e.g. `QUE-A12345` or `WLK-123456` |
-| `hospital_id` | uuid | no | FK → hospitals |
+| `booking_ref` | text | no | e.g. `QUE-A12345`, `WLK-123456`, `DIR-A1B2C3D4` |
+| `hospital_id` | uuid | **yes** | FK → hospitals. NULL for a direct (hospital-less) booking — see `doctor_user_id` below. Since `20260817000001` |
 | `patient_id` | uuid | yes | FK → users; null = unregistered walk-in |
-| `doctor_id` | uuid | no | FK → doctors |
+| `doctor_id` | uuid | yes | FK → doctors. NULL for a direct booking (mutually exclusive with `doctor_user_id` — see `appointments_booking_shape_check`) |
+| `doctor_user_id` | uuid | yes | FK → users. Set only for a direct booking, where the doctor may have zero hospital-scoped `doctors` rows to reference (a fully independent doctor). Never set alongside `doctor_id`/`hospital_id`. Since `20260817000001` |
 | `clinic_id` | uuid | yes | FK → hospital_clinics |
 | `dependent_id` | uuid | yes | FK → dependents |
 | `slot_id` | uuid | yes | FK → time_slots |
 | `service_id` | uuid | yes | FK → services |
 | `appointment_date` | date | no | |
 | `start_time` | time | no | |
-| `type` | text | no | `in-person` or `virtual` |
+| `type` | text | no | `in-person`, `virtual`, or `home_visit` (direct bookings only, since `20260817000001`) |
 | `status` | text | no | See status values below |
-| `booking_mode` | text | yes | `doctor`, `hospital`, `walkin`, `referral` |
+| `booking_mode` | text | yes | `doctor`, `hospital`, `walkin`, `referral`, `direct` (direct-to-doctor booking, since `20260817000001`) |
+| `home_visit_address` | text | yes | Patient-provided address for a `type = 'home_visit'` direct booking. Since `20260817000001` |
 | `approval_status` | text | yes | `pending_review`, `approved`, `auto_approved`, `rejected` |
 | `urgency` | text | yes | `routine` or `emergency` |
 | `reason` | text | yes | Patient-provided reason |
@@ -142,10 +153,15 @@ Core booking record — one row per appointment.
 
 **Status values:** `pending` → `confirmed` → `checked_in` → `in_progress` → `completed` | `cancelled` | `no_show`
 
+**`appointments_booking_shape_check`** (CHECK constraint, since `20260817000001`): exactly one of two shapes per row —
+`(hospital_id, doctor_id) NOT NULL AND doctor_user_id NULL` (hospital-mediated) or
+`(hospital_id, doctor_id) NULL AND doctor_user_id NOT NULL` (direct booking). Keeps every existing
+`hospital_id`/`doctor_id`-keyed query correctly blind to direct bookings — they just don't match.
+
 **DB Triggers:**
 - `appointment_status_guard` — blocks status changes FROM `completed`, `cancelled`, or `no_show`
-- `enforce_plan_booking_limit` — blocks INSERT if hospital has reached plan's `max_monthly_bookings`
-- `enforce_no_duplicate_active_booking` — blocks INSERT of a second active (non-`emergency`) booking for the same patient/dependent at the same hospital (or same clinic, for `multi` clinic_model hospitals)
+- `enforce_plan_booking_limit` — blocks INSERT if hospital has reached plan's `max_monthly_bookings`. No-ops for a direct booking (`hospital_id IS NULL` never matches a plan) — direct bookings are never subject to a hospital's monthly cap
+- `enforce_no_duplicate_active_booking` — blocks INSERT of a second active (non-`emergency`) booking for the same patient/dependent at the same hospital (or same clinic, for `multi` clinic_model hospitals). For a direct booking (`hospital_id IS NULL`), dedupes on `doctor_user_id` instead, since `NULL = NULL` never matches in SQL and the hospital-keyed path would otherwise silently never catch a duplicate direct booking (since `20260817000001`)
 - `enforce_reschedule_limit` — blocks INSERT of a reschedule (`rescheduled_from` set) whose original already has `reschedule_count >= 1`; otherwise sets `NEW.reschedule_count = original.reschedule_count + 1`
 - `set_checked_in_at` (BEFORE INSERT OR UPDATE) — stamps `checked_in_at = now()` the first time status enters `checked_in`/`in_progress`; never overwrites an existing value
 - `renumber_queue_after_change` (AFTER INSERT OR UPDATE OF `status`, `doctor_id`, `assigned_doctor_id`, `urgency`, `checked_in_at`) — calls `renumber_doctor_queue()` for every doctor+day a row's change could affect (its current doctor(s), and on UPDATE, whichever it previously belonged to if that changed). Deliberately scoped to those specific columns: `renumber_doctor_queue()`'s own UPDATE only touches `queue_position`/`estimated_wait`, which aren't in that list, so its writes don't re-fire this trigger — omitting that scoping would recurse.
@@ -250,13 +266,24 @@ Individual clinics within a multi-clinic hospital.
 
 ### `doctors`
 
+> Since Aug 2026, a doctor's identity is their `users` row, not a `doctors` row — a doctor
+> account is created hospital-agnostically (self-registered in the `doctors/` app, same
+> shape as a patient signup) and then **linked** to one or more hospitals via
+> `POST /api/doctors/link`, which inserts one `doctors` row per hospital affiliation, all
+> sharing the same `user_id`. `hospital_id` stays `NOT NULL` on this table (schema
+> unchanged), so a doctor with N hospitals has N rows here, not one hospital-agnostic row.
+> `users.active_hospital_id` picks which row is "current" wherever a single doctor
+> identity is needed (dashboard auth, mobile). All doctor-identity lookups across
+> `web`/`mobile` fetch *all* matching `doctors` rows for a caller (not `.single()`), since
+> more than one can now legitimately match.
+
 | Column | Type | Nullable | Notes |
 |---|---|---|---|
 | `id` | uuid | no | Primary key |
 | `hospital_id` | uuid | no | FK → hospitals |
 | `clinic_id` | uuid | yes | FK → hospital_clinics |
-| `user_id` | uuid | yes | FK → users (their portal account) |
-| `auth_user_id` | uuid | yes | Direct Supabase Auth UID |
+| `user_id` | uuid | yes | FK → users. Shared across every hospital a doctor is linked to — this is what makes the doctor's identity portable |
+| `auth_user_id` | uuid | yes | Direct Supabase Auth UID. Legacy path from portal-created (not self-registered) doctor accounts; still resolved alongside `user_id` everywhere |
 | `email` | text | yes | Portal login email |
 | `full_name` | text | no | |
 | `title` | text | yes | e.g. `Dr.` |
@@ -274,6 +301,51 @@ Individual clinics within a multi-clinic hospital.
 | `is_active` | boolean | yes | |
 | `created_at` | timestamptz | yes | |
 | `updated_at` | timestamptz | yes | |
+
+### `doctor_profiles` *(added Aug 2026, migration `20260817000001`)*
+A doctor's hospital-agnostic public profile and settings for **direct** (patient-initiated,
+no-hospital) bookings — distinct from `doctors`, which stays per-hospital-affiliation and keeps
+its own `consultation_fee`/`virtual_fee`/`bio`/etc. per link. One row per `users.id`, whether or
+not that account has any `doctors` row at all.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `user_id` | uuid | no | Primary key, FK → users |
+| `title` | text | yes | e.g. `Dr.` |
+| `specialty_id` | uuid | yes | FK → specialties |
+| `bio` | text | yes | |
+| `qualification` | text | yes | Free text, e.g. `MBBS, FWACS` |
+| `years_experience` | integer | yes | |
+| `virtual_fee` | integer | yes | ₦. Only shown/used if `accepts_direct_virtual` |
+| `home_visit_fee` | integer | yes | ₦. Only shown/used if `accepts_direct_home_visit` |
+| `accepts_direct_virtual` | boolean | no | Default `false` |
+| `accepts_direct_home_visit` | boolean | no | Default `false` |
+| `show_phone_to_patients` | boolean | no | Default `false`. Gates whether `users.phone` is included in `GET /api/public/doctors/*` responses — redacted server-side, never left to the client |
+| `created_at` / `updated_at` | timestamptz | no | |
+
+RLS: doctor manages their own row only (`user_id` resolves to `auth.uid()` via `users.auth_id`).
+No public SELECT policy — patient-facing reads go through `GET /api/public/doctors/search` and
+`GET /api/public/doctors/[id]` (service-role, explicit safe-column projection + phone redaction),
+matching this app's established pattern for cross-account public reads.
+
+### `doctor_qualification_documents` *(added Aug 2026, migration `20260817000001`)*
+Uploaded credential/certificate files for a doctor's independent profile (e.g. licence, degree
+certificate) — patients can view these on a doctor's public profile before booking directly.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `user_id` | uuid | no | FK → users |
+| `title` | text | no | Doctor-provided label, e.g. "MDCN Licence" |
+| `file_path` | text | no | Object path within the `doctor-credentials` Storage bucket — not a public URL |
+| `uploaded_at` | timestamptz | no | |
+
+RLS: doctor manages their own rows only. The `doctor-credentials` Storage bucket is **private**
+(not public) — every read, by the owning doctor or a browsing patient, goes through a
+service-role-generated signed URL (5-minute TTL) from `GET /api/doctors/qualifications` or
+`GET /api/public/doctors/[id]`, never a direct Storage URL. This is the first Supabase Storage
+bucket used anywhere in this project; there was no prior pattern for Storage RLS to follow, so
+`storage.objects` access is scoped to each doctor's own `{user_id}/...` path prefix.
 
 ### `specialties`
 
@@ -619,3 +691,5 @@ Batch hospital payouts.
 | `20260807000001` | Add `referring_clinic_id` to `appointments` — supports same-hospital clinic-to-clinic referrals, not just cross-hospital ones |
 | `20260808000001` | `get_doctor_queue`: return `referring_clinic_name` alongside the existing referral columns |
 | `20260809000001` | `process_missed_appointments()`: also sweep stale `checked_in`/`in_progress` rows by `check_in_date` (independent of `appointment_date`) — `checked_in` past that day with no consult started → `no_show`; `in_progress` past that day → `completed` |
+| `20260816000001` | Independent, multi-hospital doctor accounts: add `users.active_hospital_id` (FK → hospitals) + index; RLS policy letting a doctor set it themselves, but only to a hospital where they have an active `doctors` row |
+| `20260816000002` | **Security fix:** `users`' insert/update RLS policies (from `20260531130000`) had no `WITH CHECK` on column values, so any signed-in user could set their own `is_super_admin`/`is_verified`/`patient_number`, or hijack another (not-yet-registered) identity's `auth_id`, via a raw PostgREST call — revokes the table-level `INSERT`/`UPDATE` grants and re-grants an explicit safe-column allowlist (mirrors the `doctors`/`hospitals` column-privacy pattern from `20260726000004`); `auth_id`/`email` stay in the allowlist (three onboarding flows need to write them) but are pinned by `WITH CHECK` to the caller's own `auth.uid()`/JWT email; folds in and drops `20260816000001`'s standalone active-hospital policy to avoid a multiple-permissive-policy OR-bypass |
