@@ -2,6 +2,7 @@
   "expo": {
     "name": "Queue",
     "slug": "mobile",
+    "scheme": "queue",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,7 +13,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
         "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -29,7 +33,10 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -39,8 +46,7 @@
       "eas": {
         "projectId": "a46342ec-6f59-459a-8885-da9aab8d39e0"
       },
-      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6b2Rta2d5emd1enp5b3ZqcGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNDI2NjYsImV4cCI6MjA5NTcxODY2Nn0.zrVJpGaj1kICFH7_OyyxbBlTqxr0rVqIu78a_NDVTig"
+      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co"
     },
     "plugins": [
       [
@@ -55,13 +61,16 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
-          "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances."
+          "locationAlwaysAndWhenInUsePermission": "Queue reports an on-duty ambulance's position so dispatch can send it the nearest emergency. Only while you are on duty.",
+          "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       "expo-secure-store",
       "expo-status-bar",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-web-browser"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

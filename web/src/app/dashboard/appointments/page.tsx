@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
@@ -473,7 +473,7 @@ function RejectModal({
           Reject Booking
         </div>
         <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
-          Patient <strong style={{ color: C.text }}>{appointment.patient_name}</strong> will receive a full refund.
+          Patient <strong style={{ color: C.text }}>{appointment.patient_name}</strong> will be notified. No payment was taken.
         </div>
         <textarea
           value={note} onChange={e => setNote(e.target.value)}

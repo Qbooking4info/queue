@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+import * as ExpoLocation from 'expo-location'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { HospitalsMap } from '../components/map/HospitalsMap'
+import { FallbackPanel } from '../components/emergency/FallbackPanel'
 import {
   getTransportRequestById, getRequestPickupPoint, getUnitLocation,
   subscribeToTransport, subscribeToUnitLocation, cancelTransport,
-  formatEta, TRANSPORT_STATUS_LABEL,
+  sharePatientLocation, formatEta, TRANSPORT_STATUS_LABEL,
   type TransportRequestRow, type TransportStatus,
 } from '../lib/ambulance-api'
 
@@ -15,6 +17,26 @@ interface Props { navigation: any; route: any }
 
 const TERMINAL: TransportStatus[] = ['completed', 'cancelled_by_requester', 'cancelled_by_provider', 'no_unit_available']
 const CANCELLABLE: TransportStatus[] = ['requested', 'scheduled', 'searching', 'matched', 'en_route_to_patient']
+
+/** Statuses that mean nobody has taken the job yet. */
+const STILL_SEARCHING: TransportStatus[] = ['requested', 'scheduled', 'searching']
+
+// While the job is live the crew needs to know where the patient actually is.
+// Sharing starts when a unit is assigned — not before, since there is nobody to
+// share with — and stops the moment the job ends.
+const SHARING_STATUSES: TransportStatus[] = ['matched', 'en_route_to_patient', 'on_scene', 'transporting']
+
+/**
+ * Layer C of the 60s deadline (Queue-Ambulance-Stage1-Scope.md).
+ *
+ * The server enforces the same budget in SQL on pg_cron, but this timer is
+ * deliberately independent of it: the phone knows when it sent the request and
+ * does not need the backend's permission to conclude a minute has passed. If
+ * realtime drops, the API 500s, or the sweeper never runs, the patient is still
+ * told at 60 seconds. For a life-safety path, never rely on the failing system
+ * to report its own failure.
+ */
+const SEARCH_DEADLINE_MS = 60_000
 
 const STATUS_ICON: Partial<Record<TransportStatus, keyof typeof Ionicons.glyphMap>> = {
   requested: 'time-outline',
@@ -40,6 +62,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   const [unitPos,    setUnitPos]  = useState<{ lat: number; lng: number; recordedAt: string } | null>(null)
   const [loading,    setLoading]  = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const [elapsedMs,  setElapsedMs] = useState(0)
 
   const unitChannelRef = useRef<{ unsubscribe: () => void } | null>(null)
 
@@ -79,6 +102,80 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
     return () => { cancelled = true; channel.unsubscribe() }
   }, [request?.assigned_unit_id])
+
+  // ── Share position with the crew driving to us ────────────────────────────
+  //
+  // The pickup point captured at booking is a pin dropped once. People move:
+  // out of a building to the roadside, to a landmark the driver can actually
+  // find, or because someone drove them partway. Without this the crew is
+  // navigating to where the caller was when they tapped, and the last hundred
+  // metres — the part that costs minutes — is guesswork.
+  //
+  // Foreground only, and only while the job is live. record_patient_location()
+  // refuses writes once the request is terminal, so the window closes
+  // server-side too rather than depending on this screen unmounting cleanly.
+  useEffect(() => {
+    const status = request?.status
+    if (!status || !SHARING_STATUSES.includes(status)) return
+
+    let cancelled = false
+    let sub: { remove: () => void } | null = null
+
+    ;(async () => {
+      const { status: perm } = await ExpoLocation.getForegroundPermissionsAsync()
+      if (perm !== 'granted' || cancelled) return
+
+      sub = await ExpoLocation.watchPositionAsync(
+        // Distance filter rather than a tight interval: a stationary patient
+        // should not be spending battery, and record_patient_location()
+        // discards sub-10m movement anyway.
+        { accuracy: ExpoLocation.Accuracy.Balanced, timeInterval: 10_000, distanceInterval: 15 },
+        (loc) => {
+          if (cancelled) return
+          sharePatientLocation(requestId, {
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+            accuracyM: loc.coords.accuracy ?? undefined,
+            recordedAt: new Date(loc.timestamp).toISOString(),
+          }).catch(() => {/* best-effort; the static pickup point still stands */})
+        },
+      )
+    })().catch(err => console.warn('[tracking] location share failed to start', err))
+
+    return () => { cancelled = true; sub?.remove() }
+  }, [requestId, request?.status])
+
+  // Layer C. Anchored to the request's created_at rather than a mount timestamp,
+  // so backgrounding the app or re-entering this screen can't quietly restart
+  // the clock and hide the deadline from someone who has already waited.
+  const searching = request ? STILL_SEARCHING.includes(request.status) : false
+
+  // Prefer the deadline the server stamped, so the countdown the patient sees
+  // and the sweeper that fails the request agree on one number. Falls back to
+  // created_at + the local budget if it's missing — the timer must still fire
+  // for a row written before this column existed.
+  const deadlineAt = (() => {
+    const stamped = request?.search_deadline_at ? Date.parse(request.search_deadline_at) : NaN
+    if (!Number.isNaN(stamped)) return stamped
+    const created = request ? Date.parse(request.created_at) : NaN
+    return Number.isNaN(created) ? NaN : created + SEARCH_DEADLINE_MS
+  })()
+
+  useEffect(() => {
+    if (!request || !searching || Number.isNaN(deadlineAt)) return
+
+    const tick = () => setElapsedMs(Date.now() - (deadlineAt - SEARCH_DEADLINE_MS))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [deadlineAt, searching])
+
+  // True when we've blown the budget but the server hasn't said so yet — either
+  // it's about to (the sweeper runs on a 10s tick, so a few seconds of overshoot
+  // is normal), or something upstream is broken. Either way the patient is told
+  // at the deadline rather than whenever the backend gets around to it.
+  const deadlinePassed = searching && !Number.isNaN(deadlineAt) && Date.now() >= deadlineAt
+  const secondsLeft = Math.max(0, Math.ceil((SEARCH_DEADLINE_MS - elapsedMs) / 1000))
 
   function handleCancel() {
     Alert.alert(
@@ -139,18 +236,33 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
         <View style={[s.statusCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Ionicons name={STATUS_ICON[status] ?? 'help-circle-outline'} size={32} color={statusColor} />
           <Text style={[s.statusText, { color: t.textPrimary }]}>{TRANSPORT_STATUS_LABEL[status]}</Text>
-          {!isTerminal && (
+          {!isTerminal && !searching && (
             <Text style={[s.etaText, { color: t.textMuted }]}>ETA: {formatEta(request.eta_seconds)}</Text>
+          )}
+          {searching && !deadlinePassed && (
+            <Text style={[s.etaText, { color: t.textMuted }]}>
+              Finding you an ambulance · {secondsLeft}s
+            </Text>
           )}
         </View>
 
-        {status === 'no_unit_available' && (
+        {(status === 'no_unit_available' || deadlinePassed) && (
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
             <Text style={[s.noteText, { color: '#FF5C5C' }]}>
-              No ambulance could be reached. If this is life-threatening, call{' '}
-              <Text style={{ fontWeight: '800' }}>112</Text> directly instead of waiting on this request.
+              {status === 'no_unit_available'
+                ? 'No ambulance could be reached.'
+                : "We haven't been able to reach an ambulance yet."}
+              {' '}Don't keep waiting on this request — call one of the numbers below now.
             </Text>
           </View>
+        )}
+
+        {/* Always mounted while the outcome is still open, not gated behind
+            failure: someone watching a countdown is someone not dialling, and
+            both paths can run at once. It only changes tone at the deadline.
+            The number list is device-cached, so it renders with no network. */}
+        {(searching || status === 'no_unit_available') && (
+          <FallbackPanel variant={deadlinePassed || status === 'no_unit_available' ? 'urgent' : 'calm'} />
         )}
 
         {markers.length > 0 && (

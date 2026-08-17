@@ -21,7 +21,7 @@ interface FormData {
   // Step 2 — Verification
   registrationNumber: string; mdcnNumber: string
   // Step 3 — Location
-  address: string; city: string; state: string
+  address: string; city: string; state: string; latitude: number | null; longitude: number | null
   phone: string; email: string; whatsapp: string
   // Step 4 — Clinic Structure
   clinicModel: ClinicModel
@@ -538,7 +538,7 @@ export default function OnboardingPage() {
   const [data, setData]           = useState<FormData>({
     name: '', type: 'hospital', description: '',
     registrationNumber: '', mdcnNumber: '',
-    address: '', city: '', state: '', phone: '', email: '', whatsapp: '',
+    address: '', city: '', state: '', latitude: null, longitude: null, phone: '', email: '', whatsapp: '',
     clinicModel: 'single', clinics: [],
     specialtyIds: [],
     accepts_virtual: false, emergency_hours: false,
@@ -582,6 +582,7 @@ export default function OnboardingPage() {
           name: data.name, type: data.type, description: data.description,
           registrationNumber: data.registrationNumber, mdcnNumber: data.mdcnNumber,
           address: data.address, city: data.city, state: data.state,
+          latitude: data.latitude, longitude: data.longitude,
           phone: data.phone, email: data.email, whatsapp: data.whatsapp,
           clinicModel: data.clinicModel,
           clinics: data.clinics.filter(c => c.name.trim()),

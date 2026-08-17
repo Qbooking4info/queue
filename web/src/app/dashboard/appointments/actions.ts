@@ -132,7 +132,7 @@ export async function rejectPendingApprovalAppointment(appointmentId: string) {
   const hospitalName = (appt as any).hospital?.name ?? 'the hospital'
   await notifyPatient(
     db, appointmentId, 'cancelled', 'Booking Not Approved',
-    `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. A full refund has been issued.`,
+    `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${note}. No payment was taken for this booking.`,
   )
 
   revalidatePath('/dashboard/appointments')

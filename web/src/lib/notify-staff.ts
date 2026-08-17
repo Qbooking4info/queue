@@ -13,10 +13,11 @@ async function sendExpoPush(token: string, title: string, body: string, data?: R
 
 // Notifies the assigned doctor's staff account that a new appointment has landed.
 // Patient/hospital names are resolved here from appointmentId, not accepted from the
-// caller -- this route has no auth (a patient's own device calls it mid-booking,
-// before there's necessarily a way to verify the session), so trusting client-supplied
-// name strings would let anyone who knows/guesses an appointmentId inject arbitrary
+// caller -- trusting client-supplied name strings would let a caller inject arbitrary
 // text into a real staff member's notification feed, attributed to a real booking.
+// The route itself additionally requires auth and checks the caller actually owns
+// the appointment (see api/appointments/notify-staff/route.ts) -- this function's
+// own server-side composition is a second, independent layer on top of that.
 export async function notifyStaff(db: ReturnType<typeof createAdminClient>, appointmentId: string) {
   try {
     const { data: appt } = await db

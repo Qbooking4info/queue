@@ -115,6 +115,15 @@ export function NotificationsScreen({ navigation }: Props) {
       return
     }
 
+    // Ambulance dispatch. These carry request_id (and for a crew offer,
+    // offer_id) and were falling through to the no-op below, so tapping the
+    // most time-critical notification in the app did nothing at all.
+    const requestId = n.data?.request_id
+    if ((type === 'transport' || type === 'dispatch_offer') && requestId) {
+      navigation.navigate('AmbulanceTracking', { requestId: String(requestId) })
+      return
+    }
+
     // system / unknown — no-op (already marked read)
   }
 
@@ -190,7 +199,11 @@ export function NotificationsScreen({ navigation }: Props) {
                         </View>
                         <Text style={[st.body, { color: t.textSecondary }]} numberOfLines={2}>{n.body}</Text>
                       </View>
-                      {(APPT_TYPES.has(n.type) && n.data?.appointment_id) || n.type === 'prescription' || n.type === 'lab'
+                      {/* Keep in step with handleTap — a chevron on a row that
+                          does nothing is worse than no chevron. */}
+                      {(APPT_TYPES.has(n.type) && n.data?.appointment_id)
+                        || n.type === 'prescription' || n.type === 'lab'
+                        || ((n.type === 'transport' || n.type === 'dispatch_offer') && n.data?.request_id)
                         ? <Text style={[st.chevron, { color: t.textMuted }]}>›</Text>
                         : null
                       }

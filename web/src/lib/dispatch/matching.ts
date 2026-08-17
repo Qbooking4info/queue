@@ -138,6 +138,29 @@ export function hardFilter(
 }
 
 /**
+ * Why each candidate was dropped, tallied by reason.
+ *
+ * rankCandidates throws this information away — it filters and moves on — but
+ * "three units were in range and all three were tier_too_low" is a different
+ * supply problem from "all three ran out of shift", and the two need different
+ * fixes. Recorded per round in dispatch_attempts.
+ *
+ * Pure and separate from rankCandidates on purpose: instrumentation must not be
+ * able to change what gets dispatched.
+ */
+export function rejectionTally(
+  req: TransportRequest,
+  candidates: Candidate[],
+): Partial<Record<RejectReason, number>> {
+  const tally: Partial<Record<RejectReason, number>> = {};
+  for (const c of candidates) {
+    const reason = hardFilter(req, c);
+    if (reason) tally[reason] = (tally[reason] ?? 0) + 1;
+  }
+  return tally;
+}
+
+/**
  * Fallback only, used when the routing provider fails. Deliberately pessimistic:
  * in dense traffic the road distance and the achievable speed are both worse
  * than a naive straight line estimate suggests.

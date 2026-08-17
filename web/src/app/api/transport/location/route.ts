@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { isOnShiftCrew } from '@/lib/dispatch/crew-identity'
+import { refreshEtaForUnit } from '@/lib/dispatch/live-eta'
 
 /**
  * POST /api/transport/location   { ambulanceId, pings: [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }] }
@@ -33,20 +35,12 @@ export async function POST(req: NextRequest) {
     return Errors.validation(`At most ${MAX_PINGS_PER_BATCH} pings per batch`)
   }
 
-  const { data: onShift } = await db.from('ambulance_shifts')
-    .select('id, ambulance_shift_crew!inner(ambulance_crew!inner(is_active, users!inner(auth_id)))')
-    .eq('ambulance_id', ambulanceId)
-    .lte('starts_at', new Date().toISOString())
-    .gte('ends_at', new Date().toISOString())
-    .limit(1)
-
-  const authorised = (onShift ?? []).some((s) =>
-    (s.ambulance_shift_crew ?? []).some(
-      (sc) => sc?.ambulance_crew?.is_active && sc?.ambulance_crew?.users?.auth_id === userRes.user!.id,
-    ),
-  )
-
-  if (!authorised) return Errors.forbidden('You are not on the crew for this unit')
+  // Both crew identity paths — the previous `ambulance_crew!inner` embed
+  // rejected hospital-fleet crew, so their unit never sent a ping and never
+  // became visible to dispatch at all.
+  if (!(await isOnShiftCrew(db, ambulanceId, userRes.user.id))) {
+    return Errors.forbidden('You are not on the crew for this unit')
+  }
 
   const ordered = [...pings].sort(
     (a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt),
@@ -64,6 +58,16 @@ export async function POST(req: NextRequest) {
       p_recorded_at: p.recordedAt,
     })
     if (ok) accepted++
+  }
+
+  // A moved unit is the only moment new ETA information exists, so recompute
+  // here rather than on a timer. Throttled inside refreshEtaForUnit, and it
+  // never throws — a routing provider having a bad minute must not turn into a
+  // failed location ping, which would make the unit invisible to dispatch.
+  if (accepted > 0) {
+    const latest = ordered[ordered.length - 1]
+    await refreshEtaForUnit(db, ambulanceId, { lat: latest.lat, lng: latest.lng })
+      .catch(err => console.warn('[transport] eta refresh failed', err))
   }
 
   // Rejected pings are normal (drift, duplicates after a reconnect) — the crew

@@ -179,7 +179,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   }
 
   function handleReject(appt: Appt) {
-    Alert.alert('Reject Booking', 'The patient will receive a full refund.', [
+    Alert.alert('Reject Booking', 'The patient will be notified. No payment was taken, so there is nothing to refund.', [
       { text: 'Keep', style: 'cancel' },
       { text: 'Reject', style: 'destructive', onPress: async () => {
         setActioning(appt.id)

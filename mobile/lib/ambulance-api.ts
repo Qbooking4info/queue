@@ -28,6 +28,14 @@ export interface TransportRequestRow {
   pickup_address: string | null
   symptom_description: string | null
   created_at: string
+  /**
+   * When the server stops searching and declares no unit available. Stamped by
+   * the transport_search_deadline trigger on insert (emergency only, hence
+   * nullable). The client reads it so the countdown shown to the patient and
+   * the server-side sweeper agree on one number instead of each hardcoding 60s
+   * and silently drifting apart.
+   */
+  search_deadline_at: string | null
 }
 
 export interface CreateTransportInput {
@@ -190,6 +198,93 @@ export function subscribeToUnitLocation(
         schema: 'public',
         table: 'ambulance_current_location',
         filter: `ambulance_id=eq.${ambulanceId}`,
+      },
+      (payload) => {
+        const row = payload.new as { location: string; recorded_at: string }
+        const pos = parsePoint(row.location)
+        if (pos) onMove({ ...pos, recordedAt: row.recorded_at })
+      },
+    )
+    .subscribe()
+}
+
+/**
+ * Ambulances near a point, for the pre-booking map.
+ *
+ * Deliberately anonymous: the RPC returns position and tier only, no unit id
+ * and nothing identifying. Before a request exists the patient has no
+ * relationship with a particular vehicle, and this is a public-facing lookup.
+ *
+ * Polled rather than subscribed. The realtime channel on
+ * `ambulance_current_location` is gated by RLS to participants in an active
+ * job — correctly, since it is the raw fleet position feed — so there is
+ * nothing to subscribe to before booking.
+ */
+export async function fetchNearbyUnits(
+  lat: number,
+  lng: number,
+  radiusM = 15000,
+): Promise<Array<{ lat: number; lng: number; tier: string; distanceM: number }>> {
+  const { data, error } = await supabase.rpc('nearby_available_units', {
+    p_lat: lat, p_lng: lng, p_radius_m: radiusM,
+  })
+  if (error) { console.warn('[nearbyUnits]', error.message); return [] }
+  return (data ?? []).map((r: { lat: number; lng: number; tier: string; distance_m: number }) => ({
+    lat: r.lat, lng: r.lng, tier: r.tier, distanceM: r.distance_m,
+  }))
+}
+
+/**
+ * Share the patient's position with the crew driving to them.
+ *
+ * Only meaningful while a job is active — record_patient_location() refuses
+ * writes once the request reaches a terminal state, so the sharing window
+ * closes server-side rather than depending on the app remembering to stop.
+ * Returns false for a rejected fix (too inaccurate, out of order, or barely
+ * moved), which is normal and not an error.
+ */
+export async function sharePatientLocation(
+  requestId: string,
+  pos: { lat: number; lng: number; accuracyM?: number; recordedAt?: string },
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('record_patient_location', {
+    p_request_id: requestId,
+    p_lat: pos.lat,
+    p_lng: pos.lng,
+    p_accuracy_m: pos.accuracyM ?? null,
+    p_recorded_at: pos.recordedAt ?? new Date().toISOString(),
+  })
+  if (error) { console.warn('[sharePatientLocation]', error.message); return false }
+  return data === true
+}
+
+/** The patient's live position on an active job, for the crew's map. */
+export async function fetchJobPatientLocation(
+  requestId: string,
+): Promise<{ lat: number; lng: number; recordedAt: string } | null> {
+  const { data, error } = await supabase.rpc('get_job_patient_location', { p_request_id: requestId })
+  if (error) { console.warn('[jobPatientLocation]', error.message); return null }
+  const row = (data ?? [])[0] as { lat: number; lng: number; recorded_at: string } | undefined
+  return row ? { lat: row.lat, lng: row.lng, recordedAt: row.recorded_at } : null
+}
+
+/**
+ * Live patient position. The mirror of subscribeToUnitLocation — the crew map
+ * follows the patient the same way the patient's map follows the unit.
+ */
+export function subscribeToPatientLocation(
+  requestId: string,
+  onMove: (pos: { lat: number; lng: number; recordedAt: string }) => void,
+) {
+  return supabase
+    .channel(`patient:${requestId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'transport_patient_location',
+        filter: `request_id=eq.${requestId}`,
       },
       (payload) => {
         const row = payload.new as { location: string; recorded_at: string }

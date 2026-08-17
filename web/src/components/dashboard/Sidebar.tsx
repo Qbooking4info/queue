@@ -4,11 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { UserRole } from '@/lib/admin-api'
-import {
-  LayoutDashboard, CalendarDays, ListOrdered, CalendarRange,
-  Stethoscope, Users, Settings, BarChart2, Tag, Building2,
-  Hospital, Monitor, LogOut, ArrowLeft, Ambulance, type LucideIcon,
-} from 'lucide-react'
+import { LayoutDashboard, CalendarDays, ListOrdered, CalendarRange, Stethoscope, Settings, BarChart2, Tag, Building2, Hospital, Monitor, LogOut, ArrowLeft, Ambulance, type LucideIcon } from 'lucide-react'
 
 type NavItem = { href: string; icon: LucideIcon; label: string }
 
@@ -27,6 +23,7 @@ const NAV: Record<UserRole, NavItem[]> = {
   super_admin: [
     { href: '/dashboard',           icon: LayoutDashboard, label: 'Platform Overview'  },
     { href: '/dashboard/hospitals', icon: Hospital,        label: 'All Hospitals'       },
+    { href: '/dashboard/directory', icon: Ambulance,       label: 'Emergency Directory' },
     { href: '/dashboard/analytics', icon: BarChart2,       label: 'Analytics'           },
     { href: '/dashboard/settings',  icon: Settings,        label: 'Platform Settings'   },
   ],

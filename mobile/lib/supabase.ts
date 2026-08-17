@@ -4,8 +4,16 @@ import * as SecureStore from 'expo-secure-store'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl      = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey  = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 const supabasePublicKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLIC_KEY!
+
+/**
+ * The publishable key. Legacy keys were disabled on 2026-08-10 — the step that
+ * finally killed the service_role key leaked to a public repo in July — so the
+ * legacy anon fallback that carried this through the migration is gone with it.
+ * A build without this variable should fail loudly rather than quietly ship a
+ * key the server rejects.
+ */
+const supabaseClientKey = supabasePublicKey
 
 // Supabase session tokens can exceed the 2 KB keychain limit on iOS.
 // This adapter chunks large values across multiple SecureStore keys.
@@ -63,7 +71,7 @@ const WebStorageAdapter = {
 
 // Auth client — session stored encrypted in the device keychain/keystore on native,
 // localStorage on web.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseClientKey, {
   auth: {
     storage: Platform.OS === 'web' ? WebStorageAdapter : SecureStoreAdapter,
     autoRefreshToken: true,
@@ -73,6 +81,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 // Public read-only client — no session needed
-export const publicDb = createClient(supabaseUrl, supabasePublicKey || supabaseAnonKey, {
+export const publicDb = createClient(supabaseUrl, supabaseClientKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 })

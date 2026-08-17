@@ -8,6 +8,12 @@ import { Errors } from '@/lib/api-error'
 // they previously disagreed: BookingFlowScreen quoted a 1.5x emergency premium
 // while this booked revenue at 2x, so the patient saw one number and the
 // hospital's reporting recorded another.
+// 'pending' used to be total - completed - cancelled, which swept no_show,
+// checked_in and in_progress into the same number — a hospital with seven
+// no-shows saw seven "pending" appointments that were never coming. Counted
+// explicitly against the statuses that genuinely still need action.
+const OPEN_STATUSES = ['pending', 'confirmed', 'checked_in', 'in_progress']
+
 const PLATFORM_FEE = 500
 const EMERGENCY_FEE_MULTIPLIER = 2
 
@@ -35,12 +41,23 @@ async function computeRevenue(
     .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).eq('status', 'completed')
   if (orFilter) query = query.or(orFilter)
 
-  const [{ data: rows }, { data: hospital }] = await Promise.all([
-    query,
-    db.from('hospitals').select('opd_fee').eq('id', hospitalId).single(),
-  ])
+  // Paginated. PostgREST caps an unbounded select at 1000 rows and says nothing
+  // about it, so a hospital past 1000 completed appointments in the range was
+  // silently under-reporting its own revenue with no error and no warning — the
+  // most dangerous kind of wrong number, because it looks plausible.
+  const PAGE = 1000
+  const rows: any[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error } = await query.range(from, from + PAGE - 1)
+    if (error) throw error
+    const batch = (page ?? []) as any[]
+    rows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+
+  const { data: hospital } = await db.from('hospitals').select('opd_fee').eq('id', hospitalId).single()
   const opdFee = (hospital as any)?.opd_fee ?? 0
-  return ((rows ?? []) as any[]).reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
+  return rows.reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
 }
 
 interface DoctorWaitConsultStats {
@@ -148,8 +165,9 @@ export async function GET(req: NextRequest) {
     const base = () => db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).or(orFilter)
 
-    const [totalRes, completedRes, cancelledRes, revenue, waitConsult] = await Promise.all([
+    const [totalRes, completedRes, cancelledRes, pendingRes, revenue, waitConsult] = await Promise.all([
       base(), base().eq('status', 'completed'), base().eq('status', 'cancelled'),
+      base().in('status', OPEN_STATUSES),
       computeRevenue(db, hospitalId, from, to, orFilter),
       computeWaitConsultStats(db, hospitalId, from, to, orFilter),
     ])
@@ -157,19 +175,21 @@ export async function GET(req: NextRequest) {
     const completed = completedRes.count ?? 0
     const cancelled = cancelledRes.count ?? 0
     return NextResponse.json({
-      total, completed, cancelled, pending: total - completed - cancelled, revenue,
+      total, completed, cancelled, pending: pendingRes.count ?? 0, revenue,
       avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
       doctorStats: waitConsult.doctorStats,
     })
   }
 
-  const [totalRes, completedRes, cancelledRes, revenue, waitConsult] = await Promise.all([
+  const [totalRes, completedRes, cancelledRes, pendingRes, revenue, waitConsult] = await Promise.all([
     db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to),
     db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).eq('status', 'completed'),
     db.from('appointments').select('id', { count: 'exact', head: true })
       .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).eq('status', 'cancelled'),
+    db.from('appointments').select('id', { count: 'exact', head: true })
+      .eq('hospital_id', hospitalId).gte('appointment_date', from).lte('appointment_date', to).in('status', OPEN_STATUSES),
     computeRevenue(db, hospitalId, from, to),
     computeWaitConsultStats(db, hospitalId, from, to),
   ])
@@ -177,7 +197,7 @@ export async function GET(req: NextRequest) {
   const completed = completedRes.count ?? 0
   const cancelled = cancelledRes.count ?? 0
   return NextResponse.json({
-    total, completed, cancelled, pending: total - completed - cancelled, revenue,
+    total, completed, cancelled, pending: pendingRes.count ?? 0, revenue,
     avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
     doctorStats: waitConsult.doctorStats,
   })

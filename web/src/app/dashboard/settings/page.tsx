@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { PayoutAccount } from './PayoutAccount'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
-import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle } from 'lucide-react'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ export default function SettingsPage() {
   const [ambulanceRadius,     setAmbulanceRadius]      = useState<string>('')
   const [ambulance247,        setAmbulance247]         = useState(true)
 
+  const [payout, setPayout] = useState<{ bankName: string | null; last4: string | null; subaccountCode: string | null }>(
+    { bankName: null, last4: null, subaccountCode: null },
+  )
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -97,6 +101,11 @@ export default function SettingsPage() {
           setAmbulancePrivate(s.ambulance_private_fleet ?? true)
           setAmbulanceRadius(s.ambulance_service_radius_m != null ? String(s.ambulance_service_radius_m) : '')
           setAmbulance247(s.ambulance_service_hours_247 ?? true)
+          setPayout({
+            bankName:       s.paystack_bank_name ?? null,
+            last4:          s.paystack_account_last4 ?? null,
+            subaccountCode: s.paystack_subaccount_code ?? null,
+          })
         }
         setHours(body?.hours ?? [])
         setLoading(false)
@@ -223,12 +232,31 @@ export default function SettingsPage() {
             ))}
           </div>
 
+          {/* Payout account — where this hospital's share of each payment settles */}
+          <PayoutAccount existing={payout} />
+
           {/* Hospital Location */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Hospital Location</div>
             <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14 }}>
               Coordinates let patients see your clinic on the map and get directions. Search your address or enter them manually.
             </div>
+
+            {/* Without coordinates three separate features silently return wrong
+                answers rather than failing visibly: distance sorting falls back to
+                showing the city name, map pins cannot be placed, and ambulance
+                dispatch loses the destination it ranks candidates against. Said
+                plainly here because nothing else in the product reveals it. */}
+            {(!lat || !lng) && (
+              <div style={{
+                background: '#B4530914', border: '1px solid #B4530944', borderRadius: 10,
+                padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#B45309', lineHeight: 1.5,
+              }}>
+                <strong>This hospital has no coordinates set.</strong> Patients cannot see you on the
+                map or sort by distance, and ambulance dispatch cannot rank crews by how far they are
+                from you. Search your address below to fix it.
+              </div>
+            )}
 
             {/* Address search */}
             <div style={{ marginBottom: 12 }}>
@@ -387,10 +415,7 @@ export default function SettingsPage() {
                     Platform Cancellation Policy
                   </div>
                   <div style={{ fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>
-                    • Cancelled &gt;24hrs before appointment <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>100% refund</strong><br />
-                    • Cancelled ≤24hrs before appointment <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>50% refund</strong><br />
-                    • No-show: patient has <strong style={{ color: C.text }}>48 hours</strong> to reschedule free of charge<br />
-                    • Rejected bookings <ArrowRight size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: C.text }}>100% refund</strong> always
+                    Queue does not process payments. Patients pay your hospital directly when seen, so cancellations and rejections carry no refund obligation through the platform.
                   </div>
                 </div>
               </div>

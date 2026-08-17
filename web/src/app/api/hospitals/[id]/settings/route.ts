@@ -30,6 +30,10 @@ function assertOwnHospital(caller: { role: string; hospitalId?: string }, hospit
 // can never write a column outside this list (it previously spread the request
 // body straight into the UPDATE, which allowed writing *any* hospitals column,
 // including platform-controlled trust flags like is_verified).
+// Read-only on this endpoint: payout details are managed through
+// /api/payments/subaccount, which resolves the account name with Paystack first.
+const PAYOUT_FIELDS = ['paystack_subaccount_code', 'paystack_bank_name', 'paystack_account_last4'] as const
+
 const EDITABLE_SETTINGS = [
   'accepts_virtual', 'emergency_hours', 'is_24_hours', 'daily_booking_limit',
   'approval_mode', 'requires_referral', 'opd_fee', 'latitude', 'longitude',
@@ -51,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const [{ data: settings }, { data: hoursRows }] = await Promise.all([
     db.from('hospitals')
-      .select(EDITABLE_SETTINGS.join(', '))
+      .select([...EDITABLE_SETTINGS, ...PAYOUT_FIELDS].join(', '))
       .eq('id', id)
       .single(),
     db.from('hospital_operating_hours').select('day_of_week, open_time, close_time, is_closed').eq('hospital_id', id),

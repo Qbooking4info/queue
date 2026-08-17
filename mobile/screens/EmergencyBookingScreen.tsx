@@ -11,6 +11,8 @@ import { getHospitals, createHospitalAppointment, addNotification, getHospitalHo
 import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
+import { FallbackPanel } from '../components/emergency/FallbackPanel'
+import { NearbyAmbulances } from '../components/emergency/NearbyAmbulances'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 
 interface Props { navigation: any }
@@ -157,10 +159,14 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
   // MH7: load dependents when user selects "A dependent"
   useEffect(() => {
+    let cancelled = false
     if (forDependent && user && dependentsList.length === 0) {
-      getDependents(user.id).then(setDependentsList)
+      getDependents(user.id)
+        .then(rows => { if (!cancelled) setDependentsList(rows) })
+        .catch(err => console.warn('[emergency] failed to load dependents', err))
     }
     if (!forDependent) setSelectedDependentId(null)
+    return () => { cancelled = true }
   }, [forDependent, user])
 
   // Best-effort: if this is a multi-clinic hospital and it has a designated Emergency
@@ -439,6 +445,11 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 </View>
               )}
 
+              {/* Shown before anything is committed: whether help is actually
+                  near, which is the question someone in this flow is really
+                  asking. */}
+              <NearbyAmbulances coords={coords} style={{ marginTop: 16 }} />
+
               <Text style={[s.label, { color: t.textMuted }]}>Preferred hospital (optional)</Text>
               {loadingHospitals ? (
                 <ActivityIndicator color="#FF5C5C" style={{ marginTop: 8 }} />
@@ -638,6 +649,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 : 'Emergency bookings are placed at the top of the queue immediately after payment.'}
             </Text>
           </View>
+
+          {/* Available before anything is confirmed. If someone opens this screen
+              and decides they can't wait on the flow at all, the numbers are
+              already in front of them rather than three taps away. */}
+          <FallbackPanel />
+
           <View style={{ height: 20 }} />
         </ScrollView>
       )}
@@ -666,7 +683,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             style={[s.nextBtn, { backgroundColor: '#FF5C5C', flex: 1, opacity: submitting ? 0.6 : 1 }]}>
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm & Pay'}</Text></View>}
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm booking'}</Text></View>}
           </TouchableOpacity>
         )}
       </View>

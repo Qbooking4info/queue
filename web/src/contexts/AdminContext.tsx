@@ -24,6 +24,8 @@ interface AdminContextValue {
   todayAppointments: AdminAppointment[]
   loading: boolean
   accessDenied: boolean
+  /** Signed in with a valid account that has no dashboard — currently ambulance crew. */
+  crewOnly: boolean
   reload: () => Promise<void>
   signOut: () => Promise<void>
   switchHospital: (h: AdminHospital) => Promise<void>
@@ -34,7 +36,7 @@ const AdminContext = createContext<AdminContextValue>({
   user: null, role: null, doctorId: null, clinicId: null, clinicName: null, doctorAvailability: null,
   hospital: null, allHospitals: [],
   stats: { todayTotal: 0, todayCompleted: 0, activeDoctors: 0, avgRating: 4.8, totalBookings: 0, reviewCount: 0 },
-  doctors: [], todayAppointments: [], loading: true, accessDenied: false,
+  doctors: [], todayAppointments: [], loading: true, accessDenied: false, crewOnly: false,
   reload: async () => {}, signOut: async () => {}, switchHospital: async () => {}, clearHospital: () => {},
 })
 
@@ -54,6 +56,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [todayAppointments, setTodayAppointments] = useState<AdminAppointment[]>([])
   const [loading, setLoading]   = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
+  const [crewOnly, setCrewOnly] = useState(false)
 
   async function load() {
     let session: any = null
@@ -84,7 +87,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     // the caller's session, not from anything this client sends.
     const res = await fetch('/api/dashboard/bootstrap')
     if (!res.ok) {
-      setAccessDenied(true)
+      // A crew account is a valid login with nowhere to go in this dashboard.
+      // Treating it as "access denied" signed them straight back out, which
+      // reads as a rejected password rather than a wrong app.
+      const body = await res.json().catch(() => ({}))
+      if (body?.code === 'CREW_MOBILE_ONLY') setCrewOnly(true)
+      else setAccessDenied(true)
       setLoading(false)
       return
     }
@@ -146,7 +154,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   return (
     <AdminContext.Provider value={{
       user, role, doctorId, clinicId, clinicName, doctorAvailability, hospital, allHospitals, stats, doctors,
-      todayAppointments, loading, accessDenied, reload: load, signOut, switchHospital, clearHospital,
+      todayAppointments, loading, accessDenied, crewOnly, reload: load, signOut, switchHospital, clearHospital,
     }}>
       {children}
     </AdminContext.Provider>

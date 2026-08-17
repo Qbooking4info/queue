@@ -77,8 +77,9 @@ export function ConfirmationScreen({ navigation, route }: Props) {
               </Text>
             </View>
             <Text style={st.pendingText}>
-              Your payment will only be charged once {reviewerLabel} approves your booking.
-              If rejected, you'll receive a full refund.
+              {directBooking
+                ? `Your payment will only be charged once ${reviewerLabel} approves your booking. If rejected, nothing is charged.`
+                : "Your payment will only be charged once the hospital approves your booking. If rejected, nothing is charged — you pay at the hospital only after the booking is approved."}
             </Text>
           </Animated.View>
         )}

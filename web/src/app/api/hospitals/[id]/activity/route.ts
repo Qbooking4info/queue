@@ -72,12 +72,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .limit(limit),
   ])
 
+  // Where a tap should land, per role. These used to be fixed strings, and two
+  // of the three pointed at pages the role cannot open: /dashboard/doctors
+  // redirects a doctor back to Overview, and /dashboard/analytics redirects
+  // both doctors and front desk. The notification opened, navigated, and threw
+  // the user back where they started with nothing to show for the tap.
+  const isDoctor = caller.role === 'doctor'
+  const isFrontDesk = caller.role === 'front_desk'
+  const apptHref = isDoctor ? '/dashboard/specialist' : '/dashboard/appointments'
+  const reviewHref = isDoctor ? '/dashboard/specialist' : '/dashboard/doctors'
+  // Payouts are money: a doctor and a front desk officer have no analytics page
+  // to land on, so the bell should not pretend otherwise.
+  const payoutHref = isDoctor || isFrontDesk ? '/dashboard' : '/dashboard/analytics'
+
   const items: AdminNotification[] = []
 
   for (const a of (newAppts ?? []) as any[]) {
     if (!a.created_at) continue
     items.push({
-      id: `appt-new-${a.id}`, type: 'new', href: `/dashboard/appointments`,
+      id: `appt-new-${a.id}`, type: 'new', href: apptHref,
       msg: `New booking received from ${safePatientName(a.patient?.full_name, 'a patient')}`,
       time: timeAgo(a.created_at), sortAt: a.created_at,
     })
@@ -85,7 +98,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   for (const a of (cancelledAppts ?? []) as any[]) {
     if (!a.cancelled_at) continue
     items.push({
-      id: `appt-cancel-${a.id}`, type: 'cancel', href: `/dashboard/appointments`,
+      id: `appt-cancel-${a.id}`, type: 'cancel', href: apptHref,
       msg: `Appointment cancelled by ${safePatientName(a.patient?.full_name, 'a patient')}`,
       time: timeAgo(a.cancelled_at), sortAt: a.cancelled_at,
     })
@@ -93,7 +106,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   for (const r of (reviews ?? []) as any[]) {
     if (!r.created_at) continue
     items.push({
-      id: `review-${r.id}`, type: 'review', href: `/dashboard/doctors`,
+      id: `review-${r.id}`, type: 'review', href: reviewHref,
       msg: `New ${r.rating}-star review posted${r.doctor?.full_name ? ` for Dr. ${r.doctor.full_name}` : ''}`,
       time: timeAgo(r.created_at), sortAt: r.created_at,
     })
@@ -101,7 +114,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   for (const p of (payouts ?? []) as any[]) {
     if (!p.paid_at) continue
     items.push({
-      id: `payout-${p.id}`, type: 'payment', href: `/dashboard/analytics`,
+      id: `payout-${p.id}`, type: 'payment', href: payoutHref,
       msg: `Payout of ${p.amount ? `₦${Number(p.amount).toLocaleString()}` : 'funds'} processed to your bank`,
       time: timeAgo(p.paid_at), sortAt: p.paid_at,
     })

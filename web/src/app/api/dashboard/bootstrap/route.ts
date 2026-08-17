@@ -17,9 +17,24 @@ import { safePatientName, calcAge, fmtLocalDate, todayLocalDate, nameToColor, na
 // stats (the platform admin "switch hospital" view) -- trusted only for that
 // role, since super_admin already has platform-wide access.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'])
+  // ambulance_crew is listed only so it can be recognised and answered
+  // properly below. There is no crew view in this dashboard, and adding it here
+  // grants no data -- the explicit 403 immediately after is the whole point.
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor', 'ambulance_crew'])
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
+
+  // Crew accounts are real, valid logins with no dashboard to land on. They
+  // used to fall out of requireRole as a bare 403, which the shell treated as
+  // "unauthorised": it signed them out and bounced them to /login with no
+  // message, indistinguishable from a wrong password. This code lets the client
+  // say what is actually true -- use the mobile app.
+  if (caller.role === 'ambulance_crew') {
+    return NextResponse.json(
+      { error: 'Ambulance crew accounts are used in the Queue mobile app', code: 'CREW_MOBILE_ONLY' },
+      { status: 403 },
+    )
+  }
   const db = createAdminClient()
 
   const { data: profile } = await db

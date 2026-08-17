@@ -93,12 +93,26 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
             Transport requests heading to this hospital, dispatched by Queue&apos;s ambulance network.
           </p>
         </div>
-        {canManageFleet && (
-          <Link href="/dashboard/ambulances/fleet"
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Alerts first: dispatcher_alerts records every request that found no
+              ambulance, and until now nothing surfaced it. */}
+          <Link href="/dashboard/ambulances/alerts"
             style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
-            Manage Fleet
+            Alerts
           </Link>
-        )}
+          {canManageFleet && (
+            <Link href="/dashboard/ambulances/coverage"
+              style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
+              Coverage
+            </Link>
+          )}
+          {canManageFleet && (
+            <Link href="/dashboard/ambulances/fleet"
+              style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
+              Manage Fleet
+            </Link>
+          )}
+        </div>
       </div>
 
       {!active.length ? (

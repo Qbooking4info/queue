@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   effectiveTier, hardFilter, policyFor, rankCandidates, selectOffers,
-  estimateEtaSeconds, type Candidate, type TransportRequest,
+  estimateEtaSeconds, rejectionTally, type Candidate, type TransportRequest,
 } from "./matching";
 
 const NOW = Date.UTC(2026, 6, 29, 10, 0, 0);
@@ -151,5 +151,52 @@ describe("policy", () => {
   });
   it("is sequential with a long TTL for scheduled transport", () => {
     expect(policyFor(baseReq({ requestType: "scheduled", triageLevel: null })).offerTtlSeconds).toBe(600);
+  });
+});
+
+// Feeds dispatch_attempts.reject_reasons, which is how a coverage gap gets told
+// apart from a capacity problem. If this miscounts, supply decisions are made on
+// wrong numbers — so it is pinned rather than trusted.
+describe("rejection tally", () => {
+  it("is empty when every unit is usable", () => {
+    expect(rejectionTally(baseReq(), [unit(), unit({ unitId: "u2" })])).toEqual({});
+  });
+
+  it("counts units whose effective tier is below what was asked for", () => {
+    const req = baseReq({ requiredTier: "CCT" });
+    const tally = rejectionTally(req, [unit(), unit({ unitId: "u2" })]);
+    expect(tally).toEqual({ tier_too_low: 2 });
+  });
+
+  it("counts a missing capability separately from a tier shortfall", () => {
+    const req = baseReq({ requiredCapabilities: ["ventilator"] });
+    expect(rejectionTally(req, [unit()])).toEqual({ missing_capability: 1 });
+  });
+
+  it("counts a crew that cannot finish inside its shift", () => {
+    const short = unit({ shiftEndsAt: NOW + 5 * MIN });
+    expect(rejectionTally(baseReq(), [short])).toEqual({ shift_too_short: 1 });
+  });
+
+  it("counts a unit with no usable position", () => {
+    const lost = unit({ etaSeconds: null, straightLineMeters: 0 });
+    expect(rejectionTally(baseReq(), [lost])).toEqual({ no_eta: 1 });
+  });
+
+  it("tallies several reasons across a mixed set", () => {
+    const req = baseReq({ requiredTier: "CCT" });
+    const tally = rejectionTally(req, [
+      unit({ unitId: "a" }),
+      unit({ unitId: "b" }),
+      unit({ unitId: "c", vehicleTier: "CCT", crewTier: "CCT", shiftEndsAt: NOW + 5 * MIN }),
+    ]);
+    expect(tally).toEqual({ tier_too_low: 2, shift_too_short: 1 });
+  });
+
+  it("agrees with rankCandidates on how many survive", () => {
+    const req = baseReq({ requiredTier: "CCT" });
+    const candidates = [unit({ unitId: "a" }), unit({ unitId: "b", vehicleTier: "CCT", crewTier: "CCT" })];
+    const rejected = Object.values(rejectionTally(req, candidates)).reduce((a, b) => a + b, 0);
+    expect(candidates.length - rejected).toBe(rankCandidates(req, candidates, policyFor(req)).length);
   });
 });

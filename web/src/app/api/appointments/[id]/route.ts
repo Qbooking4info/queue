@@ -6,6 +6,13 @@ import { todayLocalDate } from '@/lib/dashboard-utils'
 import { notifyPatient } from '@/lib/notify-patient'
 import { checkInAppointment } from '@/lib/appointment-checkin'
 
+// The appointment state machine, as implemented across the queue, front-desk and
+// dashboard flows. appointments.status has no database CHECK, so this is the only
+// thing standing between a typo and an unreachable row.
+const APPOINTMENT_STATUSES = [
+  'pending', 'confirmed', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show',
+] as const
+
 type Action =
   | { action: 'assign_doctor'; doctorId: string }
   | { action: 'mark_no_show' }
@@ -146,7 +153,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const hospitalName = (full as any)?.hospital?.name ?? 'the hospital'
       await notifyPatient(
         db, id, 'cancelled', 'Booking Not Approved',
-        `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${body.note}. A full refund has been issued.`,
+        `Your booking (${ref}) at ${hospitalName} was not approved. Reason: ${body.note}. No payment was taken for this booking.`,
       )
       return NextResponse.json({ success: true })
     }
@@ -217,10 +224,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // "Complete" button. Its "Check In" button used to call this with
       // status: 'checked_in' too, bypassing check_in_date/queue_position entirely;
       // it now calls the dedicated 'check_in' action above instead.
-      const { error } = await db.from('appointments')
+      // appointments.status is plain text with no CHECK constraint, so an
+      // unvalidated write here could put a row into a state nothing else in the
+      // system recognises — invisible to every queue and filter, and unfixable
+      // through the UI. Whitelisted against the state machine the rest of the
+      // app implements.
+      if (!(APPOINTMENT_STATUSES as readonly string[]).includes(body.status)) {
+        return Errors.validation(`Unknown status. Expected one of: ${APPOINTMENT_STATUSES.join(', ')}`)
+      }
+      const { data: updated, error } = await db.from('appointments')
         .update({ status: body.status, updated_at: new Date().toISOString() })
         .eq('id', id)
+        .select('id')
       if (error) return Errors.internal(error.message)
+      if (!updated?.length) return Errors.notFound('Appointment')
       return NextResponse.json({ success: true })
     }
 

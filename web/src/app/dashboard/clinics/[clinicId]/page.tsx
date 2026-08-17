@@ -1840,7 +1840,7 @@ export default function ClinicDetailPage() {
                   Reject Booking
                 </div>
                 <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
-                  Patient <strong style={{ color: C.text }}>{rejectClinicAppt.patient_name}</strong> will be notified with a full refund.
+                  Patient <strong style={{ color: C.text }}>{rejectClinicAppt.patient_name}</strong> will be notified. No payment was taken.
                 </div>
                 <textarea
                   value={rejectNote} onChange={e => setRejectNote(e.target.value)}
