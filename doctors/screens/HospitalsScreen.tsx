@@ -74,8 +74,8 @@ export function HospitalsScreen({}: Props) {
           <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
             Your Doctor ID
           </Text>
-          <View style={{ backgroundColor: t.inputBg, borderColor: t.inputBorder, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <Text selectable style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: '700', color: t.textPrimary }}>{user?.id ?? '—'}</Text>
+          <View style={{ backgroundColor: t.inputBg, borderColor: t.inputBorder, borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 8, alignItems: 'center' }}>
+            <Text selectable style={{ fontSize: 24, fontFamily: 'monospace', fontWeight: '800', letterSpacing: 4, color: t.textPrimary }}>{user?.doctor_code ?? '—'}</Text>
           </View>
           <Text style={{ fontSize: 11, color: t.textMuted }}>
             Share this with a hospital admin to get linked — they'll enter it in their dashboard's

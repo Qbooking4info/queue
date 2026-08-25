@@ -213,6 +213,9 @@ export async function createReferral(payload: {
   referralReason:      string
   urgency?:            'routine' | 'urgent' | 'emergency'
   paymentMethod?:      string
+  // Defaults true server-side if omitted. Explicit false lets a doctor send more
+  // than one referral out of the same consult without each one ending it.
+  completeOriginal?:   boolean
 }): Promise<BookingResult> {
   const { data: { session } } = await supabase.auth.getSession()
   const jwt = session?.access_token
@@ -243,6 +246,7 @@ export async function savePushToken(userId: string, token: string): Promise<void
 export interface DoctorProfileSettings {
   title:                     string | null
   specialty_id:              string | null
+  level:                     string | null
   bio:                       string | null
   qualification:             string | null
   years_experience:          number | null
@@ -258,6 +262,24 @@ async function authHeader(): Promise<Record<string, string> | null> {
   const jwt = session?.access_token
   if (!jwt) return null
   return { Authorization: `Bearer ${jwt}` }
+}
+
+export interface DoctorStats {
+  avgConsultSecs: number | null
+  avgRatingOutOf10: number | null
+  reviewCount: number
+  total: number
+  completed: number
+}
+
+// Hospital-affiliated doctors only -- GET /api/doctors/me requires caller.doctorId,
+// which is null for a doctor with no hospital link at all (see requireRole/CallerInfo).
+export async function getMyDoctorStats(): Promise<DoctorStats | null> {
+  const headers = await authHeader()
+  if (!headers) return null
+  const res = await fetch(`${API_URL}/api/doctors/me`, { headers })
+  if (!res.ok) return null
+  return (await res.json()) as DoctorStats
 }
 
 export async function getDoctorProfileSettings(): Promise<DoctorProfileSettings | null> {

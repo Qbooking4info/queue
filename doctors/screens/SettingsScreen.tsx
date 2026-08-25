@@ -16,7 +16,7 @@ import { ShellScroll } from '../components/AppShell'
 interface Props { navigation: any }
 
 const DEFAULTS: DoctorProfileSettings = {
-  title: null, specialty_id: null, bio: null, qualification: null, years_experience: null,
+  title: null, specialty_id: null, level: null, bio: null, qualification: null, years_experience: null,
   virtual_fee: null, home_visit_fee: null,
   accepts_direct_virtual: false, accepts_direct_home_visit: false, show_phone_to_patients: false,
 }
@@ -129,6 +129,8 @@ export function SettingsScreen({}: Props) {
               <Ionicons name="chevron-down" size={14} color={t.textMuted} />
             </View>
           </TouchableOpacity>
+          <FieldRow theme={t} label="Level / Cadre" value={form.level ?? ''} onChange={v => set('level', v || null)}
+            placeholder="e.g. Consultant, Senior Registrar, MO" />
           <FieldRow theme={t} label="Qualifications" value={form.qualification ?? ''} onChange={v => set('qualification', v || null)} placeholder="e.g. MBBS, FWACS" />
           <FieldRow theme={t} label="Years of experience" value={form.years_experience?.toString() ?? ''}
             onChange={v => set('years_experience', v ? Number(v.replace(/\D/g, '')) : null)} placeholder="e.g. 8" keyboardType="number-pad" />

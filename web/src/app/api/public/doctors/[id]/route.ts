@@ -7,8 +7,13 @@ const SIGNED_URL_TTL_SECS = 300
 
 // `id` here is the doctor's users.id (their "Doctor ID" -- same value shown
 // to them in the doctors app and used by hospitals to link them). Public
-// profile detail for direct booking: fee, bio, qualifications, and uploaded
-// credential documents via short-lived signed URLs (bucket is private).
+// profile for any registered, active doctor -- not just ones accepting direct
+// bookings. Doctors who haven't opted into direct booking still get a full
+// profile (name, title, specialty, hospital affiliations); their fee/bio/
+// documents are only populated when a doctor_profiles row exists and the
+// relevant accepts_direct_* flag is on. Booking-flow decisions (direct vs.
+// "go through a hospital") are the caller's to make from acceptsDirectVirtual/
+// acceptsDirectHomeVisit and hospitals being present.
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: PUBLIC_CORS_HEADERS })
 }
@@ -17,30 +22,46 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const db = createAdminClient()
 
-  const { data: profile } = await db
-    .from('doctor_profiles')
+  const { data: user } = await db.from('users').select('id, full_name, avatar_url, phone').eq('id', id).single()
+  if (!user) return NextResponse.json({ error: 'Doctor not found' }, { status: 404, headers: PUBLIC_CORS_HEADERS })
+
+  type ProfileRow = {
+    title: string | null; level: string | null; specialty_id: string | null; bio: string | null
+    qualification: string | null; years_experience: number | null
+    virtual_fee: number | null; home_visit_fee: number | null
+    accepts_direct_virtual: boolean; accepts_direct_home_visit: boolean
+    show_phone_to_patients: boolean
+    specialty: { name: string; icon: string | null } | null
+  }
+
+  const profileQuery = db.from('doctor_profiles')
     .select(
-      'user_id, title, specialty_id, bio, qualification, years_experience, ' +
+      'title, level, specialty_id, bio, qualification, years_experience, ' +
       'virtual_fee, home_visit_fee, accepts_direct_virtual, accepts_direct_home_visit, ' +
-      'show_phone_to_patients, ' +
-      'user:users!doctor_profiles_user_id_fkey(full_name, avatar_url, phone), ' +
-      'specialty:specialties!doctor_profiles_specialty_id_fkey(name, icon)',
+      'show_phone_to_patients, specialty:specialties!doctor_profiles_specialty_id_fkey(name, icon)',
     )
     .eq('user_id', id)
-    .single() as { data: {
-      user_id: string; title: string | null; specialty_id: string | null; bio: string | null
-      qualification: string | null; years_experience: number | null
-      virtual_fee: number | null; home_visit_fee: number | null
-      accepts_direct_virtual: boolean; accepts_direct_home_visit: boolean
-      show_phone_to_patients: boolean
-      user: { full_name: string; avatar_url: string | null; phone: string | null } | null
-      specialty: { name: string; icon: string | null } | null
-    } | null }
+    .maybeSingle() as unknown as PromiseLike<{ data: ProfileRow | null }>
 
-  if (!profile) return NextResponse.json({ error: 'Doctor not found' }, { status: 404, headers: PUBLIC_CORS_HEADERS })
-  if (!profile.accepts_direct_virtual && !profile.accepts_direct_home_visit) {
+  const doctorRowsQuery = db.from('doctors')
+    .select('title, level, qualification, years_experience, hospital:hospitals!doctors_hospital_id_fkey(id, name), specialty:specialties!doctors_specialty_id_fkey(name, icon)')
+    .eq('user_id', id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+
+  const [{ data: profile }, { data: doctorRows }] = await Promise.all([profileQuery, doctorRowsQuery])
+
+  // Not registered anywhere at all -- no doctor_profiles row and no active
+  // hospital link. Distinct from "registered but hasn't opted into direct
+  // booking", which is a normal, fully valid state now.
+  if (!profile && (!doctorRows || doctorRows.length === 0)) {
     return NextResponse.json({ error: 'Doctor not found' }, { status: 404, headers: PUBLIC_CORS_HEADERS })
   }
+
+  const earliestHospitalRow = doctorRows?.[0] as any
+  const hospitals = (doctorRows ?? [])
+    .map((r: any) => r.hospital)
+    .filter((h: any, i: number, arr: any[]) => h && arr.findIndex(x => x?.id === h.id) === i)
 
   const { data: docs } = await db
     .from('doctor_qualification_documents')
@@ -53,22 +74,26 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return { id: d.id, title: d.title, url: signed?.signedUrl ?? null }
   }))
 
-  const user = profile.user
+  const acceptsDirectVirtual = profile?.accepts_direct_virtual ?? false
+  const acceptsDirectHomeVisit = profile?.accepts_direct_home_visit ?? false
+
   return NextResponse.json({
     doctor: {
-      userId: profile.user_id,
-      fullName: user?.full_name ?? 'Doctor',
-      avatarUrl: user?.avatar_url ?? null,
-      title: profile.title,
-      specialty: profile.specialty ?? null,
-      bio: profile.bio,
-      qualification: profile.qualification,
-      yearsExperience: profile.years_experience,
-      virtualFee: profile.accepts_direct_virtual ? profile.virtual_fee : null,
-      homeVisitFee: profile.accepts_direct_home_visit ? profile.home_visit_fee : null,
-      acceptsDirectVirtual: profile.accepts_direct_virtual,
-      acceptsDirectHomeVisit: profile.accepts_direct_home_visit,
-      phone: profile.show_phone_to_patients ? (user?.phone ?? null) : null,
+      userId: user.id,
+      fullName: user.full_name ?? 'Doctor',
+      avatarUrl: user.avatar_url ?? null,
+      title: profile?.title ?? earliestHospitalRow?.title ?? null,
+      level: profile?.level ?? earliestHospitalRow?.level ?? null,
+      specialty: profile?.specialty ?? earliestHospitalRow?.specialty ?? null,
+      bio: profile?.bio ?? null,
+      qualification: profile?.qualification ?? earliestHospitalRow?.qualification ?? null,
+      yearsExperience: profile?.years_experience ?? earliestHospitalRow?.years_experience ?? null,
+      hospitals,
+      virtualFee: acceptsDirectVirtual ? profile?.virtual_fee ?? null : null,
+      homeVisitFee: acceptsDirectHomeVisit ? profile?.home_visit_fee ?? null : null,
+      acceptsDirectVirtual,
+      acceptsDirectHomeVisit,
+      phone: profile?.show_phone_to_patients ? (user.phone ?? null) : null,
       documents,
     },
   }, { headers: PUBLIC_CORS_HEADERS })

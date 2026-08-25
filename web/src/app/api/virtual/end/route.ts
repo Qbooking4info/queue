@@ -2,10 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 // POST { appointmentId } — doctor ends the call.
 // Sets virtual_sessions.ended_at, calculates duration_secs, marks appointment completed.
+//
+// Called cross-origin by the doctors/mobile apps -- needs real CORS handling
+// (preflight OPTIONS + headers on every response), not just the
+// Allow-Origin-only pattern used by unauthenticated public routes.
+export async function OPTIONS() {
+  return corsOptions()
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
 

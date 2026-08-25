@@ -77,7 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
           id, booking_ref, appointment_date, start_time, status, type, reason,
           booking_mode, approval_status, urgency, symptom_description, approval_note,
           assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
-          queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+          queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, waiting_time_secs, check_in_date,
           patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
           doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
           assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name),
@@ -135,13 +135,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
     }
   })
 
-  let stats = { total: 0, completed: 0, cancelled: 0, pending: 0 }
+  // Reuses apptRows (already fetched, already scoped by the same orFilter as the
+  // counts below) rather than firing a separate query -- waiting_time_secs/
+  // consult_duration_secs are already in that select.
+  function avgMinutes(secs: number[]): number | null {
+    if (secs.length === 0) return null
+    return Math.round(secs.reduce((sum, v) => sum + v, 0) / secs.length / 60)
+  }
+  const avgWaitMinutes = avgMinutes(apptRows.map(a => a.waiting_time_secs).filter((v): v is number => v != null))
+  const avgConsultMinutes = avgMinutes(apptRows.map(a => a.consult_duration_secs).filter((v): v is number => v != null))
+
+  let stats = { total: 0, completed: 0, cancelled: 0, pending: 0, avgWaitMinutes, avgConsultMinutes }
   if (statsResult) {
     const [totalRes, completedRes, cancelledRes] = statsResult
     const total = totalRes.count ?? 0
     const completed = completedRes.count ?? 0
     const cancelled = cancelledRes.count ?? 0
-    stats = { total, completed, cancelled, pending: total - completed - cancelled }
+    stats = { total, completed, cancelled, pending: total - completed - cancelled, avgWaitMinutes, avgConsultMinutes }
   }
 
   return NextResponse.json({

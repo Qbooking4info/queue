@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, TextInput } from 'react-native'
+import { useState, useCallback, useEffect, type ComponentProps } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, TextInput } from 'react-native'
+import { Alert } from '../../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
@@ -10,6 +10,9 @@ import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { todayLocalDate } from '../../lib/format'
+import { ringPatient } from '../../lib/api'
+import { VitalsEntryModal } from '../../components/frontdesk/VitalsEntryModal'
+import { MovePositionModal } from '../../components/frontdesk/MovePositionModal'
 
 interface Appt {
   id:               string
@@ -22,6 +25,9 @@ interface Appt {
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
+  doctor_id:          string | null
+  assigned_doctor_id: string | null
+  check_in_date:      string | null
   walkin_patient_name:  string | null
   walkin_patient_phone: string | null
   referral_reason?:  string | null
@@ -30,6 +36,15 @@ interface Appt {
   referred_by?:      { full_name: string; title: string | null } | null
   referring_hospital?: { name: string } | null
   referring_clinic?: { name: string } | null
+}
+
+interface VitalsRow {
+  weight_kg:    number | null
+  height_cm:    number | null
+  bp_systolic:  number | null
+  bp_diastolic: number | null
+  blood_sugar:  number | null
+  recorded_at:  string
 }
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -63,6 +78,10 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const [actioning,  setActioning]  = useState<string | null>(null)
   const [tab,        setTab]        = useState<'today' | 'all'>('today')
   const [search,     setSearch]     = useState('')
+  const [vitalsMap,  setVitalsMap]  = useState<Map<string, VitalsRow>>(new Map())
+  const [vitalsTarget, setVitalsTarget] = useState<Appt | null>(null)
+  const [moveTarget,   setMoveTarget]   = useState<Appt | null>(null)
+  const [ringing,      setRinging]      = useState<string | null>(null)
 
   const hospitalId = staffProfile?.hospitalId
 
@@ -75,7 +94,8 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
       .from('appointments')
       .select(`
         id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency,
-        queue_position, walkin_patient_name, walkin_patient_phone, referral_reason,
+        queue_position, doctor_id, assigned_doctor_id, check_in_date,
+        walkin_patient_name, walkin_patient_phone, referral_reason,
         patient:users!appointments_patient_id_fkey(id, full_name, phone),
         doctor:doctors!appointments_doctor_id_fkey(full_name),
         referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
@@ -96,12 +116,37 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     // arrays even though each appointment has exactly one of each at runtime
     // (a known codegen limitation for `!fk_name(...)` embeds it can't prove
     // are one-to-one) -- cast through unknown to reflect the real shape.
-    setAppts((data ?? []) as unknown as Appt[])
+    const rows = (data ?? []) as unknown as Appt[]
+    setAppts(rows)
     setLoading(false)
     setRefreshing(false)
+    loadVitals(rows)
   }, [hospitalId, tab])
 
+  // vitals_audit_log has no hospital_id column to filter a realtime channel on
+  // cleanly, and vitals are recorded once or twice per visit (not high-frequency),
+  // so a light poll while focused is simpler than wiring up realtime here.
+  const loadVitals = useCallback(async (rows: Appt[]) => {
+    const ids = rows.filter(a => a.status === 'checked_in' || a.status === 'in_progress').map(a => a.id)
+    if (ids.length === 0) { setVitalsMap(new Map()); return }
+    const { data } = await supabase
+      .from('vitals_audit_log')
+      .select('appointment_id, weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, recorded_at')
+      .in('appointment_id', ids)
+      .order('recorded_at', { ascending: false })
+    const map = new Map<string, VitalsRow>()
+    for (const row of (data as any[]) ?? []) {
+      if (!map.has(row.appointment_id)) map.set(row.appointment_id, row)
+    }
+    setVitalsMap(map)
+  }, [])
+
   useFocusEffect(useCallback(() => { load() }, [load]))
+
+  useEffect(() => {
+    const interval = setInterval(() => loadVitals(appts), 15000)
+    return () => clearInterval(interval)
+  }, [appts, loadVitals])
 
   useEffect(() => {
     if (!hospitalId) return
@@ -211,6 +256,13 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     ])
   }
 
+  async function handleRing(appt: Appt) {
+    setRinging(appt.id)
+    const { error } = await ringPatient(appt.id)
+    setRinging(null)
+    if (error) { haptics.error(); Alert.alert('Error', error) } else haptics.success()
+  }
+
   const today = todayLocalDate()
 
   // Client-side search filter (no API call)
@@ -219,10 +271,16 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     : appts
 
   // Emergency walk-ins sort to the top of the active queue — same tiering used on the
-  // web front-desk queue and the specialist queue.
+  // web front-desk queue and the specialist queue. queue_position (nulls-last) is the
+  // secondary key so a manual reorder (this screen's own Move action, or a patient's
+  // self-delay) is actually visible here, not just on the doctor's own queue screen.
   const active = filtered
     .filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
-    .sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
+    .sort((a, b) => {
+      const tier = (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1)
+      if (tier !== 0) return tier
+      return (a.queue_position ?? Infinity) - (b.queue_position ?? Infinity)
+    })
   const done   = filtered.filter(a =>  ['completed', 'cancelled', 'no_show'].includes(a.status))
 
   // Stats from full (unfiltered) list
@@ -306,8 +364,10 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
               <Text style={[s.groupLabel, { color: t.textMuted }]}>Active ({active.length})</Text>
               {active.map(a => (
                 <ApptCard
-                  key={a.id} appt={a} theme={t} actioning={actioning}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject} today={today}
+                  key={a.id} appt={a} theme={t} actioning={actioning} today={today}
+                  vitals={vitalsMap.get(a.id) ?? null} ringing={ringing}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject}
+                  onRing={handleRing} onRecordVitals={setVitalsTarget} onMove={setMoveTarget}
                 />
               ))}
             </>
@@ -318,21 +378,45 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
               <Text style={[s.groupLabel, { color: t.textMuted, marginTop: 16 }]}>Completed / Cancelled ({done.length})</Text>
               {done.map(a => (
                 <ApptCard
-                  key={a.id} appt={a} theme={t} actioning={actioning}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject} today={today}
+                  key={a.id} appt={a} theme={t} actioning={actioning} today={today}
+                  vitals={null} ringing={ringing}
+                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject}
+                  onRing={handleRing} onRecordVitals={setVitalsTarget} onMove={setMoveTarget}
                 />
               ))}
             </>
           )}
         </ScrollView>
       )}
+
+      {vitalsTarget && (
+        <VitalsEntryModal
+          appointmentId={vitalsTarget.id}
+          patientName={vitalsTarget.patient?.full_name ?? vitalsTarget.walkin_patient_name ?? 'Patient'}
+          onClose={() => setVitalsTarget(null)}
+          onSaved={() => { setVitalsTarget(null); loadVitals(appts) }}
+        />
+      )}
+
+      {moveTarget && (
+        <MovePositionModal
+          appt={moveTarget}
+          queue={active.filter(a => a.status === 'checked_in'
+            && a.doctor_id === moveTarget.doctor_id && a.assigned_doctor_id === moveTarget.assigned_doctor_id
+            && a.check_in_date === moveTarget.check_in_date)}
+          onClose={() => setMoveTarget(null)}
+          onMoved={() => { setMoveTarget(null); load(true) }}
+        />
+      )}
     </SafeAreaView>
   )
 }
 
-function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, onReject, today }: {
-  appt: Appt; theme: any; actioning: string | null
-  onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; onReject: (a: Appt) => void; today: string
+function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn, onApprove, onReject, onRing, onRecordVitals, onMove }: {
+  appt: Appt; theme: any; actioning: string | null; today: string
+  vitals: VitalsRow | null; ringing: string | null
+  onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; onReject: (a: Appt) => void
+  onRing: (a: Appt) => void; onRecordVitals: (a: Appt) => void; onMove: (a: Appt) => void
 }) {
   // `status` and `approval_status` are independent columns -- a booking awaiting manual
   // review has status='pending', approval_status='pending_approval'; status itself never
@@ -345,6 +429,8 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, onReject, t
   const canApprove = appt.approval_status === 'pending_approval'
   const isEmergency = appt.urgency === 'emergency'
   const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const showVitals = appt.status === 'checked_in' || appt.status === 'in_progress'
+  const isRinging = ringing === appt.id
 
   return (
     <TouchableOpacity
@@ -429,7 +515,62 @@ function ApptCard({ appt, theme: t, actioning, onCheckIn, onApprove, onReject, t
           )}
         </View>
       )}
+
+      {/* Vitals peek -- live-ish (polled) once the patient's checked in */}
+      {showVitals && (
+        <View style={[s.vitalsRow, { borderTopColor: t.cardBorder }]}>
+          {vitals ? (
+            <>
+              {vitals.weight_kg != null && <VitalChip icon="scale-outline" text={`${vitals.weight_kg}kg`} theme={t} />}
+              {vitals.height_cm != null && <VitalChip icon="resize-outline" text={`${vitals.height_cm}cm`} theme={t} />}
+              {(vitals.bp_systolic != null && vitals.bp_diastolic != null) &&
+                <VitalChip icon="pulse-outline" text={`${vitals.bp_systolic}/${vitals.bp_diastolic}`} theme={t} />}
+              {vitals.blood_sugar != null && <VitalChip icon="water-outline" text={`${vitals.blood_sugar}mg/dL`} theme={t} />}
+            </>
+          ) : (
+            <Text style={{ fontSize: 11, color: t.textMuted, fontStyle: 'italic' }}>No vitals recorded yet</Text>
+          )}
+        </View>
+      )}
+
+      {showVitals && (
+        <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
+          <TouchableOpacity onPress={() => onRecordVitals(appt)}
+            style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="fitness-outline" size={13} color="#5B9EFF" />
+              <Text style={[s.actionText, { color: '#5B9EFF' }]}>Vitals</Text>
+            </View>
+          </TouchableOpacity>
+          {appt.status === 'checked_in' && (
+            <TouchableOpacity onPress={() => onMove(appt)}
+              style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.3)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="swap-vertical-outline" size={13} color="#A78BFA" />
+                <Text style={[s.actionText, { color: '#A78BFA' }]}>Move</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => onRing(appt)} disabled={isRinging}
+            style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
+            {isRinging ? <ActivityIndicator size="small" color="#EF9F27" />
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="notifications-outline" size={13} color="#EF9F27" />
+                  <Text style={[s.actionText, { color: '#EF9F27' }]}>Ring</Text>
+                </View>}
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
+  )
+}
+
+function VitalChip({ icon, text, theme: t }: { icon: ComponentProps<typeof Ionicons>['name']; text: string; theme: any }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      <Ionicons name={icon} size={11} color={t.textMuted} />
+      <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSecondary }}>{text}</Text>
+    </View>
   )
 }
 
@@ -456,6 +597,7 @@ const s = StyleSheet.create({
   ref:          { fontSize: 9, fontWeight: '600', marginTop: 2 },
   actions:      { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: 1 },
   actionBtn:    { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
+  vitalsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 14, paddingTop: 10, borderTopWidth: 1 },
   actionText:   { fontSize: 13, fontWeight: '700' },
   empty:        { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyTitle:   { fontSize: 18, fontWeight: '800', textAlign: 'center' },

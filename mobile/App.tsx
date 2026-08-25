@@ -17,6 +17,7 @@ import { View, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
 import { ThemeProvider, useTheme }     from './contexts/ThemeContext'
+import { AlertProvider }               from './contexts/AlertContext'
 import { AuthProvider, useAuth }       from './contexts/AuthContext'
 import { LocationProvider }            from './contexts/LocationContext'
 import { usePushNotifications }        from './hooks/usePushNotifications'
@@ -385,11 +386,13 @@ function AppNavigator() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <LocationProvider>
-          <AppNavigator />
-        </LocationProvider>
-      </AuthProvider>
+      <AlertProvider>
+        <AuthProvider>
+          <LocationProvider>
+            <AppNavigator />
+          </LocationProvider>
+        </AuthProvider>
+      </AlertProvider>
     </ThemeProvider>
   )
 }

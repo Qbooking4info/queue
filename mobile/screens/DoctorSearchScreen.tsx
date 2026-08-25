@@ -1,9 +1,12 @@
-// Hospital-independent doctor discovery -- separate from SearchScreen (which
-// searches hospitals, always requiring a hospital step before any doctor is
-// shown). Only surfaces doctors who opted into direct bookings via the
-// doctors app's Settings screen (doctor_profiles.accepts_direct_virtual/
-// accepts_direct_home_visit). Optionally entered pre-filtered to one
-// specialty (from SpecialtyResultsScreen's toggle) via route.params.
+// Doctor-first discovery -- separate from SearchScreen (which searches
+// hospitals). Shows every registered, active doctor, not just ones accepting
+// direct (no-hospital) bookings -- a doctor who hasn't opted into that still
+// shows up with their hospital affiliation(s) (see DoctorListItem), just
+// without a direct-booking CTA on their profile. The Virtual/Home Visit
+// filter chips narrow to doctors who specifically opted into that direct-
+// booking type (doctor_profiles.accepts_direct_virtual/accepts_direct_home_visit).
+// Optionally entered pre-filtered to one specialty (from SpecialtyResultsScreen's
+// toggle) via route.params.
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'

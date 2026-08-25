@@ -27,7 +27,7 @@ export type HospitalWithDoctors = Hospital & { latitude?: number | null; longitu
 // auth_user_id, user_id, mdcn_number and hospitals.email/registration_number/
 // mdcn_accreditation. Keep in sync with web/src/lib/public-hospital-select.ts;
 // the two can't share a module across the mobile/web boundary (see Task 13).
-const DOCTOR_SELECT = 'id, full_name, title, qualification, bio, avatar_url, ' +
+const DOCTOR_SELECT = 'id, full_name, title, level, qualification, bio, avatar_url, ' +
   'years_experience, consultation_fee, virtual_fee, accepts_virtual, ' +
   'avg_rating, review_count, availability_status, clinic_id, ' +
   'specialty:specialties!doctors_specialty_id_fkey(name, icon)'
@@ -370,6 +370,26 @@ export async function getNextAppointment(
   return data as any
 }
 
+// The patient's own appointment that's actually IN the queue today (checked in
+// or already being seen) -- disjoint from getNextAppointment's 'confirmed'/
+// 'pending' filter by construction, so the two never both match the same row.
+// Drives the home screen's live queue card in place of the generic booking CTA.
+export async function getActiveQueueAppointment(
+  patientId: string
+): Promise<AppointmentWithRelations | null> {
+  const today = todayLocalDate()
+  const { data } = await supabase
+    .from('appointments')
+    .select(APPOINTMENT_SELECT)
+    .eq('patient_id', patientId)
+    .eq('check_in_date', today)
+    .in('status', ['checked_in', 'in_progress'])
+    .order('checked_in_at', { ascending: true })
+    .limit(1)
+    .single()
+  return data as any
+}
+
 // ── Create appointment (doctor-specific / virtual) ────────────────────────────
 
 export type BookingResult =
@@ -493,10 +513,17 @@ export interface IndependentDoctor {
   fullName: string
   avatarUrl: string | null
   title: string | null
+  level: string | null
   specialty: { name: string; icon: string | null } | null
   bio: string | null
   qualification: string | null
   yearsExperience: number | null
+  // Every hospital this doctor is actively linked to -- empty for a fully
+  // independent doctor with zero hospital links. Not just direct-booking
+  // doctors show up here any more (see GET /api/public/doctors/search) --
+  // a hospital-only doctor has acceptsDirectVirtual/HomeVisit both false and
+  // must be booked by going through one of these hospitals instead.
+  hospitals: { id: string; name: string }[]
   virtualFee: number | null
   homeVisitFee: number | null
   acceptsDirectVirtual: boolean
@@ -607,6 +634,9 @@ export async function createReferral(payload: {
   referralReason:      string
   urgency?:            'routine' | 'urgent' | 'emergency'
   paymentMethod?:      string
+  // Defaults true server-side if omitted. Explicit false lets a doctor send more
+  // than one referral out of the same consult without each one ending it.
+  completeOriginal?:   boolean
 }): Promise<BookingResult> {
   const { data: { session } } = await supabase.auth.getSession()
   const jwt = session?.access_token
@@ -656,6 +686,178 @@ export async function cancelAppointment(
     return { success: false, refundPct, error: 'Permission denied — appointment could not be updated' }
   }
   return { success: true, refundPct }
+}
+
+// ── Doctor consult status (start/end) ─────────────────────────────────────────
+// Goes through PATCH /api/appointments/[id] (start_consultation/end_consultation
+// actions) rather than a direct client-side `.update()` -- there has never been
+// an RLS UPDATE policy on `appointments` for doctors (only SELECT, see
+// 20260811000002_rls_identity_and_scoping.sql and every migration before it), so
+// a direct client write from a doctor silently updates zero rows: no error, but
+// nothing actually changes, which is why Start never flipped to End and nothing
+// else watching the appointment (patients, front desk) ever saw the status
+// change either. The service-role route already implements the
+// auto-end-stale-in_progress side effect (and also closes orphaned
+// virtual_sessions, which the old client-side version didn't).
+
+async function doctorAuthHeader(): Promise<Record<string, string> | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const jwt = session?.access_token
+  return jwt ? { Authorization: `Bearer ${jwt}` } : null
+}
+
+export async function setConsultStatus(
+  appointmentId: string,
+  newStatus: 'in_progress' | 'completed',
+): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: newStatus === 'in_progress' ? 'start_consultation' : 'end_consultation' }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: body?.error ?? 'Failed to update status' }
+    return { error: null }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export interface ConsultVitals {
+  weight_kg: number | null
+  height_cm: number | null
+  bp_systolic: number | null
+  bp_diastolic: number | null
+  blood_sugar: number | null
+}
+
+// Neither vitals nor doctor_notes/diagnosis can be written by a direct client
+// update -- vitals_audit_log has no client INSERT policy at all, and
+// appointments has no doctor UPDATE policy (see setConsultStatus above). Both
+// go through service-role routes.
+// vitals is nullable -- the server rejects a vitals write for an appointment
+// that isn't checked_in/in_progress, and the consult screen still needs to
+// let a doctor save clinical notes/diagnosis before that point without also
+// firing a vitals request that's guaranteed to fail.
+export async function saveConsultVitalsAndNotes(
+  appointmentId: string,
+  vitals: ConsultVitals | null,
+  notes: { notes: string; diagnosis: string },
+): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+
+  const notesReq = fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'update_consult_notes', ...notes }),
+  })
+
+  if (!vitals) {
+    const notesRes = await notesReq
+    if (notesRes.ok) return { error: null }
+    const failed = await notesRes.json().catch(() => ({}))
+    return { error: failed?.error ?? 'Please try again' }
+  }
+
+  const [vitalsRes, notesRes] = await Promise.all([
+    fetch(`${API_URL}/api/appointments/${appointmentId}/vitals`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(vitals),
+    }),
+    notesReq,
+  ])
+
+  if (vitalsRes.ok && notesRes.ok) return { error: null }
+  const failed = await (vitalsRes.ok ? notesRes : vitalsRes).json().catch(() => ({}))
+  return { error: failed?.error ?? 'Please try again' }
+}
+
+// Calls the patient's phone with a push notification naming the doctor -- not
+// gated to being exactly "next". Front desk and the doctors app both call the
+// same PATCH action; doctorAuthHeader works for any authenticated caller
+// despite the name (front desk/patient sessions included), not doctors only.
+export async function ringPatient(appointmentId: string): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ring' }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: body?.error ?? 'Failed to ring patient' }
+    return { error: null }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+// Moves a checked-in appointment to a new global queue position. Called by
+// front desk (any direction, any of their hospital's checked-in patients) and
+// by a patient on their own appointment (later-only -- the route enforces the
+// direction, this helper is just the transport).
+export async function moveAppointmentQueuePosition(appointmentId: string, newPosition: number): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/queue-position`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPosition }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: body?.error ?? 'Failed to move position' }
+    return { error: null }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+// A patient's own queue-position bounds -- current position and how far later
+// they're allowed to move themselves within their own urgency tier.
+export async function getQueuePositionBounds(appointmentId: string): Promise<
+  { ok: true; currentPosition: number | null; minPosition: number; maxPosition: number; estimatedWait: number | null; status: string }
+  | { ok: false; error: string }
+> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/queue-position`, { headers })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Failed to load queue position' }
+    return {
+      ok: true, currentPosition: body.currentPosition, minPosition: body.minPosition, maxPosition: body.maxPosition,
+      estimatedWait: body.estimatedWait, status: body.status,
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+// Front desk recording vitals at check-in, not mid-consult -- same route the
+// doctor's consult screen posts to (already authorises front_desk).
+export async function recordVitals(appointmentId: string, vitals: ConsultVitals): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/vitals`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(vitals),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: body?.error ?? 'Failed to record vitals' }
+    return { error: null }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
 }
 
 // ── Reschedule appointment (within 48-hr no-show window) ─────────────────────

@@ -17,7 +17,7 @@ async function sendExpoPush(token: string, title: string, body: string, data?: R
 export async function notifyPatient(
   db: ReturnType<typeof createAdminClient>,
   appointmentId: string,
-  type: 'confirmed' | 'cancelled',
+  type: string,
   title: string,
   body: string,
 ) {

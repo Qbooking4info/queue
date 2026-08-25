@@ -18,7 +18,7 @@ import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 // unauthenticated public routes.
 
 const EDITABLE_FIELDS = [
-  'title', 'specialty_id', 'bio', 'qualification', 'years_experience',
+  'title', 'specialty_id', 'level', 'bio', 'qualification', 'years_experience',
   'virtual_fee', 'home_visit_fee', 'accepts_direct_virtual',
   'accepts_direct_home_visit', 'show_phone_to_patients',
 ] as const

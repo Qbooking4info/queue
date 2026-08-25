@@ -17,8 +17,10 @@ export function DoctorListItem({ doctor: d, onPress }: Props) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[st.name, { color: t.textPrimary }]}>{d.title ? `${d.title} ` : ''}{d.fullName}</Text>
-        <Text style={[st.specialty, { color: t.accent }]}>{d.specialty?.name ?? 'General Practice'}</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+        <Text style={[st.specialty, { color: t.accent }]}>
+          {d.specialty?.name ?? 'General Practice'}{d.level ? ` · ${d.level}` : ''}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
           {d.acceptsDirectVirtual && (
             <View style={[st.badge, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
               <Ionicons name="videocam-outline" size={10} color="#378ADD" />
@@ -29,6 +31,14 @@ export function DoctorListItem({ doctor: d, onPress }: Props) {
             <View style={[st.badge, { backgroundColor: t.accentBgMid }]}>
               <Ionicons name="home-outline" size={10} color={t.accent} />
               <Text style={[st.badgeText, { color: t.accent }]}>Home Visit</Text>
+            </View>
+          )}
+          {!d.acceptsDirectVirtual && !d.acceptsDirectHomeVisit && d.hospitals.length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="business-outline" size={10} color={t.textMuted} />
+              <Text style={[st.badgeText, { color: t.textMuted, fontWeight: '600' }]} numberOfLines={1}>
+                {d.hospitals.map(h => h.name).join(', ')}
+              </Text>
             </View>
           )}
         </View>

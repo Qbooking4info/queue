@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
 import { notifyPatient } from '@/lib/notify-patient'
 import { randomBytes } from 'crypto'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 // POST /api/appointments/refer -- a doctor refers a patient they're seeing, at a specific
 // appointment of theirs, to a different hospital (or a specific doctor there) for further
@@ -15,7 +16,21 @@ import { randomBytes } from 'crypto'
 // (usually) crossing hospitals, so unlike every other appointment-creation path there's no
 // caller.hospitalId === target check here (though a same-hospital referral to a
 // colleague/clinic is allowed too).
+//
+// Called cross-origin by the doctors/mobile apps -- needs real CORS handling
+// (preflight OPTIONS + headers on every response), not just the
+// Allow-Origin-only pattern used by unauthenticated public routes.
+export async function OPTIONS() {
+  return corsOptions()
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   const auth = await requireRole(['doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
@@ -27,6 +42,13 @@ export async function POST(req: NextRequest) {
     const {
       appointmentId, receivingHospitalId, receivingDoctorId, receivingClinicId,
       date, startTime, type, reason, referralReason, urgency, paymentMethod,
+      // Defaults true so any caller that doesn't send it keeps the original
+      // behaviour (refer implies done). Explicit false is how a doctor sends
+      // more than one referral out of the same consult -- e.g. Cardiology AND
+      // Radiology -- without each one prematurely ending it; they complete it
+      // themselves afterwards via start_consultation/end_consultation once
+      // they're actually finished.
+      completeOriginal = true,
     } = body
 
     if (!appointmentId || !receivingHospitalId || !date || !startTime || !referralReason?.trim()) {
@@ -168,12 +190,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Close out the consultation this referral was made from, if it's still in progress.
-    // Best-effort at this point: the referral itself already succeeded and is the primary
-    // outcome, so a failure here (e.g. someone else already completed it in the meantime)
-    // is reported back but doesn't roll back or fail the request.
+    // Close out the consultation this referral was made from, if it's still in progress
+    // AND the caller asked for that (completeOriginal, default true -- see above). A
+    // doctor sending a second or third referral out of the same consult passes false to
+    // keep it open. Best-effort at this point: the referral itself already succeeded and
+    // is the primary outcome, so a failure here (e.g. someone else already completed it
+    // in the meantime) is reported back but doesn't roll back or fail the request.
     let originalCompleted = false
-    if ((source as any).status === 'in_progress') {
+    if (completeOriginal && (source as any).status === 'in_progress') {
       const { data: closed } = await db.from('appointments').update({
         status: 'completed', consult_ended_at: new Date().toISOString(),
       }).eq('id', (source as any).id).eq('status', 'in_progress').select('id')

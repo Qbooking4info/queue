@@ -98,7 +98,9 @@ export default function DoctorsPage() {
                         <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
                           {d.title ? `${d.title} ` : ''}{d.full_name}
                         </div>
-                        <div style={{ fontSize: 12, color: C.textSub }}>{d.specialty_name ?? 'General Practice'}</div>
+                        <div style={{ fontSize: 12, color: C.textSub }}>
+                          {d.specialty_name ?? 'General Practice'}{d.level ? ` · ${d.level}` : ''}
+                        </div>
                       </div>
                       {/* Real availability badge */}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99,

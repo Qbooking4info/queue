@@ -5,7 +5,7 @@
 // hospitals('*') similarly returned the admin contact email and regulatory
 // identifiers. Keep this list to fields the public directory / mobile
 // booking flow actually renders.
-const DOCTOR_PUBLIC = 'id, full_name, title, qualification, bio, avatar_url, ' +
+const DOCTOR_PUBLIC = 'id, full_name, title, level, qualification, bio, avatar_url, ' +
   'years_experience, consultation_fee, virtual_fee, accepts_virtual, ' +
   'avg_rating, review_count, availability_status, clinic_id, ' +
   'specialty:specialties!doctors_specialty_id_fkey(name, icon)'

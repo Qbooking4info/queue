@@ -3,11 +3,26 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { RtcTokenBuilder, RtcRole } from 'agora-token'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 // Doctor-initiated: POST with { appointmentId }
 // Generates host + guest tokens, upserts virtual_sessions, sets appointment to in_progress.
 // Patient reads guest_token directly from virtual_sessions via Supabase (RLS allows it).
+//
+// Called cross-origin by the doctors/mobile apps -- needs real CORS handling
+// (preflight OPTIONS + headers on every response), not just the
+// Allow-Origin-only pattern used by unauthenticated public routes.
+export async function OPTIONS() {
+  return corsOptions()
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   const user = await getServerUser(req)
   if (!user) return Errors.unauthenticated()
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
-  StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native'
+import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'

@@ -76,6 +76,11 @@ export async function POST(req: NextRequest) {
       hospital_id: hospitalId,
       clinic_id: clinicId || null,
       is_active: true,
+      // Same reasoning as POST /api/doctors/link -- a brand-new doctor record
+      // must not be immediately assignable (see the on_duty check in
+      // appointments/[id]/route.ts's assign_doctor case) before anyone's
+      // actually confirmed they're on site.
+      availability_status: 'off_duty',
       full_name: full_name.trim(),
       title: title?.trim() || null,
       specialty_id: specialty_id || null,

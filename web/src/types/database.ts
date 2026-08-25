@@ -494,11 +494,13 @@ export type Database = {
           home_visit_address: string | null
           hospital_id: string | null
           id: string
+          next_up_alert_sent_at: string | null
           no_show_at: string | null
           patient_id: string | null
           payment_method: string | null
           prescription_url: string | null
           queue_position: number | null
+          queue_rank_override: number | null
           reason: string | null
           referral_reason: string | null
           referred_by_doctor_id: string | null
@@ -551,11 +553,13 @@ export type Database = {
           home_visit_address?: string | null
           hospital_id?: string | null
           id?: string
+          next_up_alert_sent_at?: string | null
           no_show_at?: string | null
           patient_id?: string | null
           payment_method?: string | null
           prescription_url?: string | null
           queue_position?: number | null
+          queue_rank_override?: number | null
           reason?: string | null
           referral_reason?: string | null
           referred_by_doctor_id?: string | null
@@ -608,11 +612,13 @@ export type Database = {
           home_visit_address?: string | null
           hospital_id?: string | null
           id?: string
+          next_up_alert_sent_at?: string | null
           no_show_at?: string | null
           patient_id?: string | null
           payment_method?: string | null
           prescription_url?: string | null
           queue_position?: number | null
+          queue_rank_override?: number | null
           reason?: string | null
           referral_reason?: string | null
           referred_by_doctor_id?: string | null
@@ -1133,6 +1139,7 @@ export type Database = {
           bio: string | null
           created_at: string
           home_visit_fee: number | null
+          level: string | null
           qualification: string | null
           show_phone_to_patients: boolean
           specialty_id: string | null
@@ -1148,6 +1155,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           home_visit_fee?: number | null
+          level?: string | null
           qualification?: string | null
           show_phone_to_patients?: boolean
           specialty_id?: string | null
@@ -1163,6 +1171,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           home_visit_fee?: number | null
+          level?: string | null
           qualification?: string | null
           show_phone_to_patients?: boolean
           specialty_id?: string | null
@@ -1268,6 +1277,7 @@ export type Database = {
           hospital_id: string
           id: string
           is_active: boolean | null
+          level: string | null
           mdcn_number: string | null
           qualification: string | null
           review_count: number | null
@@ -1294,6 +1304,7 @@ export type Database = {
           hospital_id: string
           id?: string
           is_active?: boolean | null
+          level?: string | null
           mdcn_number?: string | null
           qualification?: string | null
           review_count?: number | null
@@ -1320,6 +1331,7 @@ export type Database = {
           hospital_id?: string
           id?: string
           is_active?: boolean | null
+          level?: string | null
           mdcn_number?: string | null
           qualification?: string | null
           review_count?: number | null
@@ -3025,6 +3037,7 @@ export type Database = {
           country: string | null
           created_at: string | null
           date_of_birth: string | null
+          doctor_code: string
           email: string
           full_name: string
           gender: string | null
@@ -3047,6 +3060,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
+          doctor_code?: string
           email: string
           full_name: string
           gender?: string | null
@@ -3069,6 +3083,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
+          doctor_code?: string
           email?: string
           full_name?: string
           gender?: string | null
@@ -3770,6 +3785,7 @@ export type Database = {
         Args: { p_date: string; p_doctor_id: string; p_today: string }
         Returns: {
           appointment_date: string
+          hospital_id: string
           id: string
           patient_gender: string
           patient_id: string
@@ -3790,6 +3806,10 @@ export type Database = {
       get_hospital_staff_roster: {
         Args: { p_hospital_id: string }
         Returns: Json
+      }
+      move_appointment_in_queue: {
+        Args: { p_appointment_id: string; p_new_position: number }
+        Returns: undefined
       }
       get_job_patient_location: {
         Args: { p_request_id: string }

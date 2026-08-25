@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Linking, Alert, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Linking, KeyboardAvoidingView, Platform } from 'react-native'
+import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'

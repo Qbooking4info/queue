@@ -232,7 +232,7 @@ async function getDoctors(db: ReturnType<typeof createAdminClient>, hospitalId: 
   let q = db
     .from('doctors')
     .select(`
-      id, full_name, email, title, avg_rating, review_count, is_active,
+      id, full_name, email, title, level, avg_rating, review_count, is_active,
       accepts_virtual, consultation_fee, years_experience, clinic_id,
       availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
@@ -248,6 +248,7 @@ async function getDoctors(db: ReturnType<typeof createAdminClient>, hospitalId: 
     full_name: d.full_name,
     email: d.email ?? null,
     title: d.title,
+    level: d.level ?? null,
     specialty_name: d.specialty?.name ?? null,
     avg_rating: d.avg_rating,
     review_count: d.review_count,

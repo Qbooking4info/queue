@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { haptics } from '../lib/haptics'
 import { todayLocalDate } from '../lib/format'
 import { ShellScroll } from '../components/AppShell'
+import { getMyDoctorStats } from '../lib/api'
 
 interface Props { navigation: any }
 
@@ -18,6 +19,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [todayCount, setTodayCount] = useState(0)
   const [pendingDirect, setPendingDirect] = useState(0)
   const [monthCompleted, setMonthCompleted] = useState(0)
+  const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
@@ -39,11 +41,15 @@ export function DashboardScreen({ navigation }: Props) {
         )
       }
 
-      const results = await Promise.all(queries)
+      const [results, stats] = await Promise.all([
+        Promise.all(queries),
+        doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
+      ])
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
       setMonthCompleted(results[1].count ?? 0)
       setTodayCount(doctorProfile ? (results[2]?.count ?? 0) : 0)
+      setAvgConsultSecs(stats?.avgConsultSecs ?? null)
       setLoading(false)
     }
     load()
@@ -72,6 +78,11 @@ export function DashboardScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate('Appointments')} highlight={pendingDirect > 0} />
               <StatCard theme={t} icon="checkmark-done-outline" label="Completed this month" value={monthCompleted}
                 onPress={() => navigation.navigate('Appointments')} />
+              {doctorProfile && (
+                <StatCard theme={t} icon="time-outline" label="Avg. consult time"
+                  value={avgConsultSecs == null ? '—' : `${Math.round(avgConsultSecs / 60)}m`}
+                  onPress={() => navigation.navigate('Queue')} />
+              )}
             </View>
 
             {!doctorProfile && (
@@ -99,7 +110,7 @@ export function DashboardScreen({ navigation }: Props) {
 }
 
 function StatCard({ theme: t, icon, label, value, onPress, highlight, disabled }: {
-  theme: any; icon: keyof typeof Ionicons.glyphMap; label: string; value: number
+  theme: any; icon: keyof typeof Ionicons.glyphMap; label: string; value: number | string
   onPress: () => void; highlight?: boolean; disabled?: boolean
 }) {
   return (

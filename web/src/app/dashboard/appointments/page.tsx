@@ -1009,7 +1009,7 @@ export default function AppointmentsPage() {
                           Detail
                         </button>
                         {/* Vitals — admins, front desk, doctors */}
-                        {!['cancelled'].includes(a.status) && (
+                        {['checked_in', 'in_progress'].includes(a.status) && (
                           <button onClick={() => setVitalsAppt(a)}
                             style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
                               background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,
@@ -1158,7 +1158,7 @@ export default function AppointmentsPage() {
                   style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
                   Detail
                 </button>
-                {!['cancelled'].includes(a.status) && (
+                {['checked_in', 'in_progress'].includes(a.status) && (
                   <button onClick={() => setVitalsAppt(a)}
                     style={{ ...btnBase, border: `1px solid ${a.vitals_recorded_at ? C.accentBorder : C.border}`,
                       background: a.vitals_recorded_at ? C.accentLight : C.bgAlt,

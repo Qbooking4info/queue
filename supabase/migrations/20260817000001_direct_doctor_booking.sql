@@ -17,14 +17,18 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_user_id uuid REFERENCES
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS home_visit_address text;
 
 -- Exactly one of the two doctor-reference shapes, never a mix: a hospital
--- booking always has hospital_id+doctor_id and never doctor_user_id; a direct
+-- booking always has hospital_id and never doctor_user_id (doctor_id is NOT
+-- required here -- plenty of live bookings are hospital_id-set with doctor_id
+-- still NULL, assigned later at check-in via PATCH /api/appointments/[id]'s
+-- assign_doctor action; the original version of this constraint wrongly
+-- required doctor_id NOT NULL too and failed against 10 real rows); a direct
 -- booking always has doctor_user_id and never hospital_id/doctor_id. Keeps
 -- every existing hospital_id/doctor_id-keyed query correctly blind to direct
 -- bookings (they simply don't match `hospital_id = ...` / doctor_id joins)
 -- without needing a NULL-check added to each one individually.
 ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_booking_shape_check;
 ALTER TABLE appointments ADD CONSTRAINT appointments_booking_shape_check CHECK (
-  (hospital_id IS NOT NULL AND doctor_id IS NOT NULL AND doctor_user_id IS NULL)
+  (hospital_id IS NOT NULL AND doctor_user_id IS NULL)
   OR
   (hospital_id IS NULL AND doctor_id IS NULL AND doctor_user_id IS NOT NULL)
 );

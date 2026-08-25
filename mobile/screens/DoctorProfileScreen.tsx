@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
-import { getIndependentDoctorProfile, IndependentDoctorProfile } from '../lib/api'
+import { getIndependentDoctorProfile, IndependentDoctorProfile, getHospitalById } from '../lib/api'
+import { toDisplayHospital } from '../lib/adapters'
 import { haptics } from '../lib/haptics'
 
 interface Props { navigation: any; route: any }
@@ -13,10 +14,19 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
   const { userId } = route.params as { userId: string }
   const [doctor, setDoctor] = useState<IndependentDoctorProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [openingHospitalId, setOpeningHospitalId] = useState<string | null>(null)
 
   useEffect(() => {
     getIndependentDoctorProfile(userId).then(d => { setDoctor(d); setLoading(false) })
   }, [userId])
+
+  async function viewHospital(hospitalId: string) {
+    haptics.tap()
+    setOpeningHospitalId(hospitalId)
+    const raw = await getHospitalById(hospitalId)
+    setOpeningHospitalId(null)
+    if (raw) navigation.navigate('HospitalProfile', { hospital: toDisplayHospital(raw) })
+  }
 
   if (loading) {
     return (
@@ -51,7 +61,11 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
             <Text style={{ fontSize: 26, fontWeight: '800', color: t.accent }}>{initials}</Text>
           </View>
           <Text style={[st.name, { color: t.textPrimary }]}>{doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}</Text>
-          {doctor.specialty && <Text style={[st.specialty, { color: t.accent }]}>{doctor.specialty.name}</Text>}
+          {doctor.specialty && (
+            <Text style={[st.specialty, { color: t.accent }]}>
+              {doctor.specialty.name}{doctor.level ? ` · ${doctor.level}` : ''}
+            </Text>
+          )}
           {doctor.qualification && <Text style={[st.qual, { color: t.textMuted }]}>{doctor.qualification}</Text>}
         </View>
 
@@ -67,6 +81,26 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
           {doctor.yearsExperience != null && <Row label="Experience" value={`${doctor.yearsExperience} years`} theme={t} />}
           {doctor.phone && <Row label="Phone" value={doctor.phone} theme={t} />}
         </View>
+
+        {doctor.hospitals.length > 0 && (
+          <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={[st.sectionTitle, { color: t.textMuted }]}>PRACTICES AT</Text>
+            {doctor.hospitals.map(h => (
+              <TouchableOpacity key={h.id} onPress={() => viewHospital(h.id)} disabled={openingHospitalId !== null}
+                style={[st.row, { borderBottomColor: t.cardBorder }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="business-outline" size={15} color={t.accent} />
+                  <Text style={{ fontSize: 13, color: t.textPrimary }}>{h.name}</Text>
+                </View>
+                {openingHospitalId === h.id ? (
+                  <ActivityIndicator size="small" color={t.textMuted} />
+                ) : (
+                  <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {doctor.documents.length > 0 && (
           <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -85,28 +119,41 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
         )}
       </ScrollView>
 
-      <View style={[st.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
-        {doctor.acceptsDirectVirtual && (
+      {doctor.acceptsDirectVirtual || doctor.acceptsDirectHomeVisit ? (
+        <View style={[st.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
+          {doctor.acceptsDirectVirtual && (
+            <TouchableOpacity
+              onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
+              style={[st.bookBtn, { backgroundColor: t.accent }]}>
+              <Ionicons name="videocam-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
+              <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
+                Book Virtual{doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString()}` : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {doctor.acceptsDirectHomeVisit && (
+            <TouchableOpacity
+              onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'home_visit' }) }}
+              style={[st.bookBtn, { backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.accentBorder }]}>
+              <Ionicons name="home-outline" size={15} color={t.accent} />
+              <Text style={[st.bookBtnText, { color: t.accent }]}>
+                Book Home Visit{doctor.homeVisitFee ? ` · ₦${doctor.homeVisitFee.toLocaleString()}` : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : doctor.hospitals.length > 0 ? (
+        <View style={[st.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
           <TouchableOpacity
-            onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
+            onPress={() => viewHospital(doctor.hospitals[0].id)}
             style={[st.bookBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="videocam-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
+            <Ionicons name="business-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
             <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
-              Book Virtual{doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString()}` : ''}
+              Book via {doctor.hospitals[0].name}
             </Text>
           </TouchableOpacity>
-        )}
-        {doctor.acceptsDirectHomeVisit && (
-          <TouchableOpacity
-            onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'home_visit' }) }}
-            style={[st.bookBtn, { backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.accentBorder }]}>
-            <Ionicons name="home-outline" size={15} color={t.accent} />
-            <Text style={[st.bookBtnText, { color: t.accent }]}>
-              Book Home Visit{doctor.homeVisitFee ? ` · ₦${doctor.homeVisitFee.toLocaleString()}` : ''}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   )
 }

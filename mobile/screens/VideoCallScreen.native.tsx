@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Platform, PermissionsAndroid, Alert, Linking,
-} from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Linking } from 'react-native'
+import { Alert } from '../contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import {
   createAgoraRtcEngine,

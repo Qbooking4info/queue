@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { Alert } from '../../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
+import { setConsultStatus, saveConsultVitalsAndNotes } from '../../lib/consult-actions'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -34,22 +34,10 @@ interface ApptFull {
   hospital_id:       string
   doctor_id?:        string | null
   assigned_doctor_id?: string | null
-  vitals_weight_kg?:    number | null
-  vitals_height_cm?:    number | null
-  vitals_bp_systolic?:  number | null
-  vitals_bp_diastolic?: number | null
-  vitals_blood_sugar?:  number | null
-  vitals_bmi?:          number | null
 }
 
 const NOTES_MAX = 1000
 const DIAG_MAX  = 500
-
-// Local calendar date, not UTC — Date#toISOString() shifts to UTC first, which silently
-// rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
-function fmtLocalDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
@@ -109,26 +97,40 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [saved,  setSaved]    = useState(false)
 
   async function fetchAppt() {
-    const { data } = await supabase
-      .from('appointments')
-      .select(`
-        *, patient:users!appointments_patient_id_fkey(id, full_name, phone, date_of_birth, gender, blood_group),
-        referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
-        referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
-        referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
-      `)
-      .eq('id', appointmentId)
-      .single()
+    const [{ data }, { data: vitals }] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select(`
+          *, patient:users!appointments_patient_id_fkey(id, full_name, phone, date_of_birth, gender, blood_group),
+          referred_by:doctors!appointments_referred_by_doctor_id_fkey(full_name, title),
+          referring_hospital:hospitals!appointments_referring_hospital_id_fkey(name),
+          referring_clinic:hospital_clinics!appointments_referring_clinic_id_fkey(name)
+        `)
+        .eq('id', appointmentId)
+        .single(),
+      // Vitals live in vitals_audit_log, not on appointments (denormalised
+      // columns were dropped in 20260719000004_normalize_vitals.sql) -- front
+      // desk can record more than once per visit, so the latest entry wins.
+      supabase
+        .from('vitals_audit_log')
+        .select('weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar')
+        .eq('appointment_id', appointmentId)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
 
     if (data) {
       setAppt(data as ApptFull)
-      setWeight(data.vitals_weight_kg    != null ? String(data.vitals_weight_kg)    : '')
-      setHeight(data.vitals_height_cm    != null ? String(data.vitals_height_cm)    : '')
-      setBpSys( data.vitals_bp_systolic  != null ? String(data.vitals_bp_systolic)  : '')
-      setBpDia( data.vitals_bp_diastolic != null ? String(data.vitals_bp_diastolic) : '')
-      setBSugar(data.vitals_blood_sugar  != null ? String(data.vitals_blood_sugar)  : '')
-      setNotes( data.doctor_notes ?? '')
-      setDiag(  data.diagnosis   ?? '')
+      setNotes(data.doctor_notes ?? '')
+      setDiag(data.diagnosis ?? '')
+    }
+    if (vitals) {
+      setWeight(vitals.weight_kg    != null ? String(vitals.weight_kg)    : '')
+      setHeight(vitals.height_cm    != null ? String(vitals.height_cm)    : '')
+      setBpSys( vitals.bp_systolic  != null ? String(vitals.bp_systolic)  : '')
+      setBpDia( vitals.bp_diastolic != null ? String(vitals.bp_diastolic) : '')
+      setBSugar(vitals.blood_sugar  != null ? String(vitals.blood_sugar)  : '')
     }
     setLoading(false)
   }
@@ -140,21 +142,17 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   async function saveVitalsAndNotes() {
     setSaving(true)
-    const bmi = calcBMI(weight, height)
-    const { error } = await supabase
-      .from('appointments')
-      .update({
-        vitals_weight_kg:    parseFloat(weight)  || null,
-        vitals_height_cm:    parseFloat(height)  || null,
-        vitals_bp_systolic:  parseInt(bpSys)     || null,
-        vitals_bp_diastolic: parseInt(bpDia)     || null,
-        vitals_blood_sugar:  parseFloat(bSugar)  || null,
-        vitals_bmi:          bmi ? parseFloat(bmi) : null,
-        doctor_notes:        notes || null,
-        diagnosis:           diag  || null,
-        updated_at:          new Date().toISOString(),
-      })
-      .eq('id', appointmentId)
+    const { error } = await saveConsultVitalsAndNotes(
+      appointmentId,
+      canRecordVitals ? {
+        weight_kg:    parseFloat(weight) || null,
+        height_cm:    parseFloat(height) || null,
+        bp_systolic:  parseInt(bpSys)    || null,
+        bp_diastolic: parseInt(bpDia)    || null,
+        blood_sugar:  parseFloat(bSugar) || null,
+      } : null,
+      { notes, diagnosis: diag },
+    )
 
     setSaving(false)
     if (!error) {
@@ -164,49 +162,14 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       fetchAppt()
     } else {
       haptics.error()
-      Alert.alert('Save failed', error.message)
+      Alert.alert('Save failed', error)
     }
   }
 
-  async function updateStatus(newStatus: string) {
+  async function updateStatus(newStatus: 'in_progress' | 'completed') {
     setStatusUpdating(true)
 
-    // Starting a new consult auto-completes whatever this doctor was previously seeing if
-    // it was never explicitly ended — mirrors web dashboard's startConsultation, so a doctor
-    // switching patients on mobile doesn't leave a stale in_progress row behind.
-    if (newStatus === 'in_progress' && appt) {
-      const doctorId   = (appt as any).doctor_id ?? (appt as any).assigned_doctor_id
-      const hospitalId = (appt as any).hospital_id
-      const checkInDate = (appt as any).check_in_date ?? fmtLocalDate(new Date())
-      if (doctorId && hospitalId) {
-        const [byDoctor, byAssigned] = await Promise.all([
-          supabase.from('appointments').select('id')
-            .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
-            .eq('status', 'in_progress').eq('doctor_id', doctorId).neq('id', appointmentId),
-          supabase.from('appointments').select('id')
-            .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
-            .eq('status', 'in_progress').eq('assigned_doctor_id', doctorId).neq('id', appointmentId),
-        ])
-        const staleIds = Array.from(new Set([
-          ...((byDoctor.data ?? []) as { id: string }[]).map(r => r.id),
-          ...((byAssigned.data ?? []) as { id: string }[]).map(r => r.id),
-        ]))
-        if (staleIds.length > 0) {
-          await supabase.from('appointments')
-            .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
-            .in('id', staleIds)
-        }
-      }
-    }
-
-    const patch: Record<string, any> = { status: newStatus, updated_at: new Date().toISOString() }
-    if (newStatus === 'in_progress') patch.consult_started_at = new Date().toISOString()
-    if (newStatus === 'completed')   patch.consult_ended_at   = new Date().toISOString()
-
-    const { error } = await supabase
-      .from('appointments')
-      .update(patch)
-      .eq('id', appointmentId)
+    const { error } = await setConsultStatus(appointmentId, newStatus)
 
     setStatusUpdating(false)
     if (!error) {
@@ -214,7 +177,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       setAppt(prev => prev ? { ...prev, status: newStatus } : prev)
     } else {
       haptics.error()
-      Alert.alert('Update failed', error.message)
+      Alert.alert('Update failed', error)
     }
   }
 
@@ -242,6 +205,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const canComplete = appt.status === 'in_progress'
   const isDone      = appt.status === 'completed'
   const isInProgress = appt.status === 'in_progress'
+  // Vitals only mean anything once the patient has actually been checked in --
+  // Clinical Notes/Diagnosis/Save stay available regardless (out of scope here).
+  const canRecordVitals = appt.status === 'checked_in' || isInProgress
   const bmi = calcBMI(weight, height)
 
   const isEmergency = appt.urgency === 'emergency'
@@ -443,17 +409,23 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 VITALS
               </Text>
 
-              <View style={st.vitalsGrid}>
-                <VitalInput label="Weight (kg)" value={weight} onChange={setWeight} theme={t} keyboardType="decimal-pad" />
-                <VitalInput label="Height (cm)" value={height} onChange={setHeight} theme={t} keyboardType="decimal-pad" />
-                <VitalInput label="BP Systolic"  value={bpSys}  onChange={setBpSys}  theme={t} keyboardType="number-pad" />
-                <VitalInput label="BP Diastolic" value={bpDia}  onChange={setBpDia}  theme={t} keyboardType="number-pad" />
-                <VitalInput label="Blood Sugar (mg/dL)" value={bSugar} onChange={setBSugar} theme={t} keyboardType="decimal-pad" />
-                <View style={[st.vitalBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                  <Text style={[st.vitalLabel, { color: t.accent }]}>BMI</Text>
-                  <Text style={[st.vitalValue, { color: t.accent, fontSize: 20 }]}>{bmi ?? '—'}</Text>
+              {canRecordVitals ? (
+                <View style={st.vitalsGrid}>
+                  <VitalInput label="Weight (kg)" value={weight} onChange={setWeight} theme={t} keyboardType="decimal-pad" />
+                  <VitalInput label="Height (cm)" value={height} onChange={setHeight} theme={t} keyboardType="decimal-pad" />
+                  <VitalInput label="BP Systolic"  value={bpSys}  onChange={setBpSys}  theme={t} keyboardType="number-pad" />
+                  <VitalInput label="BP Diastolic" value={bpDia}  onChange={setBpDia}  theme={t} keyboardType="number-pad" />
+                  <VitalInput label="Blood Sugar (mg/dL)" value={bSugar} onChange={setBSugar} theme={t} keyboardType="decimal-pad" />
+                  <View style={[st.vitalBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+                    <Text style={[st.vitalLabel, { color: t.accent }]}>BMI</Text>
+                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 20 }]}>{bmi ?? '—'}</Text>
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
+                  Vitals can be recorded once the patient is checked in.
+                </Text>
+              )}
             </View>
 
             {/* Clinical Notes */}

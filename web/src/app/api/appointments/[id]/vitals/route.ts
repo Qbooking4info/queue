@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 export interface AppointmentVitals {
   weight_kg: number | null
@@ -15,8 +16,22 @@ export interface AppointmentVitals {
 // direct admin-api.ts/adminDb call). vitals_audit_log is the source of
 // truth -- appointments no longer stores denormalized vitals columns
 // (dropped in migration 20260719000004).
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'])
+//
+// Called cross-origin by the doctors/mobile apps -- needs real CORS handling
+// (preflight OPTIONS + headers on every response), not just the
+// Allow-Origin-only pattern used by unauthenticated public routes.
+export async function OPTIONS() {
+  return corsOptions()
+}
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const res = await handlePOST(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { id: appointmentId } = await params
@@ -24,13 +39,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: appt } = await db
     .from('appointments')
-    .select('id, hospital_id')
+    .select('id, hospital_id, status')
     .eq('id', appointmentId)
     .single()
   if (!appt) return Errors.notFound('Appointment')
 
   if (caller.role !== 'super_admin' && caller.hospitalId !== appt.hospital_id) {
     return Errors.forbidden("Cannot record vitals for another hospital's appointment")
+  }
+
+  // Backstop for every surface that records vitals (web dashboard, doctors/mobile
+  // consult screens, mobile front desk) -- a patient must actually be checked in
+  // before vitals mean anything for this visit.
+  if (!['checked_in', 'in_progress'].includes(appt.status)) {
+    return Errors.validation('Vitals can only be recorded once the patient is checked in')
   }
 
   const vitals = (await req.json()) as AppointmentVitals

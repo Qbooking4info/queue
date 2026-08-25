@@ -90,17 +90,36 @@ export default function OverviewPage() {
   const [avail,       setAvail]       = useState<DoctorAvailabilityStatus>(doctorAvailability ?? 'on_duty')
   const [savingAvail, setSavingAvail] = useState(false)
   const [availError,  setAvailError]  = useState('')
-  const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
   const { canManageBedSpace } = useEmergencyAccess()
+
+  // Doctor branch's own range + hospital-affiliation scoping -- separate from
+  // `range`/`bounds` above being unused by this branch's stats today; those stay
+  // wired for the admin branch only via the effect below reusing the same state.
+  const [myHospitals,   setMyHospitals]   = useState<{ hospitalId: string; hospitalName: string; isActive: boolean }[]>([])
+  const [hospitalFilter, setHospitalFilter] = useState('')
+  const [doctorStats,   setDoctorStats]   = useState<{
+    avgConsultSecs: number | null; avgRatingOutOf10: number | null; reviewCount: number; total: number; completed: number
+  }>({ avgConsultSecs: null, avgRatingOutOf10: null, reviewCount: 0, total: 0, completed: 0 })
 
   useEffect(() => { if (doctorAvailability) setAvail(doctorAvailability) }, [doctorAvailability])
 
   useEffect(() => {
+    if (role !== 'doctor') return
+    fetch('/api/doctors/me/hospitals')
+      .then(res => res.ok ? res.json() : { hospitals: [] })
+      .then(({ hospitals }) => setMyHospitals(hospitals))
+  }, [role])
+
+  const loadDoctorStats = useCallback(() => {
     if (role !== 'doctor' || !doctorId) return
-    fetch('/api/doctors/me')
-      .then(res => res.ok ? res.json() : { avgConsultSecs: null })
-      .then(({ avgConsultSecs }) => setAvgConsultSecs(avgConsultSecs))
-  }, [role, doctorId])
+    const params = new URLSearchParams({ from: bounds.from, to: bounds.to })
+    if (hospitalFilter) params.set('hospitalId', hospitalFilter)
+    fetch(`/api/doctors/me?${params}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setDoctorStats(data) })
+  }, [role, doctorId, bounds, hospitalFilter])
+
+  useEffect(() => { loadDoctorStats() }, [loadDoctorStats])
 
   const load = useCallback(async () => {
     if (role === 'doctor') { setLoading(false); return }
@@ -223,6 +242,30 @@ export default function OverviewPage() {
           )}
         </div>
 
+        {/* Range + hospital-affiliation filters -- scope the two stats below only;
+            Today's/Completed Today/Total Patients Seen stay as their own fixed
+            today/all-time snapshots (see cards below). */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.md, flexWrap: 'wrap', marginBottom: SPACE.md }}>
+          <DateFilter value={range} onChange={(k, b) => { setRange(k); setBounds(b) }} label="Showing" />
+          {myHospitals.length > 1 && (
+            <select
+              value={hospitalFilter}
+              onChange={e => setHospitalFilter(e.target.value)}
+              style={{
+                padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+                background: C.bgAlt, border: `1px solid ${C.border}`,
+                color: C.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              }}>
+              <option value="">Current hospital</option>
+              {myHospitals.map(h => (
+                <option key={h.hospitalId} value={h.hospitalId}>
+                  {h.hospitalName}{h.isActive ? '' : ' (past)'}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         {/* Doctor stats */}
         <div className="dash-stat-grid-5" style={{ marginBottom: SPACE.xl }}>
           <StatCard icon={<CalendarDays size={18} />} label="Today's Appointments"
@@ -236,12 +279,12 @@ export default function OverviewPage() {
             value={ctxLoading ? '…' : stats.totalBookings}
             sub="All time" colorKey="purple" />
           <StatCard icon={<Star size={18} />} label="Avg Rating"
-            value={ctxLoading ? '…' : (stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—')}
-            sub={stats.reviewCount > 0 ? `${stats.reviewCount} reviews` : 'No reviews yet'}
+            value={doctorStats.avgRatingOutOf10 == null ? '—' : doctorStats.avgRatingOutOf10.toFixed(2)}
+            sub={doctorStats.reviewCount > 0 ? `${doctorStats.reviewCount} reviews · out of 10` : 'No reviews yet'}
             colorKey="amber" />
           <StatCard icon={<Clock size={18} />} label="Avg Consultation Time"
-            value={avgConsultSecs == null ? '—' : `${Math.round(avgConsultSecs / 60)}m`}
-            sub={avgConsultSecs == null ? 'No data yet' : 'Per patient'}
+            value={doctorStats.avgConsultSecs == null ? '—' : `${Math.round(doctorStats.avgConsultSecs / 60)}m`}
+            sub={doctorStats.avgConsultSecs == null ? 'No data yet' : 'Per patient'}
             colorKey="blue" />
         </div>
 

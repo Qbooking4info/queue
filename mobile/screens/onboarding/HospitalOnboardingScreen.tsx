@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { Alert } from '../../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'

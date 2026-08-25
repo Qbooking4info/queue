@@ -81,6 +81,7 @@ export interface AdminDoctor {
   full_name: string
   email?: string | null
   title: string | null
+  level: string | null
   specialty_name: string | null
   avg_rating: number | null
   review_count: number | null
@@ -593,7 +594,7 @@ export async function getDoctors(hospitalId: string, clinicId?: string): Promise
   let q = (adminDb as any)
     .from('doctors')
     .select(`
-      id, full_name, email, title, avg_rating, review_count, is_active,
+      id, full_name, email, title, level, avg_rating, review_count, is_active,
       accepts_virtual, consultation_fee, years_experience, clinic_id,
       availability_status,
       specialty:specialties!doctors_specialty_id_fkey(name)
@@ -610,6 +611,7 @@ export async function getDoctors(hospitalId: string, clinicId?: string): Promise
     full_name: d.full_name,
     email: d.email ?? null,
     title: d.title,
+    level: d.level ?? null,
     specialty_name: d.specialty?.name ?? null,
     avg_rating: d.avg_rating,
     review_count: d.review_count,

@@ -154,7 +154,7 @@ Links an existing, independent doctor account (self-registered via the `doctors/
 `doctors` row that shares that account's `user_id`. Added Aug 2026 alongside multi-hospital
 doctor identity. If the doctor was previously linked to this same hospital and later
 deactivated, re-activates that row instead of inserting a duplicate. Copies profile fields
-(`title`, `qualification`, `bio`, `years_experience`, `mdcn_number`, `specialty_id`,
+(`title`, `level`, `qualification`, `bio`, `years_experience`, `mdcn_number`, `specialty_id`,
 `avatar_url`) from the doctor's oldest existing `doctors` row, if any, so they don't have to
 re-enter them per hospital. Subject to the same `max_doctors` plan-seat check as
 `POST /api/doctors/create`.
@@ -162,7 +162,7 @@ re-enter them per hospital. Subject to the same `max_doctors` plan-seat check as
 | Field | Value |
 |---|---|
 | Auth | `requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])` |
-| Body | `{ doctorAccountId: uuid, clinicId?: uuid }` — `doctorAccountId` is the target doctor's `users.id`, shown to them as their "Doctor ID" in the `doctors/` app |
+| Body | `{ doctorCode: string, clinicId?: uuid }` — `doctorCode` is the target doctor's `users.doctor_code`, a short 6-character code shown to them as their "Doctor ID" in the `doctors/` app (changed from the raw `users.id` UUID in `20260821000001` — shorter and human-typeable). Matched case-insensitively (uppercased server-side) |
 | Returns | `{ id: uuid, relinked: boolean }` |
 
 ---
@@ -379,7 +379,10 @@ appointment-creation route, there is deliberately no `caller.hospitalId === targ
 hospital` check — a referral's whole point is (usually) crossing hospitals, though a
 same-hospital referral to a colleague/clinic is allowed too. Mirrors walk-in's plan
 checks (subscription status, monthly booking cap) but against the *receiving* hospital.
-Rate limited: 20/hour per referring doctor.
+Rate limited: 20/hour per referring doctor. CORS-enabled (`20260821`) — called
+cross-origin by the doctors/mobile apps' Refer screen, which silently failed in the
+browser (blocked preflight, no error surfaced) before this route had `OPTIONS`/
+`AUTH_CORS_HEADERS`.
 
 `appointmentId` identifies both the patient being referred and (implicitly) the doctor
 relationship — there's no separate `patientId` field. This is deliberate: `patient_id` on
@@ -389,11 +392,19 @@ API would silently have no way to refer a walk-in at all. Identifying by appoint
 instead works for both, pulling `walkin_patient_name`/`walkin_patient_phone` off that row
 onto the new one when there's no linked account.
 
-If that appointment is (still) `in_progress` at submit time, creating the referral also
-marks it `completed` (and ends its `virtual_sessions` row, if any) in the same request —
-one action ("refer and I'm done with this patient") instead of a separate Refer then
-Complete. Best-effort: if it was already completed/changed by someone else in the
-meantime, the referral itself still succeeds and `originalCompleted` comes back `false`.
+If that appointment is (still) `in_progress` at submit time **and** the caller passes
+`completeOriginal: true`, creating the referral also marks it `completed` (and ends its
+`virtual_sessions` row, if any) in the same request — one action ("refer and I'm done with
+this patient") instead of a separate Refer then Complete. `completeOriginal` defaults to
+`true` for backward compatibility, but the doctors/mobile Refer screen now sends it
+explicitly, gated by an "Also complete this consultation" toggle that defaults **off** —
+this is what lets a doctor send more than one referral out of the same visit (e.g.
+Cardiology *and* Radiology) without the first one prematurely ending the consult; they
+complete it themselves afterwards (via `start_consultation`/`end_consultation`, i.e. the
+Queue's End button) once actually done, or flip the toggle on for the last referral. Even
+with `completeOriginal: true`, this is best-effort: if the appointment was already
+completed/changed by someone else in the meantime, the referral itself still succeeds and
+`originalCompleted` comes back `false`.
 
 | Field | Value |
 |---|---|
@@ -413,7 +424,8 @@ meantime, the referral itself still succeeds and `originalCompleted` comes back 
   "reason": "string?",
   "referralReason": "string",
   "urgency": "routine | urgent | emergency?",
-  "paymentMethod": "string?"
+  "paymentMethod": "string?",
+  "completeOriginal": "boolean? (default true)"
 }
 ```
 
@@ -485,25 +497,34 @@ raw storage path — the bucket is never read directly by a client.
 | Returns | GET: `{ documents: [{ id, title, uploadedAt, url }] }`. POST: `{ document: { id, title, uploaded_at, url } }`. DELETE: `{ success: true }` |
 
 ### `GET /api/public/doctors/search`
-Unauthenticated directory of doctors who opted into direct bookings
-(`accepts_direct_virtual` or `accepts_direct_home_visit`). Phone number is redacted
-server-side unless `show_phone_to_patients` is set — never left to the client to decide.
+Unauthenticated directory of **every registered, active doctor** — not just ones who opted
+into direct (no-hospital) bookings (changed `20260821`: source of truth is now `doctors`,
+one row per hospital affiliation, grouped by `user_id` into one entry per person with
+`hospitals: [{id,name}]` listed; `doctor_profiles` — only guaranteed to exist for a doctor
+who's touched direct-booking settings — is joined on top for fee/bio/direct-booking
+capability where present). A doctor with no `doctor_profiles` row still appears, just with
+`acceptsDirectVirtual`/`acceptsDirectHomeVisit` both `false` and only bookable via one of
+`hospitals`. Phone number is redacted server-side unless `show_phone_to_patients` is set —
+never left to the client to decide.
 
 | Field | Value |
 |---|---|
 | Auth | None |
-| Query | `q?` (name/specialty substring), `specialtyId?`, `visitType?` (`virtual` \| `home_visit`, omit for either) |
-| Returns | `{ doctors: IndependentDoctor[] }` — safe fields only, `phone` possibly `null` |
+| Query | `q?` (name/specialty substring), `specialtyId?`, `visitType?` (`virtual` \| `home_visit` — filters to doctors who specifically opted into that direct-booking type; omit to show every doctor regardless of direct-booking status) |
+| Returns | `{ doctors: IndependentDoctor[] }` — safe fields only, `phone` possibly `null`, `hospitals: [{id,name}][]` |
 
 ### `GET /api/public/doctors/{id}`
 Full public profile for one doctor (`{id}` is their `users.id`, i.e. their "Doctor ID").
-404s if the doctor hasn't opted into any direct-booking mode. Includes qualification
-documents as signed URLs.
+404s only if the account isn't a registered doctor at all (no `doctor_profiles` row and no
+active `doctors` link) — no longer requires having opted into direct booking (changed
+`20260821`). `title`/`level`/`specialty`/`qualification`/`yearsExperience` fall back to the
+doctor's oldest active `doctors` row when no `doctor_profiles` row exists. Includes
+qualification documents as signed URLs.
 
 | Field | Value |
 |---|---|
 | Auth | None |
-| Returns | `{ doctor: IndependentDoctorProfile }` (adds `documents: [{ id, title, url }]` to the search shape) or 404 |
+| Returns | `{ doctor: IndependentDoctorProfile }` (adds `documents: [{ id, title, url }]` and `hospitals` to the search shape) or 404 |
 
 ### `PATCH /api/appointments/direct/{id}`
 Doctor-side review actions on their own direct bookings — approve/reject/start/complete/
@@ -526,6 +547,9 @@ before now) needed no new routes for direct virtual consults — both already re
 caller by looking up the appointment's doctor and checking identity, and now check
 `doctor_user_id` first (falling back to the `doctors`-row path for hospital-mediated
 appointments), so the same Agora-token flow works for both booking shapes unchanged.
+Both gained CORS support in `20260821` (audit alongside the other doctor-consult routes
+above) — the doctors/mobile apps call these cross-origin to start/end a video call, which
+silently failed in the browser before either route had `OPTIONS`/`AUTH_CORS_HEADERS`.
 
 ---
 
@@ -544,14 +568,16 @@ what exists and what replaced what.
 |---|---|---|
 | `GET /api/dashboard/bootstrap` | `getHospital`, `getHospitalStats`, `getClinicStats`, `getDoctors`, `getTodayAppointments`, `getDoctorTodayAppointments`, `getAllHospitals`, `getClinicDetail`, `getDoctorProfile` | `AdminContext`'s bootstrap — every dashboard page's initial load. `?hospitalId=` is honoured only for `super_admin` ("switch hospital") |
 | `GET /api/patients/[id]` | `getPatientProfile`, `getPatientMedicalHistory` | Staff may view a patient's chart only if that patient has an appointment at the caller's hospital — `patient_medical_history` has no staff-read RLS policy, so this check lives in the route |
-| `POST /api/appointments/[id]/vitals` | `updateAppointmentVitals` | `recorded_by_auth_id` comes from the session, not a client-supplied value |
+| `POST /api/appointments/[id]/vitals` | `updateAppointmentVitals` | `recorded_by_auth_id` comes from the session, not a client-supplied value. Writes to `vitals_audit_log`, not `appointments` (denormalised columns dropped `20260719000004`) — this is the *only* path that has ever actually recorded vitals; the mobile/doctors apps' consult screens previously read/wrote nonexistent `appointments.vitals_*` columns directly, so front-desk-recorded vitals never reached the doctor's view (fixed `20260821`, screens now query `vitals_audit_log` directly for reads and call this route for writes). CORS-enabled (`20260821`) for the same cross-origin reason as `PATCH /api/appointments/[id]` above. **Bug fixed `20260821`:** `handlePOST` called `requireRole([...])` without passing `req`, so it could never see the `Authorization: Bearer` header the doctors/mobile apps actually send cross-origin — silently fell through to cookie auth (never present cross-origin) and would 401 outside same-origin Node testing. Now called `requireRole([...], req)`. **Gated `20260823`:** now requires `status` to be `checked_in` or `in_progress` (fetched alongside `hospital_id`) — server-side backstop for a bug where "Record Vitals" was reachable before check-in from the web dashboard's appointments page and both doctors/mobile `PatientConsultScreen`s (only the mobile front-desk screen was ever correctly gated); those three UI surfaces were also fixed to hide the option pre-check-in, but this is what actually closes the gap for any surface that's missed or stale |
 | `GET /api/appointments?from&to` | `getAppointments`, `getClinicAppointments`, `getDoctorAppointments` | Also returns the doctors list in the same response |
-| `PATCH /api/appointments/[id]` | `assignDoctorToAppointment`, `markNoShow`, `approveAppointment`, `rejectAppointment`, `checkInAppointment`, `startConsultation`, `endConsultation`, `updateAppointmentStatus` | Action discriminator: `assign_doctor`, `mark_no_show`, `approve`, `reject`, `check_in`, `start_consultation`, `end_consultation`, `set_status` (bare status flip, no transition guard — matches the original `updateAppointmentStatus` exactly, distinct from `check_in`/`end_consultation`'s queue-position logic) |
+| `PATCH /api/appointments/[id]` | `assignDoctorToAppointment`, `markNoShow`, `approveAppointment`, `rejectAppointment`, `checkInAppointment`, `startConsultation`, `endConsultation`, `updateAppointmentStatus` | Action discriminator: `assign_doctor`, `mark_no_show`, `approve`, `reject`, `check_in`, `start_consultation`, `end_consultation`, `set_status` (bare status flip, no transition guard — matches the original `updateAppointmentStatus` exactly, distinct from `check_in`/`end_consultation`'s queue-position logic), `update_consult_notes` (added `20260821`: `{ notes?, diagnosis? }`, doctor-only and only the doctor actually on the appointment — this is the *only* path that has ever actually written `doctor_notes`/`diagnosis`; the mobile and doctors apps previously tried a direct client `.update()`, which silently no-ops — there has never been an RLS `UPDATE` policy on `appointments` for doctors, only `SELECT`), `ring` (added `20260821`: no body — doctor or front_desk/admin calls a `checked_in`/`in_progress` patient in, any time, not gated to being exactly next; a doctor caller may only ring their own patient; sends a `queue_ring`-type push naming the doctor via `notifyPatient`). `assign_doctor` also checks the doctor's `users.active_hospital_id` (added `20260820`) — a doctor linked to multiple hospitals can only be assigned patients at whichever one is currently active for them (falls back to their earliest-linked hospital if they've never touched the doctors app's hospital switcher); staff at a hospital that isn't currently active for that doctor get a validation error even though the `doctors` row itself is still `is_active=true`; also resets `queue_rank_override` to `null` on reassignment (`20260821`) so a manually-reordered patient starts fresh FIFO in the new doctor's queue rather than keeping a rank meaningless outside their old cohort. `start_consultation` also fires a one-time `queue_next_alert` push (added `20260821`) to whoever is now `checked_in` at `queue_position=2` for that doctor+day — guarded by `next_up_alert_sent_at` so it doesn't repeat on later queue touches. Now CORS-enabled (`20260821`) — the doctors/mobile apps call `start_consultation`/`end_consultation`/`update_consult_notes`/`ring` cross-origin, which silently failed in the browser (blocked preflight, no error surfaced to the app) until this route gained `OPTIONS`/`AUTH_CORS_HEADERS` |
+| `GET/POST /api/appointments/[id]/queue-position` | *(new)* | Manual queue reordering (added `20260821`), backed by `move_appointment_in_queue()` — see `Queue-Database-Schema.md`. Dual auth: tries staff (`requireRole`, hospital-scoped, any direction, `checked_in` only) first, falls back to the patient themselves (`getServerUser` + `patient_id` match, `checked_in` only, **`newPosition` must be greater than their current position** — never lets a patient jump ahead, only step back). `GET` returns `{ currentPosition, minPosition, maxPosition, estimatedWait, status }` (last two added `20260823`, for the patient app's live queue card — `status` lets the client distinguish `in_progress` (show "being seen now", no reorder UI) from `checked_in`) bounding the appointment's own urgency tier (emergency vs. everything else) — no other patient's identity is ever exposed. Status check loosened `20260823` from `checked_in`-only to `checked_in`/`in_progress` for `GET` (an in-progress patient's card still needs data; `POST`/the move itself still requires `checked_in`). `POST` body `{ newPosition }` → `{ success: true }`. CORS-enabled (called cross-origin by all three apps: web patient flow doesn't use it, but doctors/mobile front desk and mobile patient both do) |
 | `GET /api/appointments/queue` | `getQueueForToday` | Today's physical queue (scheduled today OR checked in today) |
 | `GET /api/appointments/stats?from&to` | `getRangeStats`, `getClinicRangeStats` | |
-| `GET/PATCH /api/doctors/me` | `getDoctorAvgConsultDuration`, `setDoctorAvailability` | Doctor self-service, keyed on `caller.doctorId` |
+| `GET/PATCH /api/doctors/me` | `getDoctorAvgConsultDuration`, `setDoctorAvailability` | Doctor self-service, keyed on `caller.doctorId`. `GET` gained optional `?from&to&hospitalId` (added `20260821`, all backward-compatible no-ops when omitted) for the dashboard's date-range + hospital-affiliation filters — `hospitalId` is resolved against the caller's OWN `doctors` rows only (any `is_active` state, not just their currently-active one), never a client-trusted doctor id. Response gained `avgRatingOutOf10` (stored 1–5 `reviews.rating`, averaged over the range and doctor-row, then ×2 to 2dp — display-only rescale for this one dashboard stat, the underlying 1–5 star submission UI elsewhere is unchanged), `reviewCount`, `total`, `completed` |
+| `GET /api/doctors/me/hospitals` | *(new)* | Added `20260821` for the dashboard's hospital-affiliation filter — every hospital the caller has EVER been linked to as a doctor, active or detached, unlike every other doctor-facing hospital list in the app (which filters to `is_active=true`). Returns `{ hospitals: [{ hospitalId, hospitalName, isActive }] }` |
 | `GET /api/doctors/unassigned` | `getUnassignedDoctors` | |
-| `GET/PATCH/DELETE /api/clinics/[clinicId]` | `getClinicDetail`, `getClinicDoctors`, `getClinicStaff`, `getClinicAppointments`, `getClinicRangeStats`, `getClinicHours`, `getHospitalHours`, `updateClinic`, `toggleClinicActive`, `setEmergencyClinic`/`clearEmergencyClinic`, `updateClinicHours`/`clearClinicHours`, `deleteClinic` | `DELETE` is `super_admin`/`hospital_admin` only — deliberately excludes `clinic_admin` (the original had no check at all); flagged for product confirmation |
+| `GET/PATCH/DELETE /api/clinics/[clinicId]` | `getClinicDetail`, `getClinicDoctors`, `getClinicStaff`, `getClinicAppointments`, `getClinicRangeStats`, `getClinicHours`, `getHospitalHours`, `updateClinic`, `toggleClinicActive`, `setEmergencyClinic`/`clearEmergencyClinic`, `updateClinicHours`/`clearClinicHours`, `deleteClinic` | `DELETE` is `super_admin`/`hospital_admin` only — deliberately excludes `clinic_admin` (the original had no check at all); flagged for product confirmation. `GET`'s `stats` gained `avgWaitMinutes`/`avgConsultMinutes` (`20260823`) — computed from the SAME already-fetched, `orFilter`-scoped appointments list used for the `total`/`completed`/`cancelled` counts (added `waiting_time_secs` to that select; no new query), powering the clinic detail page's two new Overview stat cards. Unlike the vitals route above, `requireRole` here still isn't passed `req` — left as-is, this route has no real cross-origin caller (web dashboard only) |
 | `POST /api/clinics/[clinicId]/doctors`, `DELETE .../doctors/[doctorId]` | `assignDoctorToClinic`, `createClinicDoctor`, `removeDoctorFromClinic` | |
 | `GET/POST /api/hospitals/[id]/settings` | `getHospitalSettings`, `updateHospitalSettings`, `getHospitalHours`, `updateHospitalHours` | `super_admin`/`hospital_admin` only |
 | `GET /api/hospitals/[id]/activity` | `getRecentActivity` | Dashboard notification bell |
@@ -562,6 +588,78 @@ what exists and what replaced what.
 `getAllSpecialties` was **not** given a route — `specialties` has a public RLS read
 policy, so the pages that listed all specialties (doctor add form, services page)
 fetch it via the caller's own anon-key client instead.
+
+---
+
+## Client-side gotcha: `Alert.alert` is a no-op on web *(found/fixed `20260821`)*
+
+Not an API change, but worth recording next to the CORS notes above since it's the same
+species of bug — something that silently does nothing in the browser with zero error
+surfaced. `react-native-web`'s `Alert` polyfill (`node_modules/react-native-web/dist/
+exports/Alert/index.js`) is `class Alert { static alert() {} }` — a complete no-op. Both
+`mobile/` and `doctors/` are tested in-browser (Expo web), so every confirmation dialog
+*and* every error/success message routed through `Alert.alert` (77 call sites across 25
+files in both apps) silently did nothing on web: buttons whose only effect lived inside an
+`onPress` nested in the never-rendered dialog (e.g. a "Withdraw booking" cancel flow, or a
+referral's "Done" → `navigation.goBack()`) appeared completely broken, even though native
+(iOS/Android) was unaffected. Fixed with a real replacement, not a native-only workaround:
+`mobile/contexts/AlertContext.tsx` and `doctors/contexts/AlertContext.tsx` (identical,
+theme-aware, `Modal`-based, supports the same `(title, message?, buttons?)` signature
+including multi-button cases like a 1–5 star rating prompt), each mounted once via
+`<AlertProvider>` at the app root inside `ThemeProvider`. Every file that imported `Alert`
+from `'react-native'` now imports it from the local `contexts/AlertContext` module instead.
+
+## Client-side gotcha: React Native's `Modal` breaks on web when more than one instance exists *(found/fixed `20260823`)*
+
+Found while building the patient app's "ring" alert (`mobile/components/RingOverlay.tsx`,
+triggered by the `ring` PATCH action above). Two distinct, confirmed-live symptoms from the
+same root cause — `react-native-web`'s `<Modal>` doesn't cleanly support more than one
+concurrent instance in the component tree:
+
+1. **Buried, unclickable content.** `mobile/components/QueuePositionPicker.tsx`'s move
+   confirmation used to call `Alert.alert(...)` for the "are you sure" step. Since
+   `AlertContext`'s own `<Modal>` is mounted once at the app root (always present, just
+   `visible={false}` when idle), and `QueuePositionPicker` is itself a second, on-demand
+   `<Modal>`, the confirmation rendered *underneath* the picker's own overlay — invisible
+   and unclickable, confirmed via a headless-browser click that silently hit the wrong
+   element. Fixed by replacing the `Alert.alert` step with an inline confirmation view
+   inside the same modal — no second `Modal` instance at all.
+2. **Present in the DOM, invisible to text/accessibility extraction.** `RingOverlay`
+   originally also used `<Modal>`. With `AlertContext`'s modal *and* this one both mounted,
+   the overlay's content was confirmed present in the raw DOM (`aria-modal="true"`, correct
+   text) and visually painted (React Native's `position:fixed` escapes a zero-size flow
+   parent), but excluded from `document.body.innerText` and similar text-extraction —
+   traced to a zero-height wrapper `<div>` react-native-web's `Modal` leaves in the tree
+   under these conditions. Fixed by not using `<Modal>` at all: `RingOverlay` is a plain
+   `View` with `position:'absolute', top/left/right/bottom: 0`, rendered directly inside
+   `HomeScreen.tsx`'s root `<SafeAreaView>` (not inside `LiveQueueCard`, which is nested
+   several levels deep — React Native's `position:'absolute'` is scoped to the nearest
+   ancestor View, which is *every* View by RN's own default of `position:'relative'`, so an
+   absolutely-positioned overlay mounted deep in a card only covers that card's box, not
+   the screen; it has to be rendered near the screen root to actually cover the screen).
+
+Net effect: any *second* concurrently-open `<Modal>` (including `AlertContext`'s
+always-mounted-but-invisible one) is a known risk on web. Prefer a plain absolutely/fixed
+positioned `View` rendered near the screen root for anything that must reliably overlay
+the whole screen, and inline confirmation state over a nested `Alert.alert` for anything
+opened from inside an already-open custom modal.
+
+## Client-side gotcha: `supabase_realtime` publication was missing almost every table *(found/fixed `20260823`)*
+
+Also found while building the ring alert — its realtime subscription never fired even
+after every RLS/auth check passed. `ALTER PUBLICATION supabase_realtime ADD TABLE ...`
+had only ever been run for `transport_patient_location`; every other
+`.channel(...).on('postgres_changes', ...)` subscription in the codebase — 8 across
+`appointments` alone (both doctor queue screens, front desk, staff appointments, three
+web dashboard pages), plus one each for `virtual_sessions`, `transport_requests`, and
+`ambulance_current_location` — had been silently inert since written: no error, the
+subscription just never received an event, because Postgres was never publishing changes
+on these tables at all (independent of and upstream of RLS). Fixed in
+`supabase/migrations/20260823000003_realtime_publication_fix.sql`, adding all five missing
+tables (plus `notifications` for the ring alert itself) to the publication. Confirmed via a
+direct query against the live publication before writing the fix, not guessed — any new
+`postgres_changes` subscription on a table not already in this list needs the same
+migration pattern.
 
 ---
 

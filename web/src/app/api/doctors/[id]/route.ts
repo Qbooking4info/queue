@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!ownerCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const allowed = ['full_name','title','specialty_id','consultation_fee','virtual_fee',
+    const allowed = ['full_name','title','level','specialty_id','consultation_fee','virtual_fee',
                      'years_experience','accepts_virtual','bio','qualification','mdcn_number'] as const
     const updates: Partial<Database['public']['Tables']['doctors']['Update']> = {}
     for (const k of allowed) {

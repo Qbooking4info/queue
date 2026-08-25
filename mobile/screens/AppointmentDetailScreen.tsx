@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Clipboard, ActivityIndicator } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Clipboard, ActivityIndicator } from 'react-native'
+import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -9,6 +8,7 @@ import { useAuth }  from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
 import { Avatar } from '../components/ui/Avatar'
 import { Stars } from '../components/ui/Stars'
+import { QueuePositionPicker } from '../components/QueuePositionPicker'
 import { cancelAppointment, getHospitalById } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { supabase } from '../lib/supabase'
@@ -51,6 +51,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const [copied,             setCopied]             = useState(false)
   const [refundPct,          setRefundPct]          = useState(100)
   const [rescheduleLoading,  setRescheduleLoading]  = useState(false)
+  const [queuePosition,      setQueuePosition]      = useState<number | null>(raw.queue_position ?? null)
+  const [showQueuePicker,    setShowQueuePicker]    = useState(false)
 
   const approvalStatus  = (raw as any).approval_status ?? 'auto_approved'
   const bookingMode     = (raw as any).booking_mode ?? 'doctor'
@@ -92,19 +94,35 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     rating:         doctorRating,
     queue_position: raw.queue_position,
     estimated_wait: raw.estimated_wait,
-    vitals_weight_kg:    (raw as any).vitals_weight_kg    ?? null,
-    vitals_height_cm:    (raw as any).vitals_height_cm    ?? null,
-    vitals_bp_systolic:  (raw as any).vitals_bp_systolic  ?? null,
-    vitals_bp_diastolic: (raw as any).vitals_bp_diastolic ?? null,
-    vitals_blood_sugar:  (raw as any).vitals_blood_sugar  ?? null,
-    vitals_bmi:          (raw as any).vitals_bmi          ?? null,
     urgency:             (raw as any).urgency ?? 'routine',
     paymentMethod:       (raw as any).payment_method ?? null,
     rescheduleCount:     (raw as any).reschedule_count ?? 0,
   }
 
-  const hasVitals = appt.vitals_weight_kg != null || appt.vitals_height_cm != null
-    || appt.vitals_bp_systolic != null || appt.vitals_blood_sugar != null
+  // Vitals live in vitals_audit_log, not on appointments (the denormalised
+  // appointments.vitals_* columns this used to read were dropped in migration
+  // 20260719000004 -- this section showed nothing for any patient until now).
+  const [liveVitals, setLiveVitals] = useState<{
+    weight_kg: number | null; height_cm: number | null
+    bp_systolic: number | null; bp_diastolic: number | null
+    blood_sugar: number | null; bmi: number | null
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('vitals_audit_log')
+      .select('weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, bmi')
+      .eq('appointment_id', raw.id)
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setLiveVitals(data as any) })
+    return () => { cancelled = true }
+  }, [raw.id])
+
+  const hasVitals = !!liveVitals && (liveVitals.weight_kg != null || liveVitals.height_cm != null
+    || liveVitals.bp_systolic != null || liveVitals.blood_sugar != null)
   const isEmergency = appt.urgency === 'emergency'
 
   const isVirtual   = appt.type === 'virtual'
@@ -414,11 +432,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
 
-        {/* Queue position (in-person upcoming, confirmed) */}
+        {/* Queue position (in-person upcoming, confirmed) -- tappable to voluntarily
+            move later once actually checked in (not just confirmed/waiting to arrive) */}
         {isInPerson && isConfirmed && !cancelled && (
-          <View style={[st.queueCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <TouchableOpacity
+            activeOpacity={raw.status === 'checked_in' ? 0.7 : 1}
+            onPress={() => { if (raw.status === 'checked_in') setShowQueuePicker(true) }}
+            style={[st.queueCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={st.queueLeft}>
-              <Text style={[st.queueNum, { color: t.accent }]}>{appt.queue_position ?? '—'}</Text>
+              <Text style={[st.queueNum, { color: t.accent }]}>{queuePosition ?? '—'}</Text>
               <Text style={[st.queueLabel, { color: t.textMuted }]}>Queue position</Text>
             </View>
             <View style={[st.queueDivider, { backgroundColor: t.cardBorder }]} />
@@ -428,7 +450,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               </Text>
               <Text style={[st.queueLabel, { color: t.textMuted }]}>Est. wait after check-in</Text>
             </View>
-          </View>
+            {raw.status === 'checked_in' && (
+              <Ionicons name="swap-vertical-outline" size={16} color={t.textMuted} style={{ position: 'absolute', top: 10, right: 10 }} />
+            )}
+          </TouchableOpacity>
         )}
 
         <View style={st.pad}>
@@ -444,15 +469,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           </Section>
 
           {/* Vitals — recorded by hospital staff during this visit */}
-          {hasVitals && (
+          {hasVitals && liveVitals && (
             <Section title="Vitals recorded during visit">
-              {appt.vitals_weight_kg != null && <InfoRow label="Weight" value={`${appt.vitals_weight_kg} kg`} />}
-              {appt.vitals_height_cm != null && <InfoRow label="Height" value={`${appt.vitals_height_cm} cm`} />}
-              {appt.vitals_bmi != null && <InfoRow label="BMI" value={String(appt.vitals_bmi)} accent />}
-              {appt.vitals_bp_systolic != null && appt.vitals_bp_diastolic != null && (
-                <InfoRow label="Blood Pressure" value={`${appt.vitals_bp_systolic}/${appt.vitals_bp_diastolic}`} />
+              {liveVitals.weight_kg != null && <InfoRow label="Weight" value={`${liveVitals.weight_kg} kg`} />}
+              {liveVitals.height_cm != null && <InfoRow label="Height" value={`${liveVitals.height_cm} cm`} />}
+              {liveVitals.bmi != null && <InfoRow label="BMI" value={String(liveVitals.bmi)} accent />}
+              {liveVitals.bp_systolic != null && liveVitals.bp_diastolic != null && (
+                <InfoRow label="Blood Pressure" value={`${liveVitals.bp_systolic}/${liveVitals.bp_diastolic}`} />
               )}
-              {appt.vitals_blood_sugar != null && <InfoRow label="Blood Sugar" value={`${appt.vitals_blood_sugar} mg/dL`} />}
+              {liveVitals.blood_sugar != null && <InfoRow label="Blood Sugar" value={`${liveVitals.blood_sugar} mg/dL`} />}
             </Section>
           )}
 
@@ -640,6 +665,14 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           <View style={{ height: 32 }} />
         </View>
       </ScrollView>
+
+      {showQueuePicker && (
+        <QueuePositionPicker
+          appointmentId={raw.id}
+          onClose={() => setShowQueuePicker(false)}
+          onMoved={(newPosition) => { setQueuePosition(newPosition); setShowQueuePicker(false) }}
+        />
+      )}
     </SafeAreaView>
   )
 }

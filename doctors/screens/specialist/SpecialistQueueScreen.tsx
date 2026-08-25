@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type ComponentProps } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { todayLocalDate } from '../../lib/format'
+import { setConsultStatus, ringPatient } from '../../lib/consult-actions'
 
 interface ApptRow {
   id:               string
@@ -23,10 +24,20 @@ interface ApptRow {
   patient_name:     string | null
   patient_phone:    string | null
   patient_gender:   string | null
+  hospital_id:      string
   referral_reason?:         string | null
   referred_by_doctor_name?: string | null
   referring_hospital_name?: string | null
   referring_clinic_name?:   string | null
+}
+
+interface VitalsRow {
+  weight_kg:    number | null
+  height_cm:    number | null
+  bp_systolic:  number | null
+  bp_diastolic: number | null
+  blood_sugar:  number | null
+  recorded_at:  string
 }
 
 interface Props { navigation: any }
@@ -68,6 +79,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [appts,       setAppts]       = useState<ApptRow[]>([])
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
+  const [vitalsMap,   setVitalsMap]   = useState<Map<string, VitalsRow>>(new Map())
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const load = useCallback(async (silent = false) => {
@@ -82,11 +94,39 @@ export function SpecialistQueueScreen({ navigation }: Props) {
       p_today:     today,
     })
 
-    setAppts((data as ApptRow[]) ?? [])
+    const rows = (data as ApptRow[]) ?? []
+    setAppts(rows)
     setLoading(false)
+    loadVitals(rows)
   }, [doctorProfile, tab])
 
+  // vitals_audit_log has no hospital_id column to filter a realtime channel on
+  // cleanly, and vitals are recorded once or twice per visit (not high-frequency),
+  // so a light poll while the tab is focused is simpler than wiring up realtime
+  // here -- picks up front desk recording vitals at check-in without a manual
+  // pull-to-refresh.
+  const loadVitals = useCallback(async (rows: ApptRow[]) => {
+    const ids = rows.filter(a => a.status === 'checked_in' || a.status === 'in_progress').map(a => a.id)
+    if (ids.length === 0) { setVitalsMap(new Map()); return }
+    const { data } = await supabase
+      .from('vitals_audit_log')
+      .select('appointment_id, weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, recorded_at')
+      .in('appointment_id', ids)
+      .order('recorded_at', { ascending: false })
+    const map = new Map<string, VitalsRow>()
+    for (const row of (data as any[]) ?? []) {
+      if (!map.has(row.appointment_id)) map.set(row.appointment_id, row)
+    }
+    setVitalsMap(map)
+  }, [])
+
   useFocusEffect(useCallback(() => { load() }, [load]))
+
+  useEffect(() => {
+    if (tab !== 'today') return
+    const interval = setInterval(() => loadVitals(appts), 15000)
+    return () => clearInterval(interval)
+  }, [tab, appts, loadVitals])
 
   async function onRefresh() {
     setRefreshing(true)
@@ -117,10 +157,19 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   })()
 
   // Emergency patients sort to the top of the active queue — same tiering used on the
-  // front-desk queue and the web dashboard's queue view.
+  // front-desk queue and the web dashboard's queue view. queue_position (nulls-last,
+  // for not-yet-checked-in rows) is the secondary key -- without it this only agreed
+  // with the actual renumbered queue order by coincidence (RPC order is by
+  // start_time), so a manual reorder would have had no visible effect here.
   const active = appts
     .filter(a => ['pending','confirmed','checked_in','in_progress'].includes(a.status))
-    .sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
+    .sort((a, b) => {
+      const tier = (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1)
+      if (tier !== 0) return tier
+      const ap = a.queue_position ?? Infinity
+      const bp = b.queue_position ?? Infinity
+      return ap - bp
+    })
   const done   = appts.filter(a => a.status === 'completed')
 
   if (!doctorProfile && !loading) {
@@ -200,7 +249,8 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textMuted }]}>WAITING / ACTIVE</Text>
               {active.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'}
+                  vitals={vitalsMap.get(appt.id) ?? null} onChanged={() => load(true)} />
               ))}
             </View>
           )}
@@ -210,7 +260,8 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textMuted }]}>COMPLETED</Text>
               {done.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'}
+                  vitals={null} onChanged={() => load(true)} />
               ))}
             </View>
           )}
@@ -220,27 +271,69 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   )
 }
 
-function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
+function ApptCard({ appt, navigation, showDate, vitals, onChanged }: {
+  appt: ApptRow; navigation: any; showDate: boolean; vitals: VitalsRow | null; onChanged: () => void
+}) {
   const { theme: t } = useTheme()
+  const [busy, setBusy] = useState<'start' | 'end' | 'ring' | null>(null)
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
   const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'
   const isEmergency = appt.urgency === 'emergency'
   const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const isDone = appt.status === 'completed' || appt.status === 'cancelled'
+  const showVitals = appt.status === 'checked_in' || appt.status === 'in_progress'
+
+  function openConsult() {
+    haptics.tap()
+    navigation.navigate('PatientConsult', { appointmentId: appt.id })
+  }
+
+  async function handleStart() {
+    haptics.tap()
+    setBusy('start')
+    const { error } = await setConsultStatus(appt.id, 'in_progress')
+    setBusy(null)
+    if (error) { haptics.error(); Alert.alert('Could not start consultation', error) }
+    else { haptics.success(); onChanged() }
+  }
+
+  async function handleEnd() {
+    haptics.tap()
+    setBusy('end')
+    const { error } = await setConsultStatus(appt.id, 'completed')
+    setBusy(null)
+    if (error) { haptics.error(); Alert.alert('Could not end consultation', error) }
+    else { haptics.success(); onChanged() }
+  }
+
+  async function handleRing() {
+    haptics.tap()
+    setBusy('ring')
+    const { error } = await ringPatient(appt.id)
+    setBusy(null)
+    if (error) { haptics.error(); Alert.alert('Could not ring patient', error) } else haptics.success()
+  }
+
+  function openRefer() {
+    haptics.tap()
+    navigation.navigate('ReferPatient', {
+      appointmentId: appt.id,
+      patientName: appt.patient_name ?? 'Patient',
+      ownHospitalId: appt.hospital_id,
+      isInProgress: appt.status === 'in_progress',
+    })
+  }
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <View
       style={[st.card, {
         backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
         borderColor: isEmergency ? '#FF5C5C' : t.cardBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
       }]}
-      onPress={() => {
-        haptics.tap()
-        navigation.navigate('PatientConsult', { appointmentId: appt.id })
-      }}
     >
+    <TouchableOpacity activeOpacity={0.8} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={openConsult}>
       {/* Avatar */}
       <View style={[st.avatar, {
         backgroundColor: isEmergency ? 'rgba(255,92,92,0.14)' : t.accentBgMid,
@@ -302,6 +395,76 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         )}
       </View>
     </TouchableOpacity>
+
+      {/* Vitals peek -- live-ish (polled) once the patient's checked in */}
+      {showVitals && (
+        <View style={[st.vitalsRow, { borderTopColor: t.cardBorder }]}>
+          {vitals ? (
+            <>
+              {vitals.weight_kg != null && <VitalChip icon="scale-outline" text={`${vitals.weight_kg}kg`} theme={t} />}
+              {vitals.height_cm != null && <VitalChip icon="resize-outline" text={`${vitals.height_cm}cm`} theme={t} />}
+              {(vitals.bp_systolic != null && vitals.bp_diastolic != null) &&
+                <VitalChip icon="pulse-outline" text={`${vitals.bp_systolic}/${vitals.bp_diastolic}`} theme={t} />}
+              {vitals.blood_sugar != null && <VitalChip icon="water-outline" text={`${vitals.blood_sugar}mg/dL`} theme={t} />}
+            </>
+          ) : (
+            <Text style={{ fontSize: 11, color: t.textMuted, fontStyle: 'italic' }}>No vitals recorded yet</Text>
+          )}
+        </View>
+      )}
+
+      {/* Quick actions */}
+      {!isDone && (
+        <View style={st.actionsRow}>
+          {appt.status === 'checked_in' && (
+            <QuickActionBtn label="Start" icon="play" primary disabled={busy !== null}
+              loading={busy === 'start'} onPress={handleStart} theme={t} />
+          )}
+          {appt.status === 'in_progress' && (
+            <QuickActionBtn label="End" icon="checkmark-done" primary disabled={busy !== null}
+              loading={busy === 'end'} onPress={handleEnd} theme={t} />
+          )}
+          <QuickActionBtn label="Refer" icon="arrow-redo-outline" disabled={busy !== null} onPress={openRefer} theme={t} />
+          <QuickActionBtn label="Ring" icon="notifications-outline" disabled={busy !== null}
+            loading={busy === 'ring'} onPress={handleRing} theme={t} />
+          <QuickActionBtn label="Details" icon="ellipsis-horizontal" disabled={busy !== null} onPress={openConsult} theme={t} />
+        </View>
+      )}
+    </View>
+  )
+}
+
+function VitalChip({ icon, text, theme: t }: { icon: ComponentProps<typeof Ionicons>['name']; text: string; theme: any }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      <Ionicons name={icon} size={11} color={t.textMuted} />
+      <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSecondary }}>{text}</Text>
+    </View>
+  )
+}
+
+function QuickActionBtn({ label, icon, onPress, theme: t, primary, disabled, loading }: {
+  label: string; icon: ComponentProps<typeof Ionicons>['name']; onPress: () => void
+  theme: any; primary?: boolean; disabled?: boolean; loading?: boolean
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled}
+      style={[st.actionBtn, {
+        backgroundColor: primary ? t.accent : t.inputBg,
+        borderColor: primary ? t.accent : t.cardBorder,
+        opacity: disabled && !loading ? 0.5 : 1,
+      }]}>
+      {loading ? (
+        <ActivityIndicator size="small" color={primary ? (t.id === 'forest' ? '#061208' : '#fff') : t.textSecondary} />
+      ) : (
+        <>
+          <Ionicons name={icon} size={13} color={primary ? (t.id === 'forest' ? '#061208' : '#fff') : t.textSecondary} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: primary ? (t.id === 'forest' ? '#061208' : '#fff') : t.textSecondary }}>
+            {label}
+          </Text>
+        </>
+      )}
+    </TouchableOpacity>
   )
 }
 
@@ -323,7 +486,7 @@ const st = StyleSheet.create({
   emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   group:       { paddingHorizontal: 16, marginBottom: 4 },
   groupLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
-  card:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 8 },
+  card:        { padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 8 },
   avatar:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatarText:  { fontSize: 15, fontWeight: '800' },
   patientName: { fontSize: 15, fontWeight: '700' },
@@ -334,4 +497,7 @@ const st = StyleSheet.create({
   badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
   badgeText:   { fontSize: 10, fontWeight: '700' },
   queuePos:    { fontSize: 11, fontWeight: '600' },
+  vitalsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, paddingTop: 10, borderTopWidth: 1 },
+  actionsRow:  { flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(127,127,127,0.15)' },
+  actionBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
 })

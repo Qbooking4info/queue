@@ -5,6 +5,7 @@ import { Errors } from '@/lib/api-error'
 import { todayLocalDate } from '@/lib/dashboard-utils'
 import { notifyPatient } from '@/lib/notify-patient'
 import { checkInAppointment } from '@/lib/appointment-checkin'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 // The appointment state machine, as implemented across the queue, front-desk and
 // dashboard flows. appointments.status has no database CHECK, so this is the only
@@ -22,13 +23,30 @@ type Action =
   | { action: 'start_consultation' }
   | { action: 'end_consultation' }
   | { action: 'set_status'; status: string }
+  | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null }
+  | { action: 'ring' }
 
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
 // checkInAppointment/startConsultation/endConsultation, none of which had
 // any caller ownership check at all (adminDb, reachable from the browser).
 // Every action here is scoped to the caller's own hospital first.
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+//
+// Called cross-origin by the doctors/mobile apps (e.g. localhost:8095 ->
+// localhost:3000) for start_consultation/end_consultation/update_consult_notes
+// -- needs real CORS handling (preflight OPTIONS + headers on every response),
+// not just the Allow-Origin-only pattern used by unauthenticated public routes.
+export async function OPTIONS() {
+  return corsOptions()
+}
+
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const res = await handlePATCH(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
@@ -55,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   switch (body.action) {
     case 'assign_doctor': {
       const { data: doctor, error: docErr } = await (db as any)
-        .from('doctors').select('hospital_id, clinic_id, is_active, availability_status').eq('id', body.doctorId).single()
+        .from('doctors').select('hospital_id, clinic_id, is_active, availability_status, user_id').eq('id', body.doctorId).single()
       if (docErr || !doctor) return Errors.notFound('Doctor')
 
       // Assignment can only happen at check-in -- that's the first point staff actually
@@ -73,12 +91,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return Errors.validation('Doctor is on break or off duty and cannot be assigned patients')
       }
 
+      // A doctor linked to multiple hospitals can only have ONE active at a
+      // time (users.active_hospital_id, set via the doctors app's hospital
+      // switcher) -- staff at a hospital that isn't currently active for this
+      // doctor must not be able to assign them patients there, even though
+      // the doctors row itself is still is_active=true. No active_hospital_id
+      // set at all falls back to the doctor's earliest-linked hospital, same
+      // default used everywhere else this ambiguity is resolved (auth-server.ts,
+      // AuthContext) -- a doctor who never touched the switcher isn't
+      // penalised at their one and only (or first) hospital.
+      if (doctor.user_id) {
+        const { data: userRow } = await db.from('users').select('active_hospital_id').eq('id', doctor.user_id).single()
+        const activeHospitalId = (userRow as any)?.active_hospital_id ?? null
+        let effectiveActive = activeHospitalId
+        if (!effectiveActive) {
+          const { data: earliest } = await db.from('doctors')
+            .select('hospital_id')
+            .eq('user_id', doctor.user_id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single()
+          effectiveActive = (earliest as any)?.hospital_id ?? null
+        }
+        if (effectiveActive && effectiveActive !== appt.hospital_id) {
+          return Errors.validation('Doctor is not currently active at this hospital and cannot be assigned patients here')
+        }
+      }
+
       // queue_position/estimated_wait aren't set here -- assigning doctor_id triggers
       // renumber_queue_after_change (supabase/migrations/20260805000001_atomic_queue_renumbering.sql),
       // which atomically recomputes this doctor's whole queue off checked_in_at.
+      // queue_rank_override is cleared too -- a manual reorder rank was only ever
+      // meaningful relative to the PREVIOUS doctor's cohort; carrying it over would
+      // land this patient at an arbitrary spot in the new doctor's queue instead of
+      // fresh FIFO (supabase/migrations/20260821000003_queue_manual_reorder_and_alerts.sql).
       const { data: updated, error } = await db.from('appointments').update({
         assigned_doctor_id: body.doctorId,
         doctor_id: body.doctorId,
+        queue_rank_override: null,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id).eq('status', 'checked_in').select('id')
       if (error) return Errors.internal(error.message)
@@ -201,6 +252,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }).eq('id', id).in('status', ['checked_in', 'confirmed']).select('id')
       if (error) return Errors.internal(error.message)
       if (!updated?.length) return Errors.validation(`Cannot start a consultation from status ${appt.status}`)
+
+      // "Get ready" pre-alert: whoever is now at queue_position 2 for this doctor+day
+      // is about to be next, while the patient ahead of them is still being seen --
+      // this is the moment to give them a heads-up, not when they're actually called.
+      // next_up_alert_sent_at is a one-time claim guard (same UPDATE...WHERE...select
+      // pattern as approve/reject above) so this doesn't re-fire on every later queue
+      // touch (another check-in, a completion elsewhere, etc.) while they're still at
+      // position 2. Best-effort: never blocks the start_consultation response.
+      if (doctorId) {
+        const { data: nextUp } = await db.from('appointments')
+          .select('id')
+          .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
+          .eq('status', 'checked_in').eq('queue_position', 2)
+          .or(`doctor_id.eq.${doctorId},assigned_doctor_id.eq.${doctorId}`)
+          .limit(1).maybeSingle()
+        if (nextUp) {
+          const { data: claimed } = await db.from('appointments')
+            .update({ next_up_alert_sent_at: new Date().toISOString() })
+            .eq('id', nextUp.id).is('next_up_alert_sent_at', null).select('id')
+          if (claimed?.length) {
+            await notifyPatient(
+              db, nextUp.id, 'queue_next_alert', "You're next!",
+              'The doctor is now seeing the patient ahead of you — please be ready.',
+            )
+          }
+        }
+      }
+
       return NextResponse.json({ success: true })
     }
 
@@ -238,6 +317,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .select('id')
       if (error) return Errors.internal(error.message)
       if (!updated?.length) return Errors.notFound('Appointment')
+      return NextResponse.json({ success: true })
+    }
+
+    case 'update_consult_notes': {
+      // Doctor-only, and only the doctor actually on this appointment -- there's
+      // no RLS UPDATE policy on appointments for doctors at all (only SELECT, see
+      // 20260811000002_rls_identity_and_scoping.sql), so this is the only path
+      // that has ever actually persisted consult notes/diagnosis; the mobile and
+      // doctors apps previously tried a direct client update here, which RLS
+      // silently no-ops (0 rows affected, no error) -- see setConsultStatus's
+      // equivalent fix for the same class of bug on status changes.
+      if (caller.role !== 'doctor' || (caller.doctorId !== appt.doctor_id && caller.doctorId !== appt.assigned_doctor_id)) {
+        return Errors.forbidden('Only the doctor on this appointment can update consult notes')
+      }
+      const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if ('notes' in body) update.doctor_notes = body.notes?.trim() || null
+      if ('diagnosis' in body) update.diagnosis = body.diagnosis?.trim() || null
+      const { error } = await db.from('appointments').update(update as any).eq('id', id)
+      if (error) return Errors.internal(error.message)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'ring': {
+      // Not gated to being exactly "next" -- a doctor or front desk can call a
+      // checked-in patient in early if they're free, same as walking out to the
+      // waiting room and calling a name. Doctor callers can only ring their own
+      // patient; front_desk/admin are already hospital-scoped by the check at
+      // the top of this handler.
+      if (!['checked_in', 'in_progress'].includes(appt.status)) {
+        return Errors.validation(`Cannot ring a patient with status ${appt.status}`)
+      }
+      if (caller.role === 'doctor' && caller.doctorId !== appt.doctor_id && caller.doctorId !== appt.assigned_doctor_id) {
+        return Errors.forbidden('You can only ring your own patient')
+      }
+
+      const doctorId = appt.doctor_id ?? appt.assigned_doctor_id
+      let doctorLabel = 'The doctor'
+      if (doctorId) {
+        const { data: doc } = await db.from('doctors').select('title, full_name').eq('id', doctorId).single()
+        if (doc) doctorLabel = [(doc as any).title, (doc as any).full_name].filter(Boolean).join(' ') || doctorLabel
+      }
+
+      await notifyPatient(
+        db, id, 'queue_ring', `${doctorLabel} is ready for you`,
+        'Please make your way to the consultation room now.',
+      )
       return NextResponse.json({ success: true })
     }
 

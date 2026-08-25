@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '../components/map/HospitalsMap'

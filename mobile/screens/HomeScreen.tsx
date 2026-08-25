@@ -11,7 +11,10 @@ import { useLocation, distanceKm } from '../contexts/LocationContext'
 import { HospitalCard } from '../components/hospital/HospitalCard'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import { specialties } from '../data'
-import { getHospitals, getNextAppointment } from '../lib/api'
+import { getHospitals, getNextAppointment, getActiveQueueAppointment } from '../lib/api'
+import { LiveQueueCard } from '../components/LiveQueueCard'
+import { useRingAlert, RingOverlay } from '../components/RingOverlay'
+import { WELLNESS_TIPS } from '../lib/wellness-tips'
 import { supabase } from '../lib/supabase'
 import { toDisplayHospital } from '../lib/adapters'
 import { haptics } from '../lib/haptics'
@@ -34,14 +37,6 @@ function getGreeting(): { salutation: string; icon: keyof typeof Ionicons.glyphM
   if (hour < 16) return { salutation: 'Good afternoon', icon: 'partly-sunny-outline' }
   return               { salutation: 'Good evening',   icon: 'moon-outline' }
 }
-
-const WELLNESS_TIPS = [
-  'Remember to stay hydrated today',
-  'Your health is your wealth',
-  'A check-up a day keeps worries away',
-  'Taking care of yourself is a priority',
-  'Small steps lead to great health',
-]
 
 function getDayMessage(): string {
   const day = new Date().getDay()
@@ -123,7 +118,9 @@ export function HomeScreen({ navigation }: Props) {
   const [showAll, setShowAll]     = useState(false)
   const [hospitals, setHospitals] = useState<DisplayHospital[]>([])
   const [nextAppt, setNextAppt]   = useState<AppointmentWithRelations | null>(null)
+  const [activeAppt, setActiveAppt] = useState<AppointmentWithRelations | null>(null)
   const [loading, setLoading]     = useState(true)
+  const { ringNotif, dismissRing } = useRingAlert(user?.id)
   const [activeSpecialty, setActiveSpecialty] = useState<string | null>(null)
   // MM3: track unread notifications count
   const [unreadCount, setUnreadCount] = useState(0)
@@ -144,9 +141,10 @@ export function HomeScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [raw, appt] = await Promise.all([
+    const [raw, appt, active] = await Promise.all([
       getHospitals(),
       user ? getNextAppointment(user.id) : Promise.resolve(null),
+      user ? getActiveQueueAppointment(user.id) : Promise.resolve(null),
     ])
     // MM7: attach real distanceKm to each hospital display object
     const mapped = raw.map(h => {
@@ -158,6 +156,7 @@ export function HomeScreen({ navigation }: Props) {
     })
     setHospitals(mapped)
     setNextAppt(appt)
+    setActiveAppt(active)
 
     // MM3: fetch unread notifications count
     if (user) {
@@ -193,6 +192,11 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+
+      {/* Ring alert -- rendered here (screen root), not inside LiveQueueCard,
+          so its full-screen overlay actually covers the whole screen. See
+          RingOverlay.tsx for why. */}
+      {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
 
       {/* All Specialties modal */}
       <Modal visible={showAll} animationType="slide" transparent
@@ -271,8 +275,16 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Next appointment banner */}
-        {nextAppt ? (
+        {/* Live queue status -- takes priority over the upcoming/booking-CTA
+            banners once the patient is actually checked in today. The two
+            status filters (confirmed/pending vs checked_in/in_progress) are
+            disjoint by construction, so activeAppt and nextAppt never both match. */}
+        {activeAppt ? (
+          <LiveQueueCard
+            appointment={activeAppt}
+            onOpenDetail={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: activeAppt }) }}
+          />
+        ) : nextAppt ? (
           <View style={[s.banner, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
             <Text style={[s.bannerLabel, { color: t.accent }]}>NEXT APPOINTMENT</Text>
             <View style={s.bannerRow}>

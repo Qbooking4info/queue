@@ -18,6 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { View, ActivityIndicator } from 'react-native'
 
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { AlertProvider }           from './contexts/AlertContext'
 import { AuthProvider, useAuth }   from './contexts/AuthContext'
 import { usePushNotifications }    from './hooks/usePushNotifications'
 import { AppShell, ShellRoute }    from './components/AppShell'
@@ -131,9 +132,11 @@ function AppNavigator() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+      <AlertProvider>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </AlertProvider>
     </ThemeProvider>
   )
 }

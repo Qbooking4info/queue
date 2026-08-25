@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { Alert } from '../../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -111,6 +110,12 @@ export function ReferPatientScreen({ navigation, route }: Props) {
   const [reason, setReason] = useState('')
   const [referralReason, setReferralReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Off by default -- referring no longer implies finishing the consult, so a
+  // doctor can send several referrals out of the same in-progress visit (e.g.
+  // Cardiology and Radiology) without each one prematurely ending it. They
+  // complete it themselves via the Queue/consult screen's own End button once
+  // actually done, or opt in here to do both in one tap.
+  const [completeConsult, setCompleteConsult] = useState(false)
 
   const loadClinics = useCallback(async (hospitalId: string) => {
     setLoadingClinics(true)
@@ -224,6 +229,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
       reason: reason || undefined,
       referralReason: referralReason.trim(),
       urgency,
+      completeOriginal: isInProgress ? completeConsult : false,
     })
     setSubmitting(false)
 
@@ -239,7 +245,9 @@ export function ReferPatientScreen({ navigation, route }: Props) {
       : `Booking ${result.bookingRef} is confirmed at ${selectedHospital.name}.`
     Alert.alert(
       'Referral sent',
-      result.originalCompleted ? `${base} This consultation has been marked complete.` : base,
+      result.originalCompleted
+        ? `${base} This consultation has been marked complete.`
+        : `${base} This consultation is still open -- refer another patient or end it from the Queue when you're done.`,
       [{ text: 'Done', onPress: () => navigation.goBack() }],
     )
   }
@@ -255,12 +263,6 @@ export function ReferPatientScreen({ navigation, route }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          {isInProgress && (
-            <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 12, lineHeight: 17 }}>
-              Sending this referral also marks this consultation complete.
-            </Text>
-          )}
-
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             <TouchableOpacity onPress={() => switchMode('same')}
               style={[st.modeBtn, { borderColor: mode === 'same' ? t.accent : t.cardBorder, backgroundColor: mode === 'same' ? t.accentBg : t.cardBg }]}>
@@ -465,10 +467,23 @@ export function ReferPatientScreen({ navigation, route }: Props) {
             style={[st.textarea, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
           />
 
+          {isInProgress && (
+            <View style={[st.completeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Also complete this consultation</Text>
+                <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
+                  Leave off to send more referrals from this same visit — end it yourself from the Queue when you're done.
+                </Text>
+              </View>
+              <Switch value={completeConsult} onValueChange={setCompleteConsult}
+                trackColor={{ false: t.cardBorder, true: t.accent }} thumbColor="#fff" />
+            </View>
+          )}
+
           <TouchableOpacity onPress={submit} disabled={submitting}
             style={[st.submitBtn, { backgroundColor: t.accent, opacity: submitting ? 0.6 : 1 }]}>
             {submitting ? <ActivityIndicator color="#fff" /> : (
-              <Text style={st.submitTxt}>{isInProgress ? 'Refer & Complete' : 'Send Referral'}</Text>
+              <Text style={st.submitTxt}>{isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -494,4 +509,5 @@ const st = StyleSheet.create({
   noticeBox:   { borderWidth: 1, borderRadius: 12, padding: 12 },
   submitBtn:   { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 24 },
   submitTxt:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+  completeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 20 },
 })

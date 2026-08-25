@@ -17,8 +17,14 @@ import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import {
   X, AlertTriangle, RefreshCw, Check, ArrowLeft, ArrowRight, Pencil,
   Stethoscope, Users, Calendar, CheckCircle2, XCircle, Star, Monitor,
-  Building2, ClipboardList, Hourglass,
+  Building2, ClipboardList, Hourglass, Clock,
 } from 'lucide-react'
+
+function fmtMinutes(m: number | null): string {
+  if (m == null) return '—'
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -923,7 +929,10 @@ export default function ClinicDetailPage() {
   const [doctors,  setDoctors]  = useState<AdminDoctor[]>([])
   const [staff,    setStaff]    = useState<ClinicStaffMember[]>([])
   const [appts,    setAppts]    = useState<AdminAppointment[]>([])
-  const [stats,    setStats]    = useState({ total: 0, completed: 0, cancelled: 0, pending: 0 })
+  const [stats,    setStats]    = useState({
+    total: 0, completed: 0, cancelled: 0, pending: 0,
+    avgWaitMinutes: null as number | null, avgConsultMinutes: null as number | null,
+  })
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState<Tab>('overview')
 
@@ -1186,12 +1195,14 @@ export default function ClinicDetailPage() {
       {tab === 'overview' && (
         <div>
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 20 }}>
             {[
               { icon: <Calendar size={18} />, label: "Today's Appts",  value: loading ? '…' : todayAppts.length.toString(), sub: `${todayAppts.filter(a => a.status === 'completed').length} completed` },
               { icon: <CheckCircle2 size={18} />,  label: 'Completed',       value: loading ? '…' : stats.completed.toString(),   sub: 'Total period' },
               { icon: <Stethoscope size={18} />, label: 'Doctors',         value: loading ? '…' : doctors.length.toString(),   sub: 'Assigned to clinic' },
               { icon: <Users size={18} />, label: 'Staff',            value: loading ? '…' : staff.length.toString(),     sub: `${deskOfficers.length} desk · ${subAdmin ? '1' : '0'} admin` },
+              { icon: <Clock size={18} />, label: 'Avg Wait Time',    value: loading ? '…' : fmtMinutes(stats.avgWaitMinutes), sub: 'Check-in to consult start' },
+              { icon: <Clock size={18} />, label: 'Avg Consultation Time', value: loading ? '…' : fmtMinutes(stats.avgConsultMinutes), sub: 'Start to end' },
             ].map(s => (
               <div key={s.label} style={{ background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 14, padding: '16px 20px' }}>
