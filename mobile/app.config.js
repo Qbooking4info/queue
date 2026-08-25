@@ -22,8 +22,10 @@
  * opposite ones: the server key is called from Vercel functions and cannot be
  * app-restricted, this one must be.
  *
- * Set GOOGLE_MAPS_ANDROID_KEY in mobile/.env for local builds; eas.json passes
- * it through for EAS builds. Absent, the config is left exactly as it was and
+ * Set GOOGLE_MAPS_ANDROID_KEY in mobile/.env for local builds. EAS builds read
+ * it from the EAS environment variable of the same name (set on both the
+ * preview and production environments) — deliberately not from eas.json, which
+ * is committed. Absent, the config is left exactly as it was and
  * the maps degrade to the "map unavailable" state in HospitalsMap rather than
  * to a silent grey rectangle.
  */

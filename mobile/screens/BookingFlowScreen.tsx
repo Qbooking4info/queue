@@ -731,7 +731,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               <View style={{ gap: 8 }}>
                 {([
                   ['routine',   'medical-outline',      'Routine',   'Regular check-up or follow-up'],
-                  ['emergency', 'warning-outline',       'Emergency', 'Severe symptoms requiring prompt care (1.5× fee)'],
+                  ['emergency', 'warning-outline',       'Emergency', 'Severe symptoms requiring prompt care (2× fee)'],
                 ] as const).map(([id, icon, label, sub]) => {
                   const active = urgency === id
                   const danger = id === 'emergency'
