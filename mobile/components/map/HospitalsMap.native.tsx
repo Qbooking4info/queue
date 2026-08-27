@@ -18,9 +18,13 @@ import type { HospitalsMapProps, HospitalsMapMarker } from './HospitalsMap.types
  */
 function androidMapsKeyMissing(): boolean {
   if (Platform.OS !== 'android') return false
-  const key = (Constants.expoConfig as { android?: { config?: { googleMaps?: { apiKey?: string } } } } | null)
-    ?.android?.config?.googleMaps?.apiKey
-  return !key
+  // Reads the flag app.config.js publishes through `extra`, NOT
+  // android.config.googleMaps.apiKey — Expo strips android.config out of the
+  // runtime manifest, so checking it there reported "missing" on every build
+  // and hid maps that worked perfectly well.
+  const configured = (Constants.expoConfig?.extra as { androidMapsKeyConfigured?: boolean } | undefined)
+    ?.androidMapsKeyConfigured
+  return configured !== true
 }
 
 function MapUnavailable({ markers, style }: { markers: HospitalsMapMarker[]; style?: object }) {

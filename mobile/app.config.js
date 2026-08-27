@@ -51,5 +51,15 @@ module.exports = ({ config }) => {
         googleMaps: { apiKey: androidMapsKey },
       },
     },
+    extra: {
+      ...config.extra,
+      // Whether a Maps key was baked in, as a plain boolean the app can read
+      // at runtime. `android.config` itself is NOT readable from
+      // Constants.expoConfig — Expo strips it out of the manifest the app
+      // ships with — so HospitalsMap checking it there always concluded "no
+      // key" and hid the map even on builds that had one. Caught by running
+      // the app: a correctly-keyed build still rendered the fallback.
+      androidMapsKeyConfigured: true,
+    },
   }
 }
