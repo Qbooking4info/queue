@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, Platform } from 'react-native'
 import MapView, { Marker, Callout } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
-import Constants from 'expo-constants'
 import type { HospitalsMapProps, HospitalsMapMarker } from './HospitalsMap.types'
 
 /**
@@ -18,13 +17,14 @@ import type { HospitalsMapProps, HospitalsMapMarker } from './HospitalsMap.types
  */
 function androidMapsKeyMissing(): boolean {
   if (Platform.OS !== 'android') return false
-  // Reads the flag app.config.js publishes through `extra`, NOT
-  // android.config.googleMaps.apiKey — Expo strips android.config out of the
-  // runtime manifest, so checking it there reported "missing" on every build
-  // and hid maps that worked perfectly well.
-  const configured = (Constants.expoConfig?.extra as { androidMapsKeyConfigured?: boolean } | undefined)
-    ?.androidMapsKeyConfigured
-  return configured !== true
+  // Read from the bundle, not from config. Two earlier versions of this check
+  // consulted Constants.expoConfig — first android.config (stripped from the
+  // runtime manifest) then extra (absent from the expo-updates manifest a
+  // release build launches from) — and both reported "no key" on builds that
+  // had one, hiding every Android map. EXPO_PUBLIC_ variables are inlined into
+  // the JS at build time, the same route the Supabase credentials take, so this
+  // reflects what was actually built.
+  return !process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY
 }
 
 function MapUnavailable({ markers, style }: { markers: HospitalsMapMarker[]; style?: object }) {
