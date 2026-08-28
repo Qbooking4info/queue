@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { ArrowRight, Ban } from 'lucide-react'
 import type { AdminHospital } from '@/lib/admin-api'
+import { hospitalTypeLabel } from '@/lib/hospital-type'
 
 interface HospitalStat {
   id: string; name: string; city: string; state: string; type: string | null
@@ -33,7 +34,7 @@ function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; o
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{h.name}</div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{h.city}, {h.state} · {h.type ?? 'Hospital'}</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{h.city}, {h.state} · {hospitalTypeLabel(h.type)}</div>
         </div>
         <span style={{
           padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,

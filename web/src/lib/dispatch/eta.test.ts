@@ -107,3 +107,74 @@ describe("roadEta", () => {
     expect(r).toEqual({ seconds: 612, source: "mapbox", meters: 8301 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Alert relay
+//
+// dispatcher_alerts had 12 rows in production and 9 never acknowledged. The
+// relay exists so a critical alert reaches a phone, and so an alerting failure
+// can never take down the dispatch round that raised it.
+// ---------------------------------------------------------------------------
+
+import { formatAlert, relayDispatchAlert, alertRelayConfigured } from "./alert-relay";
+
+describe("alert relay", () => {
+  const saved = { ...process.env };
+  beforeEach(() => {
+    delete process.env.DISPATCH_ALERT_WEBHOOK_URL;
+    delete process.env.DISPATCH_ALERT_SMS_URL;
+    delete process.env.DISPATCH_ALERT_SMS_TO;
+    vi.restoreAllMocks();
+  });
+  afterEach(() => { process.env = { ...saved }; });
+
+  const alert = {
+    requestId: "r1", severity: "critical" as const, kind: "no_unit_available",
+    message: "Nothing in range", bookingRef: "AMB-1", triageLevel: 1,
+    contactPhone: "+2348000000000",
+  };
+
+  it("formats one actionable line", () => {
+    const line = formatAlert(alert);
+    expect(line).toContain("CRITICAL");
+    expect(line).toContain("AMB-1");
+    expect(line).toContain("triage 1");
+    expect(line).toContain("+2348000000000");
+  });
+
+  it("is a no-op when nothing is configured", async () => {
+    expect(alertRelayConfigured()).toBe(false);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await relayDispatchAlert(alert);
+    expect(fetchSpy).not.toHaveBeenCalled();   // and, crucially, did not throw
+  });
+
+  it("posts to the webhook when configured", async () => {
+    process.env.DISPATCH_ALERT_WEBHOOK_URL = "https://hook.test/x";
+    const fetchSpy = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await relayDispatchAlert(alert);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("prefers a per-recipient number over the on-call list", async () => {
+    process.env.DISPATCH_ALERT_SMS_URL = "https://sms.test/send";
+    process.env.DISPATCH_ALERT_SMS_TO = "+2340000000000";
+    let body: { to?: string[] } = {};
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return new Response("ok", { status: 200 });
+    }));
+    await relayDispatchAlert({ ...alert, smsTo: ["+2341111111111"] });
+    // A crew member who cannot be pushed to gets the message, not the whole desk.
+    expect(body.to).toEqual(["+2341111111111"]);
+  });
+
+  // The point of the whole module: it runs inside dispatch.
+  it("never throws when the channel is dead", async () => {
+    process.env.DISPATCH_ALERT_WEBHOOK_URL = "https://hook.test/x";
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
+    await expect(relayDispatchAlert(alert)).resolves.toBeUndefined();
+  });
+});

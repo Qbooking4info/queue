@@ -133,7 +133,13 @@ export async function POST(req: NextRequest) {
   // was asked. after() keeps the response fast while holding the instance open
   // until dispatch has actually run.
   if (requestType === 'emergency') {
-    after(
+    // Callback form, not the promise form. Passing a promise starts the work
+    // immediately and the response ends up waiting on it — measured at 2.4s to
+    // return the 201, which is 2.4s of the patient staring at a spinner before
+    // the tracking screen even appears. A callback runs after the response is
+    // flushed, so the patient gets their booking straight away and dispatch
+    // still completes under the platform's guarantee.
+    after(() =>
       runDispatchRound(created.id).catch((err) =>
         console.error('[transport] initial dispatch failed', created.id, err),
       ),

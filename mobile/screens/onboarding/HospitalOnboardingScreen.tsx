@@ -21,7 +21,26 @@ const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayels
 
 interface Plan { id: string; name: string; price_monthly: number | null }
 
-const HOSPITAL_TYPES = ['General', 'Specialist', 'Teaching', 'Private', 'Federal', 'State', 'Mission', 'Clinic', 'Maternity']
+// Canonical vocabulary, shared with web and enforced by hospitals_type_check.
+// `type` answers what care the facility provides; ownership is its own axis
+// below, because the old flat list mixed the two (a federal teaching hospital
+// is both, and the list forced a choice).
+const HOSPITAL_TYPES: { value: string; label: string }[] = [
+  { value: 'hospital',          label: 'General Hospital' },
+  { value: 'clinic',            label: 'Clinic' },
+  { value: 'specialist_center', label: 'Specialist Centre' },
+  { value: 'diagnostic',        label: 'Diagnostic Centre' },
+  { value: 'teaching',          label: 'Teaching Hospital' },
+  { value: 'maternity',         label: 'Maternity Centre' },
+]
+
+const OWNERSHIP_OPTIONS: { value: string; label: string }[] = [
+  { value: 'private', label: 'Private' },
+  { value: 'federal', label: 'Federal' },
+  { value: 'state',   label: 'State' },
+  { value: 'mission', label: 'Mission' },
+  { value: 'ngo',     label: 'NGO' },
+]
 
 interface DayHours { day: number; open: string; close: string; closed: boolean }
 
@@ -45,7 +64,8 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
 
   // Step 0 – Basics
   const [name,        setName]        = useState('')
-  const [type,        setType]        = useState('General')
+  const [type,        setType]        = useState('hospital')
+  const [ownership,   setOwnership]   = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [phone,       setPhone]       = useState('')
   const [email,       setEmail]       = useState('')
@@ -165,6 +185,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
         body: JSON.stringify({
           name: name.trim(),
           type,
+          ownership,
           description: description.trim() || null,
           phone: phone.trim() || null,
           email: email.trim() || null,
@@ -253,13 +274,28 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {HOSPITAL_TYPES.map(tp => (
-                    <TouchableOpacity key={tp} onPress={() => setType(tp)}
-                      style={[s.chip, { borderColor: type === tp ? t.accent : t.cardBorder, backgroundColor: type === tp ? `${t.accent}18` : t.cardBg }]}>
-                      <Text style={[s.chipText, { color: type === tp ? t.accent : t.textMuted }]}>{tp}</Text>
+                    <TouchableOpacity key={tp.value} onPress={() => setType(tp.value)}
+                      style={[s.chip, { borderColor: type === tp.value ? t.accent : t.cardBorder, backgroundColor: type === tp.value ? `${t.accent}18` : t.cardBg }]}>
+                      <Text style={[s.chipText, { color: type === tp.value ? t.accent : t.textMuted }]}>{tp.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
+              <Text style={[s.fieldLabel, { color: t.textMuted }]}>OWNERSHIP (OPTIONAL)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {OWNERSHIP_OPTIONS.map(op => {
+                    const active = ownership === op.value
+                    return (
+                      <TouchableOpacity key={op.value} onPress={() => setOwnership(active ? null : op.value)}
+                        style={[s.chip, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? `${t.accent}18` : t.cardBg }]}>
+                        <Text style={[s.chipText, { color: active ? t.accent : t.textMuted }]}>{op.label}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </ScrollView>
+
               <Field label="Description (optional)" value={description} onChange={setDescription} placeholder="Brief description of your hospital…" multiline theme={t} />
             </>
           )}
@@ -456,7 +492,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 {[
                   { label: 'Name',        value: name },
-                  { label: 'Type',        value: type },
+                  { label: 'Type',        value: HOSPITAL_TYPES.find(h => h.value === type)?.label ?? type },
                   { label: 'Address',     value: [address, city, state].filter(Boolean).join(', ') },
                   { label: 'Clinics',     value: clinicModel === 'single' ? 'Single OPD' : `${clinicNames.filter(n => n.trim()).length} clinics` },
                   { label: 'Specialties', value: `${selectedSpecIds.length} selected` },

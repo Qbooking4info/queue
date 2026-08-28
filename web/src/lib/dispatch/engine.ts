@@ -14,7 +14,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { onShiftCrewUserIds } from './crew-identity'
-import { raiseDispatchAlert } from './alert-relay'
+import { raiseDispatchAlert, relayDispatchAlert } from './alert-relay'
 import { roadEtas } from './routing'
 import {
   policyFor,
@@ -413,7 +413,38 @@ async function notifyCrews(
     }
   }
 
-  if (rows.length) await db.from('notifications').insert(rows)
+  if (!rows.length) return
+
+  await db.from('notifications').insert(rows)
+
+  // A notification row is not a page. Expo push needs users.push_token, and
+  // production has ZERO tokens across every user — so an offer that expires in
+  // 30 seconds has, to date, only ever been visible to a crew member who
+  // happened to have the app open (CrewHomeScreen polls every 6s).
+  //
+  // For anyone without a token, fall back to the same relay the dispatcher
+  // alerts use, addressed to the crew member's own phone. It is the difference
+  // between "we told the database" and "we told a person".
+  const userIds = [...new Set(rows.map(r => r.user_id))]
+  const { data: crewUsers } = await db.from('users')
+    .select('id, full_name, phone, push_token')
+    .in('id', userIds)
+
+  const unreachable = (crewUsers ?? []).filter(u => !u.push_token)
+  if (!unreachable.length) return
+
+  console.warn(`[dispatch] ${unreachable.length} of ${userIds.length} crew have no push token`)
+
+  await Promise.allSettled(unreachable.map(u =>
+    relayDispatchAlert({
+      requestId,
+      severity: 'critical',
+      kind: 'crew_unreachable',
+      message: `New dispatch offer, ${ttlSeconds}s to accept — open the Queue app now.`
+        + (u.phone ? '' : ' (no phone on file for this crew member)'),
+      smsTo: u.phone ? [u.phone] : undefined,
+    }),
+  ))
 }
 
 interface RawCandidate {

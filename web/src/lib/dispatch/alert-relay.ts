@@ -31,13 +31,20 @@ type Db = ReturnType<typeof createAdminClient>
 const TIMEOUT_MS = 4000
 
 export interface DispatchAlert {
-  requestId: string
+  /** Null for network-wide alerts that belong to no single request. */
+  requestId: string | null
   severity: 'critical' | 'high' | 'medium' | 'low'
   kind: string
   message: string
   bookingRef?: string | null
   triageLevel?: number | null
   contactPhone?: string | null
+  /**
+   * Send to these numbers instead of the on-call list. Used to reach a specific
+   * crew member whose app cannot be pushed to, rather than paging the whole
+   * dispatch desk about one unreachable phone.
+   */
+  smsTo?: string[]
 }
 
 export function alertRelayConfigured(): boolean {
@@ -94,7 +101,9 @@ export async function relayDispatchAlert(alert: DispatchAlert): Promise<void> {
   }
 
   const smsUrl = process.env.DISPATCH_ALERT_SMS_URL
-  const smsTo = (process.env.DISPATCH_ALERT_SMS_TO ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const smsTo = alert.smsTo?.length
+    ? alert.smsTo
+    : (process.env.DISPATCH_ALERT_SMS_TO ?? '').split(',').map(s => s.trim()).filter(Boolean)
   if (smsUrl && smsTo.length) {
     jobs.push(
       postWithTimeout(smsUrl, {

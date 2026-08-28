@@ -10,14 +10,15 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type HospitalType = 'hospital' | 'clinic' | 'specialist_center' | 'diagnostic'
+type HospitalType = 'hospital' | 'clinic' | 'specialist_center' | 'diagnostic' | 'teaching' | 'maternity'
+type Ownership    = 'private' | 'federal' | 'state' | 'mission' | 'ngo'
 type ClinicModel  = 'single' | 'multi'
 
 interface ClinicEntry { id: string; name: string; description: string }
 
 interface FormData {
   // Step 1 — Basics
-  name: string; type: HospitalType; description: string
+  name: string; type: HospitalType; ownership: Ownership | null; description: string
   // Step 2 — Verification
   registrationNumber: string; mdcnNumber: string
   // Step 3 — Location
@@ -44,6 +45,16 @@ const HOSPITAL_TYPES: { value: HospitalType; label: string; icon: React.ReactNod
   { value: 'clinic',            label: 'Clinic',              icon: <Stethoscope size={20} />, desc: 'Outpatient consultations & GP care' },
   { value: 'specialist_center', label: 'Specialist Centre',   icon: <Microscope size={20} />,  desc: 'Focused specialty practice' },
   { value: 'diagnostic',        label: 'Diagnostic Centre',   icon: <ScanLine size={20} />,    desc: 'Lab, imaging & diagnostics' },
+  { value: 'teaching',          label: 'Teaching Hospital',   icon: <Building size={20} />,    desc: 'Training facility attached to a medical school' },
+  { value: 'maternity',         label: 'Maternity Centre',    icon: <Building2 size={20} />,   desc: 'Antenatal, delivery & postnatal care' },
+]
+
+const OWNERSHIP_OPTIONS: { value: Ownership; label: string }[] = [
+  { value: 'private', label: 'Private' },
+  { value: 'federal', label: 'Federal' },
+  { value: 'state',   label: 'State' },
+  { value: 'mission', label: 'Mission' },
+  { value: 'ngo',     label: 'NGO' },
 ]
 
 const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
@@ -110,6 +121,27 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
           ))}
         </div>
       </div>
+      <div>
+        <label style={lightLabel}>Ownership <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {OWNERSHIP_OPTIONS.map(o => {
+            const active = data.ownership === o.value
+            return (
+              <button key={o.value} type="button"
+                onClick={() => onChange({ ownership: active ? null : o.value })}
+                style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'inherit', transition: 'all .15s',
+                  border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`,
+                  background: active ? '#EAF4FC' : '#FAFCFF',
+                  color: active ? '#1A7FC1' : '#6A8FAA' }}>
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 6 }}>Separate from the facility type above — a federal teaching hospital is both.</p>
+      </div>
+
       <div>
         <label style={lightLabel}>Description <span style={{ fontWeight: 400, textTransform: 'none', color: '#6A8FAA' }}>(optional)</span></label>
         <textarea value={data.description} onChange={e => onChange({ description: e.target.value })}
@@ -607,7 +639,7 @@ export default function OnboardingPage() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
   const [data, setData]           = useState<FormData>({
-    name: '', type: 'hospital', description: '',
+    name: '', type: 'hospital', ownership: null, description: '',
     registrationNumber: '', mdcnNumber: '',
     address: '', city: '', state: '', latitude: null, longitude: null, phone: '', email: '', whatsapp: '',
     clinicModel: 'single', clinics: [],
@@ -651,7 +683,7 @@ export default function OnboardingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: data.name, type: data.type, description: data.description,
+          name: data.name, type: data.type, ownership: data.ownership, description: data.description,
           registrationNumber: data.registrationNumber, mdcnNumber: data.mdcnNumber,
           address: data.address, city: data.city, state: data.state,
           latitude: data.latitude, longitude: data.longitude,

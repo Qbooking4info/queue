@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!allowed) return Errors.forbidden('Too many onboarding attempts. Please wait before trying again.')
     const body = await req.json()
     const {
-      name, type, description,
+      name, type, ownership, description,
       registrationNumber, mdcnNumber,
       address, city, state, phone, email, whatsapp, latitude, longitude,
       clinicModel, clinics,
@@ -75,10 +75,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'planId is required' }, { status: 400 })
     }
 
+    // Both clients send the canonical vocabulary, but this route is a public
+    // endpoint and hospitals_type_check would reject anything else with a raw
+    // Postgres error. Coerce instead, so an older mobile build that still sends
+    // 'General' registers as a hospital rather than failing at the last step.
+    const VALID_TYPES = ['hospital','clinic','specialist_center','diagnostic','teaching','maternity']
+    const VALID_OWNERSHIP = ['private','federal','state','mission','ngo']
+    const resolvedType = VALID_TYPES.includes(type) ? type : 'hospital'
+    const resolvedOwnership = VALID_OWNERSHIP.includes(ownership) ? ownership : null
+
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
+    // `ownership` is added by migration 20260828000003 and is not yet in the
+    // generated types, which are produced from the live schema. Once that
+    // migration is pushed and `npm run gen-types` is re-run, this cast can go.
     const { data: hospital, error: hErr } = await db.from('hospitals').insert({
-      name, slug, type: type ?? 'hospital',
+      name, slug, type: resolvedType, ownership: resolvedOwnership,
       description: description || null,
       address, city, state,
       // Captured at onboarding because everything location-aware depends on it:
@@ -101,7 +113,7 @@ export async function POST(req: NextRequest) {
       mdcn_accreditation: mdcnNumber || null,
       clinic_model: clinicModel ?? 'single',
       is_verified: false,
-    }).select('id').single()
+    } as never).select('id').single()
     if (hErr) return Errors.internal(hErr.message)
 
     // Link admin as owner
