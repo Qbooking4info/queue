@@ -34,7 +34,7 @@ export default function RegisterPage() {
           auth_id: authData.user.id,
           full_name: fullName,
           email,
-        }, { onConflict: 'auth_id' })
+        } as never, { onConflict: 'auth_id' })
         if (profileErr) { setError('Account created but profile setup failed: ' + profileErr.message); setLoading(false); return }
       }
 

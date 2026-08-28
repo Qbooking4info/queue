@@ -13,8 +13,27 @@
 -- Confirmed via direct query against the live publication before writing
 -- this migration, not guessed.
 
-ALTER PUBLICATION supabase_realtime ADD TABLE appointments;
-ALTER PUBLICATION supabase_realtime ADD TABLE virtual_sessions;
-ALTER PUBLICATION supabase_realtime ADD TABLE transport_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE ambulance_current_location;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+-- Idempotent: ALTER PUBLICATION ... ADD TABLE has no IF NOT EXISTS and errors
+-- if the table is already a member, which blocked every later migration when
+-- this was re-run on 2026-08-28 (some of these had been added out of band).
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'appointments',
+    'virtual_sessions',
+    'transport_requests',
+    'ambulance_current_location',
+    'notifications'
+  ] loop
+    if not exists (
+      select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime'
+         and schemaname = 'public'
+         and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;

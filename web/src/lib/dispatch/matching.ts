@@ -49,6 +49,12 @@ export interface Candidate {
   straightLineMeters: number;
   shiftEndsAt: number;                // epoch ms
   lastDispatchedAt: number | null;    // epoch ms, for fairness tie break
+  /**
+   * Age of the unit's last GPS fix, in seconds. The SQL filter admits anything
+   * inside unit_location_max_age_seconds(); this is how much to distrust the
+   * position within that window.
+   */
+  locationAgeSeconds?: number;
 }
 
 export interface DispatchPolicy {
@@ -184,6 +190,28 @@ export const WEIGHTS = {
   reliability: 0.08,
 } as const;
 
+/**
+ * How much a stale position discounts a candidate.
+ *
+ * The SQL used to exclude anything older than 2 minutes outright, which is why
+ * production went 11 requests and 32 rounds without ever finding a single
+ * candidate. Now the gate is 10 minutes and the difference between a 20-second
+ * fix and a 9-minute one is expressed here instead.
+ *
+ * A fresh fix is worth its full score; by the outer bound it is worth about
+ * half. That is enough to sort a live unit above a dozing one without doing what
+ * the hard cutoff did — pretending the dozing one does not exist while a patient
+ * waits.
+ */
+export const LOCATION_STALENESS_FLOOR = 0.5;
+
+export function freshnessScore(ageSeconds: number | undefined, maxAgeSeconds = 600): number {
+  if (ageSeconds == null || !Number.isFinite(ageSeconds)) return 1;   // unknown: don't punish
+  if (ageSeconds <= 30) return 1;
+  const ratio = clamp01(ageSeconds / maxAgeSeconds);
+  return 1 - ratio * (1 - LOCATION_STALENESS_FLOOR);
+}
+
 /** Normalizes ETA against a 20 minute horizon; beyond that everything is bad. */
 export function etaScore(etaSeconds: number): number {
   const HORIZON = 20 * 60;
@@ -247,12 +275,18 @@ export function scoreCandidate(
     ? WEIGHTS
     : { ...WEIGHTS, network: 0, eta: WEIGHTS.eta + WEIGHTS.network };
 
-  const score =
+  const weighted =
     w.eta * parts.eta +
     w.capabilityFit * parts.capabilityFit +
     w.shiftHeadroom * parts.shiftHeadroom +
     w.network * parts.network +
     w.reliability * parts.reliability;
+
+  // Applied as a multiplier rather than another weighted term: staleness is not
+  // a competing virtue, it is a discount on how much the rest of the score can
+  // be believed. A unit whose position is nine minutes old may be excellent —
+  // we are simply less sure it is where it claims.
+  const score = weighted * freshnessScore(c.locationAgeSeconds);
 
   return { ...c, score, resolvedEtaSeconds: eta, breakdown: parts };
 }

@@ -14,6 +14,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { onShiftCrewUserIds } from './crew-identity'
+import { raiseDispatchAlert } from './alert-relay'
 import { roadEtas } from './routing'
 import {
   policyFor,
@@ -111,7 +112,7 @@ export async function runDispatchRound(
     requiredCapabilities: request.required_capabilities ?? [],
     referenceTime: request.scheduled_for ? Date.parse(request.scheduled_for) : Date.now(),
     destinationHospitalId: request.destination_hospital_id,
-    estimatedJobDurationSec: estimateJobDuration(request),
+    estimatedJobDurationSec: await estimateJobDuration(db, request),
   }
 
   const policy = policyFor(req)
@@ -136,13 +137,30 @@ export async function runDispatchRound(
   if (rpcError) throw rpcError
 
   if (!rows?.length) {
-    // The most important row to record: nobody was even in range. Awaited, not
-    // fire-and-forget, because advanceOrExhaust may recurse or terminate the
-    // request and this must land first.
+    // Nobody in range. Ask the database *why* rather than recording another
+    // uninformative zero: dispatch_attempts has 32 rows in production, every one
+    // of them candidates_found=0 with an empty rejectReasons, which told nobody
+    // anything. The probe separates "no ambulances exist" from "they exist but
+    // are all off shift / busy / asleep / out of radius" — different problems
+    // with different fixes.
+    const { data: probe } = await db.rpc('dispatch_supply_probe', {
+      p_request_id: requestId, p_radius_m: radius,
+    })
+
     await recordAttempt(db, requestId, {
       round, radiusMeters: radius, candidatesFound: 0,
-      candidatesAfterFilter: 0, rejectReasons: {}, offersMade: 0,
+      candidatesAfterFilter: 0,
+      rejectReasons: (probe ?? {}) as Record<string, number>,
+      offersMade: 0,
     })
+
+    // Widening the radius cannot conjure supply that does not exist. If the
+    // first round found nothing at all, escalate to a human NOW and put the
+    // fallback numbers in front of the patient, then carry on searching. The
+    // old behaviour burned all three rounds and the full 60 seconds in silence
+    // before telling anyone — the most expensive way to deliver bad news.
+    if (round === 1) await escalateNoSupply(db, request, probe as SupplyProbe | null)
+
     return advanceOrExhaust(db, request, round, policy.maxRounds, 'no candidates in radius')
   }
 
@@ -184,6 +202,7 @@ export async function runDispatchRound(
     straightLineMeters: Number(r.straight_line_m),
     shiftEndsAt: Date.parse(r.shift_ends_at),
     lastDispatchedAt: r.last_dispatched_at ? Date.parse(r.last_dispatched_at) : null,
+    locationAgeSeconds: r.location_age_seconds ?? undefined,
   }))
 
   const ranked = rankCandidates(req, candidates, policy)
@@ -243,17 +262,76 @@ export async function runDispatchRound(
  * Failing to find an ambulance must never be silent. The requester gets plain
  * language and an emergency fallback; a human dispatcher gets paged.
  */
+interface SupplyProbe {
+  units_total?: number
+  units_active?: number
+  units_free?: number
+  units_on_shift?: number
+  units_with_recent_fix?: number
+  units_in_radius?: number
+  oldest_fix_seconds?: number | null
+}
+
+/**
+ * Raise the alarm on the first empty round instead of the last.
+ *
+ * The search continues — a unit may come on duty within the minute — but the
+ * two things that help the patient are started immediately: a dispatcher is
+ * paged, and the app is told to surface the emergency directory. Waiting for
+ * round 3 spends the patient's whole 60-second budget before offering them the
+ * one thing that was always going to work, which is a phone number.
+ *
+ * Idempotent per request: a repeat round must not page twice.
+ */
+async function escalateNoSupply(db: Db, request: RequestRow, probe: SupplyProbe | null) {
+  const { data: existing } = await db.from('dispatcher_alerts')
+    .select('id')
+    .eq('request_id', request.id)
+    .eq('kind', 'no_supply_at_round_1')
+    .limit(1)
+  if (existing?.length) return
+
+  const detail = probe
+    ? `${probe.units_in_radius ?? 0} in radius of ${probe.units_with_recent_fix ?? 0} reporting, `
+      + `${probe.units_on_shift ?? 0} on shift, ${probe.units_free ?? 0} free, `
+      + `${probe.units_total ?? 0} total`
+    : 'supply probe unavailable'
+
+  await raiseDispatchAlert(db, {
+    requestId: request.id,
+    severity: request.triage_level && request.triage_level <= 2 ? 'critical' : 'high',
+    kind: 'no_supply_at_round_1',
+    message: `No unit in range on the first round — ${detail}. Searching continues; assign manually if you can.`,
+    bookingRef: request.booking_ref,
+    triageLevel: request.triage_level,
+    contactPhone: request.contact_phone,
+  })
+
+  // show_emergency_fallback is what the patient app keys on to raise the
+  // directory to its primary surface.
+  await db.from('notifications').insert({
+    user_id: request.requester_id,
+    title: 'Still finding you an ambulance',
+    body: 'No ambulance has answered yet. We are still searching — if this is life-threatening, call one of the emergency numbers now.',
+    type: 'transport',
+    data: { request_id: request.id, show_emergency_fallback: true },
+  })
+}
+
 async function exhaustSearch(db: Db, request: RequestRow): Promise<DispatchResult> {
   await db.from('transport_requests')
     .update({ status: 'no_unit_available', updated_at: new Date().toISOString() })
     .eq('id', request.id)
     .eq('status', 'searching')
 
-  await db.from('dispatcher_alerts').insert({
-    request_id: request.id,
+  await raiseDispatchAlert(db, {
+    requestId: request.id,
     severity: request.triage_level && request.triage_level <= 2 ? 'critical' : 'high',
     kind: 'no_unit_available',
     message: 'Automated dispatch exhausted all rounds. Manual intervention needed.',
+    bookingRef: request.booking_ref,
+    triageLevel: request.triage_level,
+    contactPhone: request.contact_phone,
   })
 
   await db.from('notifications').insert({
@@ -284,8 +362,23 @@ async function advanceOrExhaust(
  * triage level and route — this number drives the shift headroom filter, so a
  * bad estimate here silently shrinks your usable fleet.
  */
-function estimateJobDuration(request: RequestRow): number {
-  return (request.request_type === 'emergency' ? 45 : 60) * 60
+async function estimateJobDuration(db: Db, request: RequestRow): Promise<number> {
+  const fallback = (request.request_type === 'emergency' ? 45 : 60) * 60
+  try {
+    const { data } = await db.rpc('median_job_duration_seconds', {
+      p_request_type: request.request_type,
+      p_min_samples: 20,
+    })
+    const median = typeof data === 'number' ? data : null
+    // NULL until there are at least 20 completed trips in 90 days. Production
+    // has zero today, so this keeps the constant until the service has actually
+    // run enough to have an opinion — which is the honest answer, and better
+    // than a median of three trips steering the shift-headroom filter.
+    if (median && median > 0) return median
+  } catch (err) {
+    console.warn('[dispatch] median job duration lookup failed, using constant', err)
+  }
+  return fallback
 }
 
 async function notifyCrews(
@@ -324,6 +417,7 @@ async function notifyCrews(
 }
 
 interface RawCandidate {
+  location_age_seconds?: number
   unit_id: string
   provider_id: string
   provider_type: 'hospital_fleet' | 'third_party'
@@ -345,5 +439,9 @@ interface RequestRow {
   triage_level: number | null
   requester_id: string
   status: string
+  // Carried into out-of-band alerts so an on-call dispatcher reading an SMS has
+  // the booking reference and a number to ring without opening anything.
+  booking_ref?: string | null
+  contact_phone?: string | null
   [key: string]: unknown
 }

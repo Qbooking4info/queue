@@ -90,7 +90,7 @@ export async function setupFrontDeskLogin(
 
     const { data: profile, error: profileErr } = await db.from('users').insert({
       auth_id: authId, email: fdEmail, full_name: 'Front Desk',
-    }).select('id').single()
+    } as never).select('id').single()
     if (profileErr || !profile) return { error: profileErr?.message ?? 'Failed to create profile' }
     userId = profile.id
   }
@@ -136,7 +136,7 @@ export async function addCrewMember(
 
   const { data: profile, error: profileErr } = await db.from('users').insert({
     auth_id: authUser.user.id, email: loginEmail, full_name: fullName,
-  }).select('id').single()
+  } as never).select('id').single()
   if (profileErr || !profile) {
     await db.auth.admin.deleteUser(authUser.user.id)
     return { error: profileErr?.message ?? 'Failed to create profile' }
@@ -207,7 +207,7 @@ export async function addStaff(
         auth_id:   inviteData.user.id,
         email,
         full_name: 'Invited Staff',
-      }).select('id').single()
+      } as never).select('id').single()
 
       if (profileErr) return { error: profileErr.message }
       userId = newProfile.id

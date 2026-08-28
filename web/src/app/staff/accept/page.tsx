@@ -112,7 +112,7 @@ export default function AcceptInvitePage() {
 
       const { error: upsertErr } = await supabase.from('users').upsert({
         auth_id: user.id, full_name: fullName.trim(), email: user.email ?? email,
-      }, { onConflict: 'auth_id' })
+      } as never, { onConflict: 'auth_id' })
       if (upsertErr) { setError(upsertErr.message); setLoading(false); return }
 
       const { error: pwErr } = await supabase.auth.updateUser({ password })

@@ -93,7 +93,7 @@ export default function StaffRegisterPage() {
 
       const { error: profileErr } = await supabase.from('users').insert({
         auth_id: authData.user.id, full_name: fullName.trim(), email: email.trim().toLowerCase(),
-      })
+      } as never)
       if (profileErr) { setError(profileErr.message); setLoading(false); return }
 
       const { data: profile } = await supabase.from('users').select('id').eq('auth_id', authData.user.id).single()

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     if (!profile) {
       const { data: np, error: pErr } = await db
         .from('users')
-        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
+        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' } as never)
         .select('id').single()
       if (pErr) return Errors.internal(pErr.message)
       profile = np

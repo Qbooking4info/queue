@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     auth_id: authUser.user.id,
     email: loginEmail,
     full_name: full_name.trim(),
-  }).select('id').single()
+  } as never).select('id').single()
 
   if (profileErr || !newProfile) {
     revalidatePath('/dashboard/doctors')

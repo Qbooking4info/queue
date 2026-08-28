@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -933,6 +933,64 @@ export type Database = {
         }
         Relationships: []
       }
+      dependent_links: {
+        Row: {
+          caretaker_id: string
+          created_at: string
+          dependent_id: string
+          id: string
+          linked_at: string
+          relationship: string
+          status: string
+          unlinked_at: string | null
+          unlinked_by: string | null
+        }
+        Insert: {
+          caretaker_id: string
+          created_at?: string
+          dependent_id: string
+          id?: string
+          linked_at?: string
+          relationship: string
+          status?: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+        }
+        Update: {
+          caretaker_id?: string
+          created_at?: string
+          dependent_id?: string
+          id?: string
+          linked_at?: string
+          relationship?: string
+          status?: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dependent_links_caretaker_id_fkey"
+            columns: ["caretaker_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dependent_links_dependent_id_fkey"
+            columns: ["dependent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dependent_links_unlinked_by_fkey"
+            columns: ["unlinked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dependents: {
         Row: {
           created_at: string | null
@@ -1586,11 +1644,14 @@ export type Database = {
           created_at: string | null
           daily_booking_limit: number | null
           description: string | null
+          gender_restriction: string | null
           hospital_id: string
           id: string
           is_active: boolean | null
           is_emergency: boolean
           is_opd: boolean
+          max_age: number | null
+          min_age: number | null
           name: string
           service_tags: string[]
           sort_order: number | null
@@ -1599,11 +1660,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name: string
           service_tags?: string[]
           sort_order?: number | null
@@ -1612,11 +1676,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id?: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name?: string
           service_tags?: string[]
           sort_order?: number | null
@@ -3043,6 +3110,7 @@ export type Database = {
           gender: string | null
           id: string
           is_verified: boolean | null
+          patient_code: string
           patient_id: string | null
           patient_number: string | null
           phone: string | null
@@ -3060,12 +3128,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
-          doctor_code?: string
+          doctor_code: string
           email: string
           full_name: string
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3089,6 +3158,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3333,13 +3403,6 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "doctors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_doctor_user_id_fkey"
-            columns: ["doctor_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -3617,12 +3680,21 @@ export type Database = {
           hospital_admin_id: string
         }[]
       }
+      can_view_patient_profile: {
+        Args: { p_patient_id: string }
+        Returns: boolean
+      }
       crew_update_job_status: {
         Args: { p_new_status: string; p_request_id: string }
         Returns: boolean
       }
       current_doctor_ids: { Args: never; Returns: string[] }
+      current_patient_ids: { Args: never; Returns: string[] }
       disablelongtransactions: { Args: never; Returns: string }
+      dispatch_supply_probe: {
+        Args: { p_radius_m?: number; p_request_id: string }
+        Returns: Json
+      }
       dropgeometrycolumn:
         | {
             Args: {
@@ -3666,6 +3738,7 @@ export type Database = {
           current_lat: number
           current_lng: number
           last_dispatched_at: string
+          location_age_seconds: number
           provider_hospital_id: string
           provider_id: string
           provider_type: string
@@ -3678,6 +3751,8 @@ export type Database = {
       }
       flag_stale_tracking: { Args: never; Returns: number }
       fn_get_my_admin_hospital_ids: { Args: never; Returns: string[] }
+      generate_doctor_code: { Args: never; Returns: string }
+      generate_patient_code: { Args: never; Returns: string }
       generate_transport_ref: { Args: never; Returns: string }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
@@ -3807,10 +3882,6 @@ export type Database = {
         Args: { p_hospital_id: string }
         Returns: Json
       }
-      move_appointment_in_queue: {
-        Args: { p_appointment_id: string; p_new_position: number }
-        Returns: undefined
-      }
       get_job_patient_location: {
         Args: { p_request_id: string }
         Returns: {
@@ -3921,6 +3992,14 @@ export type Database = {
         Returns: boolean
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      median_job_duration_seconds: {
+        Args: { p_min_samples?: number; p_request_type?: string }
+        Returns: number
+      }
+      move_appointment_in_queue: {
+        Args: { p_appointment_id: string; p_new_position: number }
+        Returns: undefined
+      }
       nearby_available_units: {
         Args: {
           p_lat: number
@@ -4632,6 +4711,7 @@ export type Database = {
         }[]
       }
       unaccent: { Args: { "": string }; Returns: string }
+      unit_location_max_age_seconds: { Args: never; Returns: number }
       unit_location_ttl_seconds: { Args: never; Returns: number }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {

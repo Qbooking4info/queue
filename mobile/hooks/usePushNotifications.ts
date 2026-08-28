@@ -101,9 +101,22 @@ export function usePushNotifications(userId: string | undefined) {
   useEffect(() => {
     if (!userId || isExpoGo) return
 
-    registerForPushNotifications().then(token => {
-      if (token) savePushToken(userId, token)
-    })
+    // Push registration failing silently is how production ended up with ZERO
+    // push tokens across every user — which means no crew has ever been paged
+    // about a dispatch offer, and offers expire in 30 seconds. A rejected
+    // promise here (permission denied, no projectId, network) previously
+    // vanished into an unhandled rejection.
+    registerForPushNotifications()
+      .then(token => {
+        if (!token) {
+          console.warn('[push] no token: Expo Go, simulator, or permission denied')
+          return
+        }
+        return savePushToken(userId, token).catch(err =>
+          console.warn('[push] token obtained but could not be saved', err),
+        )
+      })
+      .catch(err => console.warn('[push] registration failed', err))
 
     import('expo-notifications').then(Notifications => {
       // Listener for notifications received while app is in foreground

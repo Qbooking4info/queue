@@ -947,7 +947,14 @@ export async function markAllNotificationsRead(userId: string) {
 // ── Push token ───────────────────────────────────────────────────────────────
 
 export async function savePushToken(userId: string, token: string): Promise<void> {
-  await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+  // Throws on failure rather than swallowing it. Production has zero push
+  // tokens across all users; a write that fails quietly is indistinguishable
+  // from one that never ran, and the caller logs what happened.
+  const { error } = await supabase
+    .from('users')
+    .update({ push_token: token } as never)
+    .eq('id', userId)
+  if (error) throw new Error(`saving push token failed: ${error.message}`)
 }
 
 // ── User profile ─────────────────────────────────────────────────────────────

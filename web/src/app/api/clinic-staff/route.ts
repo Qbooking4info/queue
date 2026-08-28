@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     const { data: userRow, error: userErr } = await db
       .from('users')
-      .insert({ auth_id: authData.user.id, full_name: staffName, email: staffEmail })
+      .insert({ auth_id: authData.user.id, full_name: staffName, email: staffEmail } as never)
       .select('id')
       .single()
 
