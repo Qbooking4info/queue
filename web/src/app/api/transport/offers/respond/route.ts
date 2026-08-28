@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: offer } = await db.from('dispatch_offers')
-    .select('id, request_id, ambulance_id, round, response, expires_at')
+    .select('id, request_id, ambulance_id, round, response, expires_at, eta_seconds')
     .eq('id', offerId)
     .single()
 
@@ -71,6 +71,26 @@ export async function POST(req: NextRequest) {
 
   if (!won) {
     return NextResponse.json({ accepted: false, reason: 'already_covered' })
+  }
+
+  // Carry the offer's ETA onto the request.
+  //
+  // Dispatch already computed a road ETA for this unit — it is what ranked the
+  // offer above the others — and then dropped it on the floor at accept.
+  // transport_requests.eta_seconds is only written by the live refresh, which
+  // runs on the unit's next location ping. So between "an ambulance is coming"
+  // and that first ping, both the patient's tracking screen and the crew's own
+  // job card showed no ETA at all. Verified on 2026-08-28: offer carried
+  // eta_seconds 1064 while the matched request read null.
+  //
+  // That gap sits exactly where the patient most wants a number. Seeding it from
+  // the offer means they get the dispatch estimate immediately, and the live
+  // refresh replaces it with a fresher one at the first ping.
+  if (offer.eta_seconds) {
+    await db.from('transport_requests')
+      .update({ eta_seconds: offer.eta_seconds, eta_updated_at: new Date().toISOString() } as never)
+      .eq('id', offer.request_id)
+      .is('eta_seconds', null)
   }
 
   const { data: request } = await db.from('transport_requests')
