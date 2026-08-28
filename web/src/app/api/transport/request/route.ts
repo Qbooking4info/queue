@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { runDispatchRound } from '@/lib/dispatch/engine'
@@ -123,9 +123,20 @@ export async function POST(req: NextRequest) {
 
   // Emergency dispatches immediately. Scheduled transport stays unassigned
   // until T minus 60 min so the nightly optimizer can still re-plan it.
+  //
+  // `after()` rather than a bare floating promise. On Vercel the function can be
+  // frozen as soon as the response is flushed, so fire-and-forget work is not
+  // guaranteed to run — and when it does run it may be whenever the instance is
+  // next woken. Measured end to end on 2026-08-28: the first offer appeared
+  // ~35 seconds after the 201, against a 60-second promise and a 30-second
+  // offer TTL. Over half the patient's budget was being spent before any crew
+  // was asked. after() keeps the response fast while holding the instance open
+  // until dispatch has actually run.
   if (requestType === 'emergency') {
-    runDispatchRound(created.id).catch((err) =>
-      console.error('[transport] initial dispatch failed', created.id, err),
+    after(
+      runDispatchRound(created.id).catch((err) =>
+        console.error('[transport] initial dispatch failed', created.id, err),
+      ),
     )
   }
 

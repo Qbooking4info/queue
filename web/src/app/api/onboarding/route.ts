@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       registrationNumber, mdcnNumber,
       address, city, state, phone, email, whatsapp, latitude, longitude,
       clinicModel, clinics,
-      accepts_virtual, emergency_hours,
+      accepts_virtual, emergency_hours, is_24_hours, approvalMode,
       specialtyIds, hours, planId,
     } = body
 
@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
       phone: phone || null, email: email || null, whatsapp: whatsapp || null,
       accepts_virtual: accepts_virtual ?? false,
       emergency_hours: emergency_hours ?? false,
+      // Mobile has collected these since the 8-step flow shipped, but they were
+      // never destructured or inserted here — every mobile registration silently
+      // saved the column defaults instead of what the admin chose.
+      is_24_hours: is_24_hours ?? false,
+      approval_mode: approvalMode === 'manual' ? 'manual' : 'auto',
       registration_number: registrationNumber || null,
       mdcn_accreditation: mdcnNumber || null,
       clinic_model: clinicModel ?? 'single',

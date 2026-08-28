@@ -7,11 +7,19 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth }  from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { haptics }  from '../../lib/haptics'
+import * as Location from 'expo-location'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 const STEPS = ['Basics', 'Verification', 'Location', 'Clinics', 'Specialties', 'Features', 'Hours', 'Plan']
 const DAYS  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
+  'Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo','Jigawa',
+  'Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun',
+  'Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara']
+
+interface Plan { id: string; name: string; price_monthly: number | null }
 
 const HOSPITAL_TYPES = ['General', 'Specialist', 'Teaching', 'Private', 'Federal', 'State', 'Mission', 'Clinic', 'Maternity']
 
@@ -41,6 +49,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   const [description, setDescription] = useState('')
   const [phone,       setPhone]       = useState('')
   const [email,       setEmail]       = useState('')
+  const [whatsapp,    setWhatsapp]    = useState('')
 
   // Step 1 – Verification
   const [regNumber,  setRegNumber]  = useState('')
@@ -50,6 +59,9 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   const [address, setAddress] = useState('')
   const [city,    setCity]    = useState('')
   const [state,   setState]   = useState('')
+  const [latitude,  setLatitude]  = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [locating,  setLocating]  = useState(false)
 
   // Step 3 – Clinics
   const [clinicModel, setClinicModel] = useState<'single' | 'multi'>('single')
@@ -69,7 +81,10 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   // Step 6 – Hours
   const [hours, setHours] = useState<DayHours[]>(defaultHours())
 
-  // Step 7 – Plan (informational on mobile — plan managed on web)
+  // Step 7 – Plan
+  const [plans,       setPlans]       = useState<Plan[]>([])
+  const [planId,      setPlanId]      = useState<string | null>(null)
+  const [plansLoaded, setPlansLoaded] = useState(false)
 
   useEffect(() => { loadSpecialties() }, [])
 
@@ -84,6 +99,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
     if (step === 0 && !name.trim()) { Alert.alert('Required', 'Hospital name is required.'); return }
     if (step === 2 && !address.trim()) { Alert.alert('Required', 'Address is required.'); return }
     if (step === 4 && !specsLoaded) loadSpecialties()
+    if (step === 6 && !plansLoaded) loadPlans()
     if (step < STEPS.length - 1) setStep(s => s + 1)
     else handleSubmit()
   }
@@ -97,6 +113,40 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
     if (navigation.canGoBack()) navigation.goBack()
     else navigation.navigate('MainTabs')
   }
+
+  async function captureLocation() {
+    setLocating(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Location access is required to pin your hospital on the map. You can also skip this and set it later from the web portal.')
+        return
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      setLatitude(pos.coords.latitude)
+      setLongitude(pos.coords.longitude)
+      haptics.success()
+    } catch {
+      Alert.alert('Could not get location', 'Please try again, or set your coordinates later from the web portal.')
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  const loadPlans = useCallback(async () => {
+    if (plansLoaded) return
+    const { data } = await supabase
+      .from('subscription_plans')
+      .select('id, name, price_monthly')
+      .eq('is_active', true)
+      .order('sort_order')
+    const list = (data ?? []) as Plan[]
+    setPlans(list)
+    // Match web's default so the two clients pre-select the same plan.
+    const growth = list.find(pl => pl.name === 'growth')
+    if (growth) setPlanId(growth.id)
+    setPlansLoaded(true)
+  }, [plansLoaded])
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -120,9 +170,12 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
           email: email.trim() || null,
           registrationNumber: regNumber.trim() || null,
           mdcnNumber: mdcnNumber.trim() || null,
+          whatsapp: whatsapp.trim() || null,
           address: address.trim(),
           city: city.trim() || null,
           state: state.trim() || null,
+          latitude,
+          longitude,
           clinicModel,
           clinics,
           accepts_virtual: acceptsVirtual,
@@ -131,7 +184,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
           approvalMode,
           specialtyIds: selectedSpecIds,
           hours,
-          planId: null,
+          planId,
         }),
       })
 
@@ -195,6 +248,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Field label="Hospital Name *" value={name} onChange={setName} placeholder="e.g. Lagos General Hospital" theme={t} />
               <Field label="Email" value={email} onChange={setEmail} placeholder="admin@hospital.com" keyboard="email-address" theme={t} />
               <Field label="Phone" value={phone} onChange={setPhone} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
+              <Field label="WhatsApp (optional)" value={whatsapp} onChange={setWhatsapp} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>HOSPITAL TYPE</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -231,7 +285,38 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Text style={[s.stepSub, { color: t.textMuted }]}>Where is your hospital located?</Text>
               <Field label="Address *" value={address} onChange={setAddress} placeholder="12 Hospital Road" theme={t} />
               <Field label="City" value={city} onChange={setCity} placeholder="Lagos" theme={t} />
-              <Field label="State" value={state} onChange={setState} placeholder="Lagos State" theme={t} />
+
+              <Text style={[s.fieldLabel, { color: t.textMuted }]}>STATE</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {NIGERIAN_STATES.map(st => (
+                    <TouchableOpacity key={st} onPress={() => setState(st)}
+                      style={[s.chip, { borderColor: state === st ? t.accent : t.cardBorder, backgroundColor: state === st ? `${t.accent}18` : t.cardBg }]}>
+                      <Text style={[s.chipText, { color: state === st ? t.accent : t.textMuted }]}>{st}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {/* Coordinates. Ambulance dispatch ranks candidate hospitals by
+                  distance and the patient directory sorts by proximity, so a
+                  hospital with no coordinates is invisible to both. Neither
+                  client captured this before — the column was sent as null. */}
+              <Text style={[s.fieldLabel, { color: t.textMuted }]}>MAP COORDINATES</Text>
+              <TouchableOpacity onPress={captureLocation} disabled={locating}
+                style={[s.addBtn, { borderColor: latitude != null ? t.accent : t.cardBorder, backgroundColor: t.cardBg, marginBottom: 8 }]}>
+                {locating
+                  ? <ActivityIndicator size="small" color={t.accent} />
+                  : <Ionicons name={latitude != null ? 'checkmark-circle' : 'location-outline'} size={16} color={latitude != null ? t.accent : t.textMuted} />}
+                <Text style={[s.addBtnText, { color: latitude != null ? t.accent : t.textMuted }]}>
+                  {locating ? 'Getting location…' : latitude != null ? 'Location captured' : 'Use my current location'}
+                </Text>
+              </TouchableOpacity>
+              {latitude != null && longitude != null && (
+                <Text style={[s.infoText, { color: t.textMuted, marginBottom: 12 }]}>
+                  {latitude.toFixed(5)}, {longitude.toFixed(5)} — stand at the hospital for an accurate pin.
+                </Text>
+              )}
             </>
           )}
 
@@ -377,6 +462,8 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                   { label: 'Specialties', value: `${selectedSpecIds.length} selected` },
                   { label: 'Virtual',     value: acceptsVirtual ? 'Enabled' : 'Disabled' },
                   { label: 'Approval',    value: approvalMode === 'auto' ? 'Auto-approve' : 'Manual review' },
+                  { label: 'Open 24h',    value: is24Hours ? 'Yes' : 'No' },
+                  { label: 'Coordinates', value: latitude != null && longitude != null ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : 'Not set' },
                 ].map((row, i, arr) => (
                   <View key={row.label} style={[s.summaryRow, { borderBottomColor: t.cardBorder, borderBottomWidth: i < arr.length - 1 ? 1 : 0 }]}>
                     <Text style={[s.summaryLabel, { color: t.textMuted }]}>{row.label}</Text>
@@ -385,10 +472,37 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                 ))}
               </View>
 
-              <View style={[s.infoBanner, { backgroundColor: `${t.accent}10`, borderColor: `${t.accent}30`, marginTop: 8 }]}>
-                <Ionicons name="information-circle-outline" size={16} color={t.accent} />
-                <Text style={[s.infoText, { color: t.textMuted }]}>Subscription plan can be selected from the web portal after registration.</Text>
-              </View>
+              <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 20 }]}>SUBSCRIPTION PLAN</Text>
+              {!plansLoaded ? (
+                <ActivityIndicator color={t.accent} style={{ marginVertical: 16 }} />
+              ) : plans.length === 0 ? (
+                <View style={[s.infoBanner, { backgroundColor: `${t.accent}10`, borderColor: `${t.accent}30` }]}>
+                  <Ionicons name="information-circle-outline" size={16} color={t.accent} />
+                  <Text style={[s.infoText, { color: t.textMuted }]}>No plans available right now — a starter plan will be assigned automatically.</Text>
+                </View>
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {plans.map(pl => {
+                    const active = planId === pl.id
+                    return (
+                      <TouchableOpacity key={pl.id} onPress={() => setPlanId(pl.id)}
+                        style={[s.modelCard, { flexDirection: 'row', alignItems: 'center', gap: 12,
+                          borderColor: active ? t.accent : t.cardBorder,
+                          backgroundColor: active ? `${t.accent}12` : t.cardBg }]}>
+                        <View style={[s.radio, { borderColor: active ? t.accent : t.cardBorder }]}>
+                          {active && <View style={[s.radioDot, { backgroundColor: t.accent }]} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[s.modelLabel, { color: active ? t.accent : t.textPrimary, textTransform: 'capitalize' }]}>{pl.name}</Text>
+                          <Text style={[s.modelSub, { color: t.textMuted }]}>
+                            {pl.price_monthly ? `₦${pl.price_monthly.toLocaleString()}/month` : 'Free'} · 90-day trial
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              )}
             </>
           )}
         </ScrollView>
@@ -454,6 +568,8 @@ const s = StyleSheet.create({
   specChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
   chipText:    { fontSize: 12, fontWeight: '700' },
   modelCard:   { borderRadius: 14, borderWidth: 1, padding: 14 },
+  radio:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot:    { width: 8, height: 8, borderRadius: 4 },
   modelLabel:  { fontSize: 13, fontWeight: '800', marginBottom: 4 },
   modelSub:    { fontSize: 11, lineHeight: 16 },
   removeBtn:   { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
