@@ -86,9 +86,6 @@ export async function POST(req: NextRequest) {
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
-    // `ownership` is added by migration 20260828000003 and is not yet in the
-    // generated types, which are produced from the live schema. Once that
-    // migration is pushed and `npm run gen-types` is re-run, this cast can go.
     const { data: hospital, error: hErr } = await db.from('hospitals').insert({
       name, slug, type: resolvedType, ownership: resolvedOwnership,
       description: description || null,
@@ -113,7 +110,7 @@ export async function POST(req: NextRequest) {
       mdcn_accreditation: mdcnNumber || null,
       clinic_model: clinicModel ?? 'single',
       is_verified: false,
-    } as never).select('id').single()
+    }).select('id').single()
     if (hErr) return Errors.internal(hErr.message)
 
     // Link admin as owner

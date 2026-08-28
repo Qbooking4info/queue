@@ -1894,6 +1894,7 @@ export type Database = {
           mdcn_accreditation: string | null
           name: string
           opd_fee: number | null
+          ownership: string | null
           paystack_account_last4: string | null
           paystack_bank_name: string | null
           paystack_subaccount_code: string | null
@@ -1905,7 +1906,7 @@ export type Database = {
           sms_reminders: boolean
           state: string
           total_bookings: number | null
-          type: string | null
+          type: string
           updated_at: string | null
           whatsapp: string | null
         }
@@ -1941,6 +1942,7 @@ export type Database = {
           mdcn_accreditation?: string | null
           name: string
           opd_fee?: number | null
+          ownership?: string | null
           paystack_account_last4?: string | null
           paystack_bank_name?: string | null
           paystack_subaccount_code?: string | null
@@ -1952,7 +1954,7 @@ export type Database = {
           sms_reminders?: boolean
           state: string
           total_bookings?: number | null
-          type?: string | null
+          type?: string
           updated_at?: string | null
           whatsapp?: string | null
         }
@@ -1988,6 +1990,7 @@ export type Database = {
           mdcn_accreditation?: string | null
           name?: string
           opd_fee?: number | null
+          ownership?: string | null
           paystack_account_last4?: string | null
           paystack_bank_name?: string | null
           paystack_subaccount_code?: string | null
@@ -1999,7 +2002,7 @@ export type Database = {
           sms_reminders?: boolean
           state?: string
           total_bookings?: number | null
-          type?: string | null
+          type?: string
           updated_at?: string | null
           whatsapp?: string | null
         }
@@ -3684,6 +3687,7 @@ export type Database = {
         Args: { p_patient_id: string }
         Returns: boolean
       }
+      check_ambulance_coverage: { Args: never; Returns: number }
       crew_update_job_status: {
         Args: { p_new_status: string; p_request_id: string }
         Returns: boolean
