@@ -5,19 +5,20 @@ import { createClient } from '@/lib/supabase/client'
 import type { Specialty, SubscriptionPlan } from '@/types/database'
 import {
   Building2, Stethoscope, Microscope, ScanLine, Clock, Building, X, Check,
-  Video, AlertTriangle, ArrowRight,
+  Video, AlertTriangle, ArrowRight, MapPin,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type HospitalType = 'hospital' | 'clinic' | 'specialist_center' | 'diagnostic'
+type HospitalType = 'hospital' | 'clinic' | 'specialist_center' | 'diagnostic' | 'teaching' | 'maternity'
+type Ownership    = 'private' | 'federal' | 'state' | 'mission' | 'ngo'
 type ClinicModel  = 'single' | 'multi'
 
 interface ClinicEntry { id: string; name: string; description: string }
 
 interface FormData {
   // Step 1 — Basics
-  name: string; type: HospitalType; description: string
+  name: string; type: HospitalType; ownership: Ownership | null; description: string
   // Step 2 — Verification
   registrationNumber: string; mdcnNumber: string
   // Step 3 — Location
@@ -29,7 +30,8 @@ interface FormData {
   // Step 5 — Specialties
   specialtyIds: string[]
   // Step 6 — Features
-  accepts_virtual: boolean; emergency_hours: boolean
+  accepts_virtual: boolean; emergency_hours: boolean; is_24_hours: boolean
+  approvalMode: 'auto' | 'manual'
   // Step 7 — Hours
   hours: { day: number; open: string; close: string; closed: boolean }[]
   // Step 8 — Plan
@@ -43,6 +45,16 @@ const HOSPITAL_TYPES: { value: HospitalType; label: string; icon: React.ReactNod
   { value: 'clinic',            label: 'Clinic',              icon: <Stethoscope size={20} />, desc: 'Outpatient consultations & GP care' },
   { value: 'specialist_center', label: 'Specialist Centre',   icon: <Microscope size={20} />,  desc: 'Focused specialty practice' },
   { value: 'diagnostic',        label: 'Diagnostic Centre',   icon: <ScanLine size={20} />,    desc: 'Lab, imaging & diagnostics' },
+  { value: 'teaching',          label: 'Teaching Hospital',   icon: <Building size={20} />,    desc: 'Training facility attached to a medical school' },
+  { value: 'maternity',         label: 'Maternity Centre',    icon: <Building2 size={20} />,   desc: 'Antenatal, delivery & postnatal care' },
+]
+
+const OWNERSHIP_OPTIONS: { value: Ownership; label: string }[] = [
+  { value: 'private', label: 'Private' },
+  { value: 'federal', label: 'Federal' },
+  { value: 'state',   label: 'State' },
+  { value: 'mission', label: 'Mission' },
+  { value: 'ngo',     label: 'NGO' },
 ]
 
 const NIGERIAN_STATES = ['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
@@ -110,6 +122,27 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
         </div>
       </div>
       <div>
+        <label style={lightLabel}>Ownership <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {OWNERSHIP_OPTIONS.map(o => {
+            const active = data.ownership === o.value
+            return (
+              <button key={o.value} type="button"
+                onClick={() => onChange({ ownership: active ? null : o.value })}
+                style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'inherit', transition: 'all .15s',
+                  border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`,
+                  background: active ? '#EAF4FC' : '#FAFCFF',
+                  color: active ? '#1A7FC1' : '#6A8FAA' }}>
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 6 }}>Separate from the facility type above — a federal teaching hospital is both.</p>
+      </div>
+
+      <div>
         <label style={lightLabel}>Description <span style={{ fontWeight: 400, textTransform: 'none', color: '#6A8FAA' }}>(optional)</span></label>
         <textarea value={data.description} onChange={e => onChange({ description: e.target.value })}
           placeholder="Briefly describe your facility, key strengths, and what patients can expect…"
@@ -160,6 +193,8 @@ function StepVerification({ data, onChange }: { data: FormData; onChange: (d: Pa
 // ── Step 3: Contact & Location ────────────────────────────────────────────────
 
 function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partial<FormData>) => void }) {
+  const [geoBusy, setGeoBusy]   = useState(false)
+  const [geoError, setGeoError] = useState('')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -201,6 +236,42 @@ function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partia
         <input type="tel" value={data.whatsapp} onChange={e => onChange({ whatsapp: e.target.value })}
           placeholder="+234 802 000 0001" style={lightInput} />
         <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 4 }}>Patients may use this for quick queries</p>
+      </div>
+
+      {/* Coordinates. Ambulance dispatch ranks candidates by distance to the
+          destination hospital and the patient directory sorts by proximity, so
+          a hospital with no coordinates is invisible to both. This form declared
+          latitude/longitude and sent them from day one, but nothing ever set
+          them — every hospital onboarded so far stored null. */}
+      <div>
+        <label style={lightLabel}>Map Location</label>
+        <button type="button"
+          onClick={() => {
+            if (!navigator.geolocation) { setGeoError('This browser cannot share a location.'); return }
+            setGeoBusy(true); setGeoError('')
+            navigator.geolocation.getCurrentPosition(
+              pos => { onChange({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); setGeoBusy(false) },
+              err => { setGeoError(err.code === err.PERMISSION_DENIED
+                ? 'Location permission denied — you can set this later from the dashboard.'
+                : 'Could not get your location. You can set this later from the dashboard.'); setGeoBusy(false) },
+              { enableHighAccuracy: true, timeout: 10000 },
+            )
+          }}
+          disabled={geoBusy}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px',
+            borderRadius: 10, cursor: geoBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14,
+            border: `1.5px solid ${data.latitude != null ? '#1A7FC1' : '#DDE8F5'}`,
+            background: data.latitude != null ? '#EAF4FC' : '#FAFCFF',
+            color: data.latitude != null ? '#1A7FC1' : '#2A5070' }}>
+          {data.latitude != null ? <Check size={16} /> : <MapPin size={16} />}
+          {geoBusy ? 'Getting location…' : data.latitude != null ? 'Location captured' : 'Use my current location'}
+        </button>
+        {data.latitude != null && data.longitude != null && (
+          <p style={{ fontSize: 11, color: '#6A8FAA', marginTop: 4 }}>
+            {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)} — set this from the hospital site for an accurate pin.
+          </p>
+        )}
+        {geoError && <p style={{ fontSize: 11, color: '#E03E3E', marginTop: 4 }}>{geoError}</p>}
       </div>
     </div>
   )
@@ -361,6 +432,7 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
   const features = [
     { key: 'accepts_virtual',  icon: <Video size={22} />,         label: 'Virtual Consultations',  desc: 'Patients can book and attend appointments via video call' },
     { key: 'emergency_hours',  icon: <AlertTriangle size={22} />, label: '24/7 Emergency Services', desc: 'You provide round-the-clock emergency care' },
+    { key: 'is_24_hours',      icon: <Clock size={22} />,         label: 'Open 24 Hours',           desc: 'The facility itself is open around the clock, not just emergency care' },
   ] as const
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -391,6 +463,37 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
           )
         })}
       </div>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#2A5070', marginBottom: 8,
+          textTransform: 'uppercase', letterSpacing: '.04em' }}>
+          Booking Approval
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {([
+            { value: 'auto',   label: 'Automatic',      desc: 'Bookings are confirmed instantly when a slot is free' },
+            { value: 'manual', label: 'Manual review',  desc: 'Your staff confirm each booking before it is final' },
+          ] as const).map(m => {
+            const active = data.approvalMode === m.value
+            return (
+              <button key={m.value} type="button" onClick={() => onChange({ approvalMode: m.value })}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, textAlign: 'left',
+                  border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
+                  cursor: 'pointer', transition: 'all .15s', width: '100%' }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${active ? '#1A7FC1' : '#DDE8F5'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: active ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 12, color: '#6A8FAA' }}>{m.desc}</div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #DDE8F5', background: '#F4F8FC' }}>
         <p style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>
           <strong style={{ color: '#2A5070' }}>EMR Integration</strong> is available on the Growth and Enterprise plans.
@@ -536,12 +639,13 @@ export default function OnboardingPage() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
   const [data, setData]           = useState<FormData>({
-    name: '', type: 'hospital', description: '',
+    name: '', type: 'hospital', ownership: null, description: '',
     registrationNumber: '', mdcnNumber: '',
     address: '', city: '', state: '', latitude: null, longitude: null, phone: '', email: '', whatsapp: '',
     clinicModel: 'single', clinics: [],
     specialtyIds: [],
-    accepts_virtual: false, emergency_hours: false,
+    accepts_virtual: false, emergency_hours: false, is_24_hours: false,
+    approvalMode: 'auto',
     hours: defaultHours,
     planId: '',
   })
@@ -579,7 +683,7 @@ export default function OnboardingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: data.name, type: data.type, description: data.description,
+          name: data.name, type: data.type, ownership: data.ownership, description: data.description,
           registrationNumber: data.registrationNumber, mdcnNumber: data.mdcnNumber,
           address: data.address, city: data.city, state: data.state,
           latitude: data.latitude, longitude: data.longitude,
@@ -587,6 +691,7 @@ export default function OnboardingPage() {
           clinicModel: data.clinicModel,
           clinics: data.clinics.filter(c => c.name.trim()),
           accepts_virtual: data.accepts_virtual, emergency_hours: data.emergency_hours,
+          is_24_hours: data.is_24_hours, approvalMode: data.approvalMode,
           specialtyIds: data.specialtyIds,
           hours: data.hours,
           planId: data.planId,

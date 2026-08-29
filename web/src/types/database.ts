@@ -1894,6 +1894,7 @@ export type Database = {
           mdcn_accreditation: string | null
           name: string
           opd_fee: number | null
+          ownership: string | null
           paystack_account_last4: string | null
           paystack_bank_name: string | null
           paystack_subaccount_code: string | null
@@ -1905,7 +1906,7 @@ export type Database = {
           sms_reminders: boolean
           state: string
           total_bookings: number | null
-          type: string | null
+          type: string
           updated_at: string | null
           whatsapp: string | null
         }
@@ -1941,6 +1942,7 @@ export type Database = {
           mdcn_accreditation?: string | null
           name: string
           opd_fee?: number | null
+          ownership?: string | null
           paystack_account_last4?: string | null
           paystack_bank_name?: string | null
           paystack_subaccount_code?: string | null
@@ -1952,7 +1954,7 @@ export type Database = {
           sms_reminders?: boolean
           state: string
           total_bookings?: number | null
-          type?: string | null
+          type?: string
           updated_at?: string | null
           whatsapp?: string | null
         }
@@ -1988,6 +1990,7 @@ export type Database = {
           mdcn_accreditation?: string | null
           name?: string
           opd_fee?: number | null
+          ownership?: string | null
           paystack_account_last4?: string | null
           paystack_bank_name?: string | null
           paystack_subaccount_code?: string | null
@@ -1999,7 +2002,7 @@ export type Database = {
           sms_reminders?: boolean
           state?: string
           total_bookings?: number | null
-          type?: string | null
+          type?: string
           updated_at?: string | null
           whatsapp?: string | null
         }
@@ -3128,13 +3131,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
-          doctor_code?: string
+          doctor_code: string
           email: string
           full_name: string
           gender?: string | null
           id?: string
           is_verified?: boolean | null
-          patient_code?: string
+          patient_code: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3403,13 +3406,6 @@ export type Database = {
             columns: ["doctor_id"]
             isOneToOne: false
             referencedRelation: "doctors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_doctor_user_id_fkey"
-            columns: ["doctor_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -3687,12 +3683,22 @@ export type Database = {
           hospital_admin_id: string
         }[]
       }
+      can_view_patient_profile: {
+        Args: { p_patient_id: string }
+        Returns: boolean
+      }
+      check_ambulance_coverage: { Args: never; Returns: number }
       crew_update_job_status: {
         Args: { p_new_status: string; p_request_id: string }
         Returns: boolean
       }
       current_doctor_ids: { Args: never; Returns: string[] }
+      current_patient_ids: { Args: never; Returns: string[] }
       disablelongtransactions: { Args: never; Returns: string }
+      dispatch_supply_probe: {
+        Args: { p_radius_m?: number; p_request_id: string }
+        Returns: Json
+      }
       dropgeometrycolumn:
         | {
             Args: {
@@ -3736,6 +3742,7 @@ export type Database = {
           current_lat: number
           current_lng: number
           last_dispatched_at: string
+          location_age_seconds: number
           provider_hospital_id: string
           provider_id: string
           provider_type: string
@@ -3748,6 +3755,8 @@ export type Database = {
       }
       flag_stale_tracking: { Args: never; Returns: number }
       fn_get_my_admin_hospital_ids: { Args: never; Returns: string[] }
+      generate_doctor_code: { Args: never; Returns: string }
+      generate_patient_code: { Args: never; Returns: string }
       generate_transport_ref: { Args: never; Returns: string }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
@@ -3877,10 +3886,6 @@ export type Database = {
         Args: { p_hospital_id: string }
         Returns: Json
       }
-      move_appointment_in_queue: {
-        Args: { p_appointment_id: string; p_new_position: number }
-        Returns: undefined
-      }
       get_job_patient_location: {
         Args: { p_request_id: string }
         Returns: {
@@ -3991,6 +3996,14 @@ export type Database = {
         Returns: boolean
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      median_job_duration_seconds: {
+        Args: { p_min_samples?: number; p_request_type?: string }
+        Returns: number
+      }
+      move_appointment_in_queue: {
+        Args: { p_appointment_id: string; p_new_position: number }
+        Returns: undefined
+      }
       nearby_available_units: {
         Args: {
           p_lat: number
@@ -4702,6 +4715,7 @@ export type Database = {
         }[]
       }
       unaccent: { Args: { "": string }; Returns: string }
+      unit_location_max_age_seconds: { Args: never; Returns: number }
       unit_location_ttl_seconds: { Args: never; Returns: number }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {

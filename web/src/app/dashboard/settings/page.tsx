@@ -6,6 +6,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import type { DayHours } from '@/lib/admin-api'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import { Check, Clock, Building2, Building, ExternalLink, Zap, ClipboardList, AlertTriangle } from 'lucide-react'
+import { hospitalTypeLabel } from '@/lib/hospital-type'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ export default function SettingsPage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 16 }}>Hospital Profile</div>
             {[
               { label: 'Hospital Name',    value: hospital?.name ?? '—' },
-              { label: 'Type',             value: hospital?.type ?? '—' },
+              { label: 'Type',             value: hospitalTypeLabel(hospital?.type) },
               { label: 'Registration No.', value: hospital?.registration_number ?? '—' },
               { label: 'Contact Email',    value: hospital?.email ?? '—' },
               { label: 'Phone',            value: hospital?.phone ?? '—' },

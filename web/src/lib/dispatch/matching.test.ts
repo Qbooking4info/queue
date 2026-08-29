@@ -200,3 +200,46 @@ describe("rejection tally", () => {
     expect(candidates.length - rejected).toBe(rankCandidates(req, candidates, policyFor(req)).length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Location staleness
+//
+// The 2-minute hard cutoff in find_candidate_units is why production went 11
+// requests and 32 dispatch rounds without ever producing a single candidate.
+// It is now a 10-minute outer bound with the difference priced here.
+// ---------------------------------------------------------------------------
+
+import { freshnessScore, LOCATION_STALENESS_FLOOR } from "./matching";
+
+describe("freshnessScore", () => {
+  it("does not penalise a fresh fix", () => {
+    expect(freshnessScore(5)).toBe(1);
+    expect(freshnessScore(30)).toBe(1);
+  });
+
+  it("never punishes a unit whose age is unknown", () => {
+    // Older callers, or a routing path that didn't supply it, must not be
+    // silently deprioritised into never being dispatched.
+    expect(freshnessScore(undefined)).toBe(1);
+    expect(freshnessScore(NaN)).toBe(1);
+  });
+
+  it("decays monotonically with age", () => {
+    const a = freshnessScore(60), b = freshnessScore(240), c = freshnessScore(540);
+    expect(a).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(c);
+  });
+
+  it("floors rather than zeroing at the outer bound", () => {
+    // The whole point: a stale unit is worth less, never worth nothing. Zero
+    // here would reproduce the exclusion bug through the back door.
+    expect(freshnessScore(600)).toBeCloseTo(LOCATION_STALENESS_FLOOR, 5);
+    expect(freshnessScore(100000)).toBeGreaterThanOrEqual(LOCATION_STALENESS_FLOOR);
+  });
+
+  it("still ranks a stale nearby unit above nothing at all", () => {
+    // A 9-minute-old fix retains most of its value; the old behaviour discarded
+    // it entirely and told the patient no ambulance existed.
+    expect(freshnessScore(540)).toBeGreaterThan(0.5);
+  });
+});

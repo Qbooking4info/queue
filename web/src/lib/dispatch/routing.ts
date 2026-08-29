@@ -13,6 +13,7 @@
  */
 
 import 'server-only'
+import { routingProvider, roadEta } from './eta'
 
 export interface LatLng {
   lat: number
@@ -75,7 +76,18 @@ export async function roadEtas(
 
   const token = process.env.MAPBOX_ACCESS_TOKEN
   if (!token) {
-    console.warn('[dispatch] MAPBOX_ACCESS_TOKEN unset — ranking on distance only')
+    // No Mapbox matrix, but Google may well be configured — it is what the
+    // patient-facing ETA already uses. Ranking was silently degrading to
+    // straight-line distance while the app showed the patient a Google
+    // road ETA: two providers, one of them unset, disagreeing about the same
+    // journey. In Lagos that is not a rounding error, it is the wrong
+    // ambulance across a bridge.
+    if (routingProvider() !== 'estimate') {
+      const etas = await googleFallbackEtas(origins, destination)
+      rememberEtas(key, etas)
+      return etas
+    }
+    console.warn('[dispatch] no routing provider configured — ranking on distance only')
     return origins.map(() => null)
   }
 
@@ -107,6 +119,35 @@ export async function roadEtas(
     console.warn('[dispatch] routing matrix failed, degrading to distance', err)
     return origins.map(() => null)
   }
+}
+
+/**
+ * Per-origin Google calls, used only when no Mapbox matrix token is present.
+ *
+ * A matrix call is one request for N origins; this is N requests. That is the
+ * cost of not having a matrix, and it is bounded: find_candidate_units returns
+ * at most 12, and dispatch rounds are not high frequency. Issued in parallel so
+ * the round is not serialised behind them, and every failure degrades to null —
+ * the same contract as the matrix path, so ranking still works on distance.
+ *
+ * If routing volume ever justifies it, Google's Routes Matrix API is the
+ * like-for-like replacement here.
+ */
+async function googleFallbackEtas(
+  origins: LatLng[],
+  destination: LatLng,
+): Promise<(number | null)[]> {
+  const results = await Promise.allSettled(
+    origins.map((o) => roadEta({ lat: o.lat, lng: o.lng }, { lat: destination.lat, lng: destination.lng })),
+  )
+  return results.map((r) => {
+    if (r.status !== 'fulfilled') return null
+    // roadEta falls back to its own straight-line estimate rather than failing.
+    // For ranking we want to know we got a real road answer, so an estimate is
+    // reported as null and the caller's distance ranking takes over — otherwise
+    // a provider outage would look like a confident ETA.
+    return r.value.source === 'estimate' ? null : r.value.seconds
+  })
 }
 
 async function fetchWithTimeout(url: string, ms: number): Promise<Response> {

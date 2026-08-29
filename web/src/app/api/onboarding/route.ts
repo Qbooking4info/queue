@@ -17,11 +17,11 @@ export async function POST(req: NextRequest) {
     if (!allowed) return Errors.forbidden('Too many onboarding attempts. Please wait before trying again.')
     const body = await req.json()
     const {
-      name, type, description,
+      name, type, ownership, description,
       registrationNumber, mdcnNumber,
       address, city, state, phone, email, whatsapp, latitude, longitude,
       clinicModel, clinics,
-      accepts_virtual, emergency_hours,
+      accepts_virtual, emergency_hours, is_24_hours, approvalMode,
       specialtyIds, hours, planId,
     } = body
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     if (!profile) {
       const { data: np, error: pErr } = await db
         .from('users')
-        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' })
+        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' } as never)
         .select('id').single()
       if (pErr) return Errors.internal(pErr.message)
       profile = np
@@ -75,10 +75,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'planId is required' }, { status: 400 })
     }
 
+    // Both clients send the canonical vocabulary, but this route is a public
+    // endpoint and hospitals_type_check would reject anything else with a raw
+    // Postgres error. Coerce instead, so an older mobile build that still sends
+    // 'General' registers as a hospital rather than failing at the last step.
+    const VALID_TYPES = ['hospital','clinic','specialist_center','diagnostic','teaching','maternity']
+    const VALID_OWNERSHIP = ['private','federal','state','mission','ngo']
+    const resolvedType = VALID_TYPES.includes(type) ? type : 'hospital'
+    const resolvedOwnership = VALID_OWNERSHIP.includes(ownership) ? ownership : null
+
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36)
 
     const { data: hospital, error: hErr } = await db.from('hospitals').insert({
-      name, slug, type: type ?? 'hospital',
+      name, slug, type: resolvedType, ownership: resolvedOwnership,
       description: description || null,
       address, city, state,
       // Captured at onboarding because everything location-aware depends on it:
@@ -92,6 +101,11 @@ export async function POST(req: NextRequest) {
       phone: phone || null, email: email || null, whatsapp: whatsapp || null,
       accepts_virtual: accepts_virtual ?? false,
       emergency_hours: emergency_hours ?? false,
+      // Mobile has collected these since the 8-step flow shipped, but they were
+      // never destructured or inserted here — every mobile registration silently
+      // saved the column defaults instead of what the admin chose.
+      is_24_hours: is_24_hours ?? false,
+      approval_mode: approvalMode === 'manual' ? 'manual' : 'auto',
       registration_number: registrationNumber || null,
       mdcn_accreditation: mdcnNumber || null,
       clinic_model: clinicModel ?? 'single',

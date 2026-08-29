@@ -7,6 +7,12 @@
 -- longer exist, and even fixed to read vitals_audit_log directly, RLS would
 -- have filtered every row out anyway with no error.
 
+-- Idempotent: this migration failed to apply on 2026-08-28 because the policy
+-- already existed in production, which blocks every later migration behind it.
+-- Repo convention (and Postgres, which has no CREATE POLICY IF NOT EXISTS) is
+-- to drop first.
+DROP POLICY IF EXISTS "Patients can read own vitals" ON vitals_audit_log;
+
 CREATE POLICY "Patients can read own vitals" ON vitals_audit_log
   FOR SELECT USING (
     appointment_id IN (

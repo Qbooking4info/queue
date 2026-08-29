@@ -44,6 +44,12 @@ export function HospitalRegisterScreen({ navigation }: Props) {
     setError('')
     if (!validate()) return
     setLoading(true)
+    // Set BEFORE signUp, not after. signUp fires onAuthStateChange while we are
+    // still awaiting it, which flips AppNavigator to <AppStack /> — and a
+    // navigator only reads initialRouteName on its first mount. Setting the flag
+    // after the await always lost the race, so hospital sign-ups landed on the
+    // patient home tabs and the 8-step onboarding was unreachable.
+    setPendingHospitalOnboarding(true)
     try {
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -54,8 +60,10 @@ export function HospitalRegisterScreen({ navigation }: Props) {
       if (!signUpData.session) throw new Error('Account created — please check your email to confirm, then sign in.')
 
       haptics.success()
-      setPendingHospitalOnboarding(true)
     } catch (e) {
+      // Sign-up failed, so no app tree mounted — clear the flag or a later
+      // successful sign-in would be diverted into hospital onboarding.
+      setPendingHospitalOnboarding(false)
       haptics.error()
       setError(e instanceof Error ? e.message : 'Registration failed')
     } finally {
