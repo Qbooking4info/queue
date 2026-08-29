@@ -1,0 +1,22 @@
+-- ── Allow date_of_birth in the patient signup INSERT ──────────────────────
+-- 20260816000002 locked the `users` INSERT column grant down to exactly
+-- (auth_id, full_name, email, phone) -- everything else (including
+-- date_of_birth) was only ever settable afterward via the UPDATE grant, from
+-- the profile/medical-history screen.
+--
+-- mobile/contexts/AuthContext.tsx's signUp() now collects date_of_birth at
+-- registration time (added this session, so the recommended-caretaker-for-
+-- minors nudge on RegisterScreen has an age to work with) and sends it in
+-- the same INSERT. Since that column wasn't grantable, every signup through
+-- the updated RegisterScreen failed at the INSERT step with a column-
+-- privilege error -- AFTER supabase.auth.signUp() had already created the
+-- auth.users row, which is never rolled back on a later failure. Net effect:
+-- a real auth account with no matching `users` profile row, which the app
+-- has no working state for (confirmed live: alex@ugwu.com, 2026-08-26,
+-- signed up, unable to actually use the account afterward).
+--
+-- date_of_birth is exactly as safe to accept at INSERT as full_name/phone
+-- already are -- it's data about the account's own owner, still bounded by
+-- the same "Users can insert own profile" RLS policy's auth_id = auth.uid()
+-- check. This is additive to the existing grant, not a replacement.
+GRANT INSERT (date_of_birth) ON users TO authenticated;

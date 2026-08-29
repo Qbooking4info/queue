@@ -25,7 +25,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
     setError('')
     if (!email.trim() || !password) { setError('Email and password are required.'); return }
     setLoading(true)
-    const err = await signIn(email.trim().toLowerCase(), password)
+    const err = await signIn(email.trim().toLowerCase(), password, 'hospital')
     setLoading(false)
     if (err) {
       haptics.error()

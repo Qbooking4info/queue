@@ -10,9 +10,9 @@ import { fmtLocalDate } from '@/lib/dashboard-utils'
 import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
-import { createClient } from '@/lib/supabase/client'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
+import { LinkDoctorForm } from '@/components/dashboard/LinkDoctorModal'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import {
   X, AlertTriangle, RefreshCw, Check, ArrowLeft, ArrowRight, Pencil,
@@ -24,6 +24,20 @@ function fmtMinutes(m: number | null): string {
   if (m == null) return '—'
   if (m < 60) return `${m}m`
   return `${Math.floor(m / 60)}h ${m % 60}m`
+}
+
+function fmtEligibility(clinic: Pick<ClinicDetail, 'min_age' | 'max_age' | 'gender_restriction'>): string {
+  const ageText = clinic.min_age == null && clinic.max_age == null
+    ? 'All ages'
+    : clinic.min_age != null && clinic.max_age != null
+      ? `Ages ${clinic.min_age}–${clinic.max_age}`
+      : clinic.min_age != null
+        ? `Ages ${clinic.min_age}+`
+        : `Ages 0–${clinic.max_age}`
+  const genderText = clinic.gender_restriction === 'male' ? 'Male only'
+    : clinic.gender_restriction === 'female' ? 'Female only'
+    : 'All genders'
+  return `${ageText} · ${genderText}`
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -60,12 +74,21 @@ type Tab = 'overview' | 'doctors' | 'staff' | 'appointments' | 'analytics'
 
 function EditClinicModal({
   clinic, col, onClose, onSave,
-}: { clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void; onSave: (name: string, description: string | undefined, serviceTags: string[], dailyBookingLimit: number | null) => void }) {
+}: {
+  clinic: ClinicDetail; col: typeof CLINIC_PALETTE[0]; onClose: () => void
+  onSave: (
+    name: string, description: string | undefined, serviceTags: string[], dailyBookingLimit: number | null,
+    minAge: number | null, maxAge: number | null, genderRestriction: 'male' | 'female' | null,
+  ) => void
+}) {
   const { theme: C } = useTheme()
   const [name,        setName]        = useState(clinic.name)
   const [desc,        setDesc]        = useState(clinic.description ?? '')
   const [serviceTags, setServiceTags] = useState<string[]>(clinic.service_tags ?? [])
   const [dailyLimit,  setDailyLimit]  = useState(clinic.daily_booking_limit != null ? String(clinic.daily_booking_limit) : '')
+  const [minAge,      setMinAge]      = useState(clinic.min_age != null ? String(clinic.min_age) : '')
+  const [maxAge,      setMaxAge]      = useState(clinic.max_age != null ? String(clinic.max_age) : '')
+  const [genderRestriction, setGenderRestriction] = useState<'' | 'male' | 'female'>(clinic.gender_restriction ?? '')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -73,6 +96,9 @@ function EditClinicModal({
     if (!name.trim()) return
     setSaving(true); setError('')
     const limit = dailyLimit.trim() ? parseInt(dailyLimit, 10) : null
+    const min = minAge.trim() ? parseInt(minAge, 10) : null
+    const max = maxAge.trim() ? parseInt(maxAge, 10) : null
+    const gender = genderRestriction || null
     const res = await fetch(`/api/clinics/${clinic.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -82,11 +108,14 @@ function EditClinicModal({
         description: desc.trim() || null,
         service_tags: serviceTags,
         daily_booking_limit: limit,
+        min_age: min,
+        max_age: max,
+        gender_restriction: gender,
       }),
     })
     setSaving(false)
     if (!res.ok) { setError((await res.json().catch(() => null))?.error ?? 'Failed to save'); return }
-    onSave(name.trim(), desc.trim() || undefined, serviceTags, limit)
+    onSave(name.trim(), desc.trim() || undefined, serviceTags, limit, min, max, gender)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -103,10 +132,11 @@ function EditClinicModal({
 
       <div style={{ width: '100%', maxWidth: 440, background: C.card,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Edit Clinic</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
@@ -121,7 +151,7 @@ function EditClinicModal({
           </button>
         </div>
 
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', minHeight: 0 }}>
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
               marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
@@ -167,6 +197,32 @@ function EditClinicModal({
             </div>
           </div>
 
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block',
+              marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+              Booking Eligibility
+            </label>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+              <input type="number" min="0" value={minAge}
+                onChange={e => setMinAge(e.target.value)}
+                placeholder="Min age" style={inputStyle} />
+              <input type="number" min="0" value={maxAge}
+                onChange={e => setMaxAge(e.target.value)}
+                placeholder="Max age" style={inputStyle} />
+            </div>
+            <select value={genderRestriction}
+              onChange={e => setGenderRestriction(e.target.value as '' | 'male' | 'female')}
+              style={inputStyle}>
+              <option value="">All genders</option>
+              <option value="female">Female only</option>
+              <option value="male">Male only</option>
+            </select>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+              Leave age fields blank for no limit on that side (e.g. only Max age = "0–17" for a paediatric clinic).
+              Patients who don't qualify can't book this clinic.
+            </div>
+          </div>
+
           {error && (
             <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
               borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
@@ -174,24 +230,25 @@ function EditClinicModal({
               <AlertTriangle size={13} /> {error}
             </div>
           )}
+        </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onClose}
-              style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-              Cancel
-            </button>
-            <button onClick={handleSave} disabled={saving || !name.trim()}
-              style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
-                background: name.trim() ? col.text : C.bgAlt,
-                color: name.trim() ? '#061208' : C.textMuted,
-                border: 'none', fontSize: 13, fontWeight: 700,
-                cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+        <div style={{ padding: '16px 24px', borderTop: `1px solid ${C.border}`,
+          display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
+              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving || !name.trim()}
+            style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
+              background: name.trim() ? col.text : C.bgAlt,
+              color: name.trim() ? '#061208' : C.textMuted,
+              border: 'none', fontSize: 13, fontWeight: 700,
+              cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>
@@ -320,30 +377,11 @@ function AssignDoctorModal({
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState<string | null>(null)
 
-  // New doctor form state
-  const [name, setName]       = useState('')
-  const [title, setTitle]     = useState('Dr.')
-  const [spec, setSpec]       = useState('')
-  const [specId, setSpecId]   = useState('')
-  const [fee, setFee]         = useState('')
-  const [virtual, setVirtual] = useState(false)
-  const [specialties, setSpecialties] = useState<{id: string; name: string}[]>([])
-  const [creating, setCreating] = useState(false)
-  const [newError, setNewError] = useState('')
-
   useEffect(() => {
     async function load() {
       setLoading(true)
-      // specialties is public read data -- fetched via the caller's own
-      // RLS-bound session, not the service-role client.
-      const supabase = createClient()
-      const [unassignedRes, { data: specs }] = await Promise.all([
-        fetch('/api/doctors/unassigned'),
-        supabase.from('specialties').select('id, name').eq('is_active', true).order('name'),
-      ])
-      const docs = unassignedRes.ok ? (await unassignedRes.json()).doctors : []
-      setPool(docs)
-      setSpecialties((specs ?? []) as {id: string; name: string}[])
+      const res = await fetch('/api/doctors/unassigned')
+      setPool(res.ok ? (await res.json()).doctors : [])
       setLoading(false)
     }
     load()
@@ -361,33 +399,6 @@ function AssignDoctorModal({
     onDone()
   }
 
-  async function handleCreate() {
-    if (!name.trim()) return
-    setCreating(true); setNewError('')
-    const res = await fetch(`/api/clinics/${clinicId}/doctors`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: 'create',
-        full_name: name.trim(),
-        title,
-        specialty_id: specId || null,
-        consultation_fee: fee ? Number(fee) : null,
-        accepts_virtual: virtual,
-      }),
-    })
-    setCreating(false)
-    if (!res.ok) { setNewError('Failed to create doctor. Please try again.'); return }
-    onDone()
-    onClose()
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-    borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
-    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-  }
-
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
@@ -403,7 +414,7 @@ function AssignDoctorModal({
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Add Doctor</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
-              Assign existing or create a new doctor for this clinic
+              Assign a doctor already at this hospital, or link a new one by their Doctor ID
             </div>
           </div>
           <button onClick={onClose}
@@ -423,7 +434,7 @@ function AssignDoctorModal({
                 background: tab === t ? C.card : C.bgAlt,
                 color: tab === t ? col.text : C.textMuted,
                 borderBottom: tab === t ? `2px solid ${col.text}` : '2px solid transparent' }}>
-              {t === 'assign' ? 'Assign Existing' : 'Add New Doctor'}
+              {t === 'assign' ? 'Assign Existing' : 'Link by ID'}
             </button>
           ))}
         </div>
@@ -438,7 +449,7 @@ function AssignDoctorModal({
               <div style={{ textAlign: 'center', padding: 24, color: C.textMuted, fontSize: 13 }}>
                 No unassigned doctors in this hospital.<br />
                 <span style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                  Use "Add New Doctor" to create one, or add doctors via the Doctors page.
+                  Use "Link by ID" to add one from outside this hospital.
                 </span>
               </div>
             ) : (
@@ -474,64 +485,8 @@ function AssignDoctorModal({
               </div>
             )
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ width: 80 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Title</label>
-                  <select value={title} onChange={e => setTitle(e.target.value)} style={{ ...inputStyle, padding: '10px 8px' }}>
-                    {['Dr.', 'Prof.', 'Mr.', 'Mrs.', 'Ms.', 'Pharm.', 'Nurse'].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Full Name *</label>
-                  <input value={name} onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Emeka Okonkwo" style={inputStyle} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Specialty</label>
-                <select value={specId} onChange={e => { setSpecId(e.target.value); setSpec(e.target.options[e.target.selectedIndex].text) }}
-                  style={inputStyle}>
-                  <option value="">— Select specialty —</option>
-                  {specialties.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Consultation Fee (₦)</label>
-                <input type="number" value={fee} onChange={e => setFee(e.target.value)}
-                  placeholder="e.g. 5000" style={inputStyle} />
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: C.textSub }}>
-                <input type="checkbox" checked={virtual} onChange={e => setVirtual(e.target.checked)} />
-                Accepts virtual consultations
-              </label>
-              {newError && (
-                <div style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-                  borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#f07070',
-                  display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AlertTriangle size={13} /> {newError}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
-                <button onClick={handleCreate} disabled={creating || !name.trim()}
-                  style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
-                    background: name.trim() ? col.text : C.bgAlt,
-                    color: name.trim() ? '#061208' : C.textMuted,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    cursor: creating || !name.trim() ? 'not-allowed' : 'pointer',
-                    opacity: creating ? 0.7 : 1 }}>
-                  {creating ? 'Adding…' : 'Add Doctor'}
-                </button>
-              </div>
-            </div>
+            <LinkDoctorForm clinicId={clinicId} C={C} onCancel={onClose}
+              onLinked={() => { onDone(); onClose() }} />
           )}
         </div>
       </div>
@@ -954,6 +909,7 @@ export default function ClinicDetailPage() {
   const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
   const [showHours,        setShowHours]        = useState(false)
   const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
+  const canAddStaffOrDoctor = role === 'super_admin' || role === 'hospital_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -1261,7 +1217,7 @@ export default function ClinicDetailPage() {
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Sub-Admin</div>
-                  {!subAdmin && (
+                  {!subAdmin && canAddStaffOrDoctor && (
                     <button onClick={() => setShowAddStaff(true)}
                       style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
                         cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
@@ -1309,11 +1265,13 @@ export default function ClinicDetailPage() {
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Front Desk</div>
-                  <button onClick={() => setShowAddStaff(true)}
-                    style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
-                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-                    + Add
-                  </button>
+                  {canAddStaffOrDoctor && (
+                    <button onClick={() => setShowAddStaff(true)}
+                      style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                        cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                      + Add
+                    </button>
+                  )}
                 </div>
                 {deskOfficers.length === 0 ? (
                   <div style={{ padding: '12px 16px', fontSize: 12, color: C.textMuted, fontStyle: 'italic' }}>
@@ -1377,6 +1335,22 @@ export default function ClinicDetailPage() {
                 </div>
               </div>
 
+              {/* Booking eligibility */}
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Booking Eligibility</div>
+                  <button onClick={() => setShowEdit(true)}
+                    style={{ fontSize: 11, color: col.text, background: 'none', border: 'none',
+                      cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                    Edit
+                  </button>
+                </div>
+                <div style={{ padding: '12px 16px', fontSize: 12, color: C.textSub }}>
+                  {clinic ? fmtEligibility(clinic) : '—'}
+                </div>
+              </div>
+
               {/* Operating hours */}
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,
@@ -1415,12 +1389,14 @@ export default function ClinicDetailPage() {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {doctors.length} Doctor{doctors.length !== 1 ? 's' : ''} · {clinic?.name}
             </div>
-            <button onClick={() => setShowAssign(true)}
-              style={{ background: col.text, color: '#061208', border: 'none',
-                borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-              + Add Doctor
-            </button>
+            {canAddStaffOrDoctor && (
+              <button onClick={() => setShowAssign(true)}
+                style={{ background: col.text, color: '#061208', border: 'none',
+                  borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                + Add Doctor
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -1435,12 +1411,14 @@ export default function ClinicDetailPage() {
               <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
                 Assign existing hospital doctors or add new ones directly to this clinic.
               </div>
-              <button onClick={() => setShowAssign(true)}
-                style={{ background: col.text, color: '#061208', border: 'none',
-                  borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'inherit' }}>
-                + Add Doctor
-              </button>
+              {canAddStaffOrDoctor && (
+                <button onClick={() => setShowAssign(true)}
+                  style={{ background: col.text, color: '#061208', border: 'none',
+                    borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit' }}>
+                  + Add Doctor
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px,1fr))', gap: 14 }}>
@@ -1525,12 +1503,14 @@ export default function ClinicDetailPage() {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {staff.length} Staff Member{staff.length !== 1 ? 's' : ''} · {clinic?.name}
             </div>
-            <button onClick={() => setShowAddStaff(true)}
-              style={{ background: col.text, color: '#061208', border: 'none',
-                borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit' }}>
-              + Add Staff Member
-            </button>
+            {canAddStaffOrDoctor && (
+              <button onClick={() => setShowAddStaff(true)}
+                style={{ background: col.text, color: '#061208', border: 'none',
+                  borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit' }}>
+                + Add Staff Member
+              </button>
+            )}
           </div>
 
           {/* Sub-admin section */}
@@ -2028,8 +2008,11 @@ export default function ClinicDetailPage() {
           clinic={clinic}
           col={col}
           onClose={() => setShowEdit(false)}
-          onSave={(name, description, serviceTags, dailyBookingLimit) => {
-            setClinic(prev => prev ? { ...prev, name, description: description ?? null, service_tags: serviceTags, daily_booking_limit: dailyBookingLimit } : prev)
+          onSave={(name, description, serviceTags, dailyBookingLimit, minAge, maxAge, genderRestriction) => {
+            setClinic(prev => prev ? {
+              ...prev, name, description: description ?? null, service_tags: serviceTags,
+              daily_booking_limit: dailyBookingLimit, min_age: minAge, max_age: maxAge, gender_restriction: genderRestriction,
+            } : prev)
             setShowEdit(false)
           }}
         />

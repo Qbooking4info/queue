@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
-import Link from 'next/link'
 import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
@@ -23,6 +22,7 @@ export default function DoctorsPage() {
   const [linking, setLinking] = useState(false)
 
   const isFrontDesk = role === 'front_desk'
+  const canAddDoctor = role === 'hospital_admin' || role === 'super_admin'
 
   useEffect(() => {
     // Doctors (role=doctor) shouldn't access the full doctors list
@@ -52,20 +52,14 @@ export default function DoctorsPage() {
             {stats.activeDoctors} practitioner{stats.activeDoctors !== 1 ? 's' : ''} registered
           </div>
         </div>
-        {!isFrontDesk && (
+        {canAddDoctor && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={() => setLinking(true)}
-              style={{ background: C.card, color: C.textSub,
-                border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 18px',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              Link Existing Doctor
-            </button>
-            <Link href="/dashboard/doctors/add"
               style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
                 border: 'none', borderRadius: 10, padding: '10px 18px',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
-              + Invite Doctor
-            </Link>
+                fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              + Add Doctor by ID
+            </button>
           </div>
         )}
       </div>

@@ -105,15 +105,15 @@ describe('POST /api/clinic-staff', () => {
     expect(res.status).toBe(400)
   })
 
-  it('rejects a clinic_admin trying to mint a peer clinic_admin', async () => {
+  it('only allows super_admin/hospital_admin to reach staff creation -- clinic_admin can no longer mint staff of any kind', async () => {
     requireRoleMock.mockResolvedValue({
-      caller: { authId: 'auth-1', role: 'clinic_admin', hospitalId: 'HOSP_A', clinicId: 'CLINIC_A' },
+      caller: { authId: 'auth-1', role: 'hospital_admin', hospitalId: 'HOSP_A' },
     })
     dbMock.current = mockDb({
       hospital_clinics: { data: { hospital_id: 'HOSP_A' } },
     })
 
-    const res = await POST(
+    await POST(
       makeRequest({
         clinicId: 'CLINIC_A',
         hospitalId: 'HOSP_A',
@@ -124,6 +124,9 @@ describe('POST /api/clinic-staff', () => {
       }),
     )
 
-    expect(res.status).toBe(403)
+    // The route's only defense against a clinic_admin caller is no longer an
+    // inline check (removed -- staff creation is admin-only now, not "front
+    // desk only for clinic_admin") -- it's the role list passed to requireRole.
+    expect(requireRoleMock).toHaveBeenCalledWith(['super_admin', 'hospital_admin'], expect.anything())
   })
 })

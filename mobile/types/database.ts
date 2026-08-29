@@ -927,6 +927,64 @@ export type Database = {
         }
         Relationships: []
       }
+      dependent_links: {
+        Row: {
+          caretaker_id: string
+          created_at: string
+          dependent_id: string
+          id: string
+          linked_at: string
+          relationship: string
+          status: string
+          unlinked_at: string | null
+          unlinked_by: string | null
+        }
+        Insert: {
+          caretaker_id: string
+          created_at?: string
+          dependent_id: string
+          id?: string
+          linked_at?: string
+          relationship: string
+          status?: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+        }
+        Update: {
+          caretaker_id?: string
+          created_at?: string
+          dependent_id?: string
+          id?: string
+          linked_at?: string
+          relationship?: string
+          status?: string
+          unlinked_at?: string | null
+          unlinked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dependent_links_caretaker_id_fkey"
+            columns: ["caretaker_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dependent_links_dependent_id_fkey"
+            columns: ["dependent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dependent_links_unlinked_by_fkey"
+            columns: ["unlinked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dependents: {
         Row: {
           created_at: string | null
@@ -1580,11 +1638,14 @@ export type Database = {
           created_at: string | null
           daily_booking_limit: number | null
           description: string | null
+          gender_restriction: string | null
           hospital_id: string
           id: string
           is_active: boolean | null
           is_emergency: boolean
           is_opd: boolean
+          max_age: number | null
+          min_age: number | null
           name: string
           service_tags: string[]
           sort_order: number | null
@@ -1593,11 +1654,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name: string
           service_tags?: string[]
           sort_order?: number | null
@@ -1606,11 +1670,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id?: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name?: string
           service_tags?: string[]
           sort_order?: number | null
@@ -3037,6 +3104,7 @@ export type Database = {
           gender: string | null
           id: string
           is_verified: boolean | null
+          patient_code: string
           patient_id: string | null
           patient_number: string | null
           phone: string | null
@@ -3060,6 +3128,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3083,6 +3152,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null

@@ -21,6 +21,7 @@ import { AlertProvider }               from './contexts/AlertContext'
 import { AuthProvider, useAuth }       from './contexts/AuthContext'
 import { LocationProvider }            from './contexts/LocationContext'
 import { usePushNotifications }        from './hooks/usePushNotifications'
+import { useRingAlert, RingOverlay }   from './components/RingOverlay'
 
 // Patient screens
 import { SplashScreen }             from './screens/SplashScreen'
@@ -322,6 +323,14 @@ function AppNavigator() {
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
+  // Ring is a "doctor calls a patient in" feature -- only the plain-patient
+  // branch below (AppStack) should ever see it, not a doctor/staff/crew
+  // account signed into this same app. Mounted here (not inside HomeScreen)
+  // so the full-screen overlay fires no matter which tab the patient is on,
+  // not just Home -- same reasoning as usePushNotifications living at the root.
+  const isPlainPatient = !!session && !(staffMode && (doctorProfile || staffProfile || crewProfile))
+  const { ringNotif, dismissRing } = useRingAlert(isPlainPatient ? user?.id : undefined)
+
   if (loading) {
     return (
       <SafeAreaProvider>
@@ -350,6 +359,7 @@ function AppNavigator() {
           <SafeAreaProvider style={{ flex: 1 }}>
             <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
           </SafeAreaProvider>
+          {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
         </View>
       </SafeAreaProvider>
     )

@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation'
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { theme: C } = useTheme()
-  const { accessDenied, crewOnly, loading, signOut } = useAdmin()
+  const { accessDenied, crewOnly, patientOnly, loading, signOut } = useAdmin()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
@@ -29,23 +29,34 @@ function ShellLayout({ children }: { children: ReactNode }) {
 
   if (!loading && accessDenied) return null
 
-  // A crew account signing in on the web is not an error and not an intruder —
-  // it is someone using the wrong surface. Say so, instead of bouncing them to
-  // /login where a wrong password looks exactly the same.
-  if (!loading && crewOnly) {
+  // A crew or patient account signing in on the web is not an error and not an
+  // intruder — it is someone using the wrong surface. Say so, instead of bouncing
+  // them to /login where a wrong password looks exactly the same.
+  if (!loading && (crewOnly || patientOnly)) {
+    const copy = crewOnly
+      ? {
+          icon: '🚑',
+          body: 'Your sign-in worked. Ambulance crew jobs — going on duty, receiving dispatch '
+            + 'offers and updating a run — all happen in the mobile app. There is no crew '
+            + 'view in this dashboard.',
+        }
+      : {
+          icon: '🩺',
+          body: 'Your sign-in worked. This looks like a patient account — booking and managing '
+            + 'appointments happens in the Queue mobile app. There is no patient view in this '
+            + 'dashboard.',
+        }
     return (
       <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center',
         justifyContent: 'center', padding: 24, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
         <div style={{ maxWidth: 420, textAlign: 'center', background: C.card, border: `1px solid ${C.border}`,
           borderRadius: 16, padding: '32px 28px' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚑</div>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>{copy.icon}</div>
           <h1 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: '0 0 10px' }}>
             Use the Queue mobile app
           </h1>
           <p style={{ fontSize: 14, lineHeight: 1.55, color: C.textSub, margin: '0 0 22px' }}>
-            Your sign-in worked. Ambulance crew jobs — going on duty, receiving dispatch
-            offers and updating a run — all happen in the mobile app. There is no crew
-            view in this dashboard.
+            {copy.body}
           </p>
           <button onClick={signOut}
             style={{ background: C.accent, color: '#fff', border: 'none', borderRadius: 10,

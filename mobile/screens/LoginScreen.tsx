@@ -26,7 +26,7 @@ export function LoginScreen({ navigation }: Props) {
   async function handleLogin() {
     if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
     setBusy(true); setError('')
-    const err = await signIn(email.trim().toLowerCase(), pass)
+    const err = await signIn(email.trim().toLowerCase(), pass, 'patient')
     setBusy(false)
     if (err) setError(err)
   }

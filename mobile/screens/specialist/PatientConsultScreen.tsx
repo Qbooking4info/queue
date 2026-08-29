@@ -46,8 +46,8 @@ function calcBMI(weightKg: string, heightCm: string): string | null {
   return (w / (h * h)).toFixed(1)
 }
 
-function age(dob: string | null): string {
-  if (!dob) return '—'
+function age(dob: string | null): string | null {
+  if (!dob) return null
   const diff = Date.now() - new Date(dob).getTime()
   return Math.floor(diff / (365.25 * 24 * 3600 * 1000)) + ' yrs'
 }

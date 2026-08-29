@@ -14,14 +14,28 @@ export function ProfileScreen({ navigation }: Props) {
   const [signingOut, setSigningOut]         = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [idCopied, setIdCopied]             = useState(false)
+  const [codeCopied, setCodeCopied]         = useState(false)
 
+  // Two distinct, unrelated identifiers: patient_number (QB-XXXXXX) is the
+  // hospital's own record number, used by front desk to look up a returning
+  // patient for walk-in booking. patient_code (short alphanumeric, e.g. K7M3QX)
+  // is what this account shares to be linked as someone's dependent, or to add
+  // a caretaker of its own -- see DependentsScreen.tsx / RegisterScreen.tsx.
   const patientNumber = (user as any)?.patient_number ?? null
+  const patientCode   = (user as any)?.patient_code ?? null
 
   function copyPatientId() {
     if (!patientNumber) return
     Clipboard.setString(patientNumber)
     setIdCopied(true)
     setTimeout(() => setIdCopied(false), 2000)
+  }
+
+  function copyPatientCode() {
+    if (!patientCode) return
+    Clipboard.setString(patientCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
   }
 
   const initials = user?.full_name
@@ -47,7 +61,7 @@ export function ProfileScreen({ navigation }: Props) {
           <Text style={[styles.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
           <Text style={[styles.email, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
 
-          {/* Patient Number — copyable */}
+          {/* Patient Number — copyable (hospital's own record number) */}
           {patientNumber && (
             <TouchableOpacity onPress={copyPatientId} activeOpacity={0.7}
               style={[styles.patientIdRow, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
@@ -62,6 +76,29 @@ export function ProfileScreen({ navigation }: Props) {
                 <Ionicons name="copy-outline" size={13} color={t.textMuted} />
               )}
             </TouchableOpacity>
+          )}
+
+          {/* Patient ID — copyable (share this to be linked as a dependent, or to
+              add yourself as someone else's caretaker; see Dependents). */}
+          {patientCode && (
+            <>
+              <TouchableOpacity onPress={copyPatientCode} activeOpacity={0.7}
+                style={[styles.patientIdRow, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder, marginTop: 8 }]}>
+                <Text style={[styles.patientIdLabel, { color: t.accent }]}>Patient ID</Text>
+                <Text style={[styles.patientIdValue, { color: t.accent }]}>{patientCode}</Text>
+                {codeCopied ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Ionicons name="checkmark" size={11} color={t.accent} />
+                    <Text style={[styles.patientIdCopy, { color: t.accent }]}>Copied</Text>
+                  </View>
+                ) : (
+                  <Ionicons name="copy-outline" size={13} color={t.textMuted} />
+                )}
+              </TouchableOpacity>
+              <Text style={[styles.patientIdHint, { color: t.textMuted }]}>
+                Share this to be added as a dependent, or to link a caretaker
+              </Text>
+            </>
           )}
 
           <View style={styles.badges}>
@@ -187,6 +224,7 @@ const styles = StyleSheet.create({
   patientIdLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, opacity: 0.6 },
   patientIdValue: { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
   patientIdCopy:  { fontSize: 10, fontWeight: '600', marginLeft: 4 },
+  patientIdHint:  { fontSize: 10, marginTop: 5, textAlign: 'center' },
   badges:         { flexDirection: 'row', gap: 6, marginTop: 8 },
   badge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   badgeText:   { fontSize: 10, fontWeight: '700' },

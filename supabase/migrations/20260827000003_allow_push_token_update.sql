@@ -1,0 +1,18 @@
+-- ── Allow push_token to actually be saved ──────────────────────────────────
+-- 20260816000002 locked `users` UPDATE down to an explicit column allowlist
+-- that never included push_token -- it was only ever settable server-side in
+-- theory, but nothing writes it except the client-side `savePushToken()` calls
+-- in mobile/lib/api.ts and doctors/lib/api.ts, both plain `.update()` calls
+-- from the device itself. Since this is a column-level GRANT (not an RLS row
+-- policy), every one of those calls has been failing with a permission error
+-- -- silently, since neither call site checked the result -- meaning no
+-- device has ever actually had a push token on file. Confirmed as the root
+-- cause of "ring doesn't reach a closed/backgrounded app": with no token
+-- stored, web/src/lib/notify-patient.ts's push branch never had anything to
+-- send to.
+--
+-- Safe for the same reason the date_of_birth grant added in 20260827000002
+-- was: still governed by the existing "Users can update own profile" RLS
+-- policy (auth_id = auth.uid()), so a device can only ever set its own
+-- account's token, never someone else's.
+GRANT UPDATE (push_token) ON users TO authenticated;

@@ -36,6 +36,7 @@ See migration `20260816000002`.
 | `is_super_admin` | boolean | yes | Platform-wide admin flag |
 | `active_hospital_id` | uuid | yes | FK → hospitals. Added Aug 2026. Disambiguates which of a doctor's linked `doctors` rows (see below) is "current" when they have more than one; ignored for patients. Self-service update is RLS-gated to hospitals the caller actually has an active `doctors` row at |
 | `doctor_code` | text | no | Unique, auto-generated (`generate_doctor_code()`, `20260821000001`). A short (6-char, unambiguous-alphabet) human-typeable ID — what `POST /api/doctors/link` actually looks up, replacing the raw `id` UUID doctors used to have to copy-paste. Every user gets one (not just doctors — no reliable INSERT-time signal for "is a doctor" yet), system-generated only, never client-writable |
+| `patient_code` | text | no | Unique, auto-generated (`generate_patient_code()`, `20260827000001`) — same shape as `doctor_code`, kept as a separate column/concept on purpose. What `POST /api/dependents/link` looks up to link a caretaker to a dependent's own real account |
 | `created_at` | timestamptz | yes | |
 | `updated_at` | timestamptz | yes | |
 
@@ -415,7 +416,12 @@ One-off date overrides (blocked days, holiday closures).
 
 ## Patient Tables
 
-### `dependents`
+### `dependents` (superseded, `20260827000001`)
+
+A profile-only blob (name/DOB/relationship, no login) — replaced going forward by
+`dependent_links` (below), which links to the dependent's own real account. No new rows can be
+created via the app anymore; existing rows and the historical appointments/`transport_requests`
+referencing them via `dependent_id` are untouched.
 
 | Column | Type | Nullable | Notes |
 |---|---|---|---|
@@ -426,6 +432,28 @@ One-off date overrides (blocked days, holiday closures).
 | `gender` | text | yes | |
 | `relationship` | text | yes | e.g. `Child`, `Spouse` |
 | `created_at` | timestamptz | yes | |
+
+### `dependent_links` (`20260827000001`)
+
+Links a caretaker's account to a dependent's own, independently-registered account — see the
+migration-history entry above for the full design (identity resolution, RLS, the
+`fn_set_appointment_patient_id` fix that made booking-for-a-dependent actually work).
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `caretaker_id` | uuid | no | FK → users |
+| `dependent_id` | uuid | no | FK → users. Unique partial index `WHERE status='active'` — one active caretaker at a time |
+| `relationship` | text | no | `spouse` \| `child` \| `parent` \| `sibling` \| `other` |
+| `status` | text | no | `active` \| `unlinked` |
+| `linked_at` | timestamptz | no | |
+| `unlinked_at` | timestamptz | yes | |
+| `unlinked_by` | uuid | yes | FK → users — whoever ended it (either side can, but the dependent only if 18+, see `POST /api/dependents/unlink`) |
+| `created_at` | timestamptz | no | |
+
+RLS: SELECT only (caretaker sees their own links, dependent sees links where they're the
+dependent) — no INSERT/UPDATE policy at all; every write goes through the service-role-backed
+`/api/dependents/link` and `/unlink` routes, same trust model as doctor-hospital linking.
 
 ### `user_insurance`
 
@@ -711,3 +739,6 @@ Batch hospital payouts.
 | `20260823000001` | `renumber_doctor_queue()`'s `estimated_wait` formula gains a baseline term: previously only `(position-1) * avg_consult_duration_secs` (implicitly assuming the first patient in line waits zero minutes after check-in). Now `estimated_wait = round((avg_wait_secs + (position-1) * avg_consult_secs) / 60)`, where `avg_consult_secs` stays per-doctor but `avg_wait_secs` (`waiting_time_secs`) is scoped to the doctor's own `clinic_id` if they have one, else hospital-wide — check-in-to-start overhead is treated as an operational/clinic characteristic, not a per-doctor one. NULL only when both averages are null; a single missing average is treated as 0 |
 | `20260823000002` | Adds `"Patients can read own vitals"` SELECT policy on `vitals_audit_log` — previously **no** patient-facing policy existed at all (only doctor and front-desk ones), which silently broke the patient app's "Vitals recorded during visit" section (compounding the fact it was ALSO still reading the long-dropped `appointments.vitals_*` columns — see `Queue-API-Routes.md`) |
 | `20260823000003` | **Infrastructure fix, not a schema change:** `ALTER PUBLICATION supabase_realtime ADD TABLE ...` for `appointments`, `virtual_sessions`, `transport_requests`, `ambulance_current_location`, `notifications`. Discovered live while building the patient app's "ring" alert: the publication — what Postgres logical replication actually uses to emit `postgres_changes` events, independent of and upstream of RLS — contained only `transport_patient_location`. Every other realtime subscription in the codebase (8 separate screens watching `appointments` alone, across web/doctors/mobile) had been silently inert since written: no error, the subscription just never fires. Confirmed via direct query against the live publication before writing the fix, not guessed |
+| `20260825000001` | Adds `can_view_patient_profile(p_patient_id)` (`STABLE SECURITY DEFINER`) + a `users` SELECT policy using it, so a doctor/front-desk viewer can read their patient's basic profile (name, phone, DOB, gender) for an appointment they're already allowed to see. `users` previously had only "read own profile" policies, so `PatientConsultScreen.tsx`'s embedded `patient:users!appointments_patient_id_fkey(...)` join always silently resolved to null. **First attempt used a plain `EXISTS (SELECT 1 FROM appointments WHERE patient_id = users.id)` directly in the policy** — caused `infinite recursion detected in policy for relation "users"` for every query against `users` (including a doctor's own login self-lookup) because `appointments`' own SELECT policies query `users` right back to resolve `auth.uid()`. Broke doctor login app-wide for a few minutes before being caught and rolled back; fixed the same way `current_doctor_ids()` avoids this — a `SECURITY DEFINER` function's internal queries bypass RLS entirely, so resolving the relationship inside the function never re-triggers `users`' policies |
+| `20260826000001` | Per-clinic booking eligibility: adds `hospital_clinics.min_age`/`max_age`/`gender_restriction` (all nullable — null/null/null = all ages, all genders) + `check_clinic_booking_eligibility()`, a `BEFORE INSERT ON appointments` trigger (same pattern as `check_duplicate_active_booking`/`check_plan_booking_limit`) blocking a booking whose patient (or dependent, resolved the same `dependent_id`-vs-`patient_id` way) doesn't meet the target clinic's configured restriction. Exempts `urgency = 'emergency'`. Unknown DOB/gender is treated as a hard block (not a pass), asking the patient to complete their profile, rather than assuming eligibility |
+| `20260827000001` | **Real-account dependent linking** — replaces the old profile-only `dependents` table (name/DOB/relationship blob, no login, still kept for historical rows) with linking to a dependent's own real, independently-registered account. Adds `users.patient_code` (mirrors `doctor_code` exactly, kept as a separate column/concept on purpose) and `dependent_links` (`caretaker_id`, `dependent_id`, `relationship`, `status`, `unlinked_at`/`unlinked_by`; unique partial index on `dependent_id WHERE status='active'` — a dependent can only have one active caretaker at a time, enforced at the DB level). Adds `current_patient_ids()` (`SECURITY DEFINER`, mirrors `current_doctor_ids()`) and extends `appointments`' patient SELECT/INSERT/UPDATE policies, a new `users` SELECT policy, and `vitals_audit_log`'s patient policy to use it — applied and verified one policy at a time (self-lookup re-tested after each), learned from `20260825000001`'s recursion incident. Also fixed, as a side effect of the same change: `patients_insert_own`'s `WITH CHECK (true)` had been unconditionally granting every authenticated user permission to insert an appointment under **any** `patient_id` (Postgres OR-combines permissive policies, so this made the real identity check in `appointments_patient_insert` moot) — tightened to the real, now dependent-aware check. **Critical fix found only by testing a real insert, not by reading RLS**: a pre-existing trigger, `fn_set_appointment_patient_id` (predates this migration, not otherwise documented), unconditionally overwrote `NEW.patient_id` to the caller's own resolved id on every direct client insert — presumably why `dependent_id` existed as a separate column in the first place. Fixed to only force it back when the client's `patient_id` isn't in `current_patient_ids()`, preserving the original anti-spoofing behavior (confirmed live: still can't set `patient_id` to an unrelated stranger) while allowing "book using my linked dependent's own account." `check_duplicate_active_booking`/`check_clinic_booking_eligibility` needed no changes — both already resolve age/gender/duplicates via `patient_id` when `dependent_id IS NULL`, exactly this shape. "Caretaker always pays" is enforced in `web/src/app/api/payments/initialize/route.ts` (application code, not RLS) — see `Queue-API-Routes.md` |

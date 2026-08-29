@@ -47,9 +47,18 @@ export async function POST(req: NextRequest) {
   const resolved = await resolveAppointmentFee(db, appointmentId)
   if (!resolved) return Errors.notFound('Appointment')
 
-  // Only the patient on the booking may pay for it.
+  // Only the patient on the booking, or their active caretaker, may pay for it --
+  // a linked dependent's booking has the DEPENDENT'S OWN id as patient_id (see
+  // 20260827000001_dependent_account_linking.sql), so "caretaker always pays"
+  // needs this explicit check rather than relying on patient_id === caller.id.
   if (resolved.patientId && resolved.patientId !== caller.id) {
-    return Errors.forbidden('This booking belongs to another patient')
+    const { data: link } = await db.from('dependent_links')
+      .select('id')
+      .eq('caretaker_id', caller.id)
+      .eq('dependent_id', resolved.patientId)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!link) return Errors.forbidden('This booking belongs to another patient')
   }
 
   const { data: appt } = await db

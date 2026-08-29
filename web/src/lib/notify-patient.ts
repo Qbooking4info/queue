@@ -1,15 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
-    })
-  } catch { /* best-effort */ }
-}
+import { sendExpoPush } from '@/lib/push'
 
 // Shared by the appointments PATCH route and the front-desk server actions so
 // both approve/reject paths (web queue page, front-desk page, mobile) notify
@@ -38,6 +29,6 @@ export async function notifyPatient(
     })
 
     const pushToken = (patient as any)?.push_token
-    if (pushToken) await sendExpoPush(pushToken, title, body, { appointment_id: appointmentId })
+    if (pushToken) await sendExpoPush(db, appt.patient_id, pushToken, title, body, { appointment_id: appointmentId })
   } catch { /* best-effort — never block the approval/rejection action */ }
 }

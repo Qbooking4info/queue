@@ -8,11 +8,12 @@ import { checkRateLimit } from '@/lib/rate-limit'
 // account (from the doctors/ app) to the caller's hospital, given the doctor's own
 // short Doctor ID (users.doctor_code, a 6-character human-typeable code -- see
 // 20260821000001_short_doctor_code.sql -- shown to the doctor in the doctors app to
-// copy and share; NOT the raw users.id UUID this used to be keyed on). This is the
-// self-service counterpart to POST /api/doctors, which creates a brand new doctor +
-// portal login from scratch -- this one instead finds an account that already exists
-// and adds a hospital-scoped doctors row for it, the same shape every other
-// hospital-scoped query already expects (no changes needed anywhere that reads
+// copy and share; NOT the raw users.id UUID this used to be keyed on). This is now
+// the ONLY way a hospital adds a doctor -- the old POST /api/doctors, which created a
+// brand new doctor + portal login from scratch, was removed so every doctor is a real
+// self-registered account, not a hospital-issued one. This finds an account that
+// already exists and adds a hospital-scoped doctors row for it, the same shape every
+// other hospital-scoped query already expects (no changes needed anywhere that reads
 // doctors.hospital_id). The doctor's own account can go on to be linked to any number
 // of other hospitals the same way -- see users.active_hospital_id
 // (20260816000001_doctor_independent_accounts.sql) for how a doctor with multiple
@@ -30,7 +31,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 // bio, years_experience, mdcn_number, avatar_url -- still auto-transfers from their
 // existing profile with no admin input, exactly like POST already did.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'super_admin'], req)
+  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'clinic_admin', 'super_admin'], req)
+  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()

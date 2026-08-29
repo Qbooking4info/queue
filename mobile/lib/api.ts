@@ -143,6 +143,9 @@ export type Clinic = {
   sort_order:          number | null
   daily_booking_limit: number | null
   service_tags:        string[]
+  min_age:             number | null
+  max_age:             number | null
+  gender_restriction:  'male' | 'female' | null
 }
 
 export async function getClinicsForHospital(hospitalId: string): Promise<Clinic[]> {
@@ -317,6 +320,7 @@ export type AppointmentWithRelations = Appointment & {
   doctor:   AppointmentDoctor   | null
   hospital: AppointmentHospital | null
   clinic:   Clinic              | null
+  patient:  { id: string; full_name: string } | null
 }
 
 // Same column-privacy reasoning as DOCTOR_SELECT/APPOINTMENT_HOSPITAL_SELECT above --
@@ -324,18 +328,23 @@ export type AppointmentWithRelations = Appointment & {
 // own appointments), but the embedded doctor/hospital columns still need their own
 // allowlist so a patient's device doesn't receive staff login emails/MDCN numbers/
 // hospital registration numbers for every doctor and hospital on their appointments.
+// patient is just id+name -- enough to show a "for: {name}" tag on a linked
+// dependent's booking (readable via the "Caretakers can read linked dependent
+// profile" users policy, 20260827000001) without over-fetching their profile.
 const APPOINTMENT_SELECT = `*, doctor:doctors!appointments_doctor_id_fkey(${DOCTOR_SELECT}), ` +
   `hospital:hospitals!appointments_hospital_id_fkey(${APPOINTMENT_HOSPITAL_SELECT}), ` +
-  'clinic:hospital_clinics!appointments_clinic_id_fkey(*)'
+  'clinic:hospital_clinics!appointments_clinic_id_fkey(*), ' +
+  'patient:users!appointments_patient_id_fkey(id, full_name)'
 
-export async function getPatientAppointments(
-  patientId: string
-): Promise<Result<AppointmentWithRelations[]>> {
-  // Must use the authenticated supabase client so RLS can verify the user session
+// No .eq('patient_id', ...) filter -- RLS (current_patient_ids(), see
+// 20260827000001_dependent_account_linking.sql) already scopes this to the
+// caller's own appointments AND any linked dependents' appointments, so this
+// naturally returns a merged list once dependents are linked. Must use the
+// authenticated supabase client so RLS can verify the user session.
+export async function getPatientAppointments(): Promise<Result<AppointmentWithRelations[]>> {
   const { data, error } = await supabase
     .from('appointments')
     .select(APPOINTMENT_SELECT)
-    .eq('patient_id', patientId)
     .order('appointment_date', { ascending: false })
   if (error) {
     console.warn('[getPatientAppointments]', error.message, error.details)
@@ -947,7 +956,8 @@ export async function markAllNotificationsRead(userId: string) {
 // ── Push token ───────────────────────────────────────────────────────────────
 
 export async function savePushToken(userId: string, token: string): Promise<void> {
-  await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+  const { error } = await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+  if (error) console.warn('[savePushToken] failed to save push token:', error.message)
 }
 
 // ── User profile ─────────────────────────────────────────────────────────────
@@ -1032,26 +1042,104 @@ export async function deleteAccount(apiUrl: string, jwt: string): Promise<boolea
   }
 }
 
-// ── Dependents ────────────────────────────────────────────────────────────────
+// ── Dependents (real-account linking) ───────────────────────────────────────
+// Replaces the old profile-only `dependents` table (name/DOB/relationship blob,
+// no login) -- a dependent is now a real, independently-registered account
+// linked by its own short Patient ID, so it can eventually stand on its own
+// (self-unlink at 18+) and its medical history is genuinely its own. Historical
+// old-style dependents/appointments are untouched, just no longer creatable.
+// All writes go through these service-role-backed routes, same trust model as
+// doctor-hospital linking -- looking someone else's account up by code can't be
+// done under the caller's own RLS.
 
-export async function getDependents(userId: string) {
-  const { data } = await supabase.from('dependents').select('*').eq('user_id', userId).order('full_name')
-  return data ?? []
+async function dependentsAuthHeader(): Promise<Record<string, string> | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const jwt = session?.access_token
+  return jwt ? { Authorization: `Bearer ${jwt}` } : null
 }
 
-export async function addDependent(userId: string, payload: { full_name: string; relationship: string; date_of_birth?: string; gender?: string }) {
-  const { data, error } = await supabase.from('dependents').insert({ user_id: userId, ...payload }).select('*').single()
-  return error ? null : data
+export interface LinkedDependent {
+  linkId: string
+  relationship: string
+  dependent: { id: string; full_name: string; date_of_birth: string | null; gender: string | null }
+}
+export interface ManagedByCaretaker {
+  linkId: string
+  relationship: string
+  caretaker: { id: string; full_name: string }
 }
 
-export async function updateDependent(id: string, payload: Partial<{ full_name: string; relationship: string; date_of_birth: string; gender: string }>) {
-  const { error } = await supabase.from('dependents').update(payload).eq('id', id)
-  return !error
+// Every call here is wrapped in try/catch and always resolves (never rejects) --
+// a caller that awaits one of these inside a load()-then-setLoading(false)
+// sequence must never get stuck mid-await on a network failure. Confirmed live:
+// before this, a CORS misconfiguration on the server made fetch() reject with
+// "Failed to fetch", which propagated straight out of an un-caught
+// getLinkedDependents() and left the Dependents screen spinning forever since
+// setLoading(false) was never reached.
+export async function getLinkedDependents(): Promise<{ managing: LinkedDependent[]; managedBy: ManagedByCaretaker | null }> {
+  try {
+    const headers = await dependentsAuthHeader()
+    if (!headers) return { managing: [], managedBy: null }
+    const res = await fetch(`${API_URL}/api/dependents/linked`, { headers })
+    if (!res.ok) return { managing: [], managedBy: null }
+    return await res.json()
+  } catch (e) {
+    console.warn('[getLinkedDependents]', e instanceof Error ? e.message : e)
+    return { managing: [], managedBy: null }
+  }
 }
 
-export async function deleteDependent(id: string) {
-  const { error } = await supabase.from('dependents').delete().eq('id', id)
-  return !error
+// direction 'caretaker' (default): the caller is looking up/linking a DEPENDENT
+// by the dependent's own code (the original "Link by ID" flow). direction
+// 'dependent': the caller IS the dependent, looking up/linking a CARETAKER by
+// the caretaker's code (used at signup and by "Add a caretaker" in Dependents).
+export async function lookupPatientByCode(code: string, direction: 'caretaker' | 'dependent' = 'caretaker'): Promise<
+  { ok: true; fullName: string; dateOfBirth: string | null; alreadyLinked: boolean } | { ok: false; error: string }
+> {
+  try {
+    const headers = await dependentsAuthHeader()
+    if (!headers) return { ok: false, error: 'Not authenticated' }
+    const res = await fetch(`${API_URL}/api/dependents/link?code=${encodeURIComponent(code.trim())}&as=${direction}`, { headers })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not find that Patient ID' }
+    return { ok: true, fullName: body.fullName, dateOfBirth: body.dateOfBirth ?? null, alreadyLinked: !!body.alreadyLinked }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function linkDependent(code: string, relationship: string, direction: 'caretaker' | 'dependent' = 'caretaker'): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const headers = await dependentsAuthHeader()
+    if (!headers) return { ok: false, error: 'Not authenticated' }
+    const res = await fetch(`${API_URL}/api/dependents/link`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code.trim(), relationship, as: direction }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not link that account' }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function unlinkDependent(linkId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const headers = await dependentsAuthHeader()
+    if (!headers) return { ok: false, error: 'Not authenticated' }
+    const res = await fetch(`${API_URL}/api/dependents/unlink`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkId }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not unlink' }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
 }
 
 // ── Medical history ───────────────────────────────────────────────────────────

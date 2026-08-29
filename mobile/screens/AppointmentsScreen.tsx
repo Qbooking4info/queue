@@ -51,7 +51,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
   const load = useCallback(async (silent = false) => {
     if (!user) return
     if (!silent) setLoading(true)
-    const result = await getPatientAppointments(user.id)
+    const result = await getPatientAppointments()
     if (result.ok) {
       setLoadError(null)
       setAppts(result.data)
@@ -221,6 +221,13 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                         style={{ marginRight: 4 }}
                       />
                       <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
+                      {a.patient && a.patient.id !== user?.id && (
+                        <View style={{ backgroundColor: t.accentBg, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: t.accent }}>
+                            FOR {a.patient.full_name.split(' ')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
                       {isEmergency && (
                         <View style={{ backgroundColor: '#FF5C5C', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>

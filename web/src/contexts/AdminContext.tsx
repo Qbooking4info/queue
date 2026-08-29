@@ -26,6 +26,8 @@ interface AdminContextValue {
   accessDenied: boolean
   /** Signed in with a valid account that has no dashboard — currently ambulance crew. */
   crewOnly: boolean
+  /** Signed in with a valid account that has no dashboard — a plain patient account. */
+  patientOnly: boolean
   reload: () => Promise<void>
   signOut: () => Promise<void>
   switchHospital: (h: AdminHospital) => Promise<void>
@@ -36,7 +38,7 @@ const AdminContext = createContext<AdminContextValue>({
   user: null, role: null, doctorId: null, clinicId: null, clinicName: null, doctorAvailability: null,
   hospital: null, allHospitals: [],
   stats: { todayTotal: 0, todayCompleted: 0, activeDoctors: 0, avgRating: 4.8, totalBookings: 0, reviewCount: 0 },
-  doctors: [], todayAppointments: [], loading: true, accessDenied: false, crewOnly: false,
+  doctors: [], todayAppointments: [], loading: true, accessDenied: false, crewOnly: false, patientOnly: false,
   reload: async () => {}, signOut: async () => {}, switchHospital: async () => {}, clearHospital: () => {},
 })
 
@@ -57,6 +59,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading]   = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
   const [crewOnly, setCrewOnly] = useState(false)
+  const [patientOnly, setPatientOnly] = useState(false)
 
   async function load() {
     let session: any = null
@@ -92,6 +95,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       // reads as a rejected password rather than a wrong app.
       const body = await res.json().catch(() => ({}))
       if (body?.code === 'CREW_MOBILE_ONLY') setCrewOnly(true)
+      else if (body?.code === 'PATIENT_MOBILE_ONLY') setPatientOnly(true)
       else setAccessDenied(true)
       setLoading(false)
       return
@@ -154,7 +158,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   return (
     <AdminContext.Provider value={{
       user, role, doctorId, clinicId, clinicName, doctorAvailability, hospital, allHospitals, stats, doctors,
-      todayAppointments, loading, accessDenied, crewOnly, reload: load, signOut, switchHospital, clearHospital,
+      todayAppointments, loading, accessDenied, crewOnly, patientOnly, reload: load, signOut, switchHospital, clearHospital,
     }}>
       {children}
     </AdminContext.Provider>

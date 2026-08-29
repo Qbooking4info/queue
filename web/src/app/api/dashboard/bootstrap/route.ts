@@ -21,7 +21,20 @@ export async function GET(req: NextRequest) {
   // properly below. There is no crew view in this dashboard, and adding it here
   // grants no data -- the explicit 403 immediately after is the whole point.
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor', 'ambulance_crew'])
-  if (auth instanceof NextResponse) return auth
+  if (auth instanceof NextResponse) {
+    // The `allowed` list above already covers every role requireRole can ever resolve,
+    // so a 403 here (as opposed to a 401 for no session at all) can only mean: a real,
+    // signed-in account with no admin/doctor/crew row anywhere -- i.e. a plain patient.
+    // Same "valid login, wrong surface" treatment as the ambulance_crew case below,
+    // instead of the silent unauthorized bounce this used to fall through to.
+    if (auth.status === 403) {
+      return NextResponse.json(
+        { error: 'Patient accounts use the Queue mobile app', code: 'PATIENT_MOBILE_ONLY' },
+        { status: 403 },
+      )
+    }
+    return auth
+  }
   const { caller } = auth
 
   // Crew accounts are real, valid logins with no dashboard to land on. They

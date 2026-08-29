@@ -1,0 +1,61 @@
+diff --git a/node_modules/react-native-agora/android/.gradle/9.2.0/checksums/checksums.lock b/node_modules/react-native-agora/android/.gradle/9.2.0/checksums/checksums.lock
+new file mode 100644
+index 0000000..e728c13
+Binary files /dev/null and b/node_modules/react-native-agora/android/.gradle/9.2.0/checksums/checksums.lock differ
+diff --git a/node_modules/react-native-agora/android/.gradle/9.2.0/fileChanges/last-build.bin b/node_modules/react-native-agora/android/.gradle/9.2.0/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/react-native-agora/android/.gradle/9.2.0/fileChanges/last-build.bin differ
+diff --git a/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.bin b/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.bin
+new file mode 100644
+index 0000000..febd4e7
+Binary files /dev/null and b/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.bin differ
+diff --git a/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.lock b/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..8cc3f4d
+Binary files /dev/null and b/node_modules/react-native-agora/android/.gradle/9.2.0/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/react-native-agora/android/.gradle/9.2.0/gc.properties b/node_modules/react-native-agora/android/.gradle/9.2.0/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..df1cee2
+Binary files /dev/null and b/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/cache.properties b/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..148a3e0
+--- /dev/null
++++ b/node_modules/react-native-agora/android/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Fri Aug 28 14:30:35 WAT 2026
++gradle.version=9.2.0
+diff --git a/node_modules/react-native-agora/android/.gradle/vcs-1/gc.properties b/node_modules/react-native-agora/android/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-agora/android/build.gradle b/node_modules/react-native-agora/android/build.gradle
+index 0951a39..f8c2aee 100644
+--- a/node_modules/react-native-agora/android/build.gradle
++++ b/node_modules/react-native-agora/android/build.gradle
+@@ -165,8 +165,20 @@ dependencies {
+   implementation "com.facebook.react:react-native:+"
+   implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+   /// dependencies start
+-  implementation 'io.agora.rtc:full-screen-sharing:4.6.2.70'
+-  api 'io.agora.rtc:agora-special-full:4.6.2.70'
++  // Trimmed from the default 'agora-special-full' (bundles every optional
++  // extension: AI noise suppression, echo cancellation, face capture,
++  // segmentation, spatial audio, lip sync, AR/"clear vision", audio beauty,
++  // content inspection, AV1 encoding -- ~110MB of native libs per ABI) down
++  // to 'full-rtc-basic', the core engine only. VideoCallScreen.native.tsx and
++  // DoctorVideoCallScreen.native.tsx only ever call createAgoraRtcEngine()
++  // and engine.initialize() -- none of the extension APIs are used anywhere
++  // in this app. full-screen-sharing dropped too; screen sharing isn't used
++  // either. See patches/react-native-agora+*.patch (patch-package) for why
++  // this survives a fresh node_modules install instead of just node_modules.
++  // full-rtc-basic is versioned without the vendor-specific ".70" build tag
++  // agora-special-full uses -- 4.6.2 (confirmed on Maven Central) is the
++  // matching plain release for this SDK version line.
++  api 'io.agora.rtc:full-rtc-basic:4.6.2'
+   api 'io.agora.rtc:iris-rtc:4.6.2-build.1'
+   /// dependencies end
+ }

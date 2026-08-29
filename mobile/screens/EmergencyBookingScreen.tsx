@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import { useLocation } from '../contexts/LocationContext'
-import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getDependents, findEmergencyClinic } from '../lib/api'
+import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getLinkedDependents, findEmergencyClinic, type LinkedDependent } from '../lib/api'
 import { requestAmbulance, triageForSymptom } from '../lib/ambulance-api'
 import { toDisplayHospital } from '../lib/adapters'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
@@ -121,8 +121,9 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   const [symptom,           setSymptom]          = useState('')
   const [customSymptom,     setCustomSymptom]    = useState('')
   const [forDependent,      setForDependent]     = useState(false)
-  // MH7: track which dependent to book for
-  const [dependentsList,    setDependentsList]   = useState<any[]>([])
+  // Tracks which LINKED (real-account) dependent to book for -- selectedDependentId
+  // is that dependent's own users.id.
+  const [dependentsList,    setDependentsList]   = useState<LinkedDependent[]>([])
   const [selectedDependentId, setSelectedDependentId] = useState<string | null>(null)
   const [hospitals,         setHospitals]        = useState<DisplayHospital[]>([])
   const [loadingHospitals,  setLoadingHospitals] = useState(false)
@@ -157,12 +158,16 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
   useEffect(() => { loadHospitals() }, [loadHospitals])
 
-  // MH7: load dependents when user selects "A dependent"
+  // Load linked (real-account) dependents when the user selects "A dependent".
+  // Ambulance dispatch for a dependent isn't migrated to the new linked-account
+  // system yet (transport_requests.dependent_id still FKs the old profile-only
+  // dependents table) -- the picker below only feeds the hospital-appointment
+  // path; selecting a dependent has no effect on the ambulance branch.
   useEffect(() => {
     let cancelled = false
     if (forDependent && user && dependentsList.length === 0) {
-      getDependents(user.id)
-        .then(rows => { if (!cancelled) setDependentsList(rows) })
+      getLinkedDependents()
+        .then(({ managing }) => { if (!cancelled) setDependentsList(managing) })
         .catch(err => console.warn('[emergency] failed to load dependents', err))
     }
     if (!forDependent) setSelectedDependentId(null)
@@ -226,7 +231,11 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           lng:                   coords.longitude,
           contactPhone:          user.phone ?? undefined,
           symptomDescription:    symptom || customSymptom,
-          dependentId:           forDependent && selectedDependentId ? selectedDependentId : undefined,
+          // Ambulance dispatch-for-a-dependent isn't migrated to the new
+          // linked-account system yet (transport_requests.dependent_id still FKs
+          // the old profile-only dependents table, which selectedDependentId no
+          // longer points at) -- out of scope for this pass, see
+          // 20260827000001_dependent_account_linking.sql.
           destinationHospitalId: selectedHospital ? String(selectedHospital.id) : undefined,
           paymentMethod,
         })
@@ -246,8 +255,10 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     const startTime = arrivalToTime(arrival ?? 'Now (walk-in)')
     const reason    = `EMERGENCY · ${symptom || customSymptom}`
 
+    // A linked dependent's booking uses THEIR OWN account as patientId (medically
+    // correct -- history follows the real person), not the old dependentId column.
     const result = await createHospitalAppointment({
-      patientId:     user.id,
+      patientId:     forDependent && selectedDependentId ? selectedDependentId : user.id,
       hospitalId:    String(selectedHospital.id),
       date:          today,
       startTime,
@@ -255,7 +266,6 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       reason,
       urgency:       u.id,
       clinicId:      erClinicId,
-      dependentId:   forDependent && selectedDependentId ? selectedDependentId : undefined,
       paymentMethod: paymentMethod,
     })
 
@@ -363,19 +373,19 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))}
           </View>
-          {/* MH7: dependent selector */}
+          {/* Linked (real-account) dependent selector */}
           {forDependent && dependentsList.length > 0 && (
             <View style={{ marginTop: 10 }}>
               {dependentsList.map(d => (
-                <TouchableOpacity key={d.id} onPress={() => setSelectedDependentId(d.id)}
+                <TouchableOpacity key={d.linkId} onPress={() => setSelectedDependentId(d.dependent.id)}
                   style={[s.forBtn, {
                     flexDirection: 'row', justifyContent: 'flex-start', gap: 10, marginBottom: 8,
-                    borderColor:     selectedDependentId === d.id ? t.accent : t.cardBorder,
-                    backgroundColor: selectedDependentId === d.id ? t.accentBg : t.cardBg,
+                    borderColor:     selectedDependentId === d.dependent.id ? t.accent : t.cardBorder,
+                    backgroundColor: selectedDependentId === d.dependent.id ? t.accentBg : t.cardBg,
                   }]}>
                   <Ionicons name="person-outline" size={16} color="rgba(255,255,255,0.6)" />
-                  <Text style={[s.forBtnText, { color: selectedDependentId === d.id ? t.accent : t.textMuted }]}>
-                    {d.full_name} {d.relationship ? `(${d.relationship})` : ''}
+                  <Text style={[s.forBtnText, { color: selectedDependentId === d.dependent.id ? t.accent : t.textMuted }]}>
+                    {d.dependent.full_name} ({d.relationship})
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -383,7 +393,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           )}
           {forDependent && dependentsList.length === 0 && (
             <Text style={[s.noteInline, { color: t.textMuted, marginTop: 8 }]}>
-              No dependents added yet. Add a dependent in Profile › Dependents.
+              No linked dependents yet. Link one in Profile › Dependents.
             </Text>
           )}
           <View style={{ height: 20 }} />

@@ -52,35 +52,6 @@ export function RoleSelectScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Hospital / Staff */}
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={s.sectionHeader}>
-            <View style={[s.sectionIcon, { backgroundColor: 'rgba(91,158,255,0.15)' }]}>
-              <Ionicons name="business-outline" size={22} color="#5B9EFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.sectionTitle, { color: t.textPrimary }]}>Hospital / Staff</Text>
-              <Text style={[s.sectionSub, { color: t.textMuted }]}>Manage queues, staff & appointments</Text>
-            </View>
-          </View>
-          <View style={s.btnRow}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('HospitalAuth', { screen: 'HospitalPortal' })}
-              style={[s.btn, { borderColor: '#5B9EFF', backgroundColor: 'transparent', flex: 1 }]}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.btnText, { color: '#5B9EFF' }]}>Sign In</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('HospitalAuth', { screen: 'HospitalRegister' })}
-              style={[s.btn, { backgroundColor: '#5B9EFF', borderColor: '#5B9EFF', flex: 1 }]}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.btnText, { color: '#fff' }]}>Register Hospital</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
       </View>
 
       <Text style={[s.footer, { color: t.textMuted }]}>
