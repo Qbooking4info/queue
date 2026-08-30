@@ -11,14 +11,16 @@ const { withAppBuildGradle } = require('expo/config-plugins')
  * Agora loads extensions lazily via dlopen, so dropping the .so disables a feature we
  * never switch on. This is Agora's own documented way to shrink the SDK.
  *
- * Kept deliberately: libagora-rtc-sdk, libAgoraRtcWrapper, libvideo_enc/dec (the call
- * itself), and libagora-ffmpeg/fdkaac/soundtouch -- media-player codecs that are very
- * likely unused too, but worth removing in their own build so a regression is easy to
- * attribute.
+ * Do NOT add libagora-ffmpeg.so, libagora-fdkaac.so or libagora-soundtouch.so here.
+ * They look like dead media-player codecs and are another ~11 MB on arm64+v7a, but
+ * libagora-rtc-sdk.so holds a hard DT_NEEDED on all three, so excluding them makes
+ * the core SDK fail to load with UnsatisfiedLinkError the moment a call starts. This
+ * was measured, not assumed:
  *
- * `packagingOptions.excludes` (the shorthand android/app/build.gradle already reads
- * from gradle.properties) maps to *Java* resources in AGP 8 and will not touch .so
- * files, so this has to go through the jniLibs block.
+ *   llvm-readelf -d lib/arm64-v8a/libagora-rtc-sdk.so | grep NEEDED
+ *
+ * Anything added to EXCLUDED_SO should be checked the same way -- confirm no surviving
+ * library NEEDS it before trusting that it is only dlopen'd.
  */
 const EXCLUDED_SO = [
   '**/libagora_ai_echo_cancellation_extension.so',
@@ -38,35 +40,51 @@ const EXCLUDED_SO = [
   '**/libagora_video_quality_analyzer_extension.so',
 ]
 
-const MARKER = '// @generated withAgoraSlimming'
+const BEGIN = '    // @generated begin withAgoraSlimming - do not edit by hand'
+const END = '    // @generated end withAgoraSlimming'
 
-const BLOCK = `
-    ${MARKER} -- do not edit by hand
-    packagingOptions {
-        jniLibs {
-            excludes += [
-${EXCLUDED_SO.map((p) => `                '${p}',`).join('\n')}
-            ]
-        }
-    }
-`
+const BLOCK = [
+  BEGIN,
+  '    packagingOptions {',
+  '        jniLibs {',
+  '            excludes += [',
+  ...EXCLUDED_SO.map((p) => `                '${p}',`),
+  '            ]',
+  '        }',
+  '    }',
+  END,
+].join('\n')
 
 module.exports = function withAgoraSlimming(config) {
   return withAppBuildGradle(config, (cfg) => {
     if (cfg.modResults.language !== 'groovy') {
       throw new Error('withAgoraSlimming: expected a Groovy app/build.gradle')
     }
-    if (cfg.modResults.contents.includes(MARKER)) {
+
+    const contents = cfg.modResults.contents
+
+    // `expo prebuild` without --clean leaves an existing app/build.gradle in place, so
+    // a previously injected block will still be here. Replace it rather than bailing
+    // out -- skipping on "already present" lets an edited EXCLUDED_SO list go stale
+    // silently, which is exactly the sort of thing you only notice by re-measuring.
+    if (contents.includes(BEGIN)) {
+      const start = contents.indexOf(BEGIN)
+      const end = contents.indexOf(END)
+      if (end === -1 || end < start) {
+        throw new Error('withAgoraSlimming: found a begin marker with no matching end')
+      }
+      cfg.modResults.contents =
+        contents.slice(0, start) + BLOCK + contents.slice(end + END.length)
       return cfg
     }
 
     // Anchor on the app module's own `android {` opener so we never land inside a
     // nested block. It is the first line in the file that is exactly `android {`.
     const anchor = /^android \{$/m
-    if (!anchor.test(cfg.modResults.contents)) {
+    if (!anchor.test(contents)) {
       throw new Error('withAgoraSlimming: could not find the `android {` block')
     }
-    cfg.modResults.contents = cfg.modResults.contents.replace(anchor, `android {\n${BLOCK}`)
+    cfg.modResults.contents = contents.replace(anchor, `android {\n${BLOCK}\n`)
     return cfg
   })
 }
