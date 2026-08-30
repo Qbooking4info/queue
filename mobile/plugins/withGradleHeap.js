@@ -19,15 +19,25 @@ const { withGradleProperties } = require('expo/config-plugins')
  */
 const HEAP = '-Xmx6144m -XX:MaxMetaspaceSize=1024m'
 
+// EX_DEV_CLIENT_NETWORK_INSPECTOR is deliberately NOT set here. expo-build-properties
+// owns that property and rewrites it from its own default on every prebuild, so setting
+// it in this plugin is silently overwritten -- use its `android.networkInspector` option
+// in app.json instead.
+const PROPERTIES = {
+  'org.gradle.jvmargs': HEAP,
+}
+
 module.exports = function withGradleHeap(config) {
   return withGradleProperties(config, (cfg) => {
-    const existing = cfg.modResults.find(
-      (item) => item.type === 'property' && item.key === 'org.gradle.jvmargs',
-    )
-    if (existing) {
-      existing.value = HEAP
-    } else {
-      cfg.modResults.push({ type: 'property', key: 'org.gradle.jvmargs', value: HEAP })
+    for (const [key, value] of Object.entries(PROPERTIES)) {
+      const existing = cfg.modResults.find(
+        (item) => item.type === 'property' && item.key === key,
+      )
+      if (existing) {
+        existing.value = value
+      } else {
+        cfg.modResults.push({ type: 'property', key, value })
+      }
     }
     return cfg
   })
