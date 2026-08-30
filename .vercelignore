@@ -1,0 +1,36 @@
+# Vercel's Root Directory for this project is `web`, but the CLI uploads the whole
+# directory it is invoked from -- so `vercel --prod` must run from the repo root, and
+# everything outside web/ is dead weight in that upload. Without this file the upload
+# is ~1.5 GB and fails outright on "File size limit exceeded (100 MB)" as soon as a
+# release APK exists under mobile/android/app/build/outputs.
+#
+# Top-level entries are anchored with a leading slash on purpose. An unanchored
+# `scripts/` would also match web/scripts/, which the build needs -- package.json
+# runs `prebuild: node scripts/check-env-safety.mjs` from inside web/.
+
+# Sibling apps -- not part of the web build
+/mobile/
+/doctors/
+
+# Backend, docs and root-level tooling
+/supabase/
+/audit/
+/docs/
+/scripts/
+/*.md
+/*.mjs
+/*.log
+/dev.log
+
+# Build outputs and caches (safe to match at any depth -- Vercel reinstalls/rebuilds)
+**/node_modules/
+**/.next/
+**/.expo/
+**/.gradle/
+**/dist/
+
+# Binaries
+*.apk
+*.aab
+*.keystore
+*.jks

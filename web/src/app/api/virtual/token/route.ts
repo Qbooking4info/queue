@@ -69,8 +69,21 @@ async function handlePOST(req: NextRequest) {
 
   if (!callerIsDoctor) return Errors.forbidden('Only the assigned doctor can start this call')
 
-  const appId   = process.env.AGORA_APP_ID!
-  const appCert = process.env.AGORA_APP_CERTIFICATE!
+  // These were previously read with `!`, which is erased at compile time -- a missing
+  // value became `undefined`, RtcTokenBuilder happily built a token against an empty
+  // app id, and the call simply never connected. That failed silently in production
+  // for as long as the vars were absent from Vercel while working locally off
+  // .env.local. Fail loudly instead: a misconfigured deploy should be obvious.
+  const appId   = process.env.AGORA_APP_ID
+  const appCert = process.env.AGORA_APP_CERTIFICATE
+  if (!appId || !appCert) {
+    const missing = [
+      !appId && 'AGORA_APP_ID',
+      !appCert && 'AGORA_APP_CERTIFICATE',
+    ].filter(Boolean).join(', ')
+    console.error(`[virtual/token] refusing to build a token: missing ${missing}`)
+    return Errors.internal('Video calling is not configured on this server')
+  }
   const channelName = appointmentId   // UUID is a valid Agora channel name
   const expireSecs  = 7200            // 2 hours
 
