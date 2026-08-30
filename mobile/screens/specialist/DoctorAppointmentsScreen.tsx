@@ -6,12 +6,12 @@ import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
-import { haptics } from '../lib/haptics'
-import { fmtDate, fmt12 } from '../lib/format'
-import { reviewDirectAppointment } from '../lib/api'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { haptics } from '../../lib/haptics'
+import { fmtDate, fmt12 } from '../../lib/format'
+import { reviewDirectAppointment } from '../../lib/api'
 
 interface Props { navigation: any }
 
@@ -37,7 +37,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   cancelled:   { label: 'Cancelled',             color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)' },
 }
 
-export function AppointmentsScreen({ navigation }: Props) {
+export function DoctorAppointmentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user } = useAuth()
   const [tab, setTab] = useState<FilterTab>('pending')

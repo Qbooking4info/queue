@@ -3,15 +3,15 @@ import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, Lin
 import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useFocusEffect } from '@react-navigation/native'
-import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext'
-import { haptics } from '../lib/haptics'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { haptics } from '../../lib/haptics'
 import {
   getDoctorProfileSettings, updateDoctorProfileSettings, DoctorProfileSettings,
   getQualificationDocuments, uploadQualificationDocument, deleteQualificationDocument, QualificationDocument,
   getSpecialties, SpecialtyRow,
-} from '../lib/api'
-import { ShellScroll } from '../components/AppShell'
+} from '../../lib/api'
+import { ShellScroll } from '../../components/AppShell'
 
 interface Props { navigation: any }
 
@@ -21,7 +21,7 @@ const DEFAULTS: DoctorProfileSettings = {
   accepts_direct_virtual: false, accepts_direct_home_visit: false, show_phone_to_patients: false,
 }
 
-export function SettingsScreen({}: Props) {
+export function DoctorSettingsScreen({}: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
   const { user, doctorProfile, signOut } = useAuth()
   const [form, setForm] = useState<DoctorProfileSettings>(DEFAULTS)

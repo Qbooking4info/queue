@@ -55,6 +55,11 @@ import { SupportScreen }               from './screens/SupportScreen'
 import { SpecialistQueueScreen }   from './screens/specialist/SpecialistQueueScreen'
 import { PatientConsultScreen }    from './screens/specialist/PatientConsultScreen'
 import { SpecialistProfileScreen } from './screens/specialist/SpecialistProfileScreen'
+// Migrated from the standalone doctors/ app when it was folded into this one.
+import { DoctorDashboardScreen }    from './screens/specialist/DoctorDashboardScreen'
+import { DoctorAppointmentsScreen } from './screens/specialist/DoctorAppointmentsScreen'
+import { DoctorHospitalsScreen }    from './screens/specialist/DoctorHospitalsScreen'
+import { DoctorSettingsScreen }     from './screens/specialist/DoctorSettingsScreen'
 import { ReferPatientScreen }      from './screens/specialist/ReferPatientScreen'
 
 // react-native-agora is a native module Expo Go can't load at all -- lazy-load
@@ -188,7 +193,9 @@ function SpecialistTabs() {
       tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
       tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
     }}>
+      <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
+      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
       <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,     tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
   )
@@ -198,6 +205,8 @@ function SpecialistStack() {
   return (
     <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
+      <DocStack.Screen name="Hospitals"       component={DoctorHospitalsScreen as any} />
+      <DocStack.Screen name="Settings"        component={DoctorSettingsScreen  as any} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />

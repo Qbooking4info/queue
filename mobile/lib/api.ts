@@ -1179,3 +1179,132 @@ export async function addNotification(payload: {
     sent_via: ['in_app'],
   })
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Doctor-facing endpoints, migrated from the standalone doctors/ app when it was
+// folded into this one. These existed only there, which is why the doctor screens
+// could not simply be dropped in: mobile/lib/api.ts is the larger file overall but
+// had never carried the doctor profile, qualification-document or stats calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DoctorProfileSettings {
+  title:                     string | null
+  specialty_id:              string | null
+  level:                     string | null
+  bio:                       string | null
+  qualification:             string | null
+  years_experience:          number | null
+  virtual_fee:                number | null
+  home_visit_fee:             number | null
+  accepts_direct_virtual:     boolean
+  accepts_direct_home_visit:  boolean
+  show_phone_to_patients:     boolean
+}
+
+async function authHeader(): Promise<Record<string, string> | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const jwt = session?.access_token
+  if (!jwt) return null
+  return { Authorization: `Bearer ${jwt}` }
+}
+
+export interface DoctorStats {
+  avgConsultSecs: number | null
+  avgRatingOutOf10: number | null
+  reviewCount: number
+  total: number
+  completed: number
+}
+
+// Hospital-affiliated doctors only -- GET /api/doctors/me requires caller.doctorId,
+// which is null for a doctor with no hospital link at all (see requireRole/CallerInfo).
+
+export interface QualificationDocument { id: string; title: string; uploadedAt: string; url: string | null }
+
+export async function deleteQualificationDocument(id: string): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/doctors/qualifications/${id}`, { method: 'DELETE', headers })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Delete failed' }
+  return null
+}
+
+// ── Direct-booking appointment review (doctor-side) ───────────────────────────
+
+export async function getDoctorProfileSettings(): Promise<DoctorProfileSettings | null> {
+  const headers = await authHeader()
+  if (!headers) return null
+  const res = await fetch(`${API_URL}/api/doctors/profile`, { headers })
+  if (!res.ok) return null
+  const { profile } = await res.json()
+  return profile
+}
+
+// Hospital-affiliated doctors only -- GET /api/doctors/me requires caller.doctorId,
+// which is null for a doctor with no hospital link at all (see requireRole/CallerInfo).
+export async function getMyDoctorStats(): Promise<DoctorStats | null> {
+  const headers = await authHeader()
+  if (!headers) return null
+  const res = await fetch(`${API_URL}/api/doctors/me`, { headers })
+  if (!res.ok) return null
+  return (await res.json()) as DoctorStats
+}
+
+export async function getQualificationDocuments(): Promise<QualificationDocument[]> {
+  const headers = await authHeader()
+  if (!headers) return []
+  const res = await fetch(`${API_URL}/api/doctors/qualifications`, { headers })
+  if (!res.ok) return []
+  const { documents } = await res.json()
+  return documents
+}
+
+export async function reviewDirectAppointment(
+  appointmentId: string,
+  action: { action: 'approve' } | { action: 'reject'; reason: string } | { action: 'start' }
+    | { action: 'complete'; diagnosis?: string; doctorNotes?: string } | { action: 'cancel'; reason: string },
+): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/appointments/direct/${appointmentId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(action),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Action failed' }
+  return null
+}
+
+export async function updateDoctorProfileSettings(fields: Partial<DoctorProfileSettings>): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/doctors/profile`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Failed to save settings' }
+  return null
+}
+
+export async function uploadQualificationDocument(
+  title: string, uri: string, name: string, mimeType: string,
+): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+
+  const form = new FormData()
+  form.append('title', title)
+  // React Native's fetch/FormData accepts this { uri, name, type } shape directly
+  // for a file picked via expo-document-picker/expo-image-picker -- it is not a
+  // real web File object, but RN's FormData polyfill knows how to serialize it.
+  form.append('file', { uri, name, type: mimeType } as any)
+
+  const res = await fetch(`${API_URL}/api/doctors/qualifications`, {
+    method: 'POST',
+    headers, // no Content-Type -- fetch sets the multipart boundary itself
+    body: form,
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Upload failed' }
+  return null
+}

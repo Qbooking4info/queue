@@ -2,17 +2,17 @@ import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
-import { haptics } from '../lib/haptics'
-import { todayLocalDate } from '../lib/format'
-import { ShellScroll } from '../components/AppShell'
-import { getMyDoctorStats } from '../lib/api'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { haptics } from '../../lib/haptics'
+import { todayLocalDate } from '../../lib/format'
+import { ShellScroll } from '../../components/AppShell'
+import { getMyDoctorStats } from '../../lib/api'
 
 interface Props { navigation: any }
 
-export function DashboardScreen({ navigation }: Props) {
+export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile } = useAuth()
   const [loading, setLoading] = useState(true)

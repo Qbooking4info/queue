@@ -3,11 +3,20 @@ import { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { User } from '../types/database'
 
+export interface LinkedHospital {
+  doctorId:     string
+  hospitalId:   string
+  hospitalName: string
+}
+
 export interface DoctorProfile {
   doctorId:    string
   hospitalId:  string
   fullName:    string
   specialtyId: string | null
+  // Every hospital this account is linked to, not just the active one -- drives the
+  // hospital switcher in DoctorHospitalsScreen. Always includes the active hospital.
+  linkedHospitals: LinkedHospital[]
 }
 
 export interface StaffProfile {
@@ -36,6 +45,10 @@ interface AuthState {
   loading:       boolean
   staffMode:     boolean
   setStaffMode:  (v: boolean) => void
+  // Switches which linked hospital is "active" -- persisted to users.active_hospital_id
+  // (RLS only allows pointing it at a hospital this account actually has an active
+  // doctors-row link to, see 20260816000001_doctor_independent_accounts.sql).
+  switchHospital: (hospitalId: string) => Promise<string | null>
   // Set right after sign-up on the "Register a new hospital" flow — the auth
   // state change mounts the authenticated app tree before that screen's own
   // navigation call would take effect, so AppNavigator reads this to open
@@ -85,15 +98,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: rows } = await supabase
       .from('doctors')
-      .select('id, hospital_id, full_name, specialty_id')
+      .select('id, hospital_id, full_name, specialty_id, hospital:hospitals!doctors_hospital_id_fkey(name)')
       .eq('is_active', true)
       .or(orConditions.join(','))
       .order('created_at', { ascending: true })
 
     if (rows && rows.length > 0) {
+      const linkedHospitals: LinkedHospital[] = rows.map(r => ({
+        doctorId:     r.id,
+        hospitalId:   r.hospital_id,
+        // The embed comes back as an array or an object depending on how the FK is
+        // resolved, so normalise both shapes rather than trusting one.
+        hospitalName: (Array.isArray((r as any).hospital)
+          ? (r as any).hospital[0]?.name
+          : (r as any).hospital?.name) ?? 'Hospital',
+      }))
       const active = activeHospitalId ? rows.find(d => d.hospital_id === activeHospitalId) : undefined
       const row = active ?? rows[0]
-      if (current()) setDoctorProfile({ doctorId: row.id, hospitalId: row.hospital_id, fullName: row.full_name, specialtyId: row.specialty_id ?? null })
+      if (current()) setDoctorProfile({
+        doctorId: row.id, hospitalId: row.hospital_id, fullName: row.full_name,
+        specialtyId: row.specialty_id ?? null, linkedHospitals,
+      })
       return true
     }
 
@@ -301,6 +326,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null
   }
 
+  async function switchHospital(hospitalId: string): Promise<string | null> {
+    if (!user) return 'Not signed in'
+    const { error } = await supabase
+      .from('users')
+      .update({ active_hospital_id: hospitalId } as any)
+      .eq('id', user.id)
+    if (error) return error.message
+    await refreshProfile()
+    return null
+  }
+
   async function signOut() {
     // Invalidate any profile load still in flight before clearing state —
     // otherwise it resolves after this and repopulates user/staffProfile for
@@ -320,6 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       session, user, doctorProfile, staffProfile, crewProfile, loading,
       staffMode, setStaffMode,
+      switchHospital,
       pendingHospitalOnboarding, setPendingHospitalOnboarding,
       signIn, signUp, signOut, refreshProfile,
     }}>

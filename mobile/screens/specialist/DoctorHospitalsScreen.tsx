@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext'
-import { haptics } from '../lib/haptics'
-import { ShellScroll } from '../components/AppShell'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { haptics } from '../../lib/haptics'
+import { ShellScroll } from '../../components/AppShell'
 
 interface Props { navigation: any }
 
-export function HospitalsScreen({}: Props) {
+export function DoctorHospitalsScreen({}: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile, switchHospital } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
