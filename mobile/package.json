@@ -14,7 +14,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "expo": "~56.0.19",
     "expo-audio": "~56.0.13",
-    "expo-camera": "~56.0.8",
+    "expo-build-properties": "~56.0.27",
     "expo-constants": "~56.0.21",
     "expo-device": "~56.0.4",
     "expo-haptics": "~56.0.3",
