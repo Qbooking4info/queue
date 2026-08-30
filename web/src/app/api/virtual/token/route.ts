@@ -106,6 +106,14 @@ async function handlePOST(req: NextRequest) {
     token:       hostToken,
     channelName,
     uid:         1,
-    appId:       process.env.NEXT_PUBLIC_AGORA_APP_ID ?? appId,
+    // Always the exact value the token above was signed with -- NOT
+    // NEXT_PUBLIC_AGORA_APP_ID, which could silently diverge from AGORA_APP_ID
+    // (different env var, easy to set once and forget). If the client
+    // connects with an appId other than the one the token was signed for,
+    // Agora's join fails with no error surfaced client-side: the call just
+    // sits on "waiting for the other party" forever, since onJoinChannelSuccess
+    // never fires and no onError callback fires either. Returning the real
+    // signing appId here makes that entire class of bug impossible.
+    appId,
   })
 }
