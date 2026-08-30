@@ -11,8 +11,17 @@ import {
   VideoSourceType,
 } from 'react-native-agora'
 import { supabase } from '../../lib/supabase'
+import { applyAudioProfile, applyVideoProfile, signalFromQuality, SignalLevel } from '../../lib/agoraCall'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
+/** "Ikenna Ugwu" -> "IU". Falls back to a single glyph for one-word names. */
+function initials(name: string): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0][0].toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 interface Props {
   navigation: any
@@ -33,7 +42,12 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   const [phase,        setPhase]        = useState<'loading' | 'joining' | 'active' | 'error'>('loading')
   const [remoteUid,    setRemoteUid]    = useState<number | null>(null)
   const [micEnabled,   setMicEnabled]   = useState(true)
-  const [camEnabled,   setCamEnabled]   = useState(true)
+  // Consultations open as a voice call -- see VideoCallScreen.native.tsx. The doctor
+  // raises video when they actually need to look at something.
+  const [camEnabled,   setCamEnabled]   = useState(false)
+  const [remoteVideoOn, setRemoteVideoOn] = useState(false)
+  const [signal,       setSignal]       = useState<SignalLevel | null>(null)
+  const videoStarted = useRef(false)
   const [elapsed,      setElapsed]      = useState(0)
   const [error,        setError]        = useState<string | null>(null)
   const sessionRef = useRef<TokenResponse | null>(null)
@@ -95,12 +109,18 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       engine.current.addListener('onUserOffline', (_conn: any, uid: number) => {
         if (active && uid === remoteUid) setRemoteUid(null)
       })
+      engine.current.addListener('onRemoteVideoStateChanged', (_c: any, _uid: number, state: number) => {
+        if (active) setRemoteVideoOn(state === 2)
+      })
+      engine.current.addListener('onNetworkQuality', (_c: any, uid: number, tx: number, rx: number) => {
+        if (active && uid === 0) setSignal(signalFromQuality(tx, rx))
+      })
       engine.current.addListener('onError', (errCode: number) => {
         if (active) setError(`Agora error ${errCode}`)
       })
 
-      await engine.current.enableVideo()
-      engine.current.startPreview()
+      await engine.current.enableAudio()
+      applyAudioProfile(engine.current)
 
       engine.current.joinChannel(
         tokenData.token,
@@ -109,7 +129,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         {
           clientRoleType:         ClientRoleType.ClientRoleBroadcaster,
           publishMicrophoneTrack:  true,
-          publishCameraTrack:      true,
+          publishCameraTrack:      false,
           autoSubscribeAudio:      true,
           autoSubscribeVideo:      true,
         },
@@ -144,10 +164,25 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     setMicEnabled(next)
   }
 
-  function toggleCamera() {
-    const next = !camEnabled
-    engine.current?.muteLocalVideoStream(!next)
-    setCamEnabled(next)
+  async function toggleCamera() {
+    const eng = engine.current
+    if (!eng) return
+
+    if (camEnabled) {
+      eng.updateChannelMediaOptions({ publishCameraTrack: false })
+      eng.stopPreview()
+      setCamEnabled(false)
+      return
+    }
+
+    if (!videoStarted.current) {
+      await eng.enableVideo()
+      applyVideoProfile(eng)
+      videoStarted.current = true
+    }
+    eng.startPreview()
+    eng.updateChannelMediaOptions({ publishCameraTrack: true })
+    setCamEnabled(true)
   }
 
   async function handleEndSession() {
@@ -168,7 +203,11 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
                 body: JSON.stringify({ appointmentId }),
               })
             }
-          } catch (_) {}
+          } catch (err) {
+            // Teardown is best-effort — the user is leaving either way — but a
+            // silent catch meant a failed session-end was undiagnosable.
+            console.warn('[video] failed to end session on leave', err)
+          }
           navigation.goBack()
         },
       },
@@ -212,22 +251,36 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       <StatusBar barStyle="light-content" backgroundColor="#050d09" />
 
       {/* Remote video — full screen */}
-      {remoteUid != null ? (
+      {remoteUid != null && remoteVideoOn ? (
         <RtcSurfaceView canvas={{ uid: remoteUid }} style={StyleSheet.absoluteFill} />
+      ) : remoteUid != null ? (
+        <View style={st.center}>
+          <View style={st.avatarRing}>
+            <View style={st.avatar}>
+              <Text style={st.avatarInitials}>{initials(patientName)}</Text>
+            </View>
+          </View>
+          <Text style={st.audioName}>{patientName}</Text>
+          <Text style={st.audioHint}>Voice consultation · camera off</Text>
+        </View>
       ) : (
         <View style={st.center}>
-          <Ionicons name="person-circle-outline" size={52} color="#4A6058" />
+          <View style={st.pulseRing}>
+            <Ionicons name="person-outline" size={32} color="#4ade80" />
+          </View>
           <Text style={st.waitingText}>Waiting for {patientName} to join…</Text>
         </View>
       )}
 
-      {/* Local video PiP — top right */}
-      <View style={st.localPip}>
-        <RtcSurfaceView
-          canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
-          style={st.pipInner}
-        />
-      </View>
+      {/* Local video PiP — only while our own camera is publishing */}
+      {camEnabled && (
+        <View style={st.localPip}>
+          <RtcSurfaceView
+            canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
+            style={st.pipInner}
+          />
+        </View>
+      )}
 
       {/* Header */}
       <View style={st.header}>
@@ -237,22 +290,46 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
           <Text style={[st.headerStatus, { color: remoteUid != null ? '#4ade80' : '#7A9089' }]}>
             {remoteUid != null ? `Connected · ${fmt(elapsed)}` : 'Waiting for patient…'}
           </Text>
+
+          {signal && (
+            <View style={st.signalWrap}>
+              <View style={st.bars}>
+                {[1, 2, 3, 4].map(i => (
+                  <View key={i} style={[st.bar, { height: 4 + i * 2 }, i <= signal.bars ? { backgroundColor: signal.color } : st.barOff]} />
+                ))}
+              </View>
+              <Text style={[st.signalLabel, { color: signal.color }]}>{signal.label}</Text>
+            </View>
+          )}
         </View>
+
+        {signal?.degraded && camEnabled && (
+          <Text style={st.degradedHint}>Weak connection — turning your camera off will help</Text>
+        )}
       </View>
 
       {/* Controls */}
       <View style={st.controls}>
-        <TouchableOpacity onPress={toggleMic} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
-          <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity onPress={toggleMic} activeOpacity={0.8} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
+            <Ionicons name={micEnabled ? 'mic' : 'mic-off'} size={24} color={micEnabled ? '#E8F5EF' : '#050d09'} />
+          </TouchableOpacity>
+          <Text style={st.ctrlLabel}>{micEnabled ? 'Mute' : 'Unmute'}</Text>
+        </View>
 
-        <TouchableOpacity onPress={handleEndSession} style={st.endBtn}>
-          <Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity onPress={handleEndSession} activeOpacity={0.85} style={st.endBtn}>
+            <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+          </TouchableOpacity>
+          <Text style={[st.ctrlLabel, { color: '#FF7A7A' }]}>End</Text>
+        </View>
 
-        <TouchableOpacity onPress={toggleCamera} style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}>
-          <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity onPress={toggleCamera} activeOpacity={0.8} style={[st.ctrlBtn, camEnabled && st.ctrlBtnActive]}>
+            <Ionicons name={camEnabled ? 'videocam' : 'videocam-off'} size={24} color={camEnabled ? '#050d09' : '#E8F5EF'} />
+          </TouchableOpacity>
+          <Text style={st.ctrlLabel}>{camEnabled ? 'Stop video' : 'Start video'}</Text>
+        </View>
       </View>
     </View>
   )
@@ -272,6 +349,36 @@ const st = StyleSheet.create({
     overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
     backgroundColor: '#111',
   },
+  avatarRing: {
+    width: 132, height: 132, borderRadius: 66,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
+    backgroundColor: 'rgba(74,222,128,0.05)',
+  },
+  avatar: {
+    width: 104, height: 104, borderRadius: 52,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#12241B',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.35)',
+  },
+  avatarInitials: { color: '#4ade80', fontSize: 34, fontWeight: '700', letterSpacing: 1 },
+  audioName:      { color: '#fff', fontSize: 19, fontWeight: '700', marginTop: 12 },
+  audioHint:      { color: '#7A9089', fontSize: 13 },
+  pulseRing: {
+    width: 78, height: 78, borderRadius: 39,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
+    backgroundColor: 'rgba(74,222,128,0.06)',
+  },
+  signalWrap:   { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginLeft: 10 },
+  bars:         { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  bar:          { width: 3, borderRadius: 1.5 },
+  barOff:       { backgroundColor: 'rgba(255,255,255,0.18)' },
+  signalLabel:  { fontSize: 11, fontWeight: '600' },
+  degradedHint: { color: '#fbbf24', fontSize: 11, marginTop: 8 },
+  ctrlItem:     { alignItems: 'center', gap: 7 },
+  ctrlLabel:    { color: '#93A9A0', fontSize: 11, fontWeight: '500' },
+  ctrlBtnActive:{ backgroundColor: '#4ade80', borderColor: '#4ade80' },
   pipInner:     { flex: 1 },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
