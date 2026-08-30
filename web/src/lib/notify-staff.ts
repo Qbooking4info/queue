@@ -1,15 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, unknown>) {
-  try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
-    })
-  } catch { /* best-effort */ }
-}
+import { sendExpoPush } from '@/lib/push'
 
 // Notifies the assigned doctor's staff account that a new appointment has landed.
 // Patient/hospital names are resolved here from appointmentId, not accepted from the
@@ -64,6 +55,6 @@ export async function notifyStaff(db: ReturnType<typeof createAdminClient>, appo
     })
 
     const pushToken = (staffUser as any)?.push_token
-    if (pushToken) await sendExpoPush(pushToken, title, body, { appointment_id: appointmentId })
+    if (pushToken) await sendExpoPush(db, doctor.user_id, pushToken, title, body, { appointment_id: appointmentId })
   } catch { /* best-effort */ }
 }

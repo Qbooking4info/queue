@@ -42,8 +42,8 @@ interface AuthState {
   // straight into HospitalOnboardingScreen instead of the default patient home.
   pendingHospitalOnboarding:    boolean
   setPendingHospitalOnboarding: (v: boolean) => void
-  signIn:        (email: string, password: string) => Promise<string | null>
-  signUp:        (email: string, password: string, fullName: string, phone: string) => Promise<string | null>
+  signIn:        (email: string, password: string, surface: 'patient' | 'hospital') => Promise<string | null>
+  signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string) => Promise<string | null>
   signOut:       () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -101,14 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false
   }
 
-  async function fetchStaffProfile(name: string, seq: number): Promise<boolean> {
+  // Returns the resolved role (or null if not a staff account) directly, rather than
+  // just a boolean, so callers (fetchProfile -> signIn's surface check) can act on it
+  // without reading back staffProfile state, which may not have flushed yet.
+  async function fetchStaffProfile(name: string, seq: number): Promise<StaffProfile['role'] | null> {
     const current = () => seq === profileSeq.current
     // Use a SECURITY DEFINER function to bypass RLS on hospital_admins / clinic_admins.
     const { data, error } = await supabase.rpc('get_my_staff_profile')
 
     if (error || !data || data.length === 0) {
       if (current()) setStaffProfile(null)
-      return false
+      return null
     }
 
     const row = data[0]
@@ -116,17 +119,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isFrontDesk = role === 'front_desk' || role === 'desk_officer'
     const isAdmin     = role === 'admin' || role === 'owner'
     const isCrew      = role === 'ambulance_crew'
+    const resolvedRole: StaffProfile['role'] = isFrontDesk ? 'front_desk' : isCrew ? 'ambulance_crew' : isAdmin ? 'hospital_admin' : 'clinic_admin'
 
-    if (!current()) return true
+    if (!current()) return resolvedRole
     setStaffProfile({
-      role:       isFrontDesk ? 'front_desk' : isCrew ? 'ambulance_crew' : isAdmin ? 'hospital_admin' : 'clinic_admin',
+      role:       resolvedRole,
       hospitalId: row.hospital_id,
       clinicId:   row.clinic_id ?? null,
       name,
       crewRole:   row.crew_role ?? undefined,
       crewTier:   row.crew_tier ?? undefined,
     })
-    return true
+    return resolvedRole
   }
 
   async function fetchCrewProfile(seq: number): Promise<boolean> {
@@ -152,7 +156,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
-  async function fetchProfile(authId: string) {
+  // Return value (isDoctor / staffRole / isCrew) is used by signIn() to reject an
+  // account logging in through the wrong surface — resolved synchronously off this
+  // function's result rather than off React state, since the state setters above
+  // haven't necessarily flushed by the time signIn's caller needs an answer.
+  async function fetchProfile(authId: string): Promise<{ isDoctor: boolean; staffRole: StaffProfile['role'] | null; isCrew: boolean }> {
     const seq = ++profileSeq.current
     const current = () => seq === profileSeq.current
 
@@ -164,28 +172,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('auth_id', authId)
       .maybeSingle()
 
-    if (!current()) return
+    if (!current()) return { isDoctor: false, staffRole: null, isCrew: false }
     setUser(data ?? null)
 
     // Always check doctor first — doctor accounts may not have a users row
     const isDoctor = await fetchDoctorProfile(authId, data?.id ?? '', data?.active_hospital_id ?? null, seq)
     if (!isDoctor) {
-      const isStaff = await fetchStaffProfile(data?.full_name ?? '', seq)
-      if (!isStaff) {
+      const staffRole = await fetchStaffProfile(data?.full_name ?? '', seq)
+      if (!staffRole) {
         const isCrew = await fetchCrewProfile(seq)
         // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
         if (isCrew && current()) setStaffMode(true)
-      } else if (current()) {
+        return { isDoctor: false, staffRole: null, isCrew }
+      } else {
+        if (current()) {
+          setCrewProfile(null)
+          setStaffMode(true)
+        }
+        return { isDoctor: false, staffRole, isCrew: false }
+      }
+    } else {
+      if (current()) {
+        // Doctors auto-enter specialist mode. staffProfile is cleared explicitly
+        // here because the staff lookup is skipped on this branch, so a profile
+        // left over from a previously signed-in staff account would survive.
+        setStaffProfile(null)
         setCrewProfile(null)
         setStaffMode(true)
       }
-    } else if (current()) {
-      // Doctors auto-enter specialist mode. staffProfile is cleared explicitly
-      // here because the staff lookup is skipped on this branch, so a profile
-      // left over from a previously signed-in staff account would survive.
-      setStaffProfile(null)
-      setCrewProfile(null)
-      setStaffMode(true)
+      return { isDoctor: true, staffRole: null, isCrew: false }
     }
   }
 
@@ -224,13 +239,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function signIn(email: string, password: string): Promise<string | null> {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return error?.message ?? null
+  // surface tells us which door the credentials were entered on ('patient' = the
+  // Patient login screen, 'hospital' = the Hospital/Staff portal screen) so a
+  // mismatched account type can be rejected instead of silently auto-routing into
+  // whatever stack its resolved role happens to match -- see RoleSelectScreen.
+  async function signIn(email: string, password: string, surface: 'patient' | 'hospital'): Promise<string | null> {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return error.message
+    if (!data.user) return null
+
+    const profile = await fetchProfile(data.user.id)
+
+    if (profile.isDoctor) {
+      await signOut()
+      return 'This is a doctor account. Please sign in from the Queue Doctors app.'
+    }
+    if (surface === 'patient' && (profile.staffRole || profile.isCrew)) {
+      await signOut()
+      return 'This is a hospital/staff account. Please use the Hospital / Staff sign-in instead.'
+    }
+    // Escape hatch: an owner who registered a hospital but logged out before finishing
+    // the onboarding wizard has no hospital_admins row yet either -- identical, at this
+    // point, to a plain patient account. registered_via (set by HospitalRegisterScreen's
+    // signUp call) is the only way to tell them apart.
+    const pendingOnboarding = data.user.user_metadata?.registered_via === 'hospital_onboarding'
+    if (surface === 'hospital' && !profile.staffRole && !profile.isCrew) {
+      if (!pendingOnboarding) {
+        await signOut()
+        return 'This is a patient account. Please use the Patient sign-in instead.'
+      }
+      // Resume the onboarding wizard rather than dropping them into patient home.
+      setPendingHospitalOnboarding(true)
+    }
+    return null
   }
 
   async function signUp(
-    email: string, password: string, fullName: string, phone: string
+    email: string, password: string, fullName: string, phone: string, dateOfBirth: string
   ): Promise<string | null> {
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) return error.message
@@ -240,8 +285,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         full_name: fullName,
         phone,
+        date_of_birth: dateOfBirth,
       })
-      if (profileError) return profileError.message
+      if (profileError) {
+        // auth.signUp() above already created a real auth account -- it's never
+        // rolled back just because this insert failed (a column-grant mismatch
+        // did exactly this once: confirmed live, an orphaned auth.users row with
+        // no matching `users` row, unusable and stuck signed in with a null
+        // profile). Signing back out here at least avoids leaving the app
+        // half-authenticated in a state nothing else expects.
+        await signOut()
+        return profileError.message
+      }
     }
     return null
   }

@@ -58,6 +58,7 @@ describe('findEmergencyClinic', () => {
       id: '1', hospital_id: 'h1', name: 'Clinic', description: null,
       is_opd: false, is_active: true, is_emergency: false, sort_order: 0,
       daily_booking_limit: null, service_tags: [],
+      min_age: null, max_age: null, gender_restriction: null,
       ...overrides,
     }
   }

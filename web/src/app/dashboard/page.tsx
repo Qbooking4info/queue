@@ -77,7 +77,7 @@ function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C:
 export default function OverviewPage() {
   const { theme: C } = useTheme()
   const {
-    hospital, clinicName, role, user, doctorId, doctorAvailability,
+    hospital, clinicName, clinicId, role, user, doctorId, doctorAvailability,
     stats, doctors, todayAppointments, loading: ctxLoading,
   } = useAdmin()
 
@@ -561,9 +561,14 @@ export default function OverviewPage() {
               Quick Actions
             </div>
             {[
-              { href: '/dashboard/doctors/add', Icon: Stethoscope, label: 'Register Doctor',    sub: 'Add a new practitioner' },
+              { href: '/dashboard/doctors', Icon: Stethoscope, label: 'Add Doctor',    sub: 'Link a doctor by their Doctor ID' },
               { href: '/dashboard/services',    Icon: Tag,          label: 'Manage Services',   sub: 'Enable specialties & pricing' },
-              { href: '/dashboard/settings',    Icon: Settings,     label: 'Hospital Settings', sub: 'Update profile and preferences' },
+              // clinic_admin has no access to hospital-wide Settings -- their
+              // equivalent (services, hours, booking eligibility) lives on their
+              // own Clinic Detail page instead.
+              role === 'clinic_admin'
+                ? { href: clinicId ? `/dashboard/clinics/${clinicId}` : '/dashboard', Icon: Settings, label: 'Clinic Settings', sub: 'Update hours, services & eligibility' }
+                : { href: '/dashboard/settings', Icon: Settings, label: 'Hospital Settings', sub: 'Update profile and preferences' },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,

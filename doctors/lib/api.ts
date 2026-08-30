@@ -238,7 +238,8 @@ export async function createReferral(payload: {
 // ── Push notifications ────────────────────────────────────────────────────────
 
 export async function savePushToken(userId: string, token: string): Promise<void> {
-  await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+  const { error } = await supabase.from('users').update({ push_token: token } as any).eq('id', userId)
+  if (error) console.warn('[savePushToken] failed to save push token:', error.message)
 }
 
 // ── Doctor's own direct-booking settings ──────────────────────────────────────

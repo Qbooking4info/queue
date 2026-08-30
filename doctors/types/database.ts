@@ -1426,11 +1426,14 @@ export type Database = {
           created_at: string | null
           daily_booking_limit: number | null
           description: string | null
+          gender_restriction: string | null
           hospital_id: string
           id: string
           is_active: boolean | null
           is_emergency: boolean
           is_opd: boolean
+          max_age: number | null
+          min_age: number | null
           name: string
           service_tags: string[]
           sort_order: number | null
@@ -1439,11 +1442,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name: string
           service_tags?: string[]
           sort_order?: number | null
@@ -1452,11 +1458,14 @@ export type Database = {
           created_at?: string | null
           daily_booking_limit?: number | null
           description?: string | null
+          gender_restriction?: string | null
           hospital_id?: string
           id?: string
           is_active?: boolean | null
           is_emergency?: boolean
           is_opd?: boolean
+          max_age?: number | null
+          min_age?: number | null
           name?: string
           service_tags?: string[]
           sort_order?: number | null
@@ -2813,6 +2822,7 @@ export type Database = {
           gender: string | null
           id: string
           is_verified: boolean | null
+          patient_code: string
           patient_id: string | null
           patient_number: string | null
           phone: string | null
@@ -2836,6 +2846,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -2859,6 +2870,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_verified?: boolean | null
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null

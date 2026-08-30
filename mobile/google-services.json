@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "378357889658",
+    "project_id": "queue-health",
+    "storage_bucket": "queue-health.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:378357889658:android:a2fb65cf1007d3981819c3",
+        "android_client_info": {
+          "package_name": "com.qbooking.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSCbXPYZcDdMjcsqTL4ccfBrlV-d8kdSM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

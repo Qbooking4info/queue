@@ -7,7 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 const ALLOWED_STAFF_ROLES = ['front_desk', 'clinic_admin'] as const
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
+  const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
@@ -42,16 +42,6 @@ export async function POST(req: NextRequest) {
 
     if (!clinic || (clinic as any).hospital_id !== hospitalId) {
       return Errors.validation('Clinic does not belong to this hospital')
-    }
-
-    // A clinic_admin may only create staff inside their own clinic, and may not mint peers.
-    if (caller.role === 'clinic_admin') {
-      if (caller.clinicId && caller.clinicId !== clinicId) {
-        return Errors.forbidden('Cannot create staff for another clinic')
-      }
-      if (role !== 'front_desk') {
-        return Errors.forbidden('Clinic admins may only create front desk staff')
-      }
     }
 
     // 20 staff creations per hospital per hour
@@ -109,13 +99,16 @@ export async function PATCH(req: NextRequest) {
     // BC3: verify the staff member belongs to the caller's hospital
     const { data: caRow, error: caErr } = await db
       .from('clinic_admins')
-      .select('user_id, hospital_id')
+      .select('user_id, hospital_id, clinic_id')
       .eq('id', staffId)
       .single()
     if (caErr || !caRow) return Errors.notFound('Staff')
 
     if (caller.role !== 'super_admin' && caller.hospitalId !== caRow.hospital_id) {
       return Errors.forbidden()
+    }
+    if (caller.role === 'clinic_admin' && caller.clinicId && caller.clinicId !== caRow.clinic_id) {
+      return Errors.forbidden('Cannot manage staff for another clinic')
     }
 
     // Get auth_id from users table
@@ -156,13 +149,16 @@ export async function DELETE(req: NextRequest) {
     // BC3: verify the staff member belongs to the caller's hospital before deactivating
     const { data: caRow } = await db
       .from('clinic_admins')
-      .select('user_id, hospital_id')
+      .select('user_id, hospital_id, clinic_id')
       .eq('id', staffId)
       .single()
 
     if (!caRow) return Errors.notFound('Staff')
     if (caller.role !== 'super_admin' && caller.hospitalId !== caRow.hospital_id) {
       return Errors.forbidden()
+    }
+    if (caller.role === 'clinic_admin' && caller.clinicId && caller.clinicId !== caRow.clinic_id) {
+      return Errors.forbidden('Cannot manage staff for another clinic')
     }
 
     // Resolve auth UID before deactivating so we can revoke sessions

@@ -42,9 +42,10 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: LayoutDashboard, label: 'Overview'      },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
-    { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulances'    },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
+    { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics'     },
+    { href: '/dashboard/services',     icon: Tag,             label: 'Services'      },
   ],
   doctor: [
     { href: '/dashboard',              icon: LayoutDashboard, label: 'My Dashboard'      },

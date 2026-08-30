@@ -181,7 +181,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
 }
 
 type PatchBody =
-  | { action: 'update'; name?: string; description?: string | null; is_active?: boolean; service_tags?: string[]; daily_booking_limit?: number | null }
+  | {
+      action: 'update'; name?: string; description?: string | null; is_active?: boolean; service_tags?: string[]
+      daily_booking_limit?: number | null; min_age?: number | null; max_age?: number | null
+      gender_restriction?: 'male' | 'female' | null
+    }
   | { action: 'toggle_active'; is_active: boolean }
   | { action: 'set_emergency' }
   | { action: 'clear_emergency' }
@@ -224,6 +228,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
         const n = body.daily_booking_limit
         if (!Number.isInteger(n) || n < 0) return Errors.validation('daily_booking_limit must be a non-negative integer')
         updates.daily_booking_limit = n
+      }
+
+      // Age/gender booking eligibility -- same null-means-unrestricted shape as
+      // daily_booking_limit. The actual enforcement is a DB trigger
+      // (enforce_clinic_booking_eligibility, 20260826000001) since most booking
+      // paths are raw client-side inserts this API never sees; this validation
+      // just keeps obviously-bad config (negative age, min > max) out of the table.
+      for (const field of ['min_age', 'max_age'] as const) {
+        const n = body[field]
+        if (n === null) {
+          updates[field] = null
+        } else if (n !== undefined) {
+          if (!Number.isInteger(n) || n < 0) return Errors.validation(`${field} must be a non-negative integer`)
+          updates[field] = n
+        }
+      }
+      const effectiveMin = 'min_age' in updates ? (updates.min_age as number | null) : undefined
+      const effectiveMax = 'max_age' in updates ? (updates.max_age as number | null) : undefined
+      if (effectiveMin != null && effectiveMax != null && effectiveMin > effectiveMax) {
+        return Errors.validation('min_age must not be greater than max_age')
+      }
+      if (body.gender_restriction === null) {
+        updates.gender_restriction = null
+      } else if (body.gender_restriction !== undefined) {
+        if (!['male', 'female'].includes(body.gender_restriction)) {
+          return Errors.validation("gender_restriction must be 'male', 'female', or null")
+        }
+        updates.gender_restriction = body.gender_restriction
       }
 
       if (Object.keys(updates).length === 0) return Errors.validation('No valid fields to update')

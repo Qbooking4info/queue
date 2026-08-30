@@ -13,7 +13,6 @@ import { SkeletonCard } from '../components/ui/Skeleton'
 import { specialties } from '../data'
 import { getHospitals, getNextAppointment, getActiveQueueAppointment } from '../lib/api'
 import { LiveQueueCard } from '../components/LiveQueueCard'
-import { useRingAlert, RingOverlay } from '../components/RingOverlay'
 import { WELLNESS_TIPS } from '../lib/wellness-tips'
 import { supabase } from '../lib/supabase'
 import { toDisplayHospital } from '../lib/adapters'
@@ -120,7 +119,6 @@ export function HomeScreen({ navigation }: Props) {
   const [nextAppt, setNextAppt]   = useState<AppointmentWithRelations | null>(null)
   const [activeAppt, setActiveAppt] = useState<AppointmentWithRelations | null>(null)
   const [loading, setLoading]     = useState(true)
-  const { ringNotif, dismissRing } = useRingAlert(user?.id)
   const [activeSpecialty, setActiveSpecialty] = useState<string | null>(null)
   // MM3: track unread notifications count
   const [unreadCount, setUnreadCount] = useState(0)
@@ -192,11 +190,6 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-
-      {/* Ring alert -- rendered here (screen root), not inside LiveQueueCard,
-          so its full-screen overlay actually covers the whole screen. See
-          RingOverlay.tsx for why. */}
-      {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
 
       {/* All Specialties modal */}
       <Modal visible={showAll} animationType="slide" transparent

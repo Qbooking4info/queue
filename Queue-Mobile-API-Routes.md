@@ -293,7 +293,8 @@ Direct Supabase PostgREST calls return Postgres errors in the form `{ message, d
 |----------|-------|--------|
 | POST /api/onboarding | 5 | per user per hour |
 | POST /api/clinic-staff | 20 | per hospital per hour |
-| POST /api/doctors/create | 10 | per hospital per hour |
+| POST /api/doctors/link | 20 | per hospital per hour |
+| POST /api/dependents/link | 20 | per caretaker per hour |
 | POST /api/appointments/walkin | 100 | per hospital per hour |
 | POST /api/appointments/refer | 20 | per referring doctor per hour |
 | POST /api/doctors/schedule | 20 | per hospital per hour |

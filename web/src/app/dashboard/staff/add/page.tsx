@@ -56,8 +56,8 @@ export default function AddStaffPage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: C.blueLight, border: `1px solid ${C.blue}33`, borderRadius: 12, padding: 12 }}>
           <Stethoscope size={18} color={C.blue} style={{ flexShrink: 0 }} />
           <p style={{ fontSize: 12, color: C.blue, lineHeight: 1.6 }}>
-            <span style={{ fontWeight: 600 }}>Specialist logins are auto-created when you add a doctor</span> — go to{' '}
-            <Link href="/dashboard/doctors/add" style={{ textDecoration: 'underline' }}>Add Doctor</Link> to register a new specialist under this hospital.
+            <span style={{ fontWeight: 600 }}>Doctors use their own account</span> — go to{' '}
+            <Link href="/dashboard/doctors" style={{ textDecoration: 'underline' }}>Doctors</Link> and link one to this hospital using their Doctor ID.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: C.amberLight, border: `1px solid ${C.amber}33`, borderRadius: 12, padding: 12 }}>

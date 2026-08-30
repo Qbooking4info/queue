@@ -659,6 +659,9 @@ export interface ClinicDetail {
   sort_order: number | null
   service_tags: string[]
   daily_booking_limit: number | null
+  min_age: number | null
+  max_age: number | null
+  gender_restriction: 'male' | 'female' | null
 }
 
 export interface ClinicStaffMember {

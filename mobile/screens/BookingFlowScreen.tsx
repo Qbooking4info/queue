@@ -11,7 +11,7 @@ import {
   createAppointment, createHospitalAppointment, addNotification,
   getClinicsForHospital, rescheduleAppointment,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
-  getAvailableSlots,
+  getAvailableSlots, getLinkedDependents,
 } from '../lib/api'
 import { toDisplayHospital } from '../lib/adapters'
 import { supabase } from '../lib/supabase'
@@ -20,7 +20,7 @@ import { payForAppointment } from '../lib/payments'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '../lib/fees'
 import { Avatar } from '../components/ui/Avatar'
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
-import type { Clinic, BookingResult, DayHours } from '../lib/api'
+import type { Clinic, BookingResult, DayHours, LinkedDependent } from '../lib/api'
 
 interface Props { navigation: any; route: any }
 
@@ -39,6 +39,12 @@ const STEP_LABELS = ['Type', 'Hospital', 'Details', 'Schedule', 'Confirm']
 // silently rolls back to the previous day in positive-offset timezones (e.g. WAT, UTC+1).
 function fmtLocalDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Matches web/src/lib/dashboard-utils.ts's calcAge exactly (31_557_600_000ms = 365.25 days).
+function calcAge(dob: string | null): number | null {
+  if (!dob) return null
+  return Math.floor((Date.now() - new Date(dob).getTime()) / 31_557_600_000)
 }
 
 // hours=null means "not loaded yet" — falls back to the old default (every day but
@@ -133,6 +139,18 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [reason,  setReason]  = useState(rescheduleCtx?.reason ?? '')
   const [urgency, setUrgency] = useState<'routine' | 'emergency'>('routine')
   const isEmergency = urgency === 'emergency'
+
+  // Who this booking is for -- linked (real-account) dependents only; a reschedule
+  // keeps whoever the original appointment was already for, so this never applies
+  // there. null = booking for myself.
+  const [linkedDependents,   setLinkedDependents]   = useState<LinkedDependent[]>([])
+  const [bookingForDependentId, setBookingForDependentId] = useState<string | null>(null)
+  useEffect(() => {
+    if (rescheduleCtx) return
+    let cancelled = false
+    getLinkedDependents().then(({ managing }) => { if (!cancelled) setLinkedDependents(managing) })
+    return () => { cancelled = true }
+  }, [])
 
   // Emergency bookings never leave "today" — no future date, no exceptions. If this hospital
   // is closed today (and isn't a 24/7 emergency_hours hospital), the patient needs to pick
@@ -277,6 +295,44 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const visibleClinics     = isEmergency ? (emergencyClinic ? [emergencyClinic] : []) : clinics
   const noEmergencyClinic  = isEmergency && hospital?.clinic_model === 'multi' && !loadingClinics && !emergencyClinic
 
+  // Whoever the booking is actually for -- the selected linked dependent's own
+  // demographics when booking on their behalf, not the caretaker's.
+  const effectivePatient = bookingForDependentId
+    ? linkedDependents.find(d => d.dependent.id === bookingForDependentId)?.dependent ?? null
+    : user
+
+  // Client-side pre-check for a clean UX -- the real enforcement is the
+  // enforce_clinic_booking_eligibility DB trigger (20260826000001), which this
+  // mirrors exactly (same emergency exemption, same "unknown data -> ask them
+  // to complete their profile" fallback) so a race with someone else editing
+  // the clinic's restriction just falls through to that trigger's own error.
+  const clinicRestrictionReason: { reason: string; needsProfile: boolean } | null = (() => {
+    if (isEmergency || !selectedClinic) return null
+    const { min_age, max_age, gender_restriction } = selectedClinic
+    if (min_age == null && max_age == null && gender_restriction == null) return null
+    const forSelf = !bookingForDependentId
+    const profileHint = forSelf ? 'your' : "the dependent's"
+
+    if (min_age != null || max_age != null) {
+      const age = calcAge(effectivePatient?.date_of_birth ?? null)
+      if (age == null) {
+        return { reason: `This clinic has an age restriction. Please complete ${profileHint} date of birth before booking here.`, needsProfile: forSelf }
+      }
+      if (min_age != null && age < min_age) return { reason: `This clinic only accepts patients aged ${min_age} and above.`, needsProfile: false }
+      if (max_age != null && age > max_age) return { reason: `This clinic only accepts patients aged ${max_age} and under.`, needsProfile: false }
+    }
+
+    if (gender_restriction != null) {
+      const gender = effectivePatient?.gender?.toLowerCase() || null
+      if (!gender) {
+        return { reason: `This clinic has a gender restriction. Please complete ${profileHint} gender before booking here.`, needsProfile: forSelf }
+      }
+      if (gender !== gender_restriction) return { reason: `This clinic is restricted to ${gender_restriction} patients.`, needsProfile: false }
+    }
+
+    return null
+  })()
+
   // Auto-select the Emergency Department the moment it's the only option — no need to make
   // someone tap a single-item list while triaging.
   useEffect(() => {
@@ -373,6 +429,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     if (step === STEP_DETAILS) {
       if (isEmergency && hospitalOpenNow === false) return false
       if (noEmergencyClinic) return false
+      if (clinicRestrictionReason) return false
       return reason.trim().length >= 3 && !(hospital?.clinic_model === 'multi' && !selectedClinic)
     }
     if (step === STEP_SCHEDULE) {
@@ -408,6 +465,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         : (hospital.approval_mode ?? 'auto')
 
     const arrivalTime = opdSlot?.time ?? '09:00'
+    // A linked dependent's booking uses THEIR OWN account as patientId (medically
+    // correct -- history follows the real person), never the booking caretaker's.
+    const bookingPatientId = bookingForDependentId ?? user.id
 
     if (rescheduleCtx) {
       result = await rescheduleAppointment({
@@ -425,7 +485,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       })
     } else if (bookingType === 'physical' || !preferredDoc) {
       result = await createHospitalAppointment({
-        patientId:          user.id,
+        patientId:          bookingPatientId,
         hospitalId:         String(hospital.id),
         date:               selectedDate,
         startTime:          arrivalTime,
@@ -447,7 +507,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       // encodes — so a specialist booking could auto-confirm purely because the
       // patient also picked a preferred doctor.
       result = await createAppointment({
-        patientId:    user.id,
+        patientId:    bookingPatientId,
         doctorId:     preferredDoc.id,
         hospitalId:   String(hospital.id),
         slotId:       usingRealSlots ? (opdSlot?.id ?? null) : null,
@@ -710,6 +770,33 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 )}
               </View>
 
+              {/* Who is this for -- linked (real-account) dependents only */}
+              {linkedDependents.length > 0 && (
+                <>
+                  <Text style={[s.label, { color: t.textMuted }]}>Who is this for?</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                    <TouchableOpacity onPress={() => setBookingForDependentId(null)}
+                      style={[s.forBtnSmall, {
+                        borderColor:     !bookingForDependentId ? t.accent : t.cardBorder,
+                        backgroundColor: !bookingForDependentId ? t.accentBg : t.cardBg,
+                      }]}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: !bookingForDependentId ? t.accent : t.textMuted }}>Myself</Text>
+                    </TouchableOpacity>
+                    {linkedDependents.map(d => (
+                      <TouchableOpacity key={d.linkId} onPress={() => setBookingForDependentId(d.dependent.id)}
+                        style={[s.forBtnSmall, {
+                          borderColor:     bookingForDependentId === d.dependent.id ? t.accent : t.cardBorder,
+                          backgroundColor: bookingForDependentId === d.dependent.id ? t.accentBg : t.cardBg,
+                        }]}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: bookingForDependentId === d.dependent.id ? t.accent : t.textMuted }}>
+                          {d.dependent.full_name} ({d.relationship})
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
               {isManual && (
                 <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
                   <Text style={{ fontSize: 12, color: '#EF9F27', lineHeight: 18 }}>
@@ -865,7 +952,22 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     })
                   )}
 
-                  {selectedClinic && !selectedClinic.is_opd && !isEmergency && (
+                  {clinicRestrictionReason && (
+                    <View style={[s.noticeBox, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)', marginTop: 4 }]}>
+                      <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                        <Text style={{ fontWeight: '800' }}>Can't book this clinic.</Text> {clinicRestrictionReason.reason}
+                      </Text>
+                      {clinicRestrictionReason.needsProfile && (
+                        <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('MedicalHistory') }} style={{ marginTop: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C', textDecorationLine: 'underline' }}>
+                            Complete your health profile →
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {selectedClinic && !selectedClinic.is_opd && !isEmergency && !clinicRestrictionReason && (
                     <>
                       <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginTop: 4 }]}>
                         <Text style={{ fontSize: 12, color: '#EF9F27', lineHeight: 18 }}>
@@ -1279,6 +1381,7 @@ const s = StyleSheet.create({
   // Details
   contextChip:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 14, borderWidth: 1 },
   contextName:  { fontSize: 13, fontWeight: '700' },
+  forBtnSmall:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
   noticeBox:    { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
   label:        { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   textarea:     { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },

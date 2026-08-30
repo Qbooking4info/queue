@@ -108,61 +108,44 @@ Nominatim proxy with server-side rate limiting (1.1 s between calls) and in-proc
 
 ## Doctors
 
-### `POST /api/doctors`
-Creates a doctor record. Optionally creates a Supabase Auth account if `login_email` + `login_password` are provided.
-
-| Field | Value |
-|---|---|
-| Auth | `getServerUser()` |
-| Body | `hospitalId, clinicId?, full_name, title?, specialty_id?, consultation_fee?, virtual_fee?, years_experience?, accepts_virtual, bio?, qualification?, mdcn_number?, login_email?, login_password?` |
-| Returns | `{ id: uuid, hasLogin: boolean }` |
+### ~~`POST /api/doctors`~~ / ~~`POST /api/doctors/create`~~ (removed)
+Both manual-entry routes (create a `doctors` row from scratch, optionally with an
+auto-generated or admin-supplied portal login) were removed so hospitals can no longer
+mint doctor accounts themselves. `POST /api/doctors/link` (below) is now the only way to
+add a doctor — every doctor is a real, self-registered account from the `doctors/` app.
+The `/dashboard/doctors/add` page and its "+ Invite Doctor" entry point are gone too.
 
 ---
 
-### `POST /api/doctors/create`
-Creates a doctor **with auto-generated portal credentials** (email + password). Also enforces the plan's `max_doctors` seat limit.
+### `GET /api/doctors/link?code=XXXXXX`
+Lookup step before actually linking — resolves a Doctor ID to an account so the admin can
+confirm whose account they're about to link and choose the specialty before finalizing
+(specialty is a per-hospital `doctors` row column, not global to the person — the same
+doctor can be Pediatrics at one hospital and General Practice at another).
 
 | Field | Value |
 |---|---|
-| Auth | Session cookie; caller must be `hospital_admin` with role `admin` or `owner` |
-| Plan check | Queries active subscription `max_doctors`; returns 403 if at limit |
-| Creates | `doctors` row, Supabase Auth user, `users` profile, `hospital_admins` (specialist) |
-
-**Body:**
-```json
-{
-  "full_name": "string",
-  "title": "Dr.",
-  "qualification": "string?",
-  "specialty_id": "uuid?",
-  "consultation_fee": "number?",
-  "virtual_fee": "number?",
-  "accepts_virtual": "boolean",
-  "bio": "string?"
-}
-```
-
-**Returns:** `{ success, doctorId, loginCreated, loginEmail?, loginPassword? }`
-
-> Generated email format: `dr.{name-slug}.{random4}@portal.queueapp.co`
-
----
+| Auth | `requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)` |
+| Returns | `{ fullName, alreadyLinked: boolean, suggestedSpecialtyId, suggestedSpecialtyName }` — the suggestion comes from the doctor's oldest existing `doctors` row, if any |
 
 ### `POST /api/doctors/link`
 Links an existing, independent doctor account (self-registered via the `doctors/` app — see
 `users.active_hospital_id` in the schema doc) to the caller's hospital, by inserting a new
-`doctors` row that shares that account's `user_id`. Added Aug 2026 alongside multi-hospital
-doctor identity. If the doctor was previously linked to this same hospital and later
-deactivated, re-activates that row instead of inserting a duplicate. Copies profile fields
-(`title`, `level`, `qualification`, `bio`, `years_experience`, `mdcn_number`, `specialty_id`,
-`avatar_url`) from the doctor's oldest existing `doctors` row, if any, so they don't have to
-re-enter them per hospital. Subject to the same `max_doctors` plan-seat check as
-`POST /api/doctors/create`.
+`doctors` row that shares that account's `user_id`. If the doctor was previously linked to
+this same hospital and later deactivated, re-activates that row instead of inserting a
+duplicate (and resets `availability_status` to `off_duty`). Copies profile fields (`title`,
+`level`, `qualification`, `bio`, `years_experience`, `mdcn_number`, `avatar_url`) from the
+doctor's oldest existing `doctors` row, if any, so they don't have to re-enter them per
+hospital — `specialty_id` is the one field the admin picks explicitly (via the `GET` lookup
+above) rather than auto-copying, since it's hospital-scoped. New rows default to
+`availability_status: 'off_duty'` (not the table's `on_duty` default) so a newly linked
+doctor isn't immediately assignable before anyone's confirmed they've actually started.
+Subject to the plan's `max_doctors` seat limit.
 
 | Field | Value |
 |---|---|
-| Auth | `requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])` |
-| Body | `{ doctorCode: string, clinicId?: uuid }` — `doctorCode` is the target doctor's `users.doctor_code`, a short 6-character code shown to them as their "Doctor ID" in the `doctors/` app (changed from the raw `users.id` UUID in `20260821000001` — shorter and human-typeable). Matched case-insensitively (uppercased server-side) |
+| Auth | `requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)` |
+| Body | `{ doctorCode: string, clinicId?: uuid, specialtyId?: uuid \| null }` — `doctorCode` is the target doctor's `users.doctor_code`, a short 6-character code shown to them as their "Doctor ID" in the `doctors/` app (changed from the raw `users.id` UUID in `20260821000001` — shorter and human-typeable). Matched case-insensitively (uppercased server-side) |
 | Returns | `{ id: uuid, relinked: boolean }` |
 
 ---
@@ -227,6 +210,71 @@ Returns all upcoming time slots for a doctor (from today, up to 1000 rows).
 |---|---|
 | Auth | Session cookie |
 | Returns | `{ slots: [{ id, slot_date, start_time, end_time, is_virtual, booked_count, max_capacity, is_available }] }` |
+
+---
+
+## Dependents *(added Aug 2026, migration `20260827000001`)*
+
+Real-account dependent linking — a caretaker links to another, independently-registered patient
+account (e.g. a child or elderly parent) by a short Patient ID, same two-step shape as doctor
+linking but patient-authed (`getServerUser`, any logged-in patient — no staff role involved).
+Replaces the old profile-only `dependents` table (name/DOB/relationship, no login), which is kept
+around only for historical rows.
+
+### `GET /api/dependents/link?code=XXXXXX`
+Lookup step before linking, so the caretaker can confirm whose account they're about to link.
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser(req)` |
+| Returns | `{ fullName, dateOfBirth, alreadyLinked }` |
+
+### `POST /api/dependents/link`
+Links the caller's account (caretaker) to a dependent's account by their `patient_code`. Rejects
+linking your own code, and rejects (with a clean error, backed by a DB unique constraint on
+`dependent_links(dependent_id) WHERE status='active'`) if the target already has an active
+caretaker. Rate-limited (`dependents-link:{caller.id}`, 20/hour).
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser(req)` |
+| Body | `{ code: string, relationship: 'spouse' \| 'child' \| 'parent' \| 'sibling' \| 'other' }` |
+| Returns | `{ id: uuid, fullName: string }` |
+
+### `POST /api/dependents/unlink`
+Ends a caretaker/dependent relationship. The caretaker can always end it; the dependent can only
+self-unlink once they're 18+ (`calcAge` on their own `date_of_birth` — unknown DOB is treated as
+**not** eligible, same safe-default precedent as the clinic age/gender restriction feature).
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser(req)` |
+| Body | `{ linkId: uuid }` |
+| Returns | `{ success: true }` |
+
+### `GET /api/dependents/linked`
+One call powers both halves of the mobile Dependents screen.
+
+| Field | Value |
+|---|---|
+| Auth | `getServerUser(req)` |
+| Returns | `{ managing: [{ linkId, relationship, dependent: { id, full_name, date_of_birth, gender } }], managedBy: { linkId, relationship, caretaker: { id, full_name } } \| null }` |
+
+### Booking for a linked dependent — `appointments.patient_id` is the dependent's own account
+A booking made on behalf of a linked dependent sets `patient_id` to the **dependent's own
+`users.id`**, not the caretaker's — medically correct, since history then follows the real person
+(and survives them unlinking at 18+). `POST /api/payments/initialize` had to be extended for this:
+it now allows `caller.id !== resolved.patientId` when the caller has an active `dependent_links`
+row for that patient (previously payment could only ever be initiated by `patient_id` itself).
+`payments.patient_id` is unchanged — still always the payer (`caller.id`), so this is the entire
+"caretaker always pays" implementation; no wallet/billing infrastructure was needed.
+
+**Found only by testing a real insert, not by reading RLS**: a pre-existing `BEFORE INSERT` trigger,
+`fn_set_appointment_patient_id`, unconditionally overwrote `patient_id` to the caller's own id on
+every direct client insert — presumably why the old `dependent_id` column existed as a workaround
+in the first place. Fixed (as part of `20260827000001`) to only force it back when the client's
+`patient_id` isn't in `current_patient_ids()` (self or an active dependent) — see
+`Queue-Database-Schema.md` for the full trigger change and the anti-spoofing behavior it preserves.
 
 ---
 
@@ -577,7 +625,7 @@ what exists and what replaced what.
 | `GET/PATCH /api/doctors/me` | `getDoctorAvgConsultDuration`, `setDoctorAvailability` | Doctor self-service, keyed on `caller.doctorId`. `GET` gained optional `?from&to&hospitalId` (added `20260821`, all backward-compatible no-ops when omitted) for the dashboard's date-range + hospital-affiliation filters — `hospitalId` is resolved against the caller's OWN `doctors` rows only (any `is_active` state, not just their currently-active one), never a client-trusted doctor id. Response gained `avgRatingOutOf10` (stored 1–5 `reviews.rating`, averaged over the range and doctor-row, then ×2 to 2dp — display-only rescale for this one dashboard stat, the underlying 1–5 star submission UI elsewhere is unchanged), `reviewCount`, `total`, `completed` |
 | `GET /api/doctors/me/hospitals` | *(new)* | Added `20260821` for the dashboard's hospital-affiliation filter — every hospital the caller has EVER been linked to as a doctor, active or detached, unlike every other doctor-facing hospital list in the app (which filters to `is_active=true`). Returns `{ hospitals: [{ hospitalId, hospitalName, isActive }] }` |
 | `GET /api/doctors/unassigned` | `getUnassignedDoctors` | |
-| `GET/PATCH/DELETE /api/clinics/[clinicId]` | `getClinicDetail`, `getClinicDoctors`, `getClinicStaff`, `getClinicAppointments`, `getClinicRangeStats`, `getClinicHours`, `getHospitalHours`, `updateClinic`, `toggleClinicActive`, `setEmergencyClinic`/`clearEmergencyClinic`, `updateClinicHours`/`clearClinicHours`, `deleteClinic` | `DELETE` is `super_admin`/`hospital_admin` only — deliberately excludes `clinic_admin` (the original had no check at all); flagged for product confirmation. `GET`'s `stats` gained `avgWaitMinutes`/`avgConsultMinutes` (`20260823`) — computed from the SAME already-fetched, `orFilter`-scoped appointments list used for the `total`/`completed`/`cancelled` counts (added `waiting_time_secs` to that select; no new query), powering the clinic detail page's two new Overview stat cards. Unlike the vitals route above, `requireRole` here still isn't passed `req` — left as-is, this route has no real cross-origin caller (web dashboard only) |
+| `GET/PATCH/DELETE /api/clinics/[clinicId]` | `getClinicDetail`, `getClinicDoctors`, `getClinicStaff`, `getClinicAppointments`, `getClinicRangeStats`, `getClinicHours`, `getHospitalHours`, `updateClinic`, `toggleClinicActive`, `setEmergencyClinic`/`clearEmergencyClinic`, `updateClinicHours`/`clearClinicHours`, `deleteClinic` | `DELETE` is `super_admin`/`hospital_admin` only — deliberately excludes `clinic_admin` (the original had no check at all); flagged for product confirmation. `GET`'s `stats` gained `avgWaitMinutes`/`avgConsultMinutes` (`20260823`) — computed from the SAME already-fetched, `orFilter`-scoped appointments list used for the `total`/`completed`/`cancelled` counts (added `waiting_time_secs` to that select; no new query), powering the clinic detail page's two new Overview stat cards. `PATCH`'s `update` action gained `min_age`/`max_age`/`gender_restriction` (`20260826`, all optional, `null` clears) — validated here (non-negative integers, `min_age <= max_age`, gender in `('male','female')`) but the actual booking-time enforcement is the `check_clinic_booking_eligibility` DB trigger, not this route, since most bookings never go through it (see `Queue-Database-Schema.md`). Unlike the vitals route above, `requireRole` here still isn't passed `req` — left as-is, this route has no real cross-origin caller (web dashboard only) |
 | `POST /api/clinics/[clinicId]/doctors`, `DELETE .../doctors/[doctorId]` | `assignDoctorToClinic`, `createClinicDoctor`, `removeDoctorFromClinic` | |
 | `GET/POST /api/hospitals/[id]/settings` | `getHospitalSettings`, `updateHospitalSettings`, `getHospitalHours`, `updateHospitalHours` | `super_admin`/`hospital_admin` only |
 | `GET /api/hospitals/[id]/activity` | `getRecentActivity` | Dashboard notification bell |

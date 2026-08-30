@@ -54,7 +54,7 @@ export function HospitalRegisterScreen({ navigation }: Props) {
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
-        options: { data: { full_name: fullName.trim() } },
+        options: { data: { full_name: fullName.trim(), registered_via: 'hospital_onboarding' } },
       })
       if (signUpErr) throw new Error(signUpErr.message)
       if (!signUpData.session) throw new Error('Account created — please check your email to confirm, then sign in.')
