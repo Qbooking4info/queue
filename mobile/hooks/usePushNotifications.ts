@@ -33,6 +33,23 @@ async function registerForPushNotifications(): Promise<string | null> {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#0070F3',
     })
+
+    // Incoming consultations get their own channel so they actually ring rather
+    // than pinging once like a booking reminder. A separate channel also lets a
+    // patient silence routine notifications without silencing their doctor
+    // calling them -- on Android importance and sound are per-channel, and a
+    // channel's settings are fixed once created, so this cannot be tuned later
+    // by changing the payload.
+    await Notifications.setNotificationChannelAsync('queue-calls', {
+      name:        'Incoming consultations',
+      importance:  Notifications.AndroidImportance.MAX,
+      sound:       'default',
+      // Long repeating buzz — reads as a ring, not a notification blip.
+      vibrationPattern: [0, 700, 400, 700, 400, 700],
+      lightColor:  '#00E87A',
+      bypassDnd:   true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    })
   }
 
   const { status: existing } = await Notifications.getPermissionsAsync()
@@ -77,6 +94,17 @@ async function routeFromNotificationData(data: Record<string, unknown> | undefin
     }
     if (data.request_id) {
       navigateWhenReady('AmbulanceTracking', { requestId: String(data.request_id) })
+      return
+    }
+
+    // An incoming consultation goes straight into the call. This must be checked
+    // before appointment_id: the call payload carries both, and landing the patient
+    // on AppointmentDetail while the doctor waits in the room is the whole bug.
+    if (data.call_appointment_id) {
+      navigateWhenReady('VideoCall', {
+        appointmentId: String(data.call_appointment_id),
+        doctorName:    String(data.doctor_name ?? 'your doctor'),
+      })
       return
     }
 

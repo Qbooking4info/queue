@@ -14,12 +14,24 @@ export async function sendExpoPush(
   title: string,
   body: string,
   data?: Record<string, unknown>,
+  // Android delivers sound/importance per notification channel, so a payload that
+  // should ring has to name one. Omitted for everything else, which keeps the
+  // existing default-channel behaviour untouched.
+  opts?: { channelId?: string },
 ) {
   try {
     const res = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: 'default', priority: 'high' }),
+      body: JSON.stringify({
+        to: token,
+        title,
+        body,
+        data: data ?? {},
+        sound: 'default',
+        priority: 'high',
+        ...(opts?.channelId ? { channelId: opts.channelId } : {}),
+      }),
     })
     const json = await res.json().catch(() => null)
     const ticket = json?.data

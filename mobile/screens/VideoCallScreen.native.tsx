@@ -11,8 +11,17 @@ import {
   VideoSourceType,
 } from 'react-native-agora'
 import { supabase } from '../lib/supabase'
+import { applyAudioProfile, applyVideoProfile, signalFromQuality, SignalLevel } from '../lib/agoraCall'
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID ?? ''
+
+/** "Adaeze Nwachukwu" -> "AN". Falls back to a single glyph for one-word names. */
+function initials(name: string): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0][0].toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 interface Props {
   navigation: any
@@ -35,7 +44,13 @@ export function VideoCallScreen({ navigation, route }: Props) {
   const [joined,       setJoined]       = useState(false)
   const [remoteUid,    setRemoteUid]    = useState<number | null>(null)
   const [micEnabled,   setMicEnabled]   = useState(true)
-  const [camEnabled,   setCamEnabled]   = useState(true)
+  // Consultations open as a voice call: faster to connect and far more reliable on a
+  // weak mobile link. Either side can raise video mid-call via the camera control.
+  const [camEnabled,   setCamEnabled]   = useState(false)
+  const [remoteVideoOn, setRemoteVideoOn] = useState(false)
+  const [signal,       setSignal]       = useState<SignalLevel | null>(null)
+  // Agora's video module is only initialised the first time video is switched on.
+  const videoStarted = useRef(false)
   const [elapsed,      setElapsed]      = useState(0)
   const [error,        setError]        = useState<string | null>(null)
 
@@ -126,6 +141,15 @@ export function VideoCallScreen({ navigation, route }: Props) {
       engine.current.addListener('onUserOffline', (_conn: any, uid: number) => {
         if (active && uid === remoteUid) setRemoteUid(null)
       })
+      engine.current.addListener('onRemoteVideoStateChanged', (_c: any, _uid: number, state: number) => {
+        // 0 = stopped, 1 = starting, 2 = decoding, 3 = frozen. Only 2 means we have
+        // a live remote picture worth switching the layout for.
+        if (active) setRemoteVideoOn(state === 2)
+      })
+      engine.current.addListener('onNetworkQuality', (_c: any, uid: number, tx: number, rx: number) => {
+        // uid 0 is the local user -- the only one whose uplink we can act on.
+        if (active && uid === 0) setSignal(signalFromQuality(tx, rx))
+      })
       engine.current.addListener('onError', (errCode: number) => {
         if (!active) return
         // MH4: Agora error codes 134/135 = camera/microphone permission denied on iOS
@@ -145,18 +169,23 @@ export function VideoCallScreen({ navigation, route }: Props) {
         }
       })
 
-      await engine.current.enableVideo()
-      engine.current.startPreview()
+      // Audio-only join. enableVideo()/startPreview() are deferred until the user
+      // actually turns the camera on, so we neither light the camera LED nor spend
+      // uplink on a video track nobody asked for.
+      await engine.current.enableAudio()
+      applyAudioProfile(engine.current)
 
       engine.current.joinChannel(
         resolvedSession.guest_token,
         resolvedSession.room_name,
         2, // patient uid
         {
-          clientRoleType:       ClientRoleType.ClientRoleBroadcaster,
+          clientRoleType:         ClientRoleType.ClientRoleBroadcaster,
           publishMicrophoneTrack: true,
-          publishCameraTrack:     true,
+          publishCameraTrack:     false,
           autoSubscribeAudio:     true,
+          // Still subscribe to remote video: if the doctor raises their camera we
+          // want to show it immediately without a renegotiation round-trip.
           autoSubscribeVideo:     true,
         },
       )
@@ -194,14 +223,28 @@ export function VideoCallScreen({ navigation, route }: Props) {
     }
   }
 
-  function toggleCamera() {
+  async function toggleCamera() {
+    const eng = engine.current
+    if (!eng) return
+
     if (camEnabled) {
-      engine.current?.muteLocalVideoStream(true)
+      eng.updateChannelMediaOptions({ publishCameraTrack: false })
+      eng.stopPreview()
       setCamEnabled(false)
-    } else {
-      engine.current?.muteLocalVideoStream(false)
-      setCamEnabled(true)
+      return
     }
+
+    // First time up: initialise the video module and apply the encoder profile
+    // before publishing, so the very first frame the doctor sees is already at
+    // full quality rather than negotiating up from Agora's low default.
+    if (!videoStarted.current) {
+      await eng.enableVideo()
+      applyVideoProfile(eng)
+      videoStarted.current = true
+    }
+    eng.startPreview()
+    eng.updateChannelMediaOptions({ publishCameraTrack: true })
+    setCamEnabled(true)
   }
 
   function handleEndCall() {
@@ -215,24 +258,39 @@ export function VideoCallScreen({ navigation, route }: Props) {
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="#050d09" />
 
-      {/* Remote video — full screen background */}
-      {remoteUid != null ? (
+      {/* Remote video fills the screen only once the doctor actually raises their
+          camera. Until then this is a voice call, and we show a calm audio layout
+          rather than a black rectangle. */}
+      {remoteUid != null && remoteVideoOn ? (
         <RtcSurfaceView
           canvas={{ uid: remoteUid }}
           style={StyleSheet.absoluteFill}
         />
+      ) : remoteUid != null ? (
+        <View style={st.audioStage}>
+          <View style={st.avatarRing}>
+            <View style={st.avatar}>
+              <Text style={st.avatarInitials}>{initials(doctorName)}</Text>
+            </View>
+          </View>
+          <Text style={st.audioName}>Dr. {doctorName}</Text>
+          <Text style={st.audioHint}>Voice consultation · camera off</Text>
+          {error && <Text style={st.errorText}>{error}</Text>}
+        </View>
       ) : (
         <View style={st.waitingContainer}>
-          <Ionicons name="medical-outline" size={48} color="rgba(255,255,255,0.3)" />
+          <View style={st.pulseRing}>
+            <Ionicons name="videocam-outline" size={34} color="#4ade80" />
+          </View>
           <Text style={st.waitingText}>
-            {session ? 'Waiting for doctor…' : 'Waiting for doctor to start the call…'}
+            {session ? 'Connecting you to the doctor…' : 'Waiting for the doctor to start the consultation…'}
           </Text>
           {error && <Text style={st.errorText}>{error}</Text>}
         </View>
       )}
 
       {/* Local video — PiP top-right */}
-      {joined && (
+      {joined && camEnabled && (
         <View style={st.localPip}>
           <RtcSurfaceView
             canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
@@ -252,28 +310,63 @@ export function VideoCallScreen({ navigation, route }: Props) {
           <Text style={[st.headerStatus, { color: joined && remoteUid != null ? '#4ade80' : '#7A9089', marginTop: 0 }]}>
             {joined && remoteUid != null ? `Connected · ${fmt(elapsed)}` : 'Connecting…'}
           </Text>
+
+          {joined && signal && (
+            <View style={st.signalWrap}>
+              <View style={st.bars}>
+                {[1, 2, 3, 4].map(i => (
+                  <View
+                    key={i}
+                    style={[
+                      st.bar,
+                      { height: 4 + i * 2 },
+                      i <= signal.bars ? { backgroundColor: signal.color } : st.barOff,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={[st.signalLabel, { color: signal.color }]}>{signal.label}</Text>
+            </View>
+          )}
         </View>
+
+        {/* Only nudge about video when the link is genuinely struggling AND we are
+            the one spending uplink on it. */}
+        {signal?.degraded && camEnabled && (
+          <Text style={st.degradedHint}>Weak connection — turning your camera off will help</Text>
+        )}
       </View>
 
       {/* Controls */}
       <View style={st.controls}>
-        <TouchableOpacity
-          onPress={toggleMic}
-          style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}
-        >
-          <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity
+            onPress={toggleMic}
+            activeOpacity={0.8}
+            style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}
+          >
+            <Ionicons name={micEnabled ? 'mic' : 'mic-off'} size={24} color={micEnabled ? '#E8F5EF' : '#050d09'} />
+          </TouchableOpacity>
+          <Text style={st.ctrlLabel}>{micEnabled ? 'Mute' : 'Unmute'}</Text>
+        </View>
 
-        <TouchableOpacity onPress={handleEndCall} style={st.endBtn}>
-          <Ionicons name="call" size={26} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity onPress={handleEndCall} activeOpacity={0.85} style={st.endBtn}>
+            <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+          </TouchableOpacity>
+          <Text style={[st.ctrlLabel, { color: '#FF7A7A' }]}>End</Text>
+        </View>
 
-        <TouchableOpacity
-          onPress={toggleCamera}
-          style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}
-        >
-          <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={st.ctrlItem}>
+          <TouchableOpacity
+            onPress={toggleCamera}
+            activeOpacity={0.8}
+            style={[st.ctrlBtn, camEnabled && st.ctrlBtnActive]}
+          >
+            <Ionicons name={camEnabled ? 'videocam' : 'videocam-off'} size={24} color={camEnabled ? '#050d09' : '#E8F5EF'} />
+          </TouchableOpacity>
+          <Text style={st.ctrlLabel}>{camEnabled ? 'Stop video' : 'Start video'}</Text>
+        </View>
       </View>
     </View>
   )
@@ -292,6 +385,43 @@ const st = StyleSheet.create({
     backgroundColor: '#111',
   },
   pipInner:         { flex: 1 },
+
+  // ── audio-first stage ────────────────────────────────────────────────────
+  audioStage:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  avatarRing: {
+    width: 132, height: 132, borderRadius: 66,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
+    backgroundColor: 'rgba(74,222,128,0.05)',
+  },
+  avatar: {
+    width: 104, height: 104, borderRadius: 52,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#12241B',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.35)',
+  },
+  avatarInitials: { color: '#4ade80', fontSize: 34, fontWeight: '700', letterSpacing: 1 },
+  audioName:     { color: '#fff', fontSize: 19, fontWeight: '700', marginTop: 12 },
+  audioHint:     { color: '#7A9089', fontSize: 13 },
+
+  pulseRing: {
+    width: 78, height: 78, borderRadius: 39,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)',
+    backgroundColor: 'rgba(74,222,128,0.06)',
+  },
+
+  // ── signal indicator ─────────────────────────────────────────────────────
+  signalWrap:   { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginLeft: 10 },
+  bars:         { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  bar:          { width: 3, borderRadius: 1.5 },
+  barOff:       { backgroundColor: 'rgba(255,255,255,0.18)' },
+  signalLabel:  { fontSize: 11, fontWeight: '600' },
+  degradedHint: { color: '#fbbf24', fontSize: 11, marginTop: 8 },
+
+  // ── controls ─────────────────────────────────────────────────────────────
+  ctrlItem:     { alignItems: 'center', gap: 7 },
+  ctrlLabel:    { color: '#93A9A0', fontSize: 11, fontWeight: '500' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
     paddingTop: 52, paddingHorizontal: 20, paddingBottom: 14,
@@ -300,19 +430,25 @@ const st = StyleSheet.create({
   headerName:       { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerStatus:     { fontSize: 12, marginTop: 3 },
   controls: {
-    position: 'absolute', bottom: 48, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,
+    position: 'absolute', bottom: 44, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 30,
   },
   ctrlBtn: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.13)',
+    width: 58, height: 58, borderRadius: 29,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center', justifyContent: 'center',
   },
-  ctrlBtnOff:       { backgroundColor: 'rgba(239,68,68,0.35)' },
+  // Muted / camera-off reads as a filled light pill, matching how iOS and Meet
+  // show an *active* suppression rather than dimming the control into invisibility.
+  ctrlBtnOff:       { backgroundColor: '#E8F5EF', borderColor: '#E8F5EF' },
+  ctrlBtnActive:    { backgroundColor: '#4ade80', borderColor: '#4ade80' },
   endBtn: {
-    width: 64, height: 64, borderRadius: 32,
+    width: 68, height: 68, borderRadius: 34,
     backgroundColor: '#dc2626',
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#dc2626', shadowOpacity: 0.4, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 }, elevation: 6,
   },
   ctrlIcon:         { fontSize: 22 },
 })

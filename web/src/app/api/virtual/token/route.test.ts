@@ -11,6 +11,14 @@ vi.mock('agora-token', () => ({
   RtcRole: { PUBLISHER: 1 },
 }))
 
+// notify-patient pulls in lib/push, which is marked 'server-only' and throws
+// when loaded outside a server component. Mocking it here also lets us assert
+// that starting a call actually rings the patient.
+const notifyIncomingCallMock = vi.fn()
+vi.mock('@/lib/notify-patient', () => ({
+  notifyIncomingCall: (...args: unknown[]) => notifyIncomingCallMock(...args),
+}))
+
 function mockDb(responses: Record<string, { data: unknown; error?: unknown }>) {
   return {
     from: vi.fn((table: string) => {
@@ -44,6 +52,7 @@ function makeRequest(body: unknown) {
 describe('POST /api/virtual/token', () => {
   beforeEach(() => {
     getServerUserMock.mockReset()
+    notifyIncomingCallMock.mockReset()
   })
 
   // This already worked correctly before the audit -- this test locks it in
@@ -79,5 +88,45 @@ describe('POST /api/virtual/token', () => {
 
     const res = await POST(makeRequest({ appointmentId: 'appt-1' }))
     expect(res.status).toBe(200)
+  })
+
+  // The patient used to be told nothing when a doctor started the call -- they
+  // only found out if they were already sitting on the consultation screen.
+  it('rings the patient when the doctor starts the call', async () => {
+    process.env.AGORA_APP_ID = 'test-app-id'
+    process.env.AGORA_APP_CERTIFICATE = 'test-cert'
+    getServerUserMock.mockResolvedValue({ id: 'AUTH_THE_REAL_DOCTOR' })
+    dbMock.current = mockDb({
+      appointments: {
+        data: { id: 'appt-1', type: 'virtual', status: 'confirmed', doctor_id: 'DOC_1', patient_id: 'PAT_1' },
+      },
+      doctors: { data: { id: 'DOC_1', auth_user_id: 'AUTH_THE_REAL_DOCTOR', user_id: null } },
+      users: { data: { full_name: 'Emeka Obi' } },
+      virtual_sessions: { data: null, error: null },
+    })
+
+    await POST(makeRequest({ appointmentId: 'appt-1' }))
+
+    expect(notifyIncomingCallMock).toHaveBeenCalledTimes(1)
+    const [, appointmentId, doctorName] = notifyIncomingCallMock.mock.calls[0]
+    expect(appointmentId).toBe('appt-1')
+    expect(doctorName).toBe('Dr. Emeka Obi')
+  })
+
+  // A misconfigured deploy must not hand out a token signed with an empty app id.
+  it('refuses to build a token when Agora credentials are missing', async () => {
+    delete process.env.AGORA_APP_ID
+    delete process.env.AGORA_APP_CERTIFICATE
+    getServerUserMock.mockResolvedValue({ id: 'AUTH_THE_REAL_DOCTOR' })
+    dbMock.current = mockDb({
+      appointments: {
+        data: { id: 'appt-1', type: 'virtual', status: 'confirmed', doctor_id: 'DOC_1', patient_id: 'PAT_1' },
+      },
+      doctors: { data: { id: 'DOC_1', auth_user_id: 'AUTH_THE_REAL_DOCTOR', user_id: null } },
+    })
+
+    const res = await POST(makeRequest({ appointmentId: 'appt-1' }))
+    expect(res.status).toBe(500)
+    expect(notifyIncomingCallMock).not.toHaveBeenCalled()
   })
 })

@@ -4,6 +4,7 @@ import { getServerUser } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { RtcTokenBuilder, RtcRole } from 'agora-token'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+import { notifyIncomingCall } from '@/lib/notify-patient'
 
 // Doctor-initiated: POST with { appointmentId }
 // Generates host + guest tokens, upserts virtual_sessions, sets appointment to in_progress.
@@ -114,6 +115,18 @@ async function handlePOST(req: NextRequest) {
     .update({ status: 'in_progress', consult_started_at: now })
     .eq('id', appointmentId)
     .in('status', ['pending', 'confirmed', 'checked_in'])
+
+  // Ring the patient. Awaited rather than fire-and-forget: on serverless the
+  // function can be frozen the moment the response is returned, which would drop
+  // an un-awaited push often enough to look like flaky delivery. notifyIncomingCall
+  // swallows its own errors, so this cannot stop the doctor starting the call.
+  const { data: caller } = await db
+    .from('users')
+    .select('full_name')
+    .eq('auth_id', user.id)
+    .single()
+  const doctorName = (caller as { full_name?: string } | null)?.full_name
+  await notifyIncomingCall(db, appointmentId, doctorName ? `Dr. ${doctorName}` : 'Your doctor')
 
   return NextResponse.json({
     token:       hostToken,
