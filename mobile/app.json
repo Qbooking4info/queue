@@ -85,7 +85,8 @@
             "extraProguardRules": "# Keep the attributes Sentry needs to symbolicate a minified stack trace.\n-keepattributes SourceFile,LineNumberTable\n-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod\n\n# expo-modules-core resolves the headless app loader by Class.forName() on a name\n# read from AndroidManifest <meta-data android:value=...> (AppLoaderProvider.kt:34).\n# AGP auto-keeps manifest *components*, but not class names inside meta-data values,\n# and expo-modules-core only -keepclassmembers its @DoNotStrip constructor, which does\n# not retain the class itself. Without this, R8 strips it and expo-task-manager dies\n# with ClassNotFoundException -- which takes ambulance background location with it.\n-keep class * implements expo.modules.apploader.HeadlessAppLoader { *; }"
           }
         }
-      ]
+      ],
+      "./plugins/withGradleHeap.js"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
