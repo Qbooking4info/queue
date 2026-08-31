@@ -1,0 +1,95 @@
+{
+  "expo": {
+    "name": "Queue Doctor",
+    "slug": "doctor",
+    "scheme": "queuedoctor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.qbooking.doctor",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
+        "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.qbooking.doctor",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+      "eas": {
+        "projectId": "5a3c4456-2295-433a-a5f3-7a8f78b3fa2f"
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0070F3",
+          "defaultChannel": "queue-notifications",
+          "androidMode": "default"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Queue reports an on-duty ambulance's position so dispatch can send it the nearest emergency. Only while you are on duty.",
+          "locationWhenInUsePermission": "Queue needs your location to show nearby hospitals and distances.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-status-bar",
+      "@sentry/react-native",
+      "expo-web-browser",
+      "expo-audio",
+      "./plugins/withBouncyCastlePin.js",
+      "./plugins/withAbiSplits.js",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "# Keep the attributes Sentry needs to symbolicate a minified stack trace.\n-keepattributes SourceFile,LineNumberTable\n-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod\n\n# expo-modules-core resolves the headless app loader by Class.forName() on a name\n# read from AndroidManifest <meta-data android:value=...> (AppLoaderProvider.kt:34).\n# AGP auto-keeps manifest *components*, but not class names inside meta-data values,\n# and expo-modules-core only -keepclassmembers its @DoNotStrip constructor, which does\n# not retain the class itself. Without this, R8 strips it and expo-task-manager dies\n# with ClassNotFoundException -- which takes ambulance background location with it.\n-keep class * implements expo.modules.apploader.HeadlessAppLoader { *; }",
+            "networkInspector": false
+          }
+        }
+      ],
+      "./plugins/withGradleHeap.js",
+      "./plugins/withReleaseSigning.js"
+    ],
+    "owner": "qbooking"
+  }
+}

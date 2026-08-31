@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Queue Provider",
-    "slug": "provider",
-    "scheme": "queueprovider",
+    "name": "Queue Ambulance",
+    "slug": "ambulance",
+    "scheme": "queueambulance",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.qbooking.provider",
+      "bundleIdentifier": "com.qbooking.ambulance",
       "infoPlist": {
         "NSCameraUsageDescription": "Queue uses your camera for video consultations with your doctor.",
         "NSMicrophoneUsageDescription": "Queue uses your microphone for video consultations with your doctor.",
@@ -20,7 +20,7 @@
       }
     },
     "android": {
-      "package": "com.qbooking.provider",
+      "package": "com.qbooking.ambulance",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -37,14 +37,18 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co"
+      "supabaseUrl": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+      "eas": {
+        "projectId": "fa341cac-2fa0-4cb7-809e-fc8d79fecd6c"
+      }
     },
     "plugins": [
       [
