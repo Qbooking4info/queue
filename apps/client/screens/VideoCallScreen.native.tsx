@@ -6,6 +6,7 @@ import {
   createAgoraRtcEngine,
   ChannelProfileType,
   ClientRoleType,
+  ConnectionStateType,
   IRtcEngine,
   RtcSurfaceView,
   VideoSourceType,
@@ -115,6 +116,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
     if (!session) return
     const resolvedSession = session
     let active = true
+    let joinTimeout: ReturnType<typeof setTimeout> | undefined
 
     async function initAndJoin() {
       // Request Android permissions at runtime
@@ -133,7 +135,9 @@ export function VideoCallScreen({ navigation, route }: Props) {
       })
 
       engine.current.addListener('onJoinChannelSuccess', () => {
-        if (active) setJoined(true)
+        if (!active) return
+        if (joinTimeout) clearTimeout(joinTimeout)
+        setJoined(true)
       })
       engine.current.addListener('onUserJoined', (_conn: any, uid: number) => {
         if (active) setRemoteUid(uid)
@@ -168,6 +172,18 @@ export function VideoCallScreen({ navigation, route }: Props) {
           setError(`Call error ${errCode}`)
         }
       })
+      // A join can also fail purely at the network level with no onError at all --
+      // Agora's SDK can silently retry a stalled connection for up to 20 minutes before
+      // ever reporting ConnectionStateFailed (see ConnectionStateType docs). Don't wait
+      // that long: this is a fast-path for when the SDK *does* report it promptly; the
+      // joinTimeout below is the real safety net regardless.
+      engine.current.addListener('onConnectionStateChanged', (_conn: any, state: number) => {
+        if (!active) return
+        if (state === ConnectionStateType.ConnectionStateFailed) {
+          if (joinTimeout) clearTimeout(joinTimeout)
+          setError('Could not connect. Check your internet connection and try again.')
+        }
+      })
 
       // Audio-only join. enableVideo()/startPreview() are deferred until the user
       // actually turns the camera on, so we neither light the camera LED nor spend
@@ -189,12 +205,22 @@ export function VideoCallScreen({ navigation, route }: Props) {
           autoSubscribeVideo:     true,
         },
       )
+
+      // Client-side safety net: if we never hear onJoinChannelSuccess (or an error)
+      // within 20s, stop waiting silently and tell the patient something's wrong rather
+      // than sitting on "Connecting you to the doctor..." forever with no feedback at
+      // all -- this is exactly the symptom a stalled network connection produces.
+      joinTimeout = setTimeout(() => {
+        if (!active) return
+        setError('Could not connect. Check your internet connection and try again.')
+      }, 20000)
     }
 
     initAndJoin().catch(e => setError(e.message))
 
     return () => {
       active = false
+      if (joinTimeout) clearTimeout(joinTimeout)
       engine.current?.leaveChannel()
       engine.current?.release()
       engine.current = null

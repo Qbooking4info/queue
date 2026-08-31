@@ -89,7 +89,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
 
   async function handleSubmit() {
     if (!patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return }
-    if (!reason.trim()) { Alert.alert('Required', 'Please enter the visit reason.'); return }
+    if (!reason.trim()) { Alert.alert('Required', `Please enter the ${apptType === 'virtual' ? 'consultation' : 'visit'} reason.`); return }
     if (!hospitalId) return
 
     setLoading(true)
@@ -205,10 +205,10 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
 
           {/* Visit reason */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>VISIT REASON *</Text>
+          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>{apptType === 'virtual' ? 'CONSULTATION REASON *' : 'VISIT REASON *'}</Text>
           <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, height: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
             <TextInput value={reason} onChangeText={setReason}
-              placeholder="Reason for visit…" placeholderTextColor={t.textMuted} multiline
+              placeholder={apptType === 'virtual' ? 'Reason for consultation…' : 'Reason for visit…'} placeholderTextColor={t.textMuted} multiline
               style={[s.inputText, { color: t.textPrimary }]} />
           </View>
 

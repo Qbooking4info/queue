@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
+import * as SecureStore from 'expo-secure-store'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { requestDependentSwitchToken } from '../lib/api'
 import type { User } from '../types/database'
+
+// Stashes the caretaker's own session while switched into a dependent's account (see
+// switchToDependent/switchBackToCaretaker below) -- a separate SecureStore key from
+// whatever the Supabase client itself uses, since only one session can be "live" in
+// the client at a time (confirmed: @supabase/supabase-js's GoTrueClient backs one
+// storage key, no multi-session support).
+const CARETAKER_STASH_KEY = 'queue-caretaker-stash'
 
 export interface LinkedHospital {
   doctorId:     string
@@ -59,6 +68,13 @@ interface AuthState {
   signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string) => Promise<string | null>
   signOut:       () => Promise<void>
   refreshProfile: () => Promise<void>
+  // Set while a caretaker has switched their live session into a dependent's account
+  // (see switchToDependent) -- lets the app show a persistent "managing X's account"
+  // banner and suspend that device's own push-token registration so it doesn't
+  // silently overwrite the dependent's push_token.
+  switchedInto:        { fullName: string } | null
+  switchToDependent:   (dependentId: string) => Promise<string | null>
+  switchBackToCaretaker: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState)
@@ -72,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading,       setLoading]       = useState(true)
   const [staffMode,     setStaffMode]     = useState(false)
   const [pendingHospitalOnboarding, setPendingHospitalOnboarding] = useState(false)
+  const [switchedInto,  setSwitchedInto]  = useState<{ fullName: string } | null>(null)
 
   const initialLoadDone = useRef(false)
 
@@ -347,9 +364,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDoctorProfile(null)
     setStaffProfile(null)
     setCrewProfile(null)
+    setSwitchedInto(null)
+    // An explicit, final logout should never leave an orphaned stashed session
+    // behind for someone to accidentally switch back into later.
+    await SecureStore.deleteItemAsync(CARETAKER_STASH_KEY).catch(() => {})
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
+  }
+
+  // Real account switching, not just RLS-scoped viewing: a caretaker's device signs
+  // in as the dependent's own account via a magic-link token minted server-side
+  // (POST /api/dependents/switch, authorized by an active dependent_links row), then
+  // stashes the caretaker's own session so switchBackToCaretaker can restore it.
+  // Never call the existing signOut() as part of this -- it does a global revoke that
+  // would make switching back impossible; only setSession()/verifyOtp() swaps.
+  async function switchToDependent(dependentId: string): Promise<string | null> {
+    const result = await requestDependentSwitchToken(dependentId)
+    if (!result.ok) return result.error
+
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    if (!currentSession) return 'Not signed in'
+
+    await SecureStore.setItemAsync(CARETAKER_STASH_KEY, JSON.stringify({
+      access_token:  currentSession.access_token,
+      refresh_token: currentSession.refresh_token,
+      fullName:      user?.full_name ?? 'Your account',
+    }))
+
+    // Any profile load in flight for the caretaker must not land after we've
+    // switched identity underneath it.
+    profileSeq.current++
+    const { error } = await supabase.auth.verifyOtp({ token_hash: result.tokenHash, type: 'magiclink' })
+    if (error) {
+      await SecureStore.deleteItemAsync(CARETAKER_STASH_KEY).catch(() => {})
+      return error.message
+    }
+    setSwitchedInto({ fullName: result.fullName })
+    return null
+  }
+
+  async function switchBackToCaretaker(): Promise<string | null> {
+    const stashed = await SecureStore.getItemAsync(CARETAKER_STASH_KEY)
+    if (!stashed) return 'No caretaker session to switch back to'
+    const { access_token, refresh_token } = JSON.parse(stashed)
+
+    profileSeq.current++
+    // setSession transparently refreshes an expired access_token given a still-valid
+    // refresh_token, so this works even if the caretaker was switched away for a while.
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+    if (error) return error.message
+
+    await SecureStore.deleteItemAsync(CARETAKER_STASH_KEY).catch(() => {})
+    setSwitchedInto(null)
+    return null
   }
 
   return (
@@ -359,6 +427,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       switchHospital,
       pendingHospitalOnboarding, setPendingHospitalOnboarding,
       signIn, signUp, signOut, refreshProfile,
+      switchedInto, switchToDependent, switchBackToCaretaker,
     }}>
       {children}
     </AuthContext.Provider>

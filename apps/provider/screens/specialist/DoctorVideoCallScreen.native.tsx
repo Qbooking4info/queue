@@ -6,6 +6,7 @@ import {
   createAgoraRtcEngine,
   ChannelProfileType,
   ClientRoleType,
+  ConnectionStateType,
   IRtcEngine,
   RtcSurfaceView,
   VideoSourceType,
@@ -55,6 +56,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   // ── 1. Obtain host token from Next.js API ─────────────────────────────────
   useEffect(() => {
     let active = true
+    let joinTimeout: ReturnType<typeof setTimeout> | undefined
 
     async function startCall() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -100,8 +102,13 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         channelProfile: ChannelProfileType.ChannelProfileCommunication,
       })
 
+      // BUG FIX: onError previously only called setError(...), never setPhase('error') --
+      // the error screen only renders when phase === 'error', so a real Agora error was
+      // captured in state but the UI stayed stuck on the "Joining room..." spinner forever.
       engine.current.addListener('onJoinChannelSuccess', () => {
-        if (active) setPhase('active')
+        if (!active) return
+        if (joinTimeout) clearTimeout(joinTimeout)
+        setPhase('active')
       })
       engine.current.addListener('onUserJoined', (_conn: any, uid: number) => {
         if (active) setRemoteUid(uid)
@@ -116,7 +123,23 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         if (active && uid === 0) setSignal(signalFromQuality(tx, rx))
       })
       engine.current.addListener('onError', (errCode: number) => {
-        if (active) setError(`Agora error ${errCode}`)
+        if (!active) return
+        if (joinTimeout) clearTimeout(joinTimeout)
+        setError(`Agora error ${errCode}`)
+        setPhase('error')
+      })
+      // A join can also fail purely at the network level with no onError at all --
+      // Agora's SDK can silently retry a stalled connection for up to 20 minutes before
+      // ever reporting ConnectionStateFailed (see ConnectionStateType docs). Don't wait
+      // that long: ConnectionStateFailed here is a fast-path for when the SDK *does*
+      // report it promptly; the joinTimeout below is the real safety net regardless.
+      engine.current.addListener('onConnectionStateChanged', (_conn: any, state: number) => {
+        if (!active) return
+        if (state === ConnectionStateType.ConnectionStateFailed) {
+          if (joinTimeout) clearTimeout(joinTimeout)
+          setError('Could not connect. Check your internet connection and try again.')
+          setPhase('error')
+        }
       })
 
       await engine.current.enableAudio()
@@ -134,12 +157,23 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
           autoSubscribeVideo:      true,
         },
       )
+
+      // Client-side safety net: if we never hear onJoinChannelSuccess (or an error)
+      // within 20s, stop waiting silently and tell the doctor something's wrong rather
+      // than sitting on "Joining room..." forever with no feedback at all -- this is
+      // exactly the symptom a stalled network connection produces.
+      joinTimeout = setTimeout(() => {
+        if (!active) return
+        setError('Could not connect. Check your internet connection and try again.')
+        setPhase('error')
+      }, 20000)
     }
 
     startCall().catch(e => { setError(e.message); setPhase('error') })
 
     return () => {
       active = false
+      if (joinTimeout) clearTimeout(joinTimeout)
       engine.current?.leaveChannel()
       engine.current?.release()
       engine.current = null

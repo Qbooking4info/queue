@@ -52,7 +52,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
   async function handleSubmit() {
     if (!user) { setError('You must be signed in.'); return }
     if (!time) { setError('Please choose a time.'); return }
-    if (!reason.trim()) { setError('Please describe your reason for this visit.'); return }
+    if (!reason.trim()) { setError(`Please describe your reason for this ${visitType === 'virtual' ? 'consultation' : 'visit'}.`); return }
     if (visitType === 'home_visit' && !address.trim()) { setError('Please enter the address for your home visit.'); return }
 
     setSubmitting(true); setError('')
@@ -128,7 +128,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
           )}
 
           <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-            <Text style={[st.label, { color: t.textMuted, paddingHorizontal: 0 }]}>REASON FOR VISIT</Text>
+            <Text style={[st.label, { color: t.textMuted, paddingHorizontal: 0 }]}>{visitType === 'virtual' ? 'REASON FOR CONSULTATION' : 'REASON FOR VISIT'}</Text>
             <TextInput value={reason} onChangeText={setReason} placeholder="Briefly describe your symptoms or reason…"
               placeholderTextColor={t.textMuted} multiline
               style={[st.textArea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />

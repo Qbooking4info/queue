@@ -10,6 +10,7 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
 import { NavigationContainer } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { SwitchedAccountBanner } from '@queue/shared/components/ui/SwitchedAccountBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -110,6 +111,7 @@ function MainTabs() {
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
       <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Bookings' }} />
+      <Tab.Screen name="DependentsTab" component={DependentsScreen}  options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'people' : 'people-outline'} {...p} />,         tabBarLabel: 'Dependents' }} />
       <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,         tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
@@ -178,9 +180,12 @@ function RootAuthNavigator() {
 
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user } = useAuth()
+  const { session, loading, user, switchedInto } = useAuth()
   const { theme: t } = useTheme()
-  usePushNotifications(user?.id)
+  // Suspended while switched into a dependent's account -- otherwise this device's
+  // push token would silently overwrite the dependent's own push_token every time a
+  // caretaker switches in, breaking notification delivery to the dependent's own phone.
+  usePushNotifications(switchedInto ? undefined : user?.id)
 
   // "Doctor calls a patient in" overlay. Every signed-in user of this app is a
   // patient now, so the old isPlainPatient guard (which existed to stop a doctor
@@ -204,6 +209,7 @@ function AppNavigator() {
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
           <OfflineBanner />
+          <SwitchedAccountBanner />
           <SafeAreaProvider style={{ flex: 1 }}>
             <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
           </SafeAreaProvider>

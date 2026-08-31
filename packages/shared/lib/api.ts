@@ -1148,6 +1148,28 @@ export async function unlinkDependent(linkId: string): Promise<{ ok: true } | { 
   }
 }
 
+// Mints a magic-link token that lets this device sign in as the given dependent's
+// own account -- authorized server-side by an active dependent_links row for the
+// caller. See AuthContext.switchToDependent for how the token gets redeemed.
+export async function requestDependentSwitchToken(dependentId: string): Promise<
+  { ok: true; tokenHash: string; fullName: string } | { ok: false; error: string }
+> {
+  try {
+    const headers = await dependentsAuthHeader()
+    if (!headers) return { ok: false, error: 'Not authenticated' }
+    const res = await fetch(`${API_URL}/api/dependents/switch`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dependentId }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not switch to that account' }
+    return { ok: true, tokenHash: body.tokenHash, fullName: body.fullName }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
 // ── Medical history ───────────────────────────────────────────────────────────
 
 export async function getCompletedAppointments(patientId: string) {

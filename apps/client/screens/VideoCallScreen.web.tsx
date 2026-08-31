@@ -1,28 +1,236 @@
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
+import AgoraRTC, {
+  AgoraRTCProvider,
+  LocalVideoTrack,
+  RemoteUser,
+  useConnectionState,
+  useJoin,
+  useLocalCameraTrack,
+  useLocalMicrophoneTrack,
+  usePublish,
+  useRemoteUsers,
+  type ICameraVideoTrack,
+  type IMicrophoneAudioTrack,
+} from 'agora-rtc-react'
+import { supabase } from '@queue/shared/lib/supabase'
+
+// Browser counterpart to VideoCallScreen.native.tsx (patient side). The patient never
+// calls /api/virtual/token -- same as native, this reads guest_token straight off
+// virtual_sessions (RLS already permits it: "Patients can read own virtual sessions"),
+// falling back to a Realtime subscription while waiting for the doctor to start the
+// session. Ending the call is client-side only here too -- only the doctor's client
+// calls /api/virtual/end, which is what actually marks the appointment completed.
+const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID ?? ''
 
 interface Props {
   navigation: any
   route: { params: { appointmentId: string; doctorName: string } }
 }
 
-// Agora's RN SDK relies on native modules that don't exist in a browser — video calls
-// only work in the native app. This keeps the web bundle from crashing on load, same
-// pattern used for the maps screens (see components/map/HospitalsMap.web.tsx).
+interface SessionRow {
+  guest_token: string
+  room_name: string
+  status: string
+}
+
 export function VideoCallScreen({ navigation, route }: Props) {
-  const { doctorName } = route.params
+  const { appointmentId, doctorName } = route.params
+  const [session, setSession] = useState<SessionRow | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+
+  // ── Fetch session (guest_token) from Supabase, same as native ─────────────
+  useEffect(() => {
+    let mounted = true
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    async function fetchOrSubscribe() {
+      const { data } = await supabase
+        .from('virtual_sessions')
+        .select('guest_token, room_name, status')
+        .eq('appointment_id', appointmentId)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (data?.guest_token && mounted) {
+        setSession(data as SessionRow)
+        return
+      }
+
+      if (!mounted) return
+      channel = supabase
+        .channel(`vs:${appointmentId}`)
+        .on(
+          'postgres_changes' as any,
+          { event: '*', schema: 'public', table: 'virtual_sessions', filter: `appointment_id=eq.${appointmentId}` },
+          (payload: any) => {
+            const row = payload.new as SessionRow
+            if (row?.guest_token && row.status === 'active' && mounted) setSession(row)
+          },
+        )
+        .subscribe()
+    }
+
+    fetchOrSubscribe()
+    return () => { mounted = false; if (channel) supabase.removeChannel(channel) }
+  }, [appointmentId])
+
+  if (!AGORA_APP_ID) {
+    return (
+      <View style={st.container}>
+        <View style={st.center}>
+          <Ionicons name="alert-circle-outline" size={40} color="#EF9F27" style={{ marginBottom: 16 }} />
+          <Text style={st.errorTitle}>Video calling isn't configured</Text>
+          <Text style={st.errorSub}>{error ?? 'EXPO_PUBLIC_AGORA_APP_ID is not set.'}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={st.backCallBtn}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
+  if (!session) {
+    return (
+      <View style={st.container}>
+        <View style={st.center}>
+          <Ionicons name="medical-outline" size={48} color="rgba(255,255,255,0.3)" />
+          <Text style={st.waitingText}>Waiting for doctor to start the call…</Text>
+        </View>
+      </View>
+    )
+  }
+
+  return (
+    <AgoraRTCProvider client={useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])}>
+      <CallBody
+        appId={AGORA_APP_ID}
+        token={session.guest_token}
+        channelName={session.room_name}
+        doctorName={doctorName}
+        onLeave={() => navigation.goBack()}
+      />
+    </AgoraRTCProvider>
+  )
+}
+
+interface BodyProps {
+  appId: string
+  token: string
+  channelName: string
+  doctorName: string
+  onLeave: () => void
+}
+
+function CallBody({ appId, token, channelName, doctorName, onLeave }: BodyProps) {
+  const [micEnabled, setMicEnabled] = useState(true)
+  const [camEnabled, setCamEnabled] = useState(true)
+  const [elapsed, setElapsed]       = useState(0)
+
+  useJoin({ appid: appId, channel: channelName, token, uid: 2 /* patient, matches native */ })
+
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(micEnabled) as { localMicrophoneTrack: IMicrophoneAudioTrack | null }
+  const { localCameraTrack }     = useLocalCameraTrack(camEnabled) as { localCameraTrack: ICameraVideoTrack | null }
+  usePublish([localMicrophoneTrack, localCameraTrack])
+
+  const remoteUsers = useRemoteUsers()
+  const connected = remoteUsers.length > 0
+
+  // Our OWN join to Agora can stall at the network level with no error at all --
+  // useJoin never throws for that, it just leaves connectionState stuck at
+  // 'CONNECTING'/'RECONNECTING' indefinitely. Without this, the screen would sit on
+  // "Waiting for doctor..." forever with nothing to tell the patient their own
+  // connection never actually went through.
+  const connectionState = useConnectionState()
+  const [joinStalled, setJoinStalled] = useState(false)
+  useEffect(() => {
+    if (connectionState === 'CONNECTED') { setJoinStalled(false); return }
+    const t = setTimeout(() => setJoinStalled(true), 20000)
+    return () => clearTimeout(t)
+  }, [connectionState])
+
+  useEffect(() => {
+    if (!connected) { setElapsed(0); return }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [connected])
+
+  function fmt(s: number) {
+    const m = Math.floor(s / 60)
+    return `${m}:${String(s % 60).padStart(2, '0')}`
+  }
+
+  function toggleMic() {
+    localMicrophoneTrack?.setEnabled(!micEnabled)
+    setMicEnabled(v => !v)
+  }
+
+  function toggleCamera() {
+    localCameraTrack?.setEnabled(!camEnabled)
+    setCamEnabled(v => !v)
+  }
+
+  function handleEndCall() {
+    Alert.alert('Leave call?', 'End this video consultation?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: onLeave },
+    ])
+  }
 
   return (
     <View style={st.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#050d09" />
-      <View style={st.center}>
-        <Ionicons name="videocam-off-outline" size={48} color="rgba(255,255,255,0.3)" />
-        <Text style={st.title}>Video calls aren't available in the browser</Text>
-        <Text style={st.sub}>
-          Open the Queue app on your phone to join your video consultation with Dr. {doctorName}.
-        </Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-          <Text style={st.backBtnText}>Go back</Text>
+      {/* Remote video — full screen background */}
+      {connected ? (
+        <RemoteUser user={remoteUsers[0]} playVideo playAudio style={StyleSheet.absoluteFill as any} />
+      ) : joinStalled ? (
+        <View style={st.waitingContainer}>
+          <Ionicons name="alert-circle-outline" size={40} color="#EF9F27" />
+          <Text style={st.errorTitle}>Could not connect</Text>
+          <Text style={st.errorSub}>Check your internet connection and try again.</Text>
+        </View>
+      ) : (
+        <View style={st.waitingContainer}>
+          <Ionicons name="medical-outline" size={48} color="rgba(255,255,255,0.3)" />
+          <Text style={st.waitingText}>Waiting for doctor…</Text>
+        </View>
+      )}
+
+      {/* Local video — PiP top-right */}
+      <View style={st.localPip}>
+        {camEnabled
+          ? <LocalVideoTrack track={localCameraTrack} play style={st.pipInner as any} />
+          : <View style={[st.pipInner, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="videocam-off-outline" size={22} color="#4A6058" />
+            </View>}
+      </View>
+
+      {/* Header */}
+      <View style={st.header}>
+        <Text style={st.headerName}>Dr. {doctorName}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+          {connected
+            ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' }} />
+            : <Ionicons name="hourglass-outline" size={11} color="#7A9089" />}
+          <Text style={[st.headerStatus, { color: connected ? '#4ade80' : '#7A9089', marginTop: 0 }]}>
+            {connected ? `Connected · ${fmt(elapsed)}` : 'Connecting…'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Controls */}
+      <View style={st.controls}>
+        <TouchableOpacity onPress={toggleMic} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
+          <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleEndCall} style={st.endBtn}>
+          <Ionicons name="call" size={26} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={toggleCamera} style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}>
+          <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -30,10 +238,40 @@ export function VideoCallScreen({ navigation, route }: Props) {
 }
 
 const st = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#050d09' },
-  center:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
-  title:      { fontSize: 16, fontWeight: '700', color: '#fff', textAlign: 'center' },
-  sub:        { fontSize: 13, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
-  backBtn:    { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  backBtnText:{ color: '#fff', fontWeight: '700' },
+  container:        { flex: 1, backgroundColor: '#050d09', minHeight: '100vh' as any },
+  center:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
+  waitingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  waitingText:      { fontSize: 14, color: '#4A6058', textAlign: 'center', paddingHorizontal: 32 },
+  errorTitle:       { fontSize: 18, fontWeight: '700', color: '#FF5C5C', marginBottom: 8, textAlign: 'center' },
+  errorSub:         { fontSize: 13, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
+  backCallBtn:      { marginTop: 20, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  localPip: {
+    position: 'absolute', top: 68, right: 16,
+    width: 90, height: 120, borderRadius: 10,
+    overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#111',
+  },
+  pipInner:         { flex: 1, width: '100%', height: '100%' },
+  header: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    paddingTop: 20, paddingHorizontal: 20, paddingBottom: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  headerName:       { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerStatus:     { fontSize: 12, marginTop: 3 },
+  controls: {
+    position: 'absolute', bottom: 32, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,
+  },
+  ctrlBtn: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ctrlBtnOff:       { backgroundColor: 'rgba(239,68,68,0.35)' },
+  endBtn: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#dc2626',
+    alignItems: 'center', justifyContent: 'center',
+  },
 })

@@ -805,7 +805,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 </View>
               )}
 
-              <Text style={[s.label, { color: t.textMuted }]}>Reason for visit *</Text>
+              <Text style={[s.label, { color: t.textMuted }]}>{bookingType === 'virtual' ? 'Reason for consultation' : 'Reason for visit'} *</Text>
               <TextInput
                 value={reason} onChangeText={setReason}
                 multiline numberOfLines={3}

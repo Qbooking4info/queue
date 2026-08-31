@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { haptics }  from '@queue/shared/lib/haptics'
 import {
   getLinkedDependents, lookupPatientByCode, linkDependent, unlinkDependent,
   type LinkedDependent, type ManagedByCaretaker,
@@ -33,12 +34,13 @@ function calcAge(dob: string | null | undefined): number | null {
 
 export function DependentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user }     = useAuth()
+  const { user, switchToDependent } = useAuth()
 
   const [managing,  setManaging]  = useState<LinkedDependent[]>([])
   const [managedBy, setManagedBy] = useState<ManagedByCaretaker | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [unlinking, setUnlinking] = useState<string | null>(null)
+  const [switching, setSwitching] = useState<string | null>(null)
 
   // Link-by-ID modal state. linkMode 'caretaker' = this account manages the
   // looked-up account (the original flow, via header's "+ Link by ID"). 'dependent'
@@ -107,6 +109,14 @@ export function DependentsScreen({ navigation }: Props) {
     load()
   }
 
+  async function handleSwitch(dependentId: string) {
+    setSwitching(dependentId)
+    const err = await switchToDependent(dependentId)
+    setSwitching(null)
+    if (err) { haptics.error(); Alert.alert('Could not switch', err) }
+    else { haptics.success(); navigation.navigate('MainTabs') }
+  }
+
   function confirmUnlinkSelf() {
     if (!managedBy) return
     Alert.alert('Unlink your account?', `Stop being managed by ${managedBy.caretaker.full_name}? You'll manage your own bookings from now on.`, [
@@ -122,9 +132,16 @@ export function DependentsScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
+        {/* No back-button target when reached via the footer tab (no screen to pop to) --
+            still reachable via Profile's "Manage dependents" menu item, which does push
+            a real stack entry, so this stays conditional rather than always hidden. */}
+        {navigation.canGoBack?.() ? (
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
         <Text style={[s.title, { color: t.textPrimary }]}>Dependents</Text>
         <TouchableOpacity onPress={() => openLink('caretaker')}
           style={[s.addBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
@@ -255,13 +272,18 @@ export function DependentsScreen({ navigation }: Props) {
                     <Text style={[s.depName, { color: t.textPrimary }]}>{d.dependent.full_name}</Text>
                     <Text style={[s.depMeta, { color: t.textMuted }]}>{d.relationship}</Text>
                   </View>
-                  {unlinking === d.linkId
-                    ? <ActivityIndicator color={t.accent} size="small" />
-                    : (
+                  {unlinking === d.linkId || switching === d.dependent.id ? (
+                    <ActivityIndicator color={t.accent} size="small" />
+                  ) : (
+                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                      <TouchableOpacity onPress={() => handleSwitch(d.dependent.id)}>
+                        <Text style={[s.switchLink, { color: t.accent }]}>Switch to account</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => confirmUnlink(d.linkId, d.dependent.full_name)}>
                         <Text style={[s.unlinkLink]}>Unlink</Text>
                       </TouchableOpacity>
-                    )}
+                    </View>
+                  )}
                 </View>
               ))}
             </>
@@ -304,6 +326,7 @@ const s = StyleSheet.create({
   depName:        { fontSize: 14, fontWeight: '700' },
   depMeta:        { fontSize: 11, marginTop: 2, textTransform: 'capitalize' },
   unlinkLink:     { fontSize: 12, fontWeight: '700', color: '#FF5C5C' },
+  switchLink:     { fontSize: 12, fontWeight: '700' },
   managedByCard:  { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 20 },
   managedByLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   unlinkBtn:      { borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1 },

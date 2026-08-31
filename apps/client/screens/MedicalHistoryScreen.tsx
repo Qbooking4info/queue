@@ -309,7 +309,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                     </View>
                     {a.reason && (
                       <View style={[s.apptSection, { borderTopColor: t.cardBorder }]}>
-                        <Text style={[s.apptSectionLabel, { color: t.textMuted }]}>Reason for visit</Text>
+                        <Text style={[s.apptSectionLabel, { color: t.textMuted }]}>{a.type === 'virtual' ? 'Reason for consultation' : 'Reason for visit'}</Text>
                         <Text style={[s.apptSectionValue, { color: t.textPrimary }]}>{a.reason}</Text>
                       </View>
                     )}
