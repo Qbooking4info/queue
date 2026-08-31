@@ -42,3 +42,11 @@ project-source.*
 
 # Leftover isolated agent worktrees (Agent tool, isolation: "worktree")
 .claude/worktrees/
+
+# Isolated Gradle home for local builds — must never be inside the archive
+.gradle-isolated/
+apks/
+
+# Local build outputs — must never enter the eas project archive
+*.tar.gz
+queue-*.apk
