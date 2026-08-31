@@ -1,0 +1,7 @@
+{
+  "name": "@queue/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Code shared by the client and provider apps: Supabase access, the API layer, auth/theme contexts, maps, and the Agora call configuration. Anything imported by BOTH apps belongs here -- keeping one copy is the whole point, since a hand-synced second copy is what silently shipped a two-versions-behind call screen before.",
+  "main": "index.ts"
+}

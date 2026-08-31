@@ -1,0 +1,14 @@
+{
+  "name": "queue",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Queue healthcare platform. Two Expo apps share one package; web/ hosts the API the apps call and the hospital admin dashboard.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

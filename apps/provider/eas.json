@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "channel": "provider-preview",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+        "EXPO_PUBLIC_AGORA_APP_ID": "10f16da9fd644cb0a9c4450a7205f868",
+        "EXPO_PUBLIC_API_URL": "https://queue-web-omega.vercel.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_SUPABASE_PUBLIC_KEY": "sb_publishable_-yFk2T7vU0r7Fo6PMLmReg_heAxbm7M"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "distribution": "internal"
+      }
+    },
+    "production": {
+      "channel": "provider-production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qzodmkgyzguzzyovjpfx.supabase.co",
+        "EXPO_PUBLIC_AGORA_APP_ID": "10f16da9fd644cb0a9c4450a7205f868",
+        "EXPO_PUBLIC_API_URL": "https://queue-web-omega.vercel.app",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_SUPABASE_PUBLIC_KEY": "sb_publishable_-yFk2T7vU0r7Fo6PMLmReg_heAxbm7M"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}
