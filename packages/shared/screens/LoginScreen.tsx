@@ -5,11 +5,39 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
+import type { AuthSurface } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
-interface Props { navigation: any }
+// Every app mounts this same screen, so the bits that differ per app are read off
+// route params (set with `initialParams` where the screen is registered) rather than
+// hardcoded to the patient app's values:
+//
+//   surface       -- which door signIn() should treat this as; wrong-app accounts are
+//                    rejected against it. Defaults to 'patient'.
+//   registerRoute -- route name the "Create account" link pushes. Pass null in apps
+//                    with no self-registration (ambulance crew are provisioned by
+//                    their fleet) to hide the link entirely -- it used to point at
+//                    'Register', a route only the patient app defines, so in every
+//                    other app the tap silently did nothing.
+export interface LoginScreenParams {
+  surface?:        AuthSurface
+  registerRoute?:  string | null
+  tagline?:        string
+  title?:          string
+  subtitle?:       string
+  registerPrompt?: string
+  registerCta?:    string
+}
 
-export function LoginScreen({ navigation }: Props) {
+interface Props { navigation: any; route?: { params?: LoginScreenParams } }
+
+export function LoginScreen({ navigation, route }: Props) {
+  const p = route?.params ?? {}
+  const surface: AuthSurface = p.surface ?? 'patient'
+  // `undefined` means "not specified" -> patient default; explicit null means "no
+  // registration in this app". Both are falsy, so they can't be collapsed with ??.
+  const registerRoute = p.registerRoute === undefined ? 'Register' : p.registerRoute
+
   const { theme: t }        = useTheme()
   const { signIn }          = useAuth()
   const [email, setEmail]   = useState('')
@@ -26,7 +54,7 @@ export function LoginScreen({ navigation }: Props) {
   async function handleLogin() {
     if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
     setBusy(true); setError('')
-    const err = await signIn(email.trim().toLowerCase(), pass, 'patient')
+    const err = await signIn(email.trim().toLowerCase(), pass, surface)
     setBusy(false)
     if (err) setError(err)
   }
@@ -49,13 +77,13 @@ export function LoginScreen({ navigation }: Props) {
               <Text style={[s.logoText, { color: t.accent }]}>Q</Text>
             </View>
             <Text style={[s.appName, { color: t.textPrimary }]}>Queue</Text>
-            <Text style={[s.tagline, { color: t.textMuted }]}>Your health, on your schedule</Text>
+            <Text style={[s.tagline, { color: t.textMuted }]}>{p.tagline ?? 'Your health, on your schedule'}</Text>
           </View>
 
           {/* Card */}
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[s.cardTitle, { color: t.textPrimary }]}>Welcome back</Text>
-            <Text style={[s.cardSub,   { color: t.textMuted  }]}>Sign in to your account</Text>
+            <Text style={[s.cardTitle, { color: t.textPrimary }]}>{p.title ?? 'Welcome back'}</Text>
+            <Text style={[s.cardSub,   { color: t.textMuted  }]}>{p.subtitle ?? 'Sign in to your account'}</Text>
 
             <View style={s.fields}>
               <View style={s.fieldWrap}>
@@ -100,13 +128,15 @@ export function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* Register link */}
-          <View style={s.footer}>
-            <Text style={[s.footerText, { color: t.textMuted }]}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={[s.footerLink, { color: t.accent }]}>Create account</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Register link -- only in apps that actually have a registration route */}
+          {!!registerRoute && (
+            <View style={s.footer}>
+              <Text style={[s.footerText, { color: t.textMuted }]}>{p.registerPrompt ?? "Don't have an account? "}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate(registerRoute)}>
+                <Text style={[s.footerLink, { color: t.accent }]}>{p.registerCta ?? 'Create account'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>

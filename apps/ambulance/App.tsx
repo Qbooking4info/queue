@@ -30,10 +30,22 @@ function TabIcon({ name, color, size }: any) {
   return <Ionicons name={name} color={color} size={size ?? 22} />
 }
 
+// Crew accounts are provisioned by the fleet or hospital that employs them -- there's no
+// self-registration here, so registerRoute is null to hide the shared login screen's
+// "Create account" link (it pushed 'Register', a route only the patient app defines, so
+// the tap did nothing at all). surface 'crew' is what stops signIn from treating this as
+// the patient door and turning crew away from their own app.
+const LOGIN_PARAMS = {
+  surface:       'crew' as const,
+  registerRoute: null,
+  tagline:       'Every minute counts',
+  subtitle:      'Sign in to your crew account',
+}
+
 function CrewAuthStack() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Login" component={LoginScreen} initialParams={LOGIN_PARAMS} />
     </AuthStack.Navigator>
   )
 }

@@ -52,8 +52,10 @@ export function HospitalAuthScreen({ navigation }: Props) {
               <Ionicons name="business-outline" size={30} color="#5B9EFF" />
             </View>
             <Text style={[s.title, { color: t.textPrimary }]}>Staff Portal</Text>
+            {/* Crew are no longer signed in here -- they have their own app, and the
+                hospital surface now turns them away with a pointer to it. */}
             <Text style={[s.sub, { color: t.textMuted }]}>
-              Sign in to your hospital, clinic, or ambulance crew account.
+              Sign in to your hospital or clinic account.
             </Text>
 
             {/* Login form */}

@@ -12,6 +12,25 @@ import type { User } from '../types/database'
 // storage key, no multi-session support).
 const CARETAKER_STASH_KEY = 'queue-caretaker-stash'
 
+// Which app's sign-in door the credentials were entered on. One per shipped app --
+// Queue (patient), Queue Hospital, Queue Doctor, Queue Ambulance -- so a mismatched
+// account is turned away with the name of the app it actually belongs to, instead of
+// being let in and then parked on that app's "no access" screen.
+export type AuthSurface = 'patient' | 'hospital' | 'doctor' | 'crew'
+
+const WRONG_APP: Record<AuthSurface, string> = {
+  doctor:   'This is a doctor account. Please sign in from the Queue Doctor app.',
+  hospital: 'This is a hospital staff account. Please sign in from the Queue Hospital app.',
+  crew:     'This is an ambulance crew account. Please sign in from the Queue Ambulance app.',
+  patient:  'This is a patient account. Please sign in from the Queue app.',
+}
+
+// Written into auth user_metadata at sign-up so a half-finished registration survives
+// an app restart -- the only signal that tells a brand-new owner/doctor apart from a
+// plain patient, since neither has their hospital_admins/doctors row yet.
+export const REGISTERED_VIA_HOSPITAL = 'hospital_onboarding'
+export const REGISTERED_VIA_DOCTOR   = 'doctor_signup'
+
 export interface LinkedHospital {
   doctorId:     string
   hospitalId:   string
@@ -64,8 +83,14 @@ interface AuthState {
   // straight into HospitalOnboardingScreen instead of the default patient home.
   pendingHospitalOnboarding:    boolean
   setPendingHospitalOnboarding: (v: boolean) => void
-  signIn:        (email: string, password: string, surface: 'patient' | 'hospital') => Promise<string | null>
-  signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string) => Promise<string | null>
+  // Same idea for a self-registered doctor: they have no `doctors` row until a hospital
+  // links them (hospital_id is NOT NULL there, so there is no hospital-less row to
+  // create), which would otherwise drop them on Queue Doctor's "not a doctor" screen
+  // the instant they finish signing up.
+  pendingDoctorOnboarding:      boolean
+  setPendingDoctorOnboarding:   (v: boolean) => void
+  signIn:        (email: string, password: string, surface: AuthSurface) => Promise<string | null>
+  signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string, registeredVia?: string) => Promise<string | null>
   signOut:       () => Promise<void>
   refreshProfile: () => Promise<void>
   // Set while a caretaker has switched their live session into a dependent's account
@@ -88,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading,       setLoading]       = useState(true)
   const [staffMode,     setStaffMode]     = useState(false)
   const [pendingHospitalOnboarding, setPendingHospitalOnboarding] = useState(false)
+  const [pendingDoctorOnboarding,   setPendingDoctorOnboarding]   = useState(false)
   const [switchedInto,  setSwitchedInto]  = useState<{ fullName: string } | null>(null)
 
   const initialLoadDone = useRef(false)
@@ -281,53 +307,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // surface tells us which door the credentials were entered on ('patient' = the
-  // Patient login screen, 'hospital' = the Hospital/Staff portal screen) so a
-  // mismatched account type can be rejected instead of silently auto-routing into
-  // whatever stack its resolved role happens to match -- see RoleSelectScreen.
-  async function signIn(email: string, password: string, surface: 'patient' | 'hospital'): Promise<string | null> {
+  // surface tells us which app's door the credentials were entered on, so a mismatched
+  // account is rejected here instead of being silently auto-routed into whatever stack
+  // its resolved role happens to match (or, worse, let in and stranded on the target
+  // app's "no access" screen). Each of the four apps passes its own surface.
+  async function signIn(email: string, password: string, surface: AuthSurface): Promise<string | null> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return error.message
     if (!data.user) return null
 
     const profile = await fetchProfile(data.user.id)
+    const registeredVia = (data.user.user_metadata as Record<string, unknown> | undefined)?.registered_via
 
-    if (profile.isDoctor) {
+    // Crew arrive either as a dedicated crew row or as a hospital-fleet staff row whose
+    // role is 'ambulance_crew'; either way they belong in Queue Ambulance, not Hospital.
+    const isCrew  = profile.isCrew || profile.staffRole === 'ambulance_crew'
+    const isStaff = !!profile.staffRole && profile.staffRole !== 'ambulance_crew'
+    const kind: AuthSurface = profile.isDoctor ? 'doctor' : isCrew ? 'crew' : isStaff ? 'hospital' : 'patient'
+
+    // Escape hatches: someone who registered a hospital (or a doctor account) but logged
+    // out before being linked has no hospital_admins / doctors row yet -- at this point
+    // they are indistinguishable from a plain patient, and registered_via is the only
+    // thing that tells them apart. These *widen* what a patient-shaped account may enter;
+    // they never narrow it, so an abandoned registration can't lock anyone out of the
+    // patient app they'd otherwise still be entitled to.
+    const resumingHospital = kind === 'patient' && registeredVia === REGISTERED_VIA_HOSPITAL
+    const resumingDoctor   = kind === 'patient' && registeredVia === REGISTERED_VIA_DOCTOR
+
+    const allowed = kind === surface
+      || (surface === 'hospital' && resumingHospital)
+      || (surface === 'doctor'   && resumingDoctor)
+
+    if (!allowed) {
       await signOut()
-      return 'This is a doctor account. Please sign in from the Queue Doctors app.'
+      return WRONG_APP[kind]
     }
-    if (surface === 'patient' && (profile.staffRole || profile.isCrew)) {
-      await signOut()
-      return 'This is a hospital/staff account. Please use the Hospital / Staff sign-in instead.'
-    }
-    // Escape hatch: an owner who registered a hospital but logged out before finishing
-    // the onboarding wizard has no hospital_admins row yet either -- identical, at this
-    // point, to a plain patient account. registered_via (set by HospitalRegisterScreen's
-    // signUp call) is the only way to tell them apart.
-    const pendingOnboarding = data.user.user_metadata?.registered_via === 'hospital_onboarding'
-    if (surface === 'hospital' && !profile.staffRole && !profile.isCrew) {
-      if (!pendingOnboarding) {
-        await signOut()
-        return 'This is a patient account. Please use the Patient sign-in instead.'
-      }
-      // Resume the onboarding wizard rather than dropping them into patient home.
-      setPendingHospitalOnboarding(true)
-    }
+
+    // Resume the relevant onboarding rather than dropping them on a dashboard that has
+    // no hospital/doctor row behind it yet.
+    if (surface === 'hospital' && resumingHospital) setPendingHospitalOnboarding(true)
+    if (surface === 'doctor'   && resumingDoctor)   setPendingDoctorOnboarding(true)
     return null
   }
 
   async function signUp(
-    email: string, password: string, fullName: string, phone: string, dateOfBirth: string
+    email: string, password: string, fullName: string, phone: string, dateOfBirth: string,
+    registeredVia?: string
   ): Promise<string | null> {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      // registered_via lives on the auth user (not the `users` row) so it survives a
+      // restart and is readable straight off the session, before any profile fetch.
+      options: { data: { full_name: fullName, ...(registeredVia ? { registered_via: registeredVia } : {}) } },
+    })
     if (error) return error.message
+    // With email confirmation on, signUp returns a user but no session. The `users`
+    // insert below needs an authenticated session -- INSERT is revoked from `anon`
+    // (20260816000002) -- so without this check it fails with a bare permission error
+    // that says nothing about the actual cause.
+    if (data.user && !data.session) {
+      return 'Account created — check your email to confirm it, then sign in.'
+    }
     if (data.user) {
       const { error: profileError } = await supabase.from('users').insert({
         auth_id:   data.user.id,
         email,
         full_name: fullName,
         phone,
-        date_of_birth: dateOfBirth,
+        // Doctors sign up without a date of birth; '' is not a valid date literal, so
+        // an empty value has to go in as NULL rather than being passed straight through.
+        date_of_birth: dateOfBirth || null,
       })
       if (profileError) {
         // auth.signUp() above already created a real auth account -- it's never
@@ -361,6 +410,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileSeq.current++
     setStaffMode(false)
     setPendingHospitalOnboarding(false)
+    setPendingDoctorOnboarding(false)
     setDoctorProfile(null)
     setStaffProfile(null)
     setCrewProfile(null)
@@ -426,6 +476,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       staffMode, setStaffMode,
       switchHospital,
       pendingHospitalOnboarding, setPendingHospitalOnboarding,
+      pendingDoctorOnboarding,   setPendingDoctorOnboarding,
       signIn, signUp, signOut, refreshProfile,
       switchedInto, switchToDependent, switchBackToCaretaker,
     }}>

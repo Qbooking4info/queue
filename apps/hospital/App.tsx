@@ -18,7 +18,6 @@ import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
 import { usePushNotifications }    from '@queue/shared/hooks/usePushNotifications'
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
-import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
 
 import { HospitalAuthScreen }       from './screens/HospitalAuthScreen'
 import { HospitalRegisterScreen }   from './screens/HospitalRegisterScreen'
@@ -46,8 +45,11 @@ function TabIcon({ name, color, size }: any) {
 function HospitalAuthStack() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      {/* Staff sign in through HospitalAuthScreen, which passes surface 'hospital'. The
+          shared patient LoginScreen used to be registered here too, unreachable and
+          pinned to the 'patient' surface -- had anything ever routed to it, it would
+          have rejected every staff account it was meant to sign in. */}
       <AuthStack.Screen name="HospitalAuth"     component={HospitalAuthScreen} />
-      <AuthStack.Screen name="Login"            component={LoginScreen} />
       <AuthStack.Screen name="HospitalRegister" component={HospitalRegisterScreen} />
     </AuthStack.Navigator>
   )

@@ -15,9 +15,11 @@ export function SplashScreen({
   tagline = 'HEALTHCARE, ON YOUR SCHEDULE',
   highlights = ['Book appointments', 'Virtual consults', 'AI-powered care'],
   primaryLabel,
-  // The provider app has no self-registration -- staff accounts are created by their
-  // hospital -- so it hides the secondary action rather than showing two buttons that
-  // both mean "sign in".
+  secondaryLabel,
+  // Hospital and ambulance have no self-registration -- staff and crew accounts are
+  // created by their hospital/fleet -- so they hide the secondary action rather than
+  // showing two buttons that both mean "sign in". Doctors and patients do self-register,
+  // so they show it and relabel it via secondaryLabel.
   showSecondary = true,
 }: {
   onGetStarted: () => void
@@ -25,6 +27,7 @@ export function SplashScreen({
   tagline?: string
   highlights?: string[]
   primaryLabel?: string
+  secondaryLabel?: string
   showSecondary?: boolean
 }) {
   const { theme: t } = useTheme()
@@ -64,7 +67,7 @@ export function SplashScreen({
         </TouchableOpacity>
         {showSecondary && (
           <TouchableOpacity onPress={onSignIn} activeOpacity={0.7} style={styles.btnSecondary}>
-            <Text style={[styles.btnSecondaryText, { color: 'rgba(255,255,255,0.6)' }]}>Sign in</Text>
+            <Text style={[styles.btnSecondaryText, { color: 'rgba(255,255,255,0.6)' }]}>{secondaryLabel ?? 'Sign in'}</Text>
           </TouchableOpacity>
         )}
       </View>
