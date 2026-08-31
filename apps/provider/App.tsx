@@ -210,7 +210,14 @@ function AppNavigator() {
   }
 
   if (!splashDone) {
-    return <SafeAreaProvider><SplashScreen onGetStarted={() => setSplashDone(true)} onSignIn={() => setSplashDone(true)} /></SafeAreaProvider>
+    return <SafeAreaProvider><SplashScreen
+          onGetStarted={() => setSplashDone(true)}
+          onSignIn={() => setSplashDone(true)}
+          tagline="FOR HOSPITALS, DOCTORS AND CREWS"
+          highlights={['Manage your queue', 'Run consultations', 'Dispatch ambulances']}
+          primaryLabel="Sign in"
+          showSecondary={false}
+        /></SafeAreaProvider>
   }
 
   return <SafeAreaProvider><ProviderAuthStack /><OfflineBanner /></SafeAreaProvider>

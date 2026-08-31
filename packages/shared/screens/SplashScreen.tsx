@@ -3,7 +3,30 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { Ionicons } from '@expo/vector-icons'
 
-export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; onSignIn: () => void }) {
+/**
+ * Shared by both apps, so the copy is a prop rather than hardcoded. The defaults are
+ * the patient wording; the provider app passes its own, because showing "Book
+ * appointments / AI-powered care" to hospital staff signing into their work tool
+ * reads as the wrong app entirely.
+ */
+export function SplashScreen({
+  onGetStarted,
+  onSignIn,
+  tagline = 'HEALTHCARE, ON YOUR SCHEDULE',
+  highlights = ['Book appointments', 'Virtual consults', 'AI-powered care'],
+  primaryLabel,
+  // The provider app has no self-registration -- staff accounts are created by their
+  // hospital -- so it hides the secondary action rather than showing two buttons that
+  // both mean "sign in".
+  showSecondary = true,
+}: {
+  onGetStarted: () => void
+  onSignIn: () => void
+  tagline?: string
+  highlights?: string[]
+  primaryLabel?: string
+  showSecondary?: boolean
+}) {
   const { theme: t } = useTheme()
   const [vis, setVis] = useState(false)
   useEffect(() => { setTimeout(() => setVis(true), 100) }, [])
@@ -20,13 +43,13 @@ export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => v
       <View style={{ opacity: vis ? 1 : 0, alignItems: 'center', marginTop: 8 }}>
         <Text style={styles.brand}>Queue</Text>
         <Text style={[styles.tagline, { color: 'rgba(255,255,255,0.45)' }]}>
-          HEALTHCARE, ON YOUR SCHEDULE
+          {tagline}
         </Text>
       </View>
 
       {/* Feature tags */}
       <View style={[styles.tags, { opacity: vis ? 1 : 0 }]}>
-        {['Book appointments', 'Virtual consults', 'AI-powered care'].map(tag => (
+        {highlights.map(tag => (
           <View key={tag} style={styles.tag}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
@@ -37,11 +60,13 @@ export function SplashScreen({ onGetStarted, onSignIn }: { onGetStarted: () => v
       <View style={[styles.ctaGroup, { opacity: vis ? 1 : 0 }]}>
         <TouchableOpacity onPress={onGetStarted} activeOpacity={0.85}
           style={[styles.btnPrimary, { backgroundColor: t.accent }]}>
-          <Text style={[styles.btnPrimaryText]}>Get started</Text>
+          <Text style={[styles.btnPrimaryText]}>{primaryLabel ?? 'Get started'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onSignIn} activeOpacity={0.7} style={styles.btnSecondary}>
-          <Text style={[styles.btnSecondaryText, { color: 'rgba(255,255,255,0.6)' }]}>Sign in</Text>
-        </TouchableOpacity>
+        {showSecondary && (
+          <TouchableOpacity onPress={onSignIn} activeOpacity={0.7} style={styles.btnSecondary}>
+            <Text style={[styles.btnSecondaryText, { color: 'rgba(255,255,255,0.6)' }]}>Sign in</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )
