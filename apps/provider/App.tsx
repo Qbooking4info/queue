@@ -8,7 +8,7 @@ import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text } from 'react-native'
+import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -69,6 +69,7 @@ const DocStack   = createNativeStackNavigator()
 const StaffTab   = createBottomTabNavigator()
 const StaffStackN= createNativeStackNavigator()
 const CrewTab    = createBottomTabNavigator()
+const OnboardStk = createNativeStackNavigator()
 
 function TabIcon({ name, color, size }: any) {
   return <Ionicons name={name} color={color} size={size ?? 22} />
@@ -163,9 +164,21 @@ function CrewTabs() {
   )
 }
 
+// A freshly registered hospital owner has no doctors, staff or crew row yet -- those
+// only exist once onboarding creates the hospital. Without this stack they landed on
+// the "no provider access" screen immediately after signing up, which is where the
+// hospital registration flow dead-ended after the app split.
+function HospitalOnboardingStack() {
+  return (
+    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <OnboardStk.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
+    </OnboardStk.Navigator>
+  )
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user, doctorProfile, staffProfile, crewProfile } = useAuth()
+  const { session, loading, user, doctorProfile, staffProfile, crewProfile, pendingHospitalOnboarding, signOut } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
@@ -182,8 +195,22 @@ function AppNavigator() {
   if (session) {
     // Unlike the client app there is no staffMode toggle here: this app IS the staff
     // app, so the role that the account actually has decides the stack outright.
+    const hasProviderRole = !!(doctorProfile || staffProfile || crewProfile)
+
+    // Two ways to be mid-registration. pendingHospitalOnboarding is the in-session
+    // flag HospitalRegisterScreen sets before signUp. registered_via is written into
+    // the auth user's metadata at sign-up and therefore survives a restart -- without
+    // checking it, anyone who registered and then closed the app before finishing was
+    // permanently locked out behind "no provider access", with no way back in.
+    const registeredForHospital =
+      (session.user?.user_metadata as Record<string, unknown> | undefined)?.registered_via
+        === 'hospital_onboarding'
+    const needsHospitalOnboarding = !hasProviderRole && (pendingHospitalOnboarding || registeredForHospital)
+
     let content: React.ReactElement
-    if (doctorProfile) {
+    if (needsHospitalOnboarding) {
+      content = <HospitalOnboardingStack />
+    } else if (doctorProfile) {
       content = <SpecialistStack />
     } else if (staffProfile?.role === 'ambulance_crew' || crewProfile) {
       content = <CrewTabs />
@@ -203,6 +230,16 @@ function AppNavigator() {
             This app is for hospital staff, doctors and ambulance crews. If you are a
             patient, use the Queue app to book and attend appointments.
           </Text>
+          {/* Without this there is no way off this screen: the account has no role, so
+              no navigator is mounted and back does nothing. */}
+          <TouchableOpacity
+            onPress={() => { void signOut() }}
+            activeOpacity={0.8}
+            style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 30, borderRadius: 14,
+                     borderWidth: 1, borderColor: t.cardBorder }}
+          >
+            <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600' }}>Sign out</Text>
+          </TouchableOpacity>
         </View>
       )
     }

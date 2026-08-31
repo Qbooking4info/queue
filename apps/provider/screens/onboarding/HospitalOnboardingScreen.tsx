@@ -56,7 +56,7 @@ interface Props { navigation: any }
 
 export function HospitalOnboardingScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user, refreshProfile, setPendingHospitalOnboarding } = useAuth()
+  const { user, refreshProfile, setPendingHospitalOnboarding, signOut } = useAuth()
 
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -124,14 +124,18 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
     else handleSubmit()
   }
 
-  function goBack() {
+  async function goBack() {
     if (step > 0) { setStep(s => s - 1); return }
-    // This screen is the initial route when reached straight after sign-up
-    // (see pendingHospitalOnboarding), so there's nothing to go back to —
-    // bail out to the main app instead of a dead-end back press.
+
+    // In the provider app this screen is the whole tree for a newly registered
+    // hospital: there is no MainTabs to fall back to (that route belongs to the
+    // patient app), and the account has no doctor/staff/crew role yet, so nothing
+    // else would render. Backing out therefore means signing out -- which is also
+    // the only escape from an account stuck mid-registration, since the auth user's
+    // registered_via metadata routes it straight back here on every launch.
     setPendingHospitalOnboarding(false)
-    if (navigation.canGoBack()) navigation.goBack()
-    else navigation.navigate('MainTabs')
+    if (navigation.canGoBack()) { navigation.goBack(); return }
+    await signOut()
   }
 
   async function captureLocation() {
