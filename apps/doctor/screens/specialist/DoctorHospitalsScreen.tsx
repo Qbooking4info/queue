@@ -6,9 +6,9 @@ import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { ShellScroll } from '@queue/shared/components/AppShell'
 
-interface Props { navigation: any }
+interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean } }
 
-export function DoctorHospitalsScreen({}: Props) {
+export function DoctorHospitalsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile, switchHospital } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
@@ -23,7 +23,18 @@ export function DoctorHospitalsScreen({}: Props) {
 
   return (
       <ShellScroll>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>Hospitals</Text>
+        {/* Hospitals is pushed as its own stack screen above the tab bar (not a tab
+            itself), so without this there is no way back to Dashboard at all --
+            no header, no tab bar, nothing but the browser's own back button, which
+            doesn't sync with this in-memory navigation stack on web. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          {navigation.canGoBack?.() ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Hospitals</Text>
+        </View>
         <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
           Manage the hospitals and clinics you're linked to. Only one can be active at a time —
           that's the one whose queue and referrals you see.

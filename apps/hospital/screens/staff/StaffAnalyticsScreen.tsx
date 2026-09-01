@@ -20,7 +20,9 @@ interface SpecialtyRow { name: string; count: number; pct: number }
 
 const SPEC_COLORS = ['#00E87A','#5B9EFF','#A78BFA','#EF9F27','#FF8C42']
 
-export function StaffAnalyticsScreen() {
+interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean } }
+
+export function StaffAnalyticsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { staffProfile } = useAuth()
 
@@ -122,7 +124,16 @@ export function StaffAnalyticsScreen() {
 
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
+      <View style={[s.header, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        {/* Analytics is pushed as its own stack screen above the tab bar (not a tab
+            itself), so without this there is no way back to the dashboard at all --
+            no native header, no tab bar, nothing but the browser's own back button,
+            which doesn't sync with this in-memory navigation stack on web. */}
+        {navigation.canGoBack?.() ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
+          </TouchableOpacity>
+        ) : null}
         <Text style={[s.title, { color: t.textPrimary }]}>Analytics</Text>
       </View>
 

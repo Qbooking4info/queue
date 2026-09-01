@@ -101,7 +101,18 @@ export function HospitalSettingsScreen({ navigation }: Props) {
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Settings</Text>
+        {/* Settings is pushed as its own stack screen above the tab bar (not a tab
+            itself), so without this there is no way back to the dashboard at all --
+            no native header, no tab bar, nothing but the browser's own back button,
+            which doesn't sync with this in-memory navigation stack on web. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {navigation.canGoBack?.() ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={[s.title, { color: t.textPrimary }]}>Settings</Text>
+        </View>
         {saving && <ActivityIndicator color={t.accent} size="small" />}
       </View>
       {hospitalName ? <Text style={[s.subtitle, { color: t.textMuted }]}>{hospitalName}</Text> : null}

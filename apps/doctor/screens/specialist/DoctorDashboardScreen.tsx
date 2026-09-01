@@ -101,7 +101,7 @@ export function DoctorDashboardScreen({ navigation }: Props) {
             <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
               <QuickLink theme={t} icon="calendar-outline" label="Review appointments" onPress={() => navigation.navigate('Appointments')} />
               <QuickLink theme={t} icon="settings-outline" label="Edit settings & fees" onPress={() => navigation.navigate('Settings')} />
-              <QuickLink theme={t} icon="business-outline" label="Manage hospitals" onPress={() => navigation.navigate('Hospitals')} />
+              <QuickLink theme={t} icon="business-outline" label="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} />
             </View>
           </>
         )}
