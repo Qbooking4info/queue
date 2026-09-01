@@ -131,8 +131,17 @@ export function AppShell({ active, navigation, children }: {
 }
 
 export function ShellScroll({ children }: { children: React.ReactNode }) {
+  const { theme: t } = useTheme()
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    // A bare ScrollView has no background of its own, so on Android it falls through to
+    // the window's light default while everything drawn inside it is dark-themed -- the
+    // doctor dashboard rendered dark cards and a dark tab bar on a light grey page, with
+    // the "Welcome, Dr X" heading dark-on-dark and effectively invisible. Typecheck and
+    // lint both pass on that, so it only shows up on a screenshot of a real build.
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      style={{ backgroundColor: t.canvasBg }}
+      contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
       {children}
     </ScrollView>
   )

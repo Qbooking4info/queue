@@ -1,0 +1,25 @@
+{
+  "password": "QueueE2E!2026",
+  "accounts": {
+    "patient": {
+      "email": "e2e.patient@queuetest.com",
+      "authId": "285040c1-ecf6-4c5d-9460-6ad8c599c641",
+      "userId": "d31cf1ca-bb82-42b7-b3cc-33ddb8a2cb48"
+    },
+    "doctor": {
+      "email": "e2e.doctor@queuetest.com",
+      "authId": "6ae6bc32-14c4-4b22-ae1f-e68c53a4ada0",
+      "userId": "253c5f65-69af-4abe-87c7-6d6554af9905"
+    },
+    "hospital": {
+      "email": "e2e.hospital@queuetest.com",
+      "authId": "5309f97e-4612-48f3-976d-f5bd2709031c",
+      "userId": "3dc62e70-c712-4d5f-86d9-c48ab86a56e9"
+    },
+    "crew": {
+      "email": "e2e.crew@queuetest.com",
+      "authId": "5bf75bdf-9265-482b-94a9-bdecb8a56a7a",
+      "userId": "027a8497-a9f2-42c5-8f35-239463a8a1e9"
+    }
+  }
+}
