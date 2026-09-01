@@ -20,6 +20,15 @@ import { usePushNotifications }    from '@queue/shared/hooks/usePushNotification
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
 import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
 
+// Registers the TaskManager background location task at app entry, NOT lazily from
+// CrewHomeScreen. The OS wakes this app headless to deliver background fixes, and in a
+// cold start no screen mounts -- so a task only imported by CrewHomeScreen is undefined
+// at exactly the moment the OS hands work back, and every fix is dropped on the floor.
+// find_candidate_units ignores any unit whose last fix is older than 120s, so the rig
+// silently left dispatch about two minutes after the crew locked their phone: on duty,
+// pinging nothing, and never offered a job. apps/client already imports it this way.
+import '@queue/shared/lib/location-task'
+
 import { CrewHomeScreen }    from './screens/crew/CrewHomeScreen'
 import { CrewProfileScreen } from './screens/crew/CrewProfileScreen'
 
