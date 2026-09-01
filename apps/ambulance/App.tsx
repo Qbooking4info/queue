@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
 import React from 'react'
 import * as Sentry from '@sentry/react-native'
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
@@ -124,15 +124,40 @@ function AppNavigator() {
   return <SafeAreaProvider><CrewAuthStack /><OfflineBanner /></SafeAreaProvider>
 }
 
+// React Navigation paints its own scene background behind every screen, and with no
+// theme passed it uses DefaultTheme -- a light grey. Screens that paint their own
+// background hid it; the ShellScroll ones did not, so the doctor dashboard showed dark
+// cards floating on a light grey page. Feeding the app palette to the navigator fixes it
+// for every screen at once rather than per-screen.
+function ThemedNav({ children }: { children: React.ReactNode }) {
+  const { theme: t } = useTheme()
+  const navTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: t.canvasBg,
+      card:       t.cardBg,
+      text:       t.textPrimary,
+      border:     t.cardBorder,
+      primary:    t.accent,
+    },
+  }
+  return (
+    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+      {children}
+    </NavigationContainer>
+  )
+}
+
 function App() {
   return (
     <ThemeProvider>
       <AlertProvider>
         <AuthProvider>
           <LocationProvider>
-            <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
+            <ThemedNav>
               <AppNavigator />
-            </NavigationContainer>
+            </ThemedNav>
           </LocationProvider>
         </AuthProvider>
       </AlertProvider>
