@@ -12,7 +12,7 @@ import {
   type PendingOffer, type ActiveJob, type MyUnit,
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
-import { startBackgroundLocation, stopBackgroundLocation } from '@queue/shared/lib/location-task'
+import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
 import { JobPatientMap } from '@queue/shared/components/emergency/JobPatientMap'
 
 // Foreground pings. These are now a supplement, not the only source: while on
@@ -116,6 +116,30 @@ export function CrewHomeScreen() {
     const tick = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(tick)
   }, [])
+
+  // Re-arm background reporting for a unit that is already on duty.
+  //
+  // startBackgroundLocation used to be reachable only from handleToggleDuty, so once
+  // Android stopped the location service -- battery optimisation, a reboot, the process
+  // being reclaimed -- nothing ever started it again. The shift was still open and the
+  // duty card still said "On duty", but no position left the phone, and the rig fell out
+  // of find_candidate_units 120s later. The crew had no way to know, and no way to fix it
+  // short of toggling duty off and on. Re-arming on mount closes that hole: it is cheap
+  // (startBackgroundLocation returns early when updates are already running) and it makes
+  // opening the app enough to recover.
+  const rearmedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const unitId = onDutyUnit?.ambulance_id
+    if (!unitId || rearmedFor.current === unitId) return
+    rearmedFor.current = unitId
+    ;(async () => {
+      // Always re-point the task at this unit: the id lives in module scope plus
+      // storage, and a cold-started process has neither until something sets it.
+      setBackgroundUnit(unitId)
+      const started = await startBackgroundLocation(unitId)
+      setLocationDenied(!started.ok)
+    })()
+  }, [onDutyUnit?.ambulance_id])
 
   // Heartbeat.
   //
