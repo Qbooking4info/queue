@@ -3,8 +3,27 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the doctor/hospital/ambulance Expo apps running in a
+// browser (e.g. localhost:8096 -> localhost:3000) -- needs real CORS handling
+// (preflight OPTIONS + headers on every response), same as virtual/token. This
+// was missing entirely: the route worked fine called from a real native build
+// (CORS is a browser-only restriction, native fetch() ignores it), so hospital
+// registration from the web-hosted app silently failed with "Failed to fetch"
+// the moment the browser's preflight OPTIONS came back with no
+// Access-Control-Allow-Origin header, blocking the real POST from ever going out.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   try {
     const user = await getServerUser(req)
     if (!user) return Errors.unauthenticated()
@@ -60,12 +79,20 @@ export async function POST(req: NextRequest) {
 
     // BM8: planId is required — every hospital must have a subscription from day one.
     // If not provided, auto-assign the free/starter plan; if none exists return 400.
+    //
+    // subscription_plans has no `slug` column -- confirmed live against the actual
+    // table (id, name, display_name, price_monthly, ...) -- so the `slug.ilike...`
+    // conditions this .or() used to carry made the whole query error out. That error
+    // was silently discarded (only `data` was destructured), leaving defaultPlan
+    // always undefined and every onboarding with no planId hitting the 400 below,
+    // even though a real "starter" plan exists and matches the name-based half of
+    // the filter just fine.
     let resolvedPlanId: string | null = planId ?? null
     if (!resolvedPlanId) {
       const { data: defaultPlan } = await db
         .from('subscription_plans')
         .select('id')
-        .or('name.ilike.%free%,slug.ilike.%free%,name.ilike.%starter%,slug.ilike.%starter%')
+        .or('name.ilike.%free%,name.ilike.%starter%')
         .eq('is_active', true)
         .limit(1)
         .maybeSingle()
