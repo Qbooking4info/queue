@@ -10,6 +10,7 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -54,6 +55,7 @@ export function StaffManagementScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false)
   const [tab,        setTab]        = useState<'staff' | 'doctors'>('staff')
   const [showInvite, setShowInvite] = useState(false)
+  const [showLinkDoctor, setShowLinkDoctor] = useState(false)
 
   const hospitalId = staffProfile?.hospitalId
 
@@ -112,10 +114,17 @@ export function StaffManagementScreen({ navigation }: Props) {
           ) : null}
           <Text style={[s.title, { color: t.textPrimary }]}>Staff</Text>
         </View>
-        <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
-          <Ionicons name="person-add-outline" size={14} color="#fff" />
-          <Text style={s.inviteBtnText}>Invite</Text>
-        </TouchableOpacity>
+        {tab === 'staff' ? (
+          <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
+            <Ionicons name="person-add-outline" size={14} color="#fff" />
+            <Text style={s.inviteBtnText}>Invite</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
+            <Ionicons name="link-outline" size={14} color="#fff" />
+            <Text style={s.inviteBtnText}>Link</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Tabs */}
@@ -169,7 +178,7 @@ export function StaffManagementScreen({ navigation }: Props) {
               <View style={s.empty}>
                 <Ionicons name="medical-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
                 <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No doctors yet</Text>
-                <Text style={[s.emptySub, { color: t.textMuted }]}>Add doctors from the web portal.</Text>
+                <Text style={[s.emptySub, { color: t.textMuted }]}>Tap Link above and enter a doctor's ID to add them.</Text>
               </View>
             ) : doctors.map(doc => {
               const avail = AVAIL_META[doc.availability_status] ?? AVAIL_META.off_duty
@@ -196,6 +205,9 @@ export function StaffManagementScreen({ navigation }: Props) {
 
       {/* Invite modal */}
       {showInvite && <InviteModal hospitalId={hospitalId ?? ''} theme={t} onClose={() => setShowInvite(false)} onDone={() => { setShowInvite(false); load(true) }} />}
+
+      {/* Link doctor modal */}
+      {showLinkDoctor && <LinkDoctorModal theme={t} onClose={() => setShowLinkDoctor(false)} onDone={() => { setShowLinkDoctor(false); load(true) }} />}
     </SafeAreaView>
   )
 }
@@ -291,6 +303,158 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
   )
 }
 
+// Doctor-linking, the mobile equivalent of web's "+ Add Doctor by ID"
+// (web/src/components/dashboard/LinkDoctorModal.tsx). Every doctor is a real,
+// self-registered account (see apps/doctor's DoctorRegisterScreen) -- this is
+// the ONLY way to add one to a hospital, matching web exactly: no manual
+// name+specialty form, just a 2-step ID lookup then confirm.
+function LinkDoctorModal({ theme: t, onClose, onDone }: { theme: any; onClose: () => void; onDone: () => void }) {
+  const [step,        setStep]        = useState<'code' | 'confirm'>('code')
+  const [code,        setCode]        = useState('')
+  const [fullName,    setFullName]    = useState('')
+  const [alreadyLinked, setAlreadyLinked] = useState(false)
+  const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
+  const [specialtyId, setSpecialtyId] = useState<string | null>(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+  const [done,        setDone]        = useState(false)
+
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    const jwt = session?.access_token
+    if (!jwt) throw new Error('Not authenticated')
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` }
+  }
+
+  async function handleLookUp() {
+    const trimmed = code.trim().toUpperCase()
+    if (!trimmed) { setError('Doctor ID is required.'); return }
+    setLoading(true); setError('')
+    try {
+      const headers = await authHeaders()
+      const [lookupRes, specialtyList] = await Promise.all([
+        fetch(`${API_URL}/api/doctors/link?code=${encodeURIComponent(trimmed)}`, { headers }),
+        specialties.length > 0 ? Promise.resolve(specialties) : getSpecialties(),
+      ])
+      const body = await lookupRes.json()
+      if (!lookupRes.ok) throw new Error(body?.error ?? 'No doctor account found with that ID')
+      setSpecialties(specialtyList)
+      setFullName(body.fullName)
+      setAlreadyLinked(!!body.alreadyLinked)
+      setSpecialtyId(body.suggestedSpecialtyId ?? null)
+      setStep('confirm')
+    } catch (e) {
+      haptics.error()
+      setError(e instanceof Error ? e.message : 'Look up failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleConfirm() {
+    setLoading(true); setError('')
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/doctors/link`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ doctorCode: code.trim().toUpperCase(), specialtyId }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.error ?? 'Link failed')
+      haptics.success()
+      setDone(true)
+    } catch (e) {
+      haptics.error()
+      setError(e instanceof Error ? e.message : 'Link failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <View style={s.overlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          {done ? (
+            <>
+              <Ionicons name="checkmark-circle" size={48} color="#00C265" style={{ alignSelf: 'center', marginBottom: 12 }} />
+              <Text style={[s.modalTitle, { color: t.textPrimary, textAlign: 'center' }]}>Doctor linked!</Text>
+              <Text style={[s.modalSub, { color: t.textMuted, textAlign: 'center', marginBottom: 20 }]}>
+                {fullName} now appears in your hospital's doctor list.
+              </Text>
+              <TouchableOpacity onPress={onDone} style={[s.modalBtn, { backgroundColor: t.accent }]}>
+                <Text style={s.modalBtnText}>Done</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={[s.modalTitle, { color: t.textPrimary }]}>Link Existing Doctor</Text>
+                <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+              </View>
+
+              {step === 'code' ? (
+                <>
+                  <Text style={[s.modalLabel, { color: t.textMuted }]}>DOCTOR ID</Text>
+                  <View style={[s.modalInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
+                    <TextInput value={code} onChangeText={v => setCode(v.toUpperCase())}
+                      placeholder="e.g. K7M3QX" placeholderTextColor={t.textMuted}
+                      style={{ color: t.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: 4, textAlign: 'center' }}
+                      autoCapitalize="characters" maxLength={6} autoFocus />
+                  </View>
+
+                  {error ? <Text style={[s.errorText, { color: '#FF5C5C', marginTop: 10 }]}>{error}</Text> : null}
+
+                  <TouchableOpacity onPress={handleLookUp} disabled={loading}
+                    style={[s.modalBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 14 }]}>
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>Look Up</Text>}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 13, color: t.textPrimary, marginBottom: 4 }}>
+                    Found <Text style={{ fontWeight: '800' }}>{fullName}</Text>. Their profile (bio, qualifications,
+                    experience, photo) transfers automatically — just choose the specialty they'll practise here.
+                  </Text>
+                  {alreadyLinked ? (
+                    <Text style={{ fontSize: 12, color: '#EF9F27', marginBottom: 10 }}>
+                      This doctor is already linked to your hospital.
+                    </Text>
+                  ) : null}
+
+                  <Text style={[s.modalLabel, { color: t.textMuted, marginTop: 14 }]}>SPECIALTY</Text>
+                  <ScrollView style={{ maxHeight: 180, marginBottom: 4 }} showsVerticalScrollIndicator={false}>
+                    {specialties.map(sp => (
+                      <TouchableOpacity key={sp.id} onPress={() => setSpecialtyId(sp.id)}
+                        style={[s.specialtyRow, { borderColor: specialtyId === sp.id ? t.accent : t.cardBorder, backgroundColor: specialtyId === sp.id ? `${t.accent}18` : 'transparent' }]}>
+                        <Text style={{ fontSize: 13, color: specialtyId === sp.id ? t.accent : t.textPrimary, fontWeight: specialtyId === sp.id ? '700' : '400' }}>{sp.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {error ? <Text style={[s.errorText, { color: '#FF5C5C' }]}>{error}</Text> : null}
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                    <TouchableOpacity onPress={() => { setStep('code'); setError('') }}
+                      style={[s.modalBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: t.cardBorder }]}>
+                      <Text style={[s.modalBtnText, { color: t.textPrimary }]}>Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleConfirm} disabled={loading}
+                      style={[s.modalBtn, { flex: 1, backgroundColor: loading ? `${t.accent}88` : t.accent }]}>
+                      {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>Confirm & Link</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
   safe:       { flex: 1 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
@@ -322,6 +486,7 @@ const s = StyleSheet.create({
   modalInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 4 },
   roleChip:   { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: 'center' },
   roleChipText: { fontSize: 11, fontWeight: '700' },
+  specialtyRow: { borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 6 },
   modalBtn:   { borderRadius: 12, padding: 14, alignItems: 'center' },
   modalBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
   errorText:  { fontSize: 12, marginBottom: 8 },

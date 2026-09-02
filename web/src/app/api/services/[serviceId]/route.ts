@@ -2,6 +2,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 async function assertOwnService(
   db: ReturnType<typeof createAdminClient>,
@@ -16,8 +24,14 @@ async function assertOwnService(
 // PATCH/DELETE /api/services/[serviceId] -- replaces admin-api.ts's
 // updateService/toggleServiceActive/deleteService (Task 15). Verifies the
 // service belongs to the caller's hospital before any write.
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ serviceId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ serviceId: string }> }) {
+  const res = await handlePATCH(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ serviceId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { serviceId } = await params
@@ -43,8 +57,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ se
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ serviceId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ serviceId: string }> }) {
+  const res = await handleDELETE(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ serviceId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { serviceId } = await params

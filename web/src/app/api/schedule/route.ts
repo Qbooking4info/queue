@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { safePatientName, fmtLocalDate } from '@/lib/dashboard-utils'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 interface ScheduleSlot {
   id: string
@@ -33,7 +41,13 @@ function fillHours(rows: { day_of_week: number; open_time: string; close_time: s
 // the caller's own hospital; doctor callers are forced onto their own
 // doctorId regardless of any doctorId query param.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'])
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk', 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()

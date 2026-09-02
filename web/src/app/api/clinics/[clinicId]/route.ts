@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { safePatientName, calcAge } from '@/lib/dashboard-utils'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 interface DayHours { day: number; open: string; close: string; closed: boolean }
 
@@ -35,8 +43,14 @@ async function assertOwnClinic(
 // getClinicDoctors/getClinicStaff/getClinicAppointments/getClinicRangeStats/
 // getClinicHours/getHospitalHours into one call (Task 15) -- the page always
 // fetched all seven together.
-export async function GET(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+export async function GET(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handleGET(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params
@@ -192,8 +206,14 @@ type PatchBody =
   | { action: 'update_hours'; hours: DayHours[] }
   | { action: 'clear_hours' }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handlePATCH(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params
@@ -315,8 +335,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin'])
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handleDELETE(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params

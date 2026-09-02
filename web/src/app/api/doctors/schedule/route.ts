@@ -1,15 +1,33 @@
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { fmtLocalDate, todayLocalDate } from '@/lib/dashboard-utils'
-import { requireRole } from '@/lib/supabase/auth-server'
+import { requireRole, getServerUser } from '@/lib/supabase/auth-server'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return Errors.unauthenticated()
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
+  // getServerUser checks the Authorization: Bearer header first, falling back to
+  // the SSR cookie session -- the same helper every other route in this file
+  // (and this whole feature) uses. This used to be a cookie-only createClient()
+  // check, which works for the web dashboard's own same-origin requests but
+  // silently 401s any cross-origin Bearer-token caller (the mobile app) even
+  // once CORS is fixed, since no cookie is ever sent cross-origin.
+  const user = await getServerUser(req)
+  if (!user) return Errors.unauthenticated()
 
   const db = createAdminClient()
 
@@ -187,6 +205,12 @@ export async function POST(req: NextRequest) {
 // any hospital, even a patient) could pull any doctor's full schedule and booking
 // capacity by passing any doctor_id, with no ownership check at all.
 export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth

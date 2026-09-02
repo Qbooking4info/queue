@@ -3,6 +3,14 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 // POST /api/doctors/link -- links an existing, independently-registered doctor
 // account (from the doctors/ app) to the caller's hospital, given the doctor's own
@@ -31,6 +39,12 @@ import { checkRateLimit } from '@/lib/rate-limit'
 // bio, years_experience, mdcn_number, avatar_url -- still auto-transfers from their
 // existing profile with no admin input, exactly like POST already did.
 export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
   const auth = await requireRole(['hospital_admin', 'super_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
@@ -71,6 +85,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   const auth = await requireRole(['hospital_admin', 'super_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
