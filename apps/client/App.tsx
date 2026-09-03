@@ -63,7 +63,17 @@ const VideoCallScreenLazy = React.lazy(() =>
 )
 function VideoCallScreen(props: any) {
   return (
-    <React.Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>}>
+    // Same dark background VideoCallScreen itself uses (#050d09), and an explicit
+    // light spinner color -- without these this fallback rendered as a near-invisible
+    // small blue spinner on a plain light-gray background while the chunk loads
+    // (react-native-agora is native-only, so this chunk is lazy-loaded and can take
+    // a noticeable moment to fetch/compile, especially on a cold dev-server bundle),
+    // which read as "the call screen is just a blank white page."
+    <React.Suspense fallback={
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050d09' }}>
+        <ActivityIndicator color="#fff" />
+      </View>
+    }>
       <VideoCallScreenLazy {...props} />
     </React.Suspense>
   )
