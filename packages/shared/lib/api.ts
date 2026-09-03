@@ -383,6 +383,17 @@ export async function getNextAppointment(
 // or already being seen) -- disjoint from getNextAppointment's 'confirmed'/
 // 'pending' filter by construction, so the two never both match the same row.
 // Drives the home screen's live queue card in place of the generic booking CTA.
+//
+// A virtual consultation never goes through check-in at all -- it moves
+// straight from 'confirmed' to 'in_progress' the moment the doctor starts the
+// call (POST /api/virtual/token), so check_in_date stays null for it forever.
+// The original check_in_date-only filter made an in-progress virtual call
+// invisible on the home screen the instant it started -- neither this nor
+// getNextAppointment's 'confirmed'/'pending' filter would match it, so a
+// patient with no other way back in (see VideoCallScreen's join banner) had
+// no way to even find the appointment again. The .or() below keeps the
+// original in-person path unchanged and adds a second, check-in-independent
+// match for a virtual call that's actually in progress.
 export async function getActiveQueueAppointment(
   patientId: string
 ): Promise<AppointmentWithRelations | null> {
@@ -391,8 +402,7 @@ export async function getActiveQueueAppointment(
     .from('appointments')
     .select(APPOINTMENT_SELECT)
     .eq('patient_id', patientId)
-    .eq('check_in_date', today)
-    .in('status', ['checked_in', 'in_progress'])
+    .or(`and(check_in_date.eq.${today},status.in.(checked_in,in_progress)),and(type.eq.virtual,status.eq.in_progress)`)
     .order('checked_in_at', { ascending: true })
     .limit(1)
     .single()
