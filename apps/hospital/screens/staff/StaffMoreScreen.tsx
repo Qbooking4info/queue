@@ -24,6 +24,7 @@ export function StaffMoreScreen({ navigation }: Props) {
   const [confirmVisible, setConfirmVisible]  = useState(false)
 
   const isAdmin = staffProfile?.role === 'hospital_admin'
+  const isClinicAdmin = staffProfile?.role === 'clinic_admin'
   const initials = staffProfile?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
   useEffect(() => {
@@ -41,9 +42,15 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    // Staff Management also holds doctor-linking (see StaffManagementScreen's
+    // own role check for what a sub-admin can and can't do once inside it) --
+    // a clinic's own sub-admin needs to reach it to add a doctor to their
+    // clinic, same as web's clinic-detail page already lets them.
+    ...(isAdmin || isClinicAdmin ? [
+      { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
+    ] : []),
     ...(isAdmin ? [
       { icon: 'analytics-outline', label: 'Analytics', onPress: () => navigation.navigate('StaffAnalytics') },
-      { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
       // Only hospitals onboarded with the multi-clinic model have clinics to manage --
       // mirrors web's Sidebar.tsx, which hides its own Clinics nav item the same way.
       ...(clinicModel === 'multi' ? [

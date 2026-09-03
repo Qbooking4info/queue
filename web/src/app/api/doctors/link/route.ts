@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 }
 
 async function handleGET(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
+  const auth = await requireRole(['hospital_admin', 'super_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handlePOST(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
+  const auth = await requireRole(['hospital_admin', 'super_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -101,6 +101,17 @@ async function handlePOST(req: NextRequest) {
 
   if (!doctorCode?.trim()) {
     return Errors.validation('doctorCode is required')
+  }
+
+  // A clinic_admin's whole access is scoped to their own clinic -- same rule
+  // clinics/[clinicId]/doctors/route.ts already enforces for assign/unassign.
+  // Ignore whatever clinicId the client sent (or omitted) and use their own,
+  // so a subadmin can never land a doctor in a clinic they don't manage, or
+  // hospital-wide (clinicId null) where they'd have no way to reach them again.
+  let effectiveClinicId: string | null = clinicId || null
+  if (caller.role === 'clinic_admin') {
+    if (!caller.clinicId) return Errors.forbidden('Your account is not assigned to a clinic')
+    effectiveClinicId = caller.clinicId
   }
 
   const { data: account } = await db
@@ -131,7 +142,7 @@ async function handlePOST(req: NextRequest) {
   if (existing) {
     const { error } = await db.from('doctors')
       .update({
-        is_active: true, clinic_id: clinicId || null, availability_status: 'off_duty',
+        is_active: true, clinic_id: effectiveClinicId, availability_status: 'off_duty',
         ...(specialtyId ? { specialty_id: specialtyId } : {}),
       })
       .eq('id', existing.id)
@@ -177,7 +188,7 @@ async function handlePOST(req: NextRequest) {
     .from('doctors')
     .insert({
       hospital_id: caller.hospitalId,
-      clinic_id: clinicId || null,
+      clinic_id: effectiveClinicId,
       user_id: account.id,
       is_active: true,
       // Newly linked at THIS hospital -- off_duty (not the doctors table's

@@ -22,7 +22,7 @@ export default function DoctorsPage() {
   const [linking, setLinking] = useState(false)
 
   const isFrontDesk = role === 'front_desk'
-  const canAddDoctor = role === 'hospital_admin' || role === 'super_admin'
+  const canAddDoctor = role === 'hospital_admin' || role === 'super_admin' || role === 'clinic_admin'
 
   useEffect(() => {
     // Doctors (role=doctor) shouldn't access the full doctors list

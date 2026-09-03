@@ -909,7 +909,16 @@ export default function ClinicDetailPage() {
   const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
   const [showHours,        setShowHours]        = useState(false)
   const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
+  // Staff (front desk / sub-admin) additions stay admin-only -- a sub-admin
+  // shouldn't be able to hand out another sub-admin's access or add front
+  // desk officers on their own authority.
   const canAddStaffOrDoctor = role === 'super_admin' || role === 'hospital_admin'
+  // Doctors are different: a clinic's own sub-admin managing *their* clinic is
+  // exactly who should be able to add a doctor to it, not just the hospital
+  // admin. The API (POST /api/doctors/link) independently forces a clinic_admin's
+  // link into their own clinicId regardless of what this page sends, so this is
+  // just the matching UI-level permission, not the enforcement.
+  const canAddDoctor = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -1389,7 +1398,7 @@ export default function ClinicDetailPage() {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {doctors.length} Doctor{doctors.length !== 1 ? 's' : ''} · {clinic?.name}
             </div>
-            {canAddStaffOrDoctor && (
+            {canAddDoctor && (
               <button onClick={() => setShowAssign(true)}
                 style={{ background: col.text, color: '#061208', border: 'none',
                   borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
@@ -1411,7 +1420,7 @@ export default function ClinicDetailPage() {
               <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
                 Assign existing hospital doctors or add new ones directly to this clinic.
               </div>
-              {canAddStaffOrDoctor && (
+              {canAddDoctor && (
                 <button onClick={() => setShowAssign(true)}
                   style={{ background: col.text, color: '#061208', border: 'none',
                     borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 700,

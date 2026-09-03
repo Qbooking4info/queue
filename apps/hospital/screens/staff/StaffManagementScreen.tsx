@@ -49,6 +49,16 @@ interface Props { navigation: any }
 export function StaffManagementScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { staffProfile } = useAuth()
+  // Staff invites stay hospital_admin-only (a sub-admin shouldn't be able to hand
+  // out another sub-admin's access or add front desk officers on their own
+  // authority). Doctor-linking is different: a clinic's own sub-admin managing
+  // their clinic is exactly who should be able to add a doctor to it -- matches
+  // web's clinics/[clinicId] page canAddDoctor split. The API (POST
+  // /api/doctors/link) independently forces a clinic_admin's link into their own
+  // clinicId regardless of what this screen sends, so this is just the matching
+  // UI-level permission, not the enforcement.
+  const isHospitalAdmin = staffProfile?.role === 'hospital_admin'
+  const canAddDoctor = staffProfile?.role === 'hospital_admin' || staffProfile?.role === 'clinic_admin'
   const [staff,      setStaff]      = useState<StaffMember[]>([])
   const [doctors,    setDoctors]    = useState<Doctor[]>([])
   const [loading,    setLoading]    = useState(true)
@@ -115,15 +125,19 @@ export function StaffManagementScreen({ navigation }: Props) {
           <Text style={[s.title, { color: t.textPrimary }]}>Staff</Text>
         </View>
         {tab === 'staff' ? (
-          <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="person-add-outline" size={14} color="#fff" />
-            <Text style={s.inviteBtnText}>Invite</Text>
-          </TouchableOpacity>
+          isHospitalAdmin ? (
+            <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
+              <Ionicons name="person-add-outline" size={14} color="#fff" />
+              <Text style={s.inviteBtnText}>Invite</Text>
+            </TouchableOpacity>
+          ) : null
         ) : (
-          <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="link-outline" size={14} color="#fff" />
-            <Text style={s.inviteBtnText}>Link</Text>
-          </TouchableOpacity>
+          canAddDoctor ? (
+            <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
+              <Ionicons name="link-outline" size={14} color="#fff" />
+              <Text style={s.inviteBtnText}>Link</Text>
+            </TouchableOpacity>
+          ) : null
         )}
       </View>
 
