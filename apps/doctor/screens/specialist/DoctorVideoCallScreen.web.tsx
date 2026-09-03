@@ -43,6 +43,18 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   const [error, setError]   = useState<string | null>(null)
   const [tokenData, setTokenData] = useState<TokenResponse | null>(null)
 
+  // Must be called unconditionally, before either early return below -- it
+  // previously lived inline in the final JSX (`<AgoraRTCProvider
+  // client={useMemo(...)}>`), which only runs once phase === 'active'. The
+  // 'loading'/'error' early returns skipped this useMemo entirely on those
+  // renders; the moment the token arrived and phase flipped to 'active',
+  // the next render called it for the first time, changing the hook count
+  // between renders -- React throws "Rendered more hooks than during the
+  // previous render" with no error boundary above this screen, i.e. the
+  // call looks "in progress" (the token fetch succeeded) but the interface
+  // never renders. Same bug, same fix as VideoCallScreen.web.tsx (patient side).
+  const agoraClient = useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])
+
   useEffect(() => {
     let active = true
 
@@ -124,7 +136,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AgoraRTCProvider client={useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])}>
+    <AgoraRTCProvider client={agoraClient}>
       <CallBody
         appId={tokenData.appId}
         token={tokenData.token}
