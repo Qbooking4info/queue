@@ -41,6 +41,20 @@ export function VideoCallScreen({ navigation, route }: Props) {
   const [session, setSession] = useState<SessionRow | null>(null)
   const [error, setError]     = useState<string | null>(null)
 
+  // Must be called unconditionally, before either early return below --
+  // it previously lived inline in the final JSX (`<AgoraRTCProvider
+  // client={useMemo(...)}>`), which only runs once session is set. The
+  // first render (session still null) skipped this useMemo entirely via
+  // the `if (!session) return` branch below; the moment a real session
+  // arrived, the next render called it for the first time, changing the
+  // hook count between renders -- React throws "Rendered more hooks than
+  // during the previous render" with no error boundary above this screen,
+  // which is exactly the blank white page reported when a call actually
+  // starts (as opposed to the merely-slow-loading blank screen fixed in
+  // App.tsx's Suspense fallback -- that one only covered the wait before
+  // this component ever mounted at all).
+  const agoraClient = useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])
+
   // ── Fetch session (guest_token) from Supabase, same as native ─────────────
   useEffect(() => {
     let mounted = true
@@ -104,7 +118,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AgoraRTCProvider client={useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])}>
+    <AgoraRTCProvider client={agoraClient}>
       <CallBody
         appId={AGORA_APP_ID}
         token={session.guest_token}
