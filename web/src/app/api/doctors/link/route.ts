@@ -147,6 +147,14 @@ async function handlePOST(req: NextRequest) {
       })
       .eq('id', existing.id)
     if (error) return Errors.internal(error.message)
+    // Record the assignment pool membership alongside the active pointer --
+    // a doctor can now be assigned to several clinics (doctor_clinics,
+    // 20260903000001); linking still sets THIS clinic active directly,
+    // matching the pre-multi-clinic behaviour for a first/only clinic.
+    if (effectiveClinicId) {
+      await db.from('doctor_clinics')
+        .upsert({ doctor_id: existing.id, clinic_id: effectiveClinicId }, { onConflict: 'doctor_id,clinic_id', ignoreDuplicates: true })
+    }
     return NextResponse.json({ id: existing.id, relinked: true })
   }
 
@@ -211,6 +219,11 @@ async function handlePOST(req: NextRequest) {
     .single()
 
   if (error) return Errors.internal(error.message)
+
+  if (effectiveClinicId) {
+    // Brand-new doctors row -- no prior membership possible, plain insert is safe.
+    await db.from('doctor_clinics').insert({ doctor_id: data.id, clinic_id: effectiveClinicId })
+  }
 
   return NextResponse.json({ id: data.id, relinked: false })
 }

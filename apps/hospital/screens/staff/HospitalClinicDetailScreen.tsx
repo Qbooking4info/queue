@@ -20,7 +20,7 @@ interface ClinicDetail {
   daily_booking_limit: number | null; min_age: number | null; max_age: number | null
   gender_restriction: 'male' | 'female' | null
 }
-interface ClinicDoctor { id: string; full_name: string; specialty_name: string | null; is_active: boolean }
+interface ClinicDoctor { id: string; full_name: string; specialty_name: string | null; is_active: boolean; is_active_here: boolean }
 interface UnassignedDoctor { id: string; full_name: string; title: string | null; specialty_name: string | null }
 
 interface Props { navigation: any; route: { params: { clinicId: string } } }
@@ -75,21 +75,22 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     }
   }, [clinicId])
 
-  // Doctors linked to this hospital but not yet assigned to ANY clinic --
-  // matches web's clinic-detail "Assign Existing" tab exactly (GET
-  // /api/doctors/unassigned, which filters on clinic_id IS NULL hospital-wide,
-  // not just "not in this specific clinic"). A doctor already working another
-  // clinic must be unassigned there first, same rule web enforces.
+  // Doctors linked to this hospital but not yet assigned to THIS clinic --
+  // matches web's clinic-detail "Assign Existing" tab (GET
+  // /api/doctors/unassigned?clinicId=, which now excludes only doctors
+  // already a doctor_clinics member of this clinic). A doctor can be
+  // assigned to several clinics at once, so one already active elsewhere
+  // still shows up here -- that's the point of multi-clinic assignment.
   const loadUnassigned = useCallback(async () => {
     try {
       const headers = await authHeaders()
-      const res = await fetch(`${API_URL}/api/doctors/unassigned`, { headers })
+      const res = await fetch(`${API_URL}/api/doctors/unassigned?clinicId=${clinicId}`, { headers })
       const body = await res.json()
       setUnassignedDoctors(res.ok ? (body.doctors ?? []) : [])
     } catch {
       setUnassignedDoctors([])
     }
-  }, [])
+  }, [clinicId])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
@@ -203,6 +204,22 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     } finally { setSaving(false) }
   }
 
+  // Admin/staff-driven "Set Active" -- makes this clinic the doctor's
+  // currently active one among however many clinics they're assigned to.
+  // The doctor's own equivalent lives in the doctors app (DoctorHospitalsScreen).
+  async function setDoctorActive(doctorId: string) {
+    setSaving(true)
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/clinics/${clinicId}/doctors/${doctorId}`, { method: 'PATCH', headers })
+      if (!res.ok) throw new Error((await res.json())?.error ?? 'Failed to set active')
+      haptics.success()
+      await load()
+    } catch (e) {
+      haptics.error(); Alert.alert(e instanceof Error ? e.message : 'Failed to set active')
+    } finally { setSaving(false) }
+  }
+
   if (loading) {
     return (
       <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
@@ -290,7 +307,15 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{doc.full_name}</Text>
                 {doc.specialty_name && <Text style={{ fontSize: 11, color: t.textMuted }}>{doc.specialty_name}</Text>}
+                {doc.is_active_here && (
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.accent, marginTop: 2 }}>Active here</Text>
+                )}
               </View>
+              {!doc.is_active_here && (
+                <TouchableOpacity onPress={() => setDoctorActive(doc.id)} disabled={saving} style={{ marginRight: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Set Active</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => unassignDoctor(doc.id)} disabled={saving}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Unassign</Text>
               </TouchableOpacity>

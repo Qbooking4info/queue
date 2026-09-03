@@ -41,7 +41,18 @@ async function handlePOST(req: NextRequest, { params }: { params: Promise<{ clin
 
   const { data: doctor } = await db.from('doctors').select('hospital_id').eq('id', body.doctorId).single()
   if (!doctor || doctor.hospital_id !== clinic.hospital_id) return Errors.validation('Doctor does not belong to this hospital')
-  const { error } = await db.from('doctors').update({ clinic_id: clinicId }).eq('id', body.doctorId)
+
+  // Add to the assignment pool -- idempotent, already-assigned is not an
+  // error. A doctor can now be assigned to several clinics at once; only
+  // set as ACTIVE below if they don't already have one, so assigning to a
+  // 2nd/3rd clinic never silently moves them out of the one they're
+  // currently working (see doctor_clinics, 20260903000001).
+  const { error: memberErr } = await db
+    .from('doctor_clinics')
+    .upsert({ doctor_id: body.doctorId, clinic_id: clinicId }, { onConflict: 'doctor_id,clinic_id', ignoreDuplicates: true })
+  if (memberErr) return Errors.internal(memberErr.message)
+
+  const { error } = await db.from('doctors').update({ clinic_id: clinicId }).eq('id', body.doctorId).is('clinic_id', null)
   if (error) return Errors.internal(error.message)
   return NextResponse.json({ success: true })
 }

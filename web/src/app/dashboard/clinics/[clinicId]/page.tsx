@@ -380,7 +380,7 @@ function AssignDoctorModal({
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const res = await fetch('/api/doctors/unassigned')
+      const res = await fetch(`/api/doctors/unassigned?clinicId=${clinicId}`)
       setPool(res.ok ? (await res.json()).doctors : [])
       setLoading(false)
     }
@@ -1469,6 +1469,12 @@ export default function ClinicDetailPage() {
                         <Monitor size={11} /> Virtual
                       </span>
                     )}
+                    {doc.is_active_here && (
+                      <span style={{ fontSize: 11, background: `${col.text}18`, border: 'none',
+                        borderRadius: 8, padding: '3px 10px', color: col.text, fontWeight: 700 }}>
+                        Active here
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {canManageStaff && (
@@ -1477,6 +1483,17 @@ export default function ClinicDetailPage() {
                           background: col.bg, border: 'none',
                           color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
                         Manage
+                      </button>
+                    )}
+                    {canManageStaff && !doc.is_active_here && (
+                      <button onClick={async () => {
+                        const res = await fetch(`/api/clinics/${clinicId}/doctors/${doc.id}`, { method: 'PATCH' })
+                        if (res.ok) setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, is_active_here: true } : d))
+                      }}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                          background: 'transparent', border: `1px solid ${col.text}`,
+                          color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Set Active
                       </button>
                     )}
                     <button onClick={async () => {

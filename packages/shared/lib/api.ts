@@ -1272,6 +1272,34 @@ export async function getMyDoctorStats(): Promise<DoctorStats | null> {
   return (await res.json()) as DoctorStats
 }
 
+export interface DoctorClinicOption { clinicId: string; clinicName: string }
+
+// The caller's own assigned-clinics pool at their currently-active hospital,
+// plus which one is active -- drives DoctorHospitalsScreen's clinic
+// switcher. See doctor_clinics (20260903000001).
+export async function getMyDoctorClinics(): Promise<{ activeClinicId: string | null; clinics: DoctorClinicOption[] } | null> {
+  const headers = await authHeader()
+  if (!headers) return null
+  const res = await fetch(`${API_URL}/api/doctors/me/clinics`, { headers })
+  if (!res.ok) return null
+  return await res.json()
+}
+
+// Self-service "Set Active" -- the doctor's own equivalent of a hospital
+// staff/admin's "Set Active" action in the clinic's doctor list. Doctor must
+// already be assigned to clinicId.
+export async function switchMyActiveClinic(clinicId: string): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/doctors/me/clinic`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clinicId }),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Could not switch clinic' }
+  return null
+}
+
 export async function getQualificationDocuments(): Promise<QualificationDocument[]> {
   const headers = await authHeader()
   if (!headers) return []

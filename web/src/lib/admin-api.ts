@@ -92,6 +92,11 @@ export interface AdminDoctor {
   avatar: string
   color: string
   clinic_id: string | null
+  // Only present on doctors returned from a clinic-scoped endpoint
+  // (GET /api/clinics/[clinicId]) -- whether THIS clinic is the doctor's
+  // currently active one, vs. merely one they're assigned to
+  // (doctor_clinics, 20260903000001).
+  is_active_here?: boolean
   availability_status: DoctorAvailabilityStatus
 }
 
