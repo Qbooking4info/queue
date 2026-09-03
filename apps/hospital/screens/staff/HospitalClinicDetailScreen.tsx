@@ -9,7 +9,7 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { DayHours } from '@queue/shared/lib/api'
+import { DayHours, getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -21,6 +21,7 @@ interface ClinicDetail {
   gender_restriction: 'male' | 'female' | null
 }
 interface ClinicDoctor { id: string; full_name: string; specialty_name: string | null; is_active: boolean }
+interface UnassignedDoctor { id: string; full_name: string; title: string | null; specialty_name: string | null }
 
 interface Props { navigation: any; route: { params: { clinicId: string } } }
 
@@ -31,10 +32,11 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
   const [clinic,   setClinic]   = useState<ClinicDetail | null>(null)
   const [doctors,  setDoctors]  = useState<ClinicDoctor[]>([])
   const [hours,    setHours]    = useState<DayHours[]>([])
-  const [allHospitalDoctors, setAllHospitalDoctors] = useState<{ id: string; full_name: string }[]>([])
+  const [unassignedDoctors, setUnassignedDoctors] = useState<UnassignedDoctor[]>([])
   const [loading,  setLoading]  = useState(true)
   const [saving,   setSaving]   = useState(false)
   const [showAssign, setShowAssign] = useState(false)
+  const [assignTab, setAssignTab] = useState<'assign' | 'new'>('assign')
 
   // Edit-form fields, seeded from `clinic` once loaded
   const [name,        setName]        = useState('')
@@ -73,12 +75,20 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     }
   }, [clinicId])
 
-  // The hospital's full doctor roster, to compute who is assignable to this
-  // clinic (linked to the hospital, not yet assigned here). Reuses the same
-  // RPC StaffManagementScreen already relies on for this hospital's doctors.
-  const loadRoster = useCallback(async (hospitalId: string) => {
-    const { data } = await supabase.rpc('get_hospital_staff_roster', { p_hospital_id: hospitalId })
-    setAllHospitalDoctors((data?.doctors ?? []).map((d: any) => ({ id: d.id, full_name: d.full_name })))
+  // Doctors linked to this hospital but not yet assigned to ANY clinic --
+  // matches web's clinic-detail "Assign Existing" tab exactly (GET
+  // /api/doctors/unassigned, which filters on clinic_id IS NULL hospital-wide,
+  // not just "not in this specific clinic"). A doctor already working another
+  // clinic must be unassigned there first, same rule web enforces.
+  const loadUnassigned = useCallback(async () => {
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/doctors/unassigned`, { headers })
+      const body = await res.json()
+      setUnassignedDoctors(res.ok ? (body.doctors ?? []) : [])
+    } catch {
+      setUnassignedDoctors([])
+    }
   }, [])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
@@ -201,8 +211,6 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     )
   }
 
-  const assignable = allHospitalDoctors.filter(d => !doctors.some(cd => cd.id === d.id))
-
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
@@ -289,9 +297,9 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
             </View>
           ))}
           <TouchableOpacity
-            onPress={() => { setShowAssign(true); if (clinic) loadRoster(clinic.hospital_id) }}
+            onPress={() => { setAssignTab('assign'); setShowAssign(true); loadUnassigned() }}
             style={[s.smallOutlineBtn, { borderColor: t.accent, marginTop: 10 }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Assign a doctor</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add Doctor</Text>
           </TouchableOpacity>
         </Section>
       </ScrollView>
@@ -299,27 +307,169 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
       {showAssign && (
         <View style={s.overlay}>
           <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={[s.sectionTitle, { color: t.textPrimary }]}>Assign a doctor</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={[s.sectionTitle, { color: t.textPrimary, marginBottom: 0 }]}>Add Doctor</Text>
               <TouchableOpacity onPress={() => setShowAssign(false)}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {assignable.length === 0 ? (
-                <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>
-                  Every doctor linked to this hospital is already assigned here.
-                </Text>
-              ) : assignable.map(d => (
-                <TouchableOpacity key={d.id} onPress={() => assignDoctor(d.id)}
-                  style={[s.doctorRow, { borderColor: t.cardBorder, borderWidth: 1, borderRadius: 10, marginBottom: 6, paddingHorizontal: 10 }]}>
-                  <Text style={{ fontSize: 13, color: t.textPrimary, flex: 1 }}>{d.full_name}</Text>
-                  <Ionicons name="add-circle-outline" size={20} color={t.accent} />
+            <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 14 }}>
+              Assign a doctor already at this hospital, or link a new one by their Doctor ID.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {(['assign', 'new'] as const).map(tb => (
+                <TouchableOpacity key={tb} onPress={() => setAssignTab(tb)}
+                  style={[s.tab, { borderColor: assignTab === tb ? t.accent : t.cardBorder, backgroundColor: assignTab === tb ? `${t.accent}18` : 'transparent' }]}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: assignTab === tb ? t.accent : t.textMuted }}>
+                    {tb === 'assign' ? 'Assign Existing' : 'Link by ID'}
+                  </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
+
+            {assignTab === 'assign' ? (
+              <ScrollView style={{ maxHeight: 320 }}>
+                {unassignedDoctors.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8, lineHeight: 18 }}>
+                    No unassigned doctors at this hospital.{'\n'}Use "Link by ID" to add one who isn't linked yet.
+                  </Text>
+                ) : unassignedDoctors.map(d => (
+                  <TouchableOpacity key={d.id} onPress={() => assignDoctor(d.id)} disabled={saving}
+                    style={[s.doctorRow, { borderColor: t.cardBorder, borderWidth: 1, borderRadius: 10, marginBottom: 6, paddingHorizontal: 10 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{[d.title, d.full_name].filter(Boolean).join(' ')}</Text>
+                      {d.specialty_name && <Text style={{ fontSize: 11, color: t.textMuted }}>{d.specialty_name}</Text>}
+                    </View>
+                    <Ionicons name="add-circle-outline" size={20} color={t.accent} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <LinkDoctorByIdForm
+                theme={t} clinicId={clinicId}
+                onLinked={() => { setShowAssign(false); load() }}
+              />
+            )}
           </View>
         </View>
       )}
     </SafeAreaView>
+  )
+}
+
+// The "Link by ID" tab of the Add Doctor modal -- the piece that was entirely
+// missing before: "Assign Existing" only ever offered doctors already linked
+// to the hospital, so a hospital with no doctors linked yet (or none free)
+// had no way at all to add a doctor to a specific clinic. Mirrors web's
+// LinkDoctorForm (clinics/[clinicId]/page.tsx's AssignDoctorModal) and the
+// hospital-wide version already on StaffManagementScreen's Doctors tab --
+// this one just fixes clinicId to the clinic being viewed instead of leaving
+// it unscoped.
+function LinkDoctorByIdForm({ theme: t, clinicId, onLinked }: { theme: any; clinicId: string; onLinked: () => void }) {
+  const [step,        setStep]        = useState<'code' | 'confirm'>('code')
+  const [code,        setCode]        = useState('')
+  const [fullName,    setFullName]    = useState('')
+  const [alreadyLinked, setAlreadyLinked] = useState(false)
+  const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
+  const [specialtyId, setSpecialtyId] = useState<string | null>(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    const jwt = session?.access_token
+    if (!jwt) throw new Error('Not authenticated')
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` }
+  }
+
+  async function handleLookUp() {
+    const trimmed = code.trim().toUpperCase()
+    if (!trimmed) { setError('Doctor ID is required.'); return }
+    setLoading(true); setError('')
+    try {
+      const headers = await authHeaders()
+      const [lookupRes, specialtyList] = await Promise.all([
+        fetch(`${API_URL}/api/doctors/link?code=${encodeURIComponent(trimmed)}`, { headers }),
+        specialties.length > 0 ? Promise.resolve(specialties) : getSpecialties(),
+      ])
+      const body = await lookupRes.json()
+      if (!lookupRes.ok) throw new Error(body?.error ?? 'No doctor account found with that ID')
+      setSpecialties(specialtyList)
+      setFullName(body.fullName)
+      setAlreadyLinked(!!body.alreadyLinked)
+      setSpecialtyId(body.suggestedSpecialtyId ?? null)
+      setStep('confirm')
+    } catch (e) {
+      haptics.error()
+      setError(e instanceof Error ? e.message : 'Look up failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleConfirm() {
+    setLoading(true); setError('')
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/doctors/link`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ doctorCode: code.trim().toUpperCase(), clinicId, specialtyId }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.error ?? 'Link failed')
+      haptics.success()
+      onLinked()
+    } catch (e) {
+      haptics.error()
+      setError(e instanceof Error ? e.message : 'Link failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return step === 'code' ? (
+    <>
+      <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, marginBottom: 4 }]}>
+        <TextInput value={code} onChangeText={v => setCode(v.toUpperCase())}
+          placeholder="e.g. K7M3QX" placeholderTextColor={t.textMuted}
+          style={{ color: t.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: 4, textAlign: 'center' }}
+          autoCapitalize="characters" maxLength={6} />
+      </View>
+      {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginTop: 8 }}>{error}</Text> : null}
+      <TouchableOpacity onPress={handleLookUp} disabled={loading}
+        style={[s.saveBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 14 }]}>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Look Up</Text>}
+      </TouchableOpacity>
+    </>
+  ) : (
+    <>
+      <Text style={{ fontSize: 13, color: t.textPrimary, marginBottom: 4 }}>
+        Found <Text style={{ fontWeight: '800' }}>{fullName}</Text>. Their profile transfers automatically —
+        just choose the specialty they'll practise here.
+      </Text>
+      {alreadyLinked ? (
+        <Text style={{ fontSize: 12, color: '#EF9F27', marginBottom: 10 }}>This doctor is already linked to your hospital.</Text>
+      ) : null}
+      <Text style={[s.label, { color: t.textMuted, marginTop: 10 }]}>SPECIALTY</Text>
+      <ScrollView style={{ maxHeight: 160, marginBottom: 4 }} showsVerticalScrollIndicator={false}>
+        {specialties.map(sp => (
+          <TouchableOpacity key={sp.id} onPress={() => setSpecialtyId(sp.id)}
+            style={[s.doctorRow, { borderColor: specialtyId === sp.id ? t.accent : t.cardBorder, borderWidth: 1, borderRadius: 10, marginBottom: 6, paddingHorizontal: 10, backgroundColor: specialtyId === sp.id ? `${t.accent}18` : 'transparent' }]}>
+            <Text style={{ fontSize: 13, color: specialtyId === sp.id ? t.accent : t.textPrimary, fontWeight: specialtyId === sp.id ? '700' : '400' }}>{sp.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      {error ? <Text style={{ fontSize: 12, color: '#FF5C5C' }}>{error}</Text> : null}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+        <TouchableOpacity onPress={() => { setStep('code'); setError('') }}
+          style={[s.saveBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: t.cardBorder }]}>
+          <Text style={[s.saveBtnText, { color: t.textPrimary }]}>Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleConfirm} disabled={loading}
+          style={[s.saveBtn, { flex: 1, backgroundColor: loading ? `${t.accent}88` : t.accent }]}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Confirm & Link</Text>}
+        </TouchableOpacity>
+      </View>
+    </>
   )
 }
 
@@ -370,6 +520,7 @@ const s = StyleSheet.create({
   label:      { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
   input:      { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   chip:       { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  tab:        { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   saveBtn:    { borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   saveBtnText:{ fontSize: 13, fontWeight: '800', color: '#fff' },
   toggleRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
