@@ -11,7 +11,6 @@ import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
-import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { LinkDoctorForm } from '@/components/dashboard/LinkDoctorModal'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import {
@@ -903,7 +902,6 @@ export default function ClinicDetailPage() {
   const [rejectNote,       setRejectNote]       = useState('')
   const [rejectSaving,     setRejectSaving]     = useState(false)
   const [managingStaff,    setManagingStaff]    = useState<ClinicStaffMember | null>(null)
-  const [managingDoctor,   setManagingDoctor]   = useState<AdminDoctor | null>(null)
   const [clinicHours,      setClinicHours]      = useState<DayHours[]>([])
   const [hospitalHours,    setHospitalHours]    = useState<DayHours[]>([])
   const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
@@ -1478,11 +1476,19 @@ export default function ClinicDetailPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {canManageStaff && (
-                      <button onClick={() => setManagingDoctor(doc)}
+                      <button onClick={async () => {
+                        if (doc.is_active && !confirm(`Deactivate ${doc.full_name}? They'll stop appearing in bookings and queues at this hospital until reactivated.`)) return
+                        const res = await fetch(`/api/doctors/${doc.id}`, {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ is_active: !doc.is_active }),
+                        })
+                        if (res.ok) setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, is_active: !d.is_active } : d))
+                      }}
                         style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
-                          background: col.bg, border: 'none',
-                          color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
-                        Manage
+                          background: doc.is_active ? col.bg : 'transparent',
+                          border: doc.is_active ? 'none' : `1px solid ${C.border}`,
+                          color: doc.is_active ? col.text : C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        {doc.is_active ? 'Deactivate' : 'Activate'}
                       </button>
                     )}
                     {canManageStaff && !doc.is_active_here && (
@@ -2070,17 +2076,6 @@ export default function ClinicDetailPage() {
           onClose={() => setManagingStaff(null)}
           onRemoved={() => { setStaff(prev => prev.filter(s => s.id !== managingStaff!.id)); setManagingStaff(null) }}
           onUpdated={(updated) => { setStaff(prev => prev.map(s => s.id === updated.id ? updated : s)); setManagingStaff(null) }}
-        />
-      )}
-
-      {/* ── Manage Doctor Modal ──────────────────────────────────────────── */}
-      {managingDoctor && (
-        <ManageDoctorModal
-          doctor={managingDoctor}
-          col={col}
-          C={C}
-          onClose={() => setManagingDoctor(null)}
-          onUpdated={(updated) => { setDoctors(prev => prev.map(d => d.id === updated.id ? updated : d)); setManagingDoctor(null) }}
         />
       )}
 

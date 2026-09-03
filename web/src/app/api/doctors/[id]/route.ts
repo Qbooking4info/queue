@@ -2,51 +2,45 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
-import type { Database } from '@/types/database'
 
+// PATCH /api/doctors/[id] -- hospital/clinic staff's ONLY lever over a
+// doctor's account: activate or deactivate them at this hospital.
+// Doctors are independent, self-registered accounts (see doctors/link) --
+// their profile (name, title, fees, bio, qualification, specialty, email,
+// password, ...) is theirs alone to edit, via PATCH /api/doctors/profile
+// and Supabase auth directly. This route previously also accepted a long
+// whitelist of profile fields (and a sibling route reset the doctor's own
+// portal password) -- both removed: a hospital should never be able to
+// rewrite a doctor's profile or take over their login out from under them.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireRole(['hospital_admin', 'clinic_admin'])
+  const auth = await requireRole(['hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const db = createAdminClient()
   try {
     const { id } = await params
-    const body = await req.json()
+    const { is_active } = await req.json()
+    if (typeof is_active !== 'boolean') return Errors.validation('is_active must be a boolean')
 
-    // BC2: verify the doctor belongs to the caller's hospital before any write
-    if (caller.hospitalId) {
-      const { data: ownerCheck } = await db
-        .from('doctors')
+    const { data: doctor } = await db.from('doctors').select('id, hospital_id').eq('id', id).single()
+    if (!doctor || (caller.hospitalId && doctor.hospital_id !== caller.hospitalId)) {
+      return Errors.forbidden()
+    }
+
+    // A clinic_admin may only deactivate doctors actually assigned to their
+    // own clinic -- membership, not just currently-active-there, matching
+    // the same rule assign/unassign/set-active already enforce (doctor_clinics).
+    if (caller.role === 'clinic_admin' && caller.clinicId) {
+      const { data: membership } = await db
+        .from('doctor_clinics')
         .select('id')
-        .eq('id', id)
-        .eq('hospital_id', caller.hospitalId)
-        .single()
-      if (!ownerCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        .eq('doctor_id', id)
+        .eq('clinic_id', caller.clinicId)
+        .maybeSingle()
+      if (!membership) return Errors.forbidden()
     }
 
-    const allowed = ['full_name','title','level','specialty_id','consultation_fee','virtual_fee',
-                     'years_experience','accepts_virtual','bio','qualification','mdcn_number'] as const
-    const updates: Partial<Database['public']['Tables']['doctors']['Update']> = {}
-    for (const k of allowed) {
-      if (k in body) updates[k] = body[k]
-    }
-
-    if ('email' in body) {
-      const email = (body.email as string)?.trim()
-      if (!email) return Errors.validation('Email cannot be blank')
-
-      const { data: doc } = await db.from('doctors').select('auth_user_id').eq('id', id).single()
-      if (doc?.auth_user_id) {
-        const { error: authErr } = await db.auth.admin.updateUserById(doc.auth_user_id, { email })
-        if (authErr) return Errors.internal(authErr.message)
-      }
-      updates.email = email
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return Errors.validation('No fields to update')
-    }
-    const { error } = await db.from('doctors').update(updates).eq('id', id)
+    const { error } = await db.from('doctors').update({ is_active }).eq('id', id)
     if (error) return Errors.internal(error.message)
     return NextResponse.json({ success: true })
   } catch (e: unknown) {
