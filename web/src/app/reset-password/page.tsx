@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
   })
 
   const leftPanel = (
-    <div style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+    <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
       flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
       position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
