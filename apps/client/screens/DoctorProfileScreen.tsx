@@ -51,7 +51,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
         </TouchableOpacity>
       </View>

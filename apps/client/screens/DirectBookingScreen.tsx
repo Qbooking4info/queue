@@ -82,7 +82,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
     <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
           </TouchableOpacity>
           <Text style={[st.title, { color: t.textPrimary }]}>

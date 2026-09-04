@@ -137,7 +137,7 @@ export function DependentsScreen({ navigation }: Props) {
             still reachable via Profile's "Manage dependents" menu item, which does push
             a real stack entry, so this stays conditional rather than always hidden. */}
         {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={22} color={t.textMuted} />
           </TouchableOpacity>
         ) : (

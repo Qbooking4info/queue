@@ -14,18 +14,27 @@ import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { haptics } from '@queue/shared/lib/haptics'
 import { useIsOffline } from '@queue/shared/hooks/useIsOffline'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 const FILTERS = ['upcoming', 'pending review', 'missed', 'completed', 'cancelled'] as const
 
+// pending/checked_in/in_progress/cancelled used to be hardcoded hex tuned for a white
+// card ('#E8F4FE', '#FEF0E6', '#FCEBEB'...) -- on forest (the app's dark default theme)
+// these painted pale, light-mode-only chips on a dark card instead of switching with the
+// theme at all, not just failing a contrast check. Only confirmed/completed already read
+// live theme tokens, which is why they were left as-is. Also converges this screen's
+// pending_approval (was amber here) onto the purple every other screen already uses for
+// that same status, since the two had quietly drifted apart.
 function statusColors(status: string, approvalStatus: string, t: any) {
+  const sc = statusBadgeColors(t)
   if (approvalStatus === 'pending_approval')
-    return { bg: 'rgba(239,159,39,0.12)', color: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
-  if (status === 'confirmed')   return { bg: t.accentBg,            color: t.accent,    border: t.accentBorder }
-  if (status === 'pending')     return { bg: 'rgba(26,127,193,0.1)', color: '#1A7FC1',   border: 'rgba(26,127,193,0.3)' }
-  if (status === 'checked_in')  return { bg: '#E8F4FE',              color: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' }
-  if (status === 'in_progress') return { bg: '#FEF0E6',              color: '#7A3A00',   border: 'rgba(122,58,0,0.3)' }
-  if (status === 'completed')   return { bg: t.inputBg,              color: t.textMuted, border: t.cardBorder }
-  return { bg: '#FCEBEB', color: '#791F1F', border: 'rgba(163,45,45,0.3)' }
+    return { bg: sc.pending_approval.bg, color: sc.pending_approval.text, border: sc.pending_approval.border }
+  if (status === 'confirmed')   return { bg: t.accentBg,       color: t.accent,     border: t.accentBorder }
+  if (status === 'pending')     return { bg: sc.pending.bg,     color: sc.pending.text,     border: sc.pending.border }
+  if (status === 'checked_in')  return { bg: sc.checked_in.bg,  color: sc.checked_in.text,  border: sc.checked_in.border }
+  if (status === 'in_progress') return { bg: sc.in_progress.bg, color: sc.in_progress.text, border: sc.in_progress.border }
+  if (status === 'completed')   return { bg: t.inputBg,        color: t.textMuted,  border: t.cardBorder }
+  return { bg: sc.cancelled.bg, color: sc.cancelled.text, border: sc.cancelled.border }
 }
 
 function statusLabel(status: string, approvalStatus: string) {
@@ -123,7 +132,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                 </Text>
                 {f === 'pending review' && pendingCount > 0 && (
-                  <View style={s.filterDot} />
+                  <View style={[s.filterDot, { backgroundColor: t.statusBusy.text }]} />
                 )}
               </TouchableOpacity>
             )
@@ -313,7 +322,7 @@ const s = StyleSheet.create({
   filterPill:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8 },
   filterPillLast:{ marginRight: 0 },
   filterText:    { fontSize: 12, fontWeight: '600' },
-  filterDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF9F27', marginLeft: 5 },
+  filterDot:     { width: 6, height: 6, borderRadius: 3, marginLeft: 5 },
   // List
   list:          { paddingHorizontal: 20 },
   // Empty state

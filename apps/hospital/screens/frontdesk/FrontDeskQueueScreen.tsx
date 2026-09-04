@@ -14,6 +14,7 @@ import { todayLocalDate } from '@queue/shared/lib/format'
 import { ringPatient } from '@queue/shared/lib/api'
 import { VitalsEntryModal } from '@queue/shared/components/frontdesk/VitalsEntryModal'
 import { MovePositionModal } from '@queue/shared/components/frontdesk/MovePositionModal'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 interface Appt {
   id:               string
@@ -50,15 +51,18 @@ interface VitalsRow {
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:           { label: 'Pending',          color: '#EF9F27', bg: 'rgba(239,159,39,0.12)' },
-  pending_approval:  { label: 'Awaiting Approval', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
-  confirmed:         { label: 'Confirmed',         color: '#00C265', bg: 'rgba(0,194,101,0.12)'  },
-  checked_in:        { label: 'Checked In',        color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
-  in_progress:       { label: 'In Progress',       color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
-  completed:         { label: 'Completed',         color: '#7A9089', bg: 'rgba(122,144,137,0.12)'},
-  cancelled:         { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)'  },
-  no_show:           { label: 'No Show',           color: '#888',    bg: 'rgba(128,128,128,0.1)' },
+function buildStatusMeta(t: Parameters<typeof statusBadgeColors>[0]): Record<string, { label: string; color: string; bg: string }> {
+  const sc = statusBadgeColors(t)
+  return {
+    pending:          { label: 'Pending',           color: sc.pending.text,          bg: sc.pending.bg },
+    pending_approval: { label: 'Awaiting Approval',  color: sc.pending_approval.text, bg: sc.pending_approval.bg },
+    confirmed:        { label: 'Confirmed',          color: sc.confirmed.text,        bg: sc.confirmed.bg },
+    checked_in:       { label: 'Checked In',         color: sc.checked_in.text,       bg: sc.checked_in.bg },
+    in_progress:      { label: 'In Progress',        color: sc.in_progress.text,      bg: sc.in_progress.bg },
+    completed:        { label: 'Completed',          color: sc.completed.text,        bg: sc.completed.bg },
+    cancelled:        { label: 'Cancelled',          color: sc.cancelled.text,        bg: sc.cancelled.bg },
+    no_show:          { label: 'No Show',            color: sc.no_show.text,          bg: sc.no_show.bg },
+  }
 }
 
 function fmt12(t: string) {
@@ -161,7 +165,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
 
   async function handleCheckIn(appt: Appt) {
     if (appt.status !== 'confirmed' && appt.status !== 'pending') {
-      Alert.alert('Cannot check in', `Status is "${STATUS_META[appt.status]?.label ?? appt.status}".`)
+      Alert.alert('Cannot check in', `Status is "${buildStatusMeta(t)[appt.status]?.label ?? appt.status}".`)
       return
     }
     if (appt.approval_status === 'pending_approval') {
@@ -423,7 +427,9 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
   // review has status='pending', approval_status='pending_approval'; status itself never
   // holds that string. Derive a single display status so the badge agrees with canApprove below.
   const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
-  const meta      = STATUS_META[dispStatus] ?? { label: dispStatus, color: '#888', bg: 'rgba(128,128,128,0.1)' }
+  const statusMeta = buildStatusMeta(t)
+  const fallback  = statusBadgeColors(t).no_show
+  const meta      = statusMeta[dispStatus] ?? { label: dispStatus, color: fallback.text, bg: fallback.bg }
   const isLoading = actioning === appt.id
   const canCheckIn = (appt.status === 'confirmed' || appt.status === 'pending') && appt.appointment_date === today
     && appt.approval_status !== 'pending_approval'
@@ -527,10 +533,10 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
           <Button label="Vitals" onPress={() => onRecordVitals(appt)} variant="info" icon="fitness-outline" size="sm" style={{ flex: 1 }} />
           {appt.status === 'checked_in' && (
             <TouchableOpacity onPress={() => onMove(appt)}
-              style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.3)' }]}>
+              style={[s.actionBtn, { flex: 1, backgroundColor: t.statusApproval.bg, borderColor: t.statusApproval.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="swap-vertical-outline" size={13} color="#A78BFA" />
-                <Text style={[s.actionText, { color: '#A78BFA' }]}>Move</Text>
+                <Ionicons name="swap-vertical-outline" size={13} color={t.statusApproval.text} />
+                <Text style={[s.actionText, { color: t.statusApproval.text }]}>Move</Text>
               </View>
             </TouchableOpacity>
           )}

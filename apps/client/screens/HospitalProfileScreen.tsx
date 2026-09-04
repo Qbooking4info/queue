@@ -58,7 +58,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
     <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: t.canvasBg }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={styles.heroRow}>

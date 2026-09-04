@@ -54,7 +54,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
             navigation stack on web. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 16 }}>
           {navigation?.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}

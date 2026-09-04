@@ -176,6 +176,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
                 style={[s.inputText, { color: t.textPrimary }]} autoCapitalize="characters" />
             </View>
             <TouchableOpacity onPress={handleLookup} disabled={lookupLoading || (!patientNumber.trim() && !patientPhone.trim())}
+              accessibilityLabel="Look up patient"
               style={[s.lookupBtn, { backgroundColor: t.accent }]}>
               {lookupLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={18} color="#fff" />}
             </TouchableOpacity>

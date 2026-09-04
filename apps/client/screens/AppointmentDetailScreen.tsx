@@ -218,7 +218,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
           <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <Text style={[st.headerTitle, { color: t.textPrimary }]}>Appointment</Text>

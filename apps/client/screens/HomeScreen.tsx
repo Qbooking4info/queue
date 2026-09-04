@@ -201,6 +201,8 @@ export function HomeScreen({ navigation }: Props) {
           <View style={s.sheetHeader}>
             <Text style={[s.sheetTitle, { color: t.textPrimary }]}>All Specialties</Text>
             <TouchableOpacity onPress={() => { haptics.tap(); setShowAll(false) }}
+              accessibilityLabel="Close"
+              hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
               style={[s.closeBtn, { backgroundColor: t.inputBg }]}>
               <Ionicons name="close" size={16} color={t.textMuted} />
             </TouchableOpacity>
@@ -241,6 +243,7 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={[s.dayMsg, { color: t.textMuted }]} numberOfLines={1}>{dayMessage}</Text>
           </View>
           <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Notifications') }}
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
             style={[s.notifBtn, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
             <Ionicons name="notifications-outline" size={19} color={t.textMuted} />
             {unreadCount > 0 && <View style={[s.notifDot, { backgroundColor: t.accent }]} />}
@@ -263,6 +266,7 @@ export function HomeScreen({ navigation }: Props) {
               <Ionicons name="arrow-forward" size={12} color="#000" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { haptics.tap(); setBannerDismissed(true) }}
+              accessibilityLabel="Dismiss"
               style={s.profileBannerDismiss}>
               <Ionicons name="close" size={14} color="rgba(239,159,39,0.5)" />
             </TouchableOpacity>

@@ -302,7 +302,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} style={s.backBtn}>
+        <TouchableOpacity onPress={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} accessibilityLabel="Go back" style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

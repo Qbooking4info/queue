@@ -70,6 +70,20 @@ const forest = {
   statusBusy:     { bg:'rgba(239,159,39,0.14)', text:'#EF9F27', border:'rgba(239,159,39,0.28)' },
   statusVirtual:  { bg:'rgba(55,138,221,0.14)', text:'#85B7EB', border:'rgba(55,138,221,0.28)' },
   statusCancelled:{ bg:'rgba(226,75,74,0.14)',  text:'#F09595', border:'rgba(226,75,74,0.28)' },
+  // Added for statusBadgeColors() (lib/statusColors.ts) -- 5 screens each hand-rolled a
+  // STATUS_META table covering 6-8 appointment statuses from literals that never changed
+  // with the theme (clinical inherited forest's tuning and failed AA -- see the 6-status
+  // table measured directly on this app's own badges: every one was under 2.8:1 on white).
+  // Copy-paste also drifted: AdminDashboardScreen's in_progress was blue while its four
+  // siblings used orange. These three cover the buckets statusOpen/Busy/Virtual/Cancelled
+  // don't: pending_approval, in_progress (distinct from checked_in's blue and pending's
+  // amber), and a neutral tone for completed/no_show/off-duty. Text values are literals
+  // already in use elsewhere in the app (not invented): #A78BFA is the existing purple
+  // accent, #FF8C42 the existing in_progress orange, #93A9A0 an existing neutral gray
+  // (DoctorVideoCallScreen). All three measured against both cardBg and their own tint.
+  statusApproval: { bg:'rgba(167,139,250,0.14)', text:'#A78BFA', border:'rgba(167,139,250,0.28)' },
+  statusProgress: { bg:'rgba(255,140,66,0.14)',  text:'#FF8C42', border:'rgba(255,140,66,0.28)' },
+  statusNeutral:  { bg:'rgba(147,169,160,0.14)', text:'#93A9A0', border:'rgba(147,169,160,0.28)' },
   bannerBg:    '#0A1A0F',
   bannerBorder:'rgba(0,232,122,0.22)',
   inputBg:     '#161D19',
@@ -126,6 +140,16 @@ const clinical = {
   statusBusy:     { bg:'#FEF8E7', text:'#633806', border:'rgba(196,127,0,0.3)' },
   statusVirtual:  { bg:'#E6F1FB', text:'#0C447C', border:'rgba(26,95,165,0.3)' },
   statusCancelled:{ bg:'#FCEBEB', text:'#791F1F', border:'rgba(163,45,45,0.3)' },
+  // Mirrors forest's three -- see that side for why these exist. statusApproval reuses
+  // this palette's own existing purple/purpleLight pair (already proven at 8.30:1 card,
+  // 7.29:1 tint) rather than inventing a new hue. statusProgress is a new burnt-orange,
+  // deliberately NOT statusBusy's brown-amber (#633806) -- pending and in_progress must
+  // stay visually distinct on a badge, not just contrast-legal. statusNeutral reuses
+  // textMuted for the text (a muted/gray semantic fits "completed" or "off duty") with
+  // a plain light-gray tint rather than bgAlt, so it doesn't read as "canvas" on a card.
+  statusApproval: { bg:'#F2EEFF', text:'#5C35A8', border:'rgba(92,53,168,0.3)' },
+  statusProgress: { bg:'#FDECE1', text:'#9A3412', border:'rgba(154,52,18,0.3)' },
+  statusNeutral:  { bg:'#EEF4FA', text:'#4C718C', border:'rgba(76,113,140,0.3)' },
   bannerBg:    '#0C2A4A',
   bannerBorder:'rgba(26,127,193,0.30)',
   inputBg:     '#F4F8FC',

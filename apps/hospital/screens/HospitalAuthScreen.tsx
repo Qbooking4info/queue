@@ -42,7 +42,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
 
           {/* Back */}
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={s.back}>
             <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
           </TouchableOpacity>
 
@@ -84,7 +84,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
                 secureTextEntry={!showPass}
                 style={[s.inputText, { color: t.textPrimary, flex: 1 }]}
               />
-              <TouchableOpacity onPress={() => setShowPass(v => !v)}>
+              <TouchableOpacity onPress={() => setShowPass(v => !v)} accessibilityLabel={showPass ? 'Hide password' : 'Show password'} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={16} color={t.textMuted} />
               </TouchableOpacity>
             </View>

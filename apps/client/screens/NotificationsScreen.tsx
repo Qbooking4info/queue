@@ -130,7 +130,7 @@ export function NotificationsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
           <Ionicons name="arrow-back" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

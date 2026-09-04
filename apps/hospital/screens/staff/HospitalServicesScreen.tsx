@@ -125,7 +125,7 @@ export function HospitalServicesScreen({ navigation }: Props) {
       <View style={s.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
@@ -230,7 +230,7 @@ export function HospitalServicesScreen({ navigation }: Props) {
           <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[s.modalTitle, { color: t.textPrimary }]}>Add Specialty</Text>
-              <TouchableOpacity onPress={() => setAddingSpecialty(false)}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setAddingSpecialty(false)} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 320 }}>
               {allSpecialties.filter(sp => !registered.some(r => r.id === sp.id)).map(sp => (
@@ -334,7 +334,7 @@ function ServiceModal({ theme: t, service, specialties, onClose, onDone }: {
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[s.modalTitle, { color: t.textPrimary }]}>{service ? 'Edit Service' : 'Add Service'}</Text>
-              <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+              <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
             </View>
 
             <Text style={[s.modalLabel, { color: t.textMuted }]}>SERVICE NAME</Text>

@@ -12,6 +12,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 interface Props { navigation: any }
 
@@ -28,14 +29,6 @@ interface DirectAppt {
 }
 
 type FilterTab = 'pending' | 'upcoming' | 'past'
-
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Awaiting your review', color: '#EF9F27', bg: 'rgba(239,159,39,0.12)' },
-  confirmed:   { label: 'Confirmed',            color: '#00C265', bg: 'rgba(0,194,101,0.12)' },
-  in_progress: { label: 'In progress',          color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
-  completed:   { label: 'Completed',            color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:   { label: 'Cancelled',             color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
-}
 
 export function DoctorAppointmentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -129,6 +122,14 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
 }) {
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
+  const sc = statusBadgeColors(t)
+  const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+    pending:     { label: 'Awaiting your review', color: sc.pending.text,     bg: sc.pending.bg },
+    confirmed:   { label: 'Confirmed',            color: sc.confirmed.text,   bg: sc.confirmed.bg },
+    in_progress: { label: 'In progress',          color: sc.in_progress.text, bg: sc.in_progress.bg },
+    completed:   { label: 'Completed',            color: sc.completed.text,   bg: sc.completed.bg },
+    cancelled:   { label: 'Cancelled',            color: sc.cancelled.text,   bg: sc.cancelled.bg },
+  }
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
 
   return (

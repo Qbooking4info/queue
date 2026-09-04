@@ -130,7 +130,7 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
             no native header, no tab bar, nothing but the browser's own back button,
             which doesn't sync with this in-memory navigation stack on web. */}
         {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
             <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
           </TouchableOpacity>
         ) : null}
