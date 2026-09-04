@@ -245,7 +245,7 @@ export function CrewHomeScreen() {
           return (
             <View key={unit.ambulance_id} style={[s.card, {
               backgroundColor: t.cardBg,
-              borderColor: unit.on_duty ? (stale ? '#FFB547' : '#00C265') : t.cardBorder,
+              borderColor: unit.on_duty ? (stale ? '#FFB547' : t.accentDark) : t.cardBorder,
               borderWidth: unit.on_duty ? 1.5 : 1,
             }]}>
               <View style={[s.row, { alignItems: 'center' }]}>
@@ -269,7 +269,7 @@ export function CrewHomeScreen() {
                 >
                   {dutyBusy === unit.ambulance_id
                     ? <ActivityIndicator size="small" color={t.textMuted} />
-                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? '#FF5C5C' : '#00C265' }}>
+                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? t.danger : t.accentDark }}>
                         {unit.on_duty ? 'Go off duty' : 'Go on duty'}
                       </Text>}
                 </TouchableOpacity>
@@ -281,10 +281,10 @@ export function CrewHomeScreen() {
                 <Ionicons
                   name={unit.visible_to_dispatch ? 'radio-outline' : unit.on_duty ? 'warning-outline' : 'moon-outline'}
                   size={14}
-                  color={unit.visible_to_dispatch ? '#00C265' : stale ? '#FFB547' : t.textMuted}
+                  color={unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted}
                 />
                 <Text style={[s.detailText, {
-                  color: unit.visible_to_dispatch ? '#00C265' : stale ? '#FFB547' : t.textMuted, flex: 1,
+                  color: unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted, flex: 1,
                 }]}>
                   {unit.visible_to_dispatch
                     ? 'Visible to dispatch — you can receive jobs'
@@ -376,7 +376,7 @@ export function CrewHomeScreen() {
                       {o.triage_level ? `Triage ${o.triage_level}` : '—'}
                     </Text>
                   </View>
-                  <Text style={[s.countdown, { color: secs <= 10 ? '#FF5C5C' : t.textMuted }]}>{secs}s</Text>
+                  <Text style={[s.countdown, { color: secs <= 10 ? t.danger : t.textMuted }]}>{secs}s</Text>
                 </View>
                 <Text style={[s.symptom, { color: t.textPrimary }]}>{o.symptom_description ?? 'No condition details provided'}</Text>
                 {o.pickup_address && (
@@ -395,7 +395,7 @@ export function CrewHomeScreen() {
                     <Text style={[s.secondaryBtnText, { color: t.textPrimary }]}>Decline</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'accept')} disabled={busy}
-                    style={[s.primaryBtn, { flex: 1, backgroundColor: '#FF5C5C', opacity: busy ? 0.6 : 1 }]}>
+                    style={[s.primaryBtn, { flex: 1, backgroundColor: t.danger, opacity: busy ? 0.6 : 1 }]}>
                     {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>Accept</Text>}
                   </TouchableOpacity>
                 </View>

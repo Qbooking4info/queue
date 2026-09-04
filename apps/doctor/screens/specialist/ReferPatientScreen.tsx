@@ -339,12 +339,12 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               borderColor: 'rgba(255,92,92,0.4)',
             }]}>
               {emergencyMaybeClosed ? (
-                <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                   <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} may be closed right now.</Text> Emergency
                   referrals are still sent immediately — confirm they can receive the patient before sending.
                 </Text>
               ) : (
-                <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                   Emergency referrals are sent for <Text style={{ fontWeight: '800' }}>right now</Text> — no date or
                   time to pick, and this patient will be prioritized at the receiving side.
                 </Text>
@@ -359,7 +359,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               </Text>
               {isEmergency ? (
                 <View style={[st.docRow, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.08)' }]}>
-                  <Text style={{ color: '#FF5C5C', fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
+                  <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
                 </View>
               ) : (
                 <>
@@ -386,7 +386,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
 
           {noEmergencyClinic && (
             <View style={[st.noticeBox, { marginTop: 8, backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
-              <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+              <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                 <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} hasn't set up an Emergency Department.</Text> Choose
                 a different hospital for an emergency referral.
               </Text>

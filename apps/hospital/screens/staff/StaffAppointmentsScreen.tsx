@@ -236,7 +236,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
             const isEmergency = appt.urgency === 'emergency'
 
             return (
-              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg, borderColor: isEmergency ? '#FF5C5C' : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
+              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg, borderColor: isEmergency ? t.danger : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
                 <View style={s.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in'}</Text>
@@ -252,8 +252,8 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                       <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
                     </View>
                     {isEmergency && (
-                      <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-                        <Text style={[s.badgeText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
+                      <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }]}>
+                        <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
                       </View>
                     )}
                     {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
@@ -263,14 +263,14 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
                     <TouchableOpacity onPress={() => handleReject(appt)} disabled={!!actioning}
                       style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)', flex: 1 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color="#FF5C5C" /> : <Text style={[s.actionText, { color: '#FF5C5C' }]}>Reject</Text>}
+                      {isLoading ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={[s.actionText, { color: t.danger }]}>Reject</Text>}
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleApprove(appt)} disabled={!!actioning}
                       style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)', flex: 2 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color="#00C265" /> : (
+                      {isLoading ? <ActivityIndicator size="small" color={t.accentDark} /> : (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="checkmark" size={13} color="#00C265" />
-                          <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
+                          <Ionicons name="checkmark" size={13} color={t.accentDark} />
+                          <Text style={[s.actionText, { color: t.accentDark }]}>Approve</Text>
                         </View>
                       )}
                     </TouchableOpacity>

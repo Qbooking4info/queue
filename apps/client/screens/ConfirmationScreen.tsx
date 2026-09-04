@@ -43,7 +43,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Appointments' } }] })
   }
 
-  const accentColor = isPending ? '#EF9F27' : t.accent
+  const accentColor = isPending ? t.statusBusy.text : t.accent
 
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: t.splashBg }]}>
@@ -71,7 +71,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
         {isPending && (
           <Animated.View style={[st.pendingBanner, { opacity }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-              <Ionicons name="hourglass-outline" size={14} color="#EF9F27" />
+              <Ionicons name="hourglass-outline" size={14} color={t.statusBusy.text} />
               <Text style={[st.pendingTitle, { marginBottom: 0 }]}>
                 {directBooking ? "Awaiting the doctor's confirmation" : 'Awaiting hospital approval'}
               </Text>

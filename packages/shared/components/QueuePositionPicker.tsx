@@ -85,7 +85,7 @@ export function QueuePositionPicker({ appointmentId, onClose, onMoved }: Props) 
               </View>
             </>
           ) : error ? (
-            <Text style={{ fontSize: 13, color: '#FF5C5C', marginTop: 12 }}>{error}</Text>
+            <Text style={{ fontSize: 13, color: t.danger, marginTop: 12 }}>{error}</Text>
           ) : laterPositions.length === 0 ? (
             <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 12 }}>
               You're already at the end of the queue.

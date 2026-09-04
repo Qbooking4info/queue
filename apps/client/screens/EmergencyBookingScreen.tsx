@@ -88,7 +88,7 @@ function BedSpaceAck({ selectedHospital, needsAck, acked, onToggle, t }: {
 }) {
   if (!selectedHospital || !needsAck) return null
   const isNone = selectedHospital.bed_space_status === 'none'
-  const color = isNone ? '#FF5C5C' : '#FF8C42'
+  const color = isNone ? t.danger : '#FF8C42'
   return (
     <View style={[s.bedSpaceWarnBox, { borderColor: color, backgroundColor: isNone ? 'rgba(255,92,92,0.08)' : 'rgba(255,140,66,0.08)' }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -307,8 +307,8 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={s.headerTitleRow}>
-            <Ionicons name="alert-circle-outline" size={18} color="#FF5C5C" />
-            <Text style={[s.headerTitle, { color: '#FF5C5C' }]}>Emergency Booking</Text>
+            <Ionicons name="alert-circle-outline" size={18} color={t.danger} />
+            <Text style={[s.headerTitle, { color: t.danger }]}>Emergency Booking</Text>
           </View>
           <Text style={[s.headerSub, { color: t.textMuted }]}>Skip the queue · Immediate attention</Text>
         </View>
@@ -318,8 +318,8 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       <View style={s.progressRow}>
         {STEPS.map((st, i) => (
           <View key={st} style={{ flex: 1 }}>
-            <View style={[s.progressBar, { backgroundColor: i <= step ? '#FF5C5C' : t.cardBorder }]} />
-            <Text style={[s.progressLabel, { color: i <= step ? '#FF5C5C' : t.textMuted, fontWeight: i === step ? '700' : '400' }]}>
+            <View style={[s.progressBar, { backgroundColor: i <= step ? t.danger : t.cardBorder }]} />
+            <Text style={[s.progressLabel, { color: i <= step ? t.danger : t.textMuted, fontWeight: i === step ? '700' : '400' }]}>
               {st}
             </Text>
           </View>
@@ -331,21 +331,21 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {step === 0 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
           <View style={[s.alertBanner, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.25)' }]}>
-            <Ionicons name="alert-circle-outline" size={20} color="#EF9F27" />
-            <Text style={[s.alertText, { color: '#FF5C5C' }]}>
+            <Ionicons name="alert-circle-outline" size={20} color={t.statusBusy.text} />
+            <Text style={[s.alertText, { color: t.danger }]}>
               If life-threatening, call <Text style={{ fontWeight: '900' }}>112</Text> immediately.
             </Text>
           </View>
 
-          <Text style={[s.label, { color: t.textMuted }]}>What's the issue? <Text style={{ color: '#FF5C5C' }}>*</Text></Text>
+          <Text style={[s.label, { color: t.textMuted }]}>What's the issue? <Text style={{ color: t.danger }}>*</Text></Text>
           <View style={s.symptomGrid}>
             {SYMPTOMS.map(sym => (
               <TouchableOpacity key={sym} onPress={() => setSymptom(symptom === sym ? '' : sym)}
                 style={[s.symptomChip, {
-                  borderColor:     symptom === sym ? '#FF5C5C' : t.cardBorder,
+                  borderColor:     symptom === sym ? t.danger : t.cardBorder,
                   backgroundColor: symptom === sym ? 'rgba(255,92,92,0.1)' : t.cardBg,
                 }]}>
-                <Text style={[s.symptomText, { color: symptom === sym ? '#FF5C5C' : t.textSecondary }]}>{sym}</Text>
+                <Text style={[s.symptomText, { color: symptom === sym ? t.danger : t.textSecondary }]}>{sym}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -408,10 +408,10 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             {ARRIVAL_OPTIONS.map(opt => (
               <TouchableOpacity key={opt} onPress={() => setArrival(opt)}
                 style={[s.slotChip, {
-                  borderColor:     arrival === opt ? '#FF5C5C' : t.cardBorder,
+                  borderColor:     arrival === opt ? t.danger : t.cardBorder,
                   backgroundColor: arrival === opt ? 'rgba(255,92,92,0.1)' : t.cardBg,
                 }]}>
-                <Text style={[s.slotText, { color: arrival === opt ? '#FF5C5C' : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
+                <Text style={[s.slotText, { color: arrival === opt ? t.danger : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
                   {opt}
                 </Text>
               </TouchableOpacity>
@@ -421,7 +421,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           {arrival === AMBULANCE_ARRIVAL ? (
             <>
               <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-                <Text style={[s.noteText, { color: '#FF5C5C' }]}>
+                <Text style={[s.noteText, { color: t.danger }]}>
                   An ambulance will be dispatched to your current location immediately after you confirm.
                   The nearest available crew decides the receiving hospital based on your condition and
                   bed capacity — a preference below is used only when it doesn't conflict with that.
@@ -431,12 +431,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               <Text style={[s.label, { color: t.textMuted }]}>Pickup location</Text>
               {locationLoading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator color="#FF5C5C" />
+                  <ActivityIndicator color={t.danger} />
                   <Text style={[s.noteInline, { color: t.textMuted }]}>Getting your location…</Text>
                 </View>
               ) : coords ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="location" size={14} color="#00C265" />
+                  <Ionicons name="location" size={14} color={t.accentDark} />
                   <Text style={[s.noteInline, { color: t.textSecondary, marginTop: 0 }]}>
                     Location found ({coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)})
                   </Text>
@@ -444,8 +444,8 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               ) : (
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="alert-circle-outline" size={14} color="#FF5C5C" />
-                    <Text style={[s.noteInline, { color: '#FF5C5C', marginTop: 0 }]}>
+                    <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
+                    <Text style={[s.noteInline, { color: t.danger, marginTop: 0 }]}>
                       {locationGranted ? 'Could not get a location fix.' : 'Location permission is required.'}
                     </Text>
                   </View>
@@ -462,13 +462,13 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
               <Text style={[s.label, { color: t.textMuted }]}>Preferred hospital (optional)</Text>
               {loadingHospitals ? (
-                <ActivityIndicator color="#FF5C5C" style={{ marginTop: 8 }} />
+                <ActivityIndicator color={t.danger} style={{ marginTop: 8 }} />
               ) : (
                 hospitals.map(h => (
                   <TouchableOpacity key={h.id}
                     onPress={() => setSelectedHospital(selectedHospital?.id === h.id ? null : h)}
                     style={[s.hospitalCard, {
-                      borderColor:     selectedHospital?.id === h.id ? '#FF5C5C' : t.cardBorder,
+                      borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
                       backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
                     }]}>
                     <View style={s.hospitalTop}>
@@ -480,7 +480,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                         <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
                       </View>
                       {selectedHospital?.id === h.id && (
-                        <View style={[s.selectedCheck, { backgroundColor: '#FF5C5C' }]}>
+                        <View style={[s.selectedCheck, { backgroundColor: t.danger }]}>
                           <Ionicons name="checkmark" size={12} color="#fff" />
                         </View>
                       )}
@@ -502,14 +502,14 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             </Text>
           </View>
           {loadingHospitals ? (
-            <ActivityIndicator color="#FF5C5C" style={{ marginTop: 20 }} />
+            <ActivityIndicator color={t.danger} style={{ marginTop: 20 }} />
           ) : hospitals.length === 0 ? (
             <View style={[s.noHospitalsBox, { borderColor: 'rgba(255,92,92,0.35)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
-              <Ionicons name="alert-circle-outline" size={28} color="#FF5C5C" style={{ marginBottom: 8 }} />
-              <Text style={[s.noHospitalsTitle, { color: '#FF5C5C' }]}>No hospitals currently available</Text>
+              <Ionicons name="alert-circle-outline" size={28} color={t.danger} style={{ marginBottom: 8 }} />
+              <Text style={[s.noHospitalsTitle, { color: t.danger }]}>No hospitals currently available</Text>
               <Text style={[s.noHospitalsText, { color: t.textMuted }]}>
                 Every hospital on Queue is closed right now. If this is life-threatening, call{' '}
-                <Text style={{ fontWeight: '800', color: '#FF5C5C' }}>112</Text> immediately instead of waiting on a booking.
+                <Text style={{ fontWeight: '800', color: t.danger }}>112</Text> immediately instead of waiting on a booking.
               </Text>
             </View>
           ) : (
@@ -517,7 +517,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               <TouchableOpacity key={h.id}
                 onPress={() => setSelectedHospital(h)}
                 style={[s.hospitalCard, {
-                  borderColor:     selectedHospital?.id === h.id ? '#FF5C5C' : t.cardBorder,
+                  borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
                   backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
                 }]}>
                 <View style={s.hospitalTop}>
@@ -532,7 +532,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                     <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
                   </View>
                   {selectedHospital?.id === h.id && (
-                    <View style={[s.selectedCheck, { backgroundColor: '#FF5C5C' }]}>
+                    <View style={[s.selectedCheck, { backgroundColor: t.danger }]}>
                       <Ionicons name="checkmark" size={12} color="#fff" />
                     </View>
                   )}
@@ -540,13 +540,13 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 <View style={s.hospitalMeta}>
                   {[
                     ...(BED_SPACE_META[h.bed_space_status ?? ''] ? [BED_SPACE_META[h.bed_space_status ?? '']!] : []),
-                    { icon: 'alert-circle-outline' as const, label: 'Emergency', color: '#FF5C5C' },
+                    { icon: 'alert-circle-outline' as const, label: 'Emergency', color: t.danger },
                     { icon: 'time-outline' as const,         label: h.wait,      color: t.textSecondary },
                     { icon: 'location-outline' as const,     label: h.distance,  color: t.textSecondary },
                   ].map(m => (
                     <View key={m.label} style={[s.metaChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
                       <Ionicons name={m.icon} size={11} color={m.color} />
-                      <Text style={[s.metaText, { color: m.color, fontWeight: m.color === '#FF5C5C' || m.color === '#FF8C42' ? '700' : '400' }]}>{m.label}</Text>
+                      <Text style={[s.metaText, { color: m.color, fontWeight: m.color === t.danger || m.color === '#FF8C42' ? '700' : '400' }]}>{m.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -639,12 +639,12 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   backgroundColor: active ? 'rgba(255,92,92,0.08)' : t.cardBg,
                   borderColor:     active ? 'rgba(255,92,92,0.4)'  : t.cardBorder,
                 }]}>
-                <Ionicons name={p.icon} size={20} color={active ? '#FF5C5C' : t.textSecondary} />
+                <Ionicons name={p.icon} size={20} color={active ? t.danger : t.textSecondary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.payLabel, { color: active ? '#FF5C5C' : t.textPrimary }]}>{p.label}</Text>
+                  <Text style={[s.payLabel, { color: active ? t.danger : t.textPrimary }]}>{p.label}</Text>
                   <Text style={[s.paySub,   { color: t.textMuted }]}>{p.sub}</Text>
                 </View>
-                <View style={[s.payRadio, { borderColor: active ? '#FF5C5C' : t.cardBorder, backgroundColor: active ? '#FF5C5C' : 'transparent' }]}>
+                <View style={[s.payRadio, { borderColor: active ? t.danger : t.cardBorder, backgroundColor: active ? t.danger : 'transparent' }]}>
                   {active && <Ionicons name="checkmark" size={11} color="#fff" />}
                 </View>
               </TouchableOpacity>
@@ -684,13 +684,13 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         )}
         {step < 2 ? (
           <TouchableOpacity onPress={() => setStep(p => p + 1)} disabled={!canProceed()}
-            style={[s.nextBtn, { backgroundColor: canProceed() ? '#FF5C5C' : t.inputBg, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+            style={[s.nextBtn, { backgroundColor: canProceed() ? t.danger : t.inputBg, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
             <Text style={[s.nextBtnText, { color: canProceed() ? '#fff' : t.textMuted }]}>Continue</Text>
             <Ionicons name="arrow-forward" size={16} color={canProceed() ? '#fff' : t.textMuted} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={handleConfirm} disabled={submitting}
-            style={[s.nextBtn, { backgroundColor: '#FF5C5C', flex: 1, opacity: submitting ? 0.6 : 1 }]}>
+            style={[s.nextBtn, { backgroundColor: t.danger, flex: 1, opacity: submitting ? 0.6 : 1 }]}>
             {submitting
               ? <ActivityIndicator color="#fff" />
               : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm booking'}</Text></View>}

@@ -30,7 +30,7 @@ export function FallbackPanel({ variant = 'calm', state, title }: Props) {
   useEffect(() => loadEmergencyContacts(setContacts, { state }), [state])
 
   const urgent = variant === 'urgent'
-  const accent = urgent ? '#FF5C5C' : t.textMuted
+  const accent = urgent ? t.danger : t.textMuted
 
   function dial(contact: EmergencyContact) {
     Linking.openURL(telHref(contact.phone)).catch(() =>
@@ -84,8 +84,8 @@ export function FallbackPanel({ variant = 'calm', state, title }: Props) {
             borderColor: urgent ? 'rgba(255,92,92,0.4)' : t.cardBorder,
             backgroundColor: urgent ? 'rgba(255,92,92,0.12)' : 'transparent',
           }]}>
-            <Ionicons name="call" size={13} color={urgent ? '#FF5C5C' : t.textPrimary} />
-            <Text style={[s.phone, { color: urgent ? '#FF5C5C' : t.textPrimary }]}>{c.phone}</Text>
+            <Ionicons name="call" size={13} color={urgent ? t.danger : t.textPrimary} />
+            <Text style={[s.phone, { color: urgent ? t.danger : t.textPrimary }]}>{c.phone}</Text>
           </View>
         </TouchableOpacity>
       ))}

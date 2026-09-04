@@ -7,7 +7,7 @@ export function Badge({ status }: { status: string }) {
   const meta: Record<string, { label: string; bg: string; color: string }> = {
     confirmed:        { label: 'Confirmed',        bg: C.blueLight,                   color: C.blue      },
     pending:          { label: 'Pending',           bg: C.amberLight,                  color: C.amber     },
-    pending_approval: { label: 'Pending Approval',  bg: 'rgba(239,159,39,0.15)',       color: '#EF9F27'   },
+    pending_approval: { label: 'Pending Approval',  bg: 'rgba(239,159,39,0.15)',       color: C.amber   },
     'checked-in':     { label: 'Checked In',        bg: C.accentLight,                 color: C.accent    },
     checked_in:       { label: 'Checked In',        bg: C.accentLight,                 color: C.accent    },
     'in-progress':    { label: 'In Progress',       bg: C.blueLight,                   color: C.blue      },

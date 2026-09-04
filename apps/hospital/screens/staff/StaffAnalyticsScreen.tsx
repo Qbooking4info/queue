@@ -150,9 +150,9 @@ export function StaffAnalyticsScreen() {
           <View style={s.kpiGrid}>
             {[
               { label: 'Total',      value: stats.total,     color: t.accent },
-              { label: 'Completed',  value: stats.completed, color: '#00C265' },
-              { label: 'Cancelled',  value: stats.cancelled, color: '#FF5C5C' },
-              { label: 'Show-up %', value: `${showUp}%`,    color: '#5B9EFF' },
+              { label: 'Completed',  value: stats.completed, color: t.accentDark },
+              { label: 'Cancelled',  value: stats.cancelled, color: t.danger },
+              { label: 'Show-up %', value: `${showUp}%`,    color: t.info },
             ].map(k => (
               <View key={k.label} style={[s.kpiCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <Text style={[s.kpiValue, { color: k.color }]}>{k.value}</Text>
@@ -167,7 +167,7 @@ export function StaffAnalyticsScreen() {
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
               {[
                 { label: 'In-person', count: inperson, color: t.accent },
-                { label: 'Virtual',   count: virtual,  color: '#5B9EFF' },
+                { label: 'Virtual',   count: virtual,  color: t.info },
               ].map(tp => (
                 <View key={tp.label} style={[s.typeCard, { backgroundColor: `${tp.color}12`, flex: 1 }]}>
                   <Text style={[s.typeCount, { color: tp.color }]}>{tp.count}</Text>
@@ -178,7 +178,7 @@ export function StaffAnalyticsScreen() {
             </View>
             <View style={{ height: 8, borderRadius: 99, overflow: 'hidden', flexDirection: 'row' }}>
               <View style={{ width: `${Math.round(inperson / total * 100)}%`, backgroundColor: t.accent }} />
-              <View style={{ flex: 1, backgroundColor: '#5B9EFF' }} />
+              <View style={{ flex: 1, backgroundColor: t.info }} />
             </View>
           </View>
 

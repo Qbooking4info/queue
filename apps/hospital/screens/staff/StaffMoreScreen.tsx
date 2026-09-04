@@ -89,7 +89,7 @@ export function StaffMoreScreen({ navigation }: Props) {
           <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
             style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <View style={[s.menuIcon, { backgroundColor: 'rgba(91,158,255,0.12)' }]}>
-              <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+              <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
             </View>
             <Text style={[s.menuLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
             <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
@@ -115,16 +115,16 @@ export function StaffMoreScreen({ navigation }: Props) {
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { haptics.tap(); handleSignOut() }} disabled={signingOut}
                   style={[s.confirmBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)', flex: 1 }]}>
-                  {signingOut ? <ActivityIndicator size="small" color="#FF5C5C" /> : <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Sign out</Text>}
+                  {signingOut ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>}
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
             <TouchableOpacity onPress={() => setConfirmVisible(true)} style={s.menuRow}>
               <View style={[s.menuIcon, { backgroundColor: 'rgba(255,92,92,0.1)' }]}>
-                <Ionicons name="log-out-outline" size={18} color="#FF5C5C" />
+                <Ionicons name="log-out-outline" size={18} color={t.danger} />
               </View>
-              <Text style={[s.menuLabel, { color: '#FF5C5C' }]}>Sign out</Text>
+              <Text style={[s.menuLabel, { color: t.danger }]}>Sign out</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -69,7 +69,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
         <Animated.View style={[st.iconCircle, { transform: [{ scale: pulseAnim }],
           borderColor: urgencyColor, backgroundColor: `${urgencyColor}18`,
           opacity: show ? 1 : 0 }]}>
-          <Ionicons name="alert-circle-outline" size={48} color="#FF5C5C" />
+          <Ionicons name="alert-circle-outline" size={48} color={t.danger} />
         </Animated.View>
 
         <Text style={[st.headline, { opacity: show ? 1 : 0 }]}>
@@ -133,8 +133,8 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
             opacity: show ? 1 : 0,
           }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Ionicons name="warning-outline" size={16} color={bedSpaceStatus === 'none' ? '#FF5C5C' : '#FF8C42'} />
-              <Text style={[st.bedSpaceTitle, { color: bedSpaceStatus === 'none' ? '#FF5C5C' : '#FF8C42' }]}>
+              <Ionicons name="warning-outline" size={16} color={bedSpaceStatus === 'none' ? t.danger : '#FF8C42'} />
+              <Text style={[st.bedSpaceTitle, { color: bedSpaceStatus === 'none' ? t.danger : '#FF8C42' }]}>
                 {bedSpaceStatus === 'none' ? 'Reminder: no bed space confirmed' : 'Reminder: very limited bed space'}
               </Text>
             </View>

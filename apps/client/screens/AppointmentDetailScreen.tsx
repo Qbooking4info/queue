@@ -150,7 +150,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     : appt.status.charAt(0).toUpperCase() + appt.status.slice(1)
 
   const displayStatusColor = isPendingReview
-    ? { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
+    ? { bg: 'rgba(239,159,39,0.12)', text: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
     : isRejected
     ? { bg: '#FCEBEB', text: '#791F1F', border: 'rgba(163,45,45,0.3)' }
     : statusColor
@@ -229,15 +229,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             borderColor: isVirtual ? 'rgba(91,158,255,0.35)' : t.accentBorder,
           }]}>
             <View style={[st.passHeader, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={isVirtual ? '#85B7EB' : t.accent} />
-              <Text style={[st.passTitle, { color: isVirtual ? '#85B7EB' : t.accent }]}>
+              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={isVirtual ? t.statusVirtual.text : t.accent} />
+              <Text style={[st.passTitle, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
                 {isVirtual ? 'VIRTUAL CONSULTATION PASS' : 'HOSPITAL CHECK-IN PASS'}
               </Text>
             </View>
 
             {/* Big booking ref */}
             <TouchableOpacity onPress={copyRef} style={st.passRefWrap} activeOpacity={0.7}>
-              <Text style={[st.passRef, { color: isVirtual ? '#85B7EB' : t.accent }]}>{appt.id}</Text>
+              <Text style={[st.passRef, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>{appt.id}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                 {copied && <Ionicons name="checkmark" size={10} color={t.accent} />}
                 <Text style={[st.passCopy, { color: copied ? t.accent : 'rgba(255,255,255,0.35)' }]}>
@@ -277,12 +277,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         {/* Pending review notice */}
         {isPendingReview && (
           <View style={[st.pendingCard, { borderColor: 'rgba(239,159,39,0.3)', backgroundColor: 'rgba(239,159,39,0.07)' }]}>
-            <Ionicons name="hourglass-outline" size={18} color="#EF9F27" />
+            <Ionicons name="hourglass-outline" size={18} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
-              <Text style={[st.pendingTitle, { color: '#EF9F27' }]}>Awaiting hospital approval</Text>
+              <Text style={[st.pendingTitle, { color: t.statusBusy.text }]}>Awaiting hospital approval</Text>
               {appt.clinic && !isOpdClinic && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 11, color: '#EF9F27', fontWeight: '700' }}>Clinic:</Text>
+                  <Text style={{ fontSize: 11, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
                   <Text style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)' }}>{appt.clinic}</Text>
                 </View>
               )}
@@ -368,8 +368,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {isVirtual ? (
               <View style={[st.typePill, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: 'rgba(91,158,255,0.3)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="videocam-outline" size={11} color="#85B7EB" />
-                  <Text style={[st.typePillText, { color: '#85B7EB' }]}>Virtual</Text>
+                  <Ionicons name="videocam-outline" size={11} color={t.statusVirtual.text} />
+                  <Text style={[st.typePillText, { color: t.statusVirtual.text }]}>Virtual</Text>
                 </View>
               </View>
             ) : (
@@ -400,9 +400,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         {/* Emergency banner */}
         {isEmergency && !cancelled && (
           <View style={[st.joinBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.4)' }]}>
-            <Ionicons name="alert-circle-outline" size={22} color="#FF5C5C" />
+            <Ionicons name="alert-circle-outline" size={22} color={t.danger} />
             <View style={{ flex: 1 }}>
-              <Text style={[st.joinTitle, { color: '#FF5C5C' }]}>Emergency booking</Text>
+              <Text style={[st.joinTitle, { color: t.danger }]}>Emergency booking</Text>
               <Text style={[st.joinSub, { color: 'rgba(255,92,92,0.7)' }]}>
                 {appt.status === 'checked_in' || appt.status === 'in_progress'
                   ? "You've been placed at the front of today's queue."
@@ -421,9 +421,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               doctorName:    appt.doctor ?? 'your doctor',
             })}
           >
-            <Ionicons name="videocam-outline" size={22} color="#85B7EB" />
+            <Ionicons name="videocam-outline" size={22} color={t.statusVirtual.text} />
             <View style={{ flex: 1 }}>
-              <Text style={[st.joinTitle, { color: '#85B7EB' }]}>Virtual consultation</Text>
+              <Text style={[st.joinTitle, { color: t.statusVirtual.text }]}>Virtual consultation</Text>
               <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
             </View>
             <View style={[st.joinBtn, { backgroundColor: '#1A7FC1' }]}>
@@ -557,10 +557,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
                 style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', opacity: cancelling ? 0.5 : 1 }]}>
                 {cancelling
-                  ? <ActivityIndicator size="small" color="#FF5C5C" />
+                  ? <ActivityIndicator size="small" color={t.danger} />
                   : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Ionicons name="close" size={13} color="#FF5C5C" />
-                      <Text style={[st.cancelTxt, { color: '#FF5C5C' }]}>Cancel</Text>
+                      <Ionicons name="close" size={13} color={t.danger} />
+                      <Text style={[st.cancelTxt, { color: t.danger }]}>Cancel</Text>
                     </View>
                 }
               </TouchableOpacity>
@@ -571,8 +571,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {isMissed && (
             <View style={[st.refundNote, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.2)', marginBottom: 12 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: canReschedule || raw.hospital ? 10 : 0 }}>
-                <Ionicons name="alert-circle-outline" size={14} color="#FF5C5C" style={{ marginTop: 1 }} />
-                <Text style={[st.refundText, { color: '#FF5C5C', flex: 1 }]}>
+                <Ionicons name="alert-circle-outline" size={14} color={t.danger} style={{ marginTop: 1 }} />
+                <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
                   {canReschedule
                     ? 'This appointment was marked as missed. You can reschedule it once for free.'
                     : "This appointment was marked as missed and you've already used your free reschedule. Book a new appointment to continue."}
@@ -609,10 +609,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
               style={[st.cancelBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.08)', marginBottom: 12, opacity: cancelling ? 0.5 : 1 }]}>
               {cancelling
-                ? <ActivityIndicator size="small" color="#FF5C5C" />
+                ? <ActivityIndicator size="small" color={t.danger} />
                 : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons name="close" size={13} color="#FF5C5C" />
-                    <Text style={[st.cancelTxt, { color: '#FF5C5C' }]}>Withdraw booking request</Text>
+                    <Ionicons name="close" size={13} color={t.danger} />
+                    <Text style={[st.cancelTxt, { color: t.danger }]}>Withdraw booking request</Text>
                   </View>
               }
             </TouchableOpacity>
@@ -655,8 +655,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Cancelled refund note */}
           {cancelled && (
             <View style={[st.refundNote, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.2)', flexDirection: 'row', alignItems: 'flex-start', gap: 6 }]}>
-              <Ionicons name="checkmark-circle" size={14} color="#FF5C5C" style={{ marginTop: 1 }} />
-              <Text style={[st.refundText, { color: '#FF5C5C', flex: 1 }]}>
+              <Ionicons name="checkmark-circle" size={14} color={t.danger} style={{ marginTop: 1 }} />
+              <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
                 Appointment cancelled. Nothing was charged for this booking, so there is nothing to refund.
               </Text>
             </View>

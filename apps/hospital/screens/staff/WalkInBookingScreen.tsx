@@ -141,7 +141,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
       <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View style={[s.successIcon, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-            <Ionicons name="checkmark-circle" size={56} color="#00C265" />
+            <Ionicons name="checkmark-circle" size={56} color={t.accentDark} />
           </View>
           <Text style={[s.successTitle, { color: t.textPrimary }]}>Walk-in Registered</Text>
           <Text style={[s.successRef, { color: t.accent }]}>{bookingRef}</Text>
@@ -186,8 +186,8 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
           {foundPatient && (
             <View style={[s.foundBanner, { backgroundColor: 'rgba(0,194,101,0.1)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-              <Ionicons name="person-circle-outline" size={18} color="#00C265" />
-              <Text style={[s.foundText, { color: '#00C265' }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
+              <Ionicons name="person-circle-outline" size={18} color={t.accentDark} />
+              <Text style={[s.foundText, { color: t.accentDark }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
             </View>
           )}
 
@@ -216,7 +216,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>URGENCY</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['routine', 'urgent', 'emergency'] as const).map(u => {
-              const colors = { routine: t.accent, urgent: '#EF9F27', emergency: '#FF5C5C' }
+              const colors = { routine: t.accent, urgent: t.statusBusy.text, emergency: t.danger }
               const color = colors[u]
               const active = urgency === u
               return (

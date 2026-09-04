@@ -188,7 +188,7 @@ function ToggleRow({ label, sub, value, disabled, onToggle, theme: t, last }: {
         <Text style={[s.toggleSub, { color: t.textMuted }]}>{sub}</Text>
       </View>
       <Switch value={value} onValueChange={onToggle} disabled={disabled}
-        trackColor={{ true: '#00C265', false: t.cardBorder }} />
+        trackColor={{ true: t.accentDark, false: t.cardBorder }} />
     </View>
   )
 }

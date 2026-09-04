@@ -232,7 +232,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
     return (
       <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Ionicons name="checkmark-circle" size={72} color="#00C265" style={{ marginBottom: 20 }} />
+          <Ionicons name="checkmark-circle" size={72} color={t.accentDark} style={{ marginBottom: 20 }} />
           <Text style={[s.doneTitle, { color: t.textPrimary }]}>Hospital registered!</Text>
           <Text style={[s.doneSub, { color: t.textMuted }]}>
             {name} is now on Queue.
@@ -390,7 +390,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                       {clinicNames.length > 1 && (
                         <TouchableOpacity onPress={() => setClinicNames(clinicNames.filter((_, j) => j !== i))}
                           style={[s.removeBtn, { borderColor: t.cardBorder }]}>
-                          <Ionicons name="remove" size={16} color="#FF5C5C" />
+                          <Ionicons name="remove" size={16} color={t.danger} />
                         </TouchableOpacity>
                       )}
                     </View>

@@ -18,7 +18,7 @@ const FILTERS = ['upcoming', 'pending review', 'missed', 'completed', 'cancelled
 
 function statusColors(status: string, approvalStatus: string, t: any) {
   if (approvalStatus === 'pending_approval')
-    return { bg: 'rgba(239,159,39,0.12)', color: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
+    return { bg: 'rgba(239,159,39,0.12)', color: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
   if (status === 'confirmed')   return { bg: t.accentBg,            color: t.accent,    border: t.accentBorder }
   if (status === 'pending')     return { bg: 'rgba(26,127,193,0.1)', color: '#1A7FC1',   border: 'rgba(26,127,193,0.3)' }
   if (status === 'checked_in')  return { bg: '#E8F4FE',              color: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' }
@@ -90,7 +90,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
           <Text style={[s.title, { color: t.textPrimary }]}>My Bookings</Text>
           {pendingCount > 0 && (
             <View style={[s.pendingBadge, { backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#EF9F27' }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: t.statusBusy.text }}>
                 {pendingCount} awaiting review
               </Text>
             </View>
@@ -151,7 +151,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
               <View style={s.empty}>
                 <Ionicons
                   name={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-                  size={52} color="#FF5C5C" style={{ marginBottom: 10, opacity: 0.6 }} />
+                  size={52} color={t.danger} style={{ marginBottom: 10, opacity: 0.6 }} />
                 <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
                   {offline ? "You're offline" : "Couldn't load your bookings"}
                 </Text>
@@ -207,7 +207,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                     s.card,
                     {
                       backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
-                      borderColor: isEmergency ? '#FF5C5C' : isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
+                      borderColor: isEmergency ? t.danger : isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
                       borderLeftWidth: isEmergency ? 4 : 1,
                     },
                   ]}>
@@ -229,7 +229,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                         </View>
                       )}
                       {isEmergency && (
-                        <View style={{ backgroundColor: '#FF5C5C', borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
+                        <View style={{ backgroundColor: t.danger, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                             <Ionicons name="alert-circle-outline" size={9} color="#fff" />
                             <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>EMERGENCY</Text>
@@ -265,7 +265,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {/* Pending approval banner */}
                   {isPending && (
                     <View style={[s.approvalBanner, { backgroundColor: 'rgba(239,159,39,0.06)', borderTopColor: 'rgba(239,159,39,0.2)' }]}>
-                      <Text style={{ fontSize: 11, color: '#EF9F27' }}>
+                      <Text style={{ fontSize: 11, color: t.statusBusy.text }}>
                         ⏳ Awaiting hospital review — you'll be notified once approved.
                       </Text>
                     </View>
@@ -286,7 +286,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {/* Footer — missed appointment */}
                   {a.status === 'no_show' && (
                     <View style={[s.cardFooter, { borderTopColor: t.cardBorder }]}>
-                      <Text style={[s.footerHint, { color: '#FF5C5C' }]}>
+                      <Text style={[s.footerHint, { color: t.danger }]}>
                         {((a as any).reschedule_count ?? 0) < 1 ? 'Tap to reschedule for free' : 'Tap to book a new appointment'}
                       </Text>
                     </View>

@@ -87,7 +87,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
         {/* Sign out */}
         {confirmVisible ? (
           <View style={[s.section, { backgroundColor: 'rgba(255,92,92,0.07)', borderColor: 'rgba(255,92,92,0.25)' }]}>
-            <Text style={[s.sectionTitle, { color: '#FF5C5C', borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
+            <Text style={[s.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
             <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
               <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }]}
                 onPress={() => setConfirmVisible(false)}>
@@ -99,8 +99,8 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
                 disabled={signingOut}
               >
                 {signingOut
-                  ? <ActivityIndicator size="small" color="#FF5C5C" />
-                  : <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Sign out</Text>}
+                  ? <ActivityIndicator size="small" color={t.danger} />
+                  : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>}
               </TouchableOpacity>
             </View>
           </View>

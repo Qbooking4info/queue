@@ -77,7 +77,7 @@ export function MovePositionModal({ appt, queue, onClose, onMoved }: Props) {
             })}
           </View>
 
-          {!!error && <Text style={{ fontSize: 12, color: '#FF5C5C', marginTop: 10 }}>{error}</Text>}
+          {!!error && <Text style={{ fontSize: 12, color: t.danger, marginTop: 10 }}>{error}</Text>}
 
           <TouchableOpacity onPress={onClose} disabled={moving !== null} style={[st.closeBtn, { borderColor: t.cardBorder }]}>
             <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 14 }}>Close</Text>

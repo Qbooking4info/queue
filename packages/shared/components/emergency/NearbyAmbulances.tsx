@@ -74,8 +74,8 @@ export function NearbyAmbulances({ coords, style }: Props) {
   if (units.length === 0) {
     return (
       <View style={[st.emptyBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }, style]}>
-        <Ionicons name="alert-circle-outline" size={16} color="#FF5C5C" />
-        <Text style={[st.emptyText, { color: '#FF5C5C' }]}>
+        <Ionicons name="alert-circle-outline" size={16} color={t.danger} />
+        <Text style={[st.emptyText, { color: t.danger }]}>
           No ambulances are on duty near you right now. You can still request one, but start
           calling the numbers below at the same time.
         </Text>
@@ -98,7 +98,7 @@ export function NearbyAmbulances({ coords, style }: Props) {
   return (
     <View style={style}>
       <View style={st.row}>
-        <Ionicons name="pulse" size={15} color="#00C265" />
+        <Ionicons name="pulse" size={15} color={t.accentDark} />
         <Text style={[st.headline, { color: t.textPrimary }]}>
           {units.length} ambulance{units.length === 1 ? '' : 's'} near you
         </Text>

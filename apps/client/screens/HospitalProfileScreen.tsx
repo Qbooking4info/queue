@@ -121,7 +121,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Approval mode notice */}
         {hospital.approval_mode === 'manual' && (
           <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
-            <Ionicons name="clipboard-outline" size={16} color="#EF9F27" style={{ marginTop: 1 }} />
+            <Ionicons name="clipboard-outline" size={16} color={t.statusBusy.text} style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
               requests. You may be asked to describe your symptoms or upload a referral letter.

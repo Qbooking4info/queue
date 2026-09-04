@@ -60,7 +60,7 @@ export function VitalsEntryModal({ appointmentId, patientName, onClose, onSaved 
           </View>
           <Field label="Blood Sugar (mg/dL)" value={sugar} onChangeText={setSugar} theme={t} />
 
-          {!!error && <Text style={{ fontSize: 12, color: '#FF5C5C', marginTop: 10 }}>{error}</Text>}
+          {!!error && <Text style={{ fontSize: 12, color: t.danger, marginTop: 10 }}>{error}</Text>}
 
           <View style={st.buttonRow}>
             <TouchableOpacity onPress={onClose} disabled={saving} style={[st.button, { borderColor: t.cardBorder }]}>

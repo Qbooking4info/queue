@@ -165,7 +165,7 @@ export function StaffManagementScreen({ navigation }: Props) {
               return (
                 <View key={doc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                   <View style={[s.avatar, { backgroundColor: `rgba(91,158,255,0.12)`, borderColor: `rgba(91,158,255,0.3)` }]}>
-                    <Text style={[s.avatarText, { color: '#5B9EFF' }]}>{initials(doc.full_name)}</Text>
+                    <Text style={[s.avatarText, { color: t.info }]}>{initials(doc.full_name)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.memberName, { color: t.textPrimary }]}>{[doc.title, doc.full_name].filter(Boolean).join(' ')}</Text>
@@ -232,7 +232,7 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           {done ? (
             <>
-              <Ionicons name="checkmark-circle" size={48} color="#00C265" style={{ alignSelf: 'center', marginBottom: 12 }} />
+              <Ionicons name="checkmark-circle" size={48} color={t.accentDark} style={{ alignSelf: 'center', marginBottom: 12 }} />
               <Text style={[s.modalTitle, { color: t.textPrimary, textAlign: 'center' }]}>Invite sent!</Text>
               <Text style={[s.modalSub, { color: t.textMuted, textAlign: 'center', marginBottom: 20 }]}>
                 {email} will receive an invitation email.
@@ -266,7 +266,7 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
                 ))}
               </View>
 
-              {error ? <Text style={[s.errorText, { color: '#FF5C5C' }]}>{error}</Text> : null}
+              {error ? <Text style={[s.errorText, { color: t.danger }]}>{error}</Text> : null}
 
               <TouchableOpacity onPress={handleInvite} disabled={loading}
                 style={[s.modalBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent }]}>

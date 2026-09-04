@@ -448,7 +448,7 @@ export default function ServicesPage() {
                     )}
                     {s.virtual_price != null && (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px',
-                        borderRadius: 99, background: 'rgba(91,158,255,0.12)', color: '#5B9EFF' }}>
+                        borderRadius: 99, background: 'rgba(91,158,255,0.12)', color: C.info }}>
                         {fmtPrice(s.virtual_price)}
                       </span>
                     )}

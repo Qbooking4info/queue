@@ -206,7 +206,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   if (loading || !request) {
     return (
       <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color="#FF5C5C" />
+        <ActivityIndicator color={t.danger} />
       </SafeAreaView>
     )
   }
@@ -214,7 +214,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   const status      = request.status
   const isTerminal   = TERMINAL.includes(status)
   const canCancel    = CANCELLABLE.includes(status)
-  const statusColor  = status === 'completed' ? '#00C265' : status.startsWith('cancelled') || status === 'no_unit_available' ? '#8A8A8A' : '#FF5C5C'
+  const statusColor  = status === 'completed' ? t.accentDark : status.startsWith('cancelled') || status === 'no_unit_available' ? '#8A8A8A' : t.danger
 
   const markers = [
     ...(pickup  ? [{ id: 'pickup', latitude: pickup.lat,  longitude: pickup.lng,  title: 'Pickup location' }] : []),
@@ -249,7 +249,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
         {(status === 'no_unit_available' || deadlinePassed) && (
           <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-            <Text style={[s.noteText, { color: '#FF5C5C' }]}>
+            <Text style={[s.noteText, { color: t.danger }]}>
               {status === 'no_unit_available'
                 ? 'No ambulance could be reached.'
                 : "We haven't been able to reach an ambulance yet."}
@@ -296,8 +296,8 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
           <TouchableOpacity onPress={handleCancel} disabled={cancelling}
             style={[s.actionBtn, { borderColor: 'rgba(255,92,92,0.4)', opacity: cancelling ? 0.6 : 1 }]}>
             {cancelling
-              ? <ActivityIndicator color="#FF5C5C" />
-              : <Text style={[s.actionBtnText, { color: '#FF5C5C' }]}>Cancel request</Text>}
+              ? <ActivityIndicator color={t.danger} />
+              : <Text style={[s.actionBtnText, { color: t.danger }]}>Cancel request</Text>}
           </TouchableOpacity>
         )}
 

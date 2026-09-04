@@ -85,9 +85,9 @@ export function AdminDashboardScreen() {
           <View style={s.statGrid}>
             {[
               { label: "Today's appts", value: stats?.total ?? 0,     color: t.accent },
-              { label: 'Completed',     value: stats?.completed ?? 0, color: '#00C265' },
-              { label: 'Pending',       value: stats?.pending ?? 0,   color: '#EF9F27' },
-              { label: 'Doctors on duty', value: onDutyCount,         color: '#5B9EFF' },
+              { label: 'Completed',     value: stats?.completed ?? 0, color: t.accentDark },
+              { label: 'Pending',       value: stats?.pending ?? 0,   color: t.statusBusy.text },
+              { label: 'Doctors on duty', value: onDutyCount,         color: t.info },
             ].map(stat => (
               <View key={stat.label} style={[s.statCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>

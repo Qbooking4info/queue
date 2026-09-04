@@ -154,13 +154,13 @@ export function MedicalHistoryScreen({ navigation }: Props) {
           {tab === 'profile' && (
             <>
               {historyError && (
-                <View style={[s.errorCard, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: '#FF5C5C' }]}>
-                  <Ionicons name="alert-circle-outline" size={18} color="#FF5C5C" style={{ marginRight: 8 }} />
-                  <Text style={[s.errorText, { color: '#FF5C5C' }]}>
+                <View style={[s.errorCard, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: t.danger }]}>
+                  <Ionicons name="alert-circle-outline" size={18} color={t.danger} style={{ marginRight: 8 }} />
+                  <Text style={[s.errorText, { color: t.danger }]}>
                     Couldn't load your conditions, allergies and medications -- this is not the same as having none recorded.
                   </Text>
                   <TouchableOpacity onPress={load}>
-                    <Text style={[s.errorRetry, { color: '#FF5C5C' }]}>Retry</Text>
+                    <Text style={[s.errorRetry, { color: t.danger }]}>Retry</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -227,8 +227,8 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <View style={s.pillRow}>
                   {ALLERGY_PROMPTS.map(a => (
                     <TouchableOpacity key={a} onPress={() => toggleAllergy(a)}
-                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? '#FF5C5C' : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? 'rgba(255,92,92,0.1)' : t.inputBg }]}>
-                      <Text style={[s.pillText, { color: notes.allergies.includes(a) ? '#FF5C5C' : t.textMuted, fontWeight: notes.allergies.includes(a) ? '700' : '400' }]}>{a}</Text>
+                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? t.danger : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? 'rgba(255,92,92,0.1)' : t.inputBg }]}>
+                      <Text style={[s.pillText, { color: notes.allergies.includes(a) ? t.danger : t.textMuted, fontWeight: notes.allergies.includes(a) ? '700' : '400' }]}>{a}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

@@ -113,7 +113,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           {(doctor?.avg_rating ?? 0) > 0 && (
             <View style={st.ratingRow}>
               {[0, 1, 2, 3, 4].map(i => (
-                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? '#EF9F27' : t.textMuted} />
+                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? t.statusBusy.text : t.textMuted} />
               ))}
               <Text style={[st.ratingNum, { color: t.textMuted }]}>
                 {doctor!.avg_rating!.toFixed(1)} ({doctor!.review_count ?? 0} reviews)
@@ -171,7 +171,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
         {/* Switch to Patient Mode */}
         <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
           style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14 }]}>
-          <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+          <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
           <View style={{ flex: 1 }}>
             <Text style={[st.rowLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
             <Text style={[{ fontSize: 11, color: t.textMuted, marginTop: 1 }]}>Book appointments as a patient</Text>
@@ -196,7 +196,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
         {/* Sign out */}
         {confirmVisible ? (
           <View style={[st.section, { backgroundColor: 'rgba(255,92,92,0.07)', borderColor: 'rgba(255,92,92,0.25)', marginHorizontal: 16, marginBottom: 12 }]}>
-            <Text style={[st.sectionTitle, { color: '#FF5C5C', borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
+            <Text style={[st.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
             <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
               <TouchableOpacity
                 style={[st.actionBtn, { flex: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }]}
@@ -210,8 +210,8 @@ export function SpecialistProfileScreen({ navigation }: Props) {
                 disabled={signingOut}
               >
                 {signingOut
-                  ? <ActivityIndicator size="small" color="#FF5C5C" />
-                  : <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Sign out</Text>
+                  ? <ActivityIndicator size="small" color={t.danger} />
+                  : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>
                 }
               </TouchableOpacity>
             </View>

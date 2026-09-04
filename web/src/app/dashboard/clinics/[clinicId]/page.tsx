@@ -1100,7 +1100,7 @@ export default function ClinicDetailPage() {
                   cursor: 'pointer', fontFamily: 'inherit',
                   background: clinic.is_active ? 'rgba(239,159,39,0.12)' : 'rgba(0,232,122,0.12)',
                   border: `1px solid ${clinic.is_active ? 'rgba(239,159,39,0.3)' : 'rgba(0,232,122,0.3)'}`,
-                  color: clinic.is_active ? '#EF9F27' : '#00E87A' }}>
+                  color: clinic.is_active ? C.amber : '#00E87A' }}>
                 {clinic.is_active ? 'Deactivate' : 'Reactivate'}
               </button>
               <button onClick={handleToggleEmergency}
@@ -1658,8 +1658,8 @@ export default function ClinicDetailPage() {
               <div style={{ background: 'rgba(239,159,39,0.08)', border: '1px solid rgba(239,159,39,0.25)',
                 borderRadius: 12, padding: '10px 16px', marginBottom: 14,
                 display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Hourglass size={16} color="#EF9F27" />
-                <span style={{ fontSize: 13, color: '#EF9F27', fontWeight: 700 }}>
+                <Hourglass size={16} color={C.amber} />
+                <span style={{ fontSize: 13, color: C.amber, fontWeight: 700 }}>
                   {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting your review
                 </span>
               </div>
@@ -1725,7 +1725,7 @@ export default function ClinicDetailPage() {
                           {a.reason ?? '—'}
                         </div>
                         {a.symptom_description && (
-                          <div style={{ fontSize: 11, color: '#EF9F27', marginTop: 2,
+                          <div style={{ fontSize: 11, color: C.amber, marginTop: 2,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             display: 'flex', alignItems: 'center', gap: 4 }}
                             title={a.symptom_description}>
@@ -1743,7 +1743,7 @@ export default function ClinicDetailPage() {
                         <Badge status={a.status} />
                         {needsApproval && (
                           <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
-                            color: '#EF9F27', background: 'rgba(239,159,39,0.1)',
+                            color: C.amber, background: 'rgba(239,159,39,0.1)',
                             borderRadius: 6, padding: '2px 6px', display: 'inline-block' }}>
                             AWAITING REVIEW
                           </div>
@@ -2066,7 +2066,7 @@ export default function ClinicDetailPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px 28px 24px' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 10 }}>
               Delete &quot;{clinic.name}&quot;?
             </div>

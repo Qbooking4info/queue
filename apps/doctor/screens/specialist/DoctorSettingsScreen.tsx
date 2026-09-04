@@ -159,7 +159,7 @@ export function DoctorSettingsScreen({}: Props) {
                 <Text numberOfLines={1} style={{ fontSize: 12, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(d.id)} style={{ padding: 4 }}>
-                <Ionicons name="trash-outline" size={15} color="#FF5C5C" />
+                <Ionicons name="trash-outline" size={15} color={t.danger} />
               </TouchableOpacity>
             </View>
           ))}
@@ -192,13 +192,13 @@ export function DoctorSettingsScreen({}: Props) {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => signOut()}
               style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }}>
-              <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Confirm Sign Out</Text>
+              <Text style={{ color: t.danger, fontWeight: '700' }}>Confirm Sign Out</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => setConfirmSignOut(true)}
             style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#FF5C5C' }}>Sign out</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger }}>Sign out</Text>
           </TouchableOpacity>
         )}
       </ShellScroll>

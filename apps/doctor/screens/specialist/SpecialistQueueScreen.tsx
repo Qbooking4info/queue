@@ -214,14 +214,14 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
   const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const urgencyColor = isEmergency ? t.danger : appt.urgency === 'urgent' ? t.statusBusy.text : null
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
       style={[st.card, {
         backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
-        borderColor: isEmergency ? '#FF5C5C' : t.cardBorder,
+        borderColor: isEmergency ? t.danger : t.cardBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
       }]}
       onPress={() => {
@@ -232,9 +232,9 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
       {/* Avatar */}
       <View style={[st.avatar, {
         backgroundColor: isEmergency ? 'rgba(255,92,92,0.14)' : t.accentBgMid,
-        borderColor: isEmergency ? '#FF5C5C' : t.accentBorder,
+        borderColor: isEmergency ? t.danger : t.accentBorder,
       }]}>
-        <Text style={[st.avatarText, { color: isEmergency ? '#FF5C5C' : t.accent }]}>{initials}</Text>
+        <Text style={[st.avatarText, { color: isEmergency ? t.danger : t.accent }]}>{initials}</Text>
       </View>
 
       {/* Info */}
@@ -244,9 +244,9 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
             {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {isEmergency ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }}>
-              <Ionicons name="alert-circle-outline" size={9} color="#FF5C5C" />
-              <Text style={{ fontSize: 9, fontWeight: '800', color: '#FF5C5C' }}>EMERGENCY</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }}>
+              <Ionicons name="alert-circle-outline" size={9} color={t.danger} />
+              <Text style={{ fontSize: 9, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
             <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -259,8 +259,8 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
             {showDate ? fmtDate(appt.appointment_date) + ' · ' : ''}{fmt12(appt.start_time)}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? '#5B9EFF' : t.textMuted} />
-            <Text style={[st.typeDot, { color: isVirtual ? '#5B9EFF' : t.textMuted }]}>
+            <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? t.info : t.textMuted} />
+            <Text style={[st.typeDot, { color: isVirtual ? t.info : t.textMuted }]}>
               {isVirtual ? 'Virtual' : 'In-person'}
             </Text>
           </View>
@@ -270,8 +270,8 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         )}
         {appt.referred_by_doctor_name && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
-            <Ionicons name="arrow-redo-outline" size={10} color="#5B9EFF" />
-            <Text style={{ fontSize: 10, fontWeight: '700', color: '#5B9EFF' }} numberOfLines={1}>
+            <Ionicons name="arrow-redo-outline" size={10} color={t.info} />
+            <Text style={{ fontSize: 10, fontWeight: '700', color: t.info }} numberOfLines={1}>
               {appt.referred_by_doctor_name}
               {appt.referring_clinic_name ? ` · ${appt.referring_clinic_name}` : ''}
               {appt.referring_hospital_name ? ` · ${appt.referring_hospital_name}` : ''}

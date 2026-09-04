@@ -136,7 +136,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
 
           {error ? (
             <View style={[st.errorBox, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-              <Text style={{ fontSize: 12, color: '#FF5C5C' }}>{error}</Text>
+              <Text style={{ fontSize: 12, color: t.danger }}>{error}</Text>
             </View>
           ) : null}
 

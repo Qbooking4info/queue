@@ -1,8 +1,22 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
+// Structural scale, not color -- identical across both palettes on purpose, and
+// mirrored (same numeric values) in web/src/contexts/ThemeContext.tsx's own `scale`
+// so a card or button reads as the same size on web and mobile even though the two
+// token systems aren't code-shared. Values were picked to match the modes actually
+// in use across screens today (fontSize clustered hardest at 11/12/13/14, borderRadius
+// at 10/14/20/99), not invented from scratch -- the goal is a named home for the
+// numbers already being reached for, not new numbers nobody was using.
+const scale = {
+  spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
+  radius:  { sm: 10, md: 14, lg: 20, pill: 99 },
+  font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 26 },
+}
+
 const forest = {
   id: 'forest',
+  ...scale,
   canvasBg:    '#0A0F0D',
   cardBg:      '#111915',
   cardBorder:  'rgba(255,255,255,0.07)',
@@ -14,6 +28,15 @@ const forest = {
   textPrimary: '#E8F5EE',
   textSecondary:'#7ABDA0',
   textMuted:   '#4A7060',
+  // Solid semantic colors for buttons/icons/banners -- distinct from the statusX
+  // trios below, which are specifically for queue-status badges (bg+text+border at
+  // one fixed opacity). danger/info were never named before this: every screen that
+  // needed an alert red or an info blue just retyped the same literal. forest's value
+  // here is the exact literal that was already the de facto standard (zero visual
+  // change); info is identical in both palettes because '#5B9EFF' was already proven
+  // to read fine on both a dark mobile screen and a white web dashboard card.
+  danger:      '#FF5C5C',
+  info:        '#5B9EFF',
   statusOpen:     { bg:'rgba(0,232,122,0.14)',  text:'#5DCAA5', border:'rgba(0,232,122,0.28)' },
   statusBusy:     { bg:'rgba(239,159,39,0.14)', text:'#EF9F27', border:'rgba(239,159,39,0.28)' },
   statusVirtual:  { bg:'rgba(55,138,221,0.14)', text:'#85B7EB', border:'rgba(55,138,221,0.28)' },
@@ -28,6 +51,7 @@ const forest = {
 
 const clinical = {
   id: 'clinical',
+  ...scale,
   canvasBg:    '#F4F8FC',
   cardBg:      '#FFFFFF',
   cardBorder:  '#DDE8F5',
@@ -36,6 +60,12 @@ const clinical = {
   accentBg:    '#E6F1FB',
   accentBgMid: 'rgba(26,127,193,0.12)',
   accentBorder:'rgba(26,127,193,0.30)',
+  // '#DC2626' isn't invented for this -- it's already the exact literal one mobile
+  // screen (AppointmentDetailScreen) and multiple web dashboard pages independently
+  // reached for as "the readable red on a light background", so it's a documented
+  // choice, not a guess.
+  danger:      '#DC2626',
+  info:        '#5B9EFF',
   textPrimary: '#0C2A4A',
   textSecondary:'#2A5070',
   textMuted:   '#6A8FAA',
