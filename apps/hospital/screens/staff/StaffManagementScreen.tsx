@@ -165,7 +165,7 @@ export function StaffManagementScreen({ navigation }: Props) {
               const avail = AVAIL_META[doc.availability_status] ?? AVAIL_META.off_duty
               return (
                 <View key={doc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <View style={[s.avatar, { backgroundColor: `rgba(91,158,255,0.12)`, borderColor: `rgba(91,158,255,0.3)` }]}>
+                  <View style={[s.avatar, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
                     <Text style={[s.avatarText, { color: t.info }]}>{initials(doc.full_name)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
