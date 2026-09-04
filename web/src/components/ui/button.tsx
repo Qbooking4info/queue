@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import { useTheme } from '@/contexts/ThemeContext'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger'
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger' | 'success' | 'info'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
 }
@@ -36,6 +36,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       outline: { background: 'transparent', border: `1px solid ${C.border}`, color: C.textSub },
       ghost:   { background: 'transparent', color: C.textMuted },
       danger:  { background: C.redLight, color: C.red, border: `1px solid ${C.redLight}` },
+      // Same "Approve"/positive-action tint mobile's Button gained -- built from the
+      // theme's own accent (green in forest, blue in clinical), not a universal green,
+      // matching what StatusButton/FrontDeskActions/SettingsForm already hand-rolled.
+      success: { background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}` },
+      info:    { background: C.infoBg, color: C.info, border: `1px solid ${C.infoBorder}` },
     }[variant]
     return (
       <button

@@ -1,6 +1,8 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { Video, AlertTriangle, Check } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 import { updateHospitalProfile, upsertOperatingHours } from './actions'
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -12,7 +14,14 @@ interface Hospital {
   emergency_hours: boolean | null
 }
 
+// Never called useTheme() -- every color was either a static Tailwind class or a
+// literal hex that happened to equal forest's values exactly (#111915/#7A9089/
+// #0A0F0D/#4A6058 are forest.card/textSub/bg/textMuted verbatim), so this always
+// rendered dark regardless of the clinical/forest toggle. Input focus rings are left
+// as the static Tailwind green -- a transient, interaction-only accent, not an
+// always-visible mismatch, and not worth per-input focus-state tracking to theme.
 export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: Hour[] }) {
+  const { theme: C } = useTheme()
   const [saved, setSaved]       = useState(false)
   const [saveErr, setSaveErr]   = useState<string | null>(null)
   const [hourErr, setHourErr]   = useState<string | null>(null)
@@ -51,11 +60,14 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
     })
   }
 
+  const inputClass = "w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500/50"
+  const inputStyle = { background: C.bg, border: `1px solid ${C.borderMed}`, color: C.text }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Contact & Profile Edit */}
-      <section className="bg-[#111915] border border-white/7 rounded-2xl p-5">
-        <h2 className="font-bold mb-4">Edit Profile</h2>
+      <section className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+        <h2 className="font-bold mb-4" style={{ color: C.text }}>Edit Profile</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {[
             { name: 'phone',       label: 'Phone',       placeholder: '+234...' },
@@ -64,23 +76,25 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
             { name: 'address',     label: 'Address',     placeholder: '123 Hospital Rd' },
           ].map(f => (
             <div key={f.name}>
-              <label className="text-xs text-[#7A9089] mb-1 block">{f.label}</label>
+              <label className="text-xs mb-1 block" style={{ color: C.textSub }}>{f.label}</label>
               <input
                 name={f.name}
                 defaultValue={(hospital as unknown as Record<string, string | null>)[f.name] ?? ''}
                 placeholder={f.placeholder}
-                className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500/50"
+                className={inputClass}
+                style={inputStyle}
               />
             </div>
           ))}
           <div>
-            <label className="text-xs text-[#7A9089] mb-1 block">Description</label>
+            <label className="text-xs mb-1 block" style={{ color: C.textSub }}>Description</label>
             <textarea
               name="description"
               defaultValue={hospital.description ?? ''}
               rows={3}
               placeholder="Brief description of your hospital..."
-              className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500/50 resize-none"
+              className={`${inputClass} resize-none`}
+              style={inputStyle}
             />
           </div>
           <div className="flex gap-4">
@@ -88,7 +102,7 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
               { name: 'accepts_virtual', icon: <Video size={14} />,         label: 'Virtual Consultations', value: hospital.accepts_virtual },
               { name: 'emergency_hours', icon: <AlertTriangle size={14} />, label: '24/7 Emergency',        value: hospital.emergency_hours },
             ].map(f => (
-              <label key={f.name} className="flex items-center gap-2 cursor-pointer">
+              <label key={f.name} className="flex items-center gap-2 cursor-pointer" style={{ color: C.text }}>
                 <input type="hidden" name={f.name} value="false" />
                 <input type="checkbox" name={f.name} value="true" defaultChecked={!!f.value}
                   className="accent-green-500 w-4 h-4" />
@@ -97,26 +111,23 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
             ))}
           </div>
           <div className="flex items-center gap-3 pt-1 flex-wrap">
-            <button type="submit" disabled={pending}
-              className="px-5 py-2 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50">
-              {pending ? 'Saving…' : 'Save Changes'}
-            </button>
-            {saved && <span className="inline-flex items-center gap-1 text-sm text-green-400"><Check size={14} /> Saved</span>}
-            {saveErr && <span className="text-sm text-red-400">{saveErr}</span>}
+            <Button type="submit" loading={pending} size="sm">Save Changes</Button>
+            {saved && <span className="inline-flex items-center gap-1 text-sm" style={{ color: C.accent }}><Check size={14} /> Saved</span>}
+            {saveErr && <span className="text-sm" style={{ color: C.red }}>{saveErr}</span>}
           </div>
         </form>
       </section>
 
       {/* Operating Hours Edit */}
-      <section className="bg-[#111915] border border-white/7 rounded-2xl p-5">
-        <h2 className="font-bold mb-4">Operating Hours</h2>
+      <section className="rounded-2xl p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+        <h2 className="font-bold mb-4" style={{ color: C.text }}>Operating Hours</h2>
         <div className="flex flex-col gap-2">
           {DAYS.map((day, i) => {
             const s = hourState[i]
             return (
-              <div key={day} className="flex items-center gap-3 py-2 border-b border-white/5 flex-wrap">
-                <span className="text-sm text-[#7A9089] w-24 shrink-0">{day}</span>
-                <label className="flex items-center gap-1.5 text-xs text-[#4A6058]">
+              <div key={day} className="flex items-center gap-3 py-2 flex-wrap" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <span className="text-sm w-24 shrink-0" style={{ color: C.textSub }}>{day}</span>
+                <label className="flex items-center gap-1.5 text-xs" style={{ color: C.textMuted }}>
                   <input type="checkbox" checked={s.closed}
                     onChange={e => setHourState(prev => ({ ...prev, [i]: { ...prev[i], closed: e.target.checked } }))}
                     className="accent-green-500" />
@@ -126,22 +137,26 @@ export function SettingsForm({ hospital, hours }: { hospital: Hospital; hours: H
                   <>
                     <input type="time" value={s.open}
                       onChange={e => setHourState(prev => ({ ...prev, [i]: { ...prev[i], open: e.target.value } }))}
-                      className="bg-[#0A0F0D] border border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-green-500/50" />
-                    <span className="text-[#4A6058] text-xs">–</span>
+                      className="rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-green-500/50"
+                      style={inputStyle} />
+                    <span className="text-xs" style={{ color: C.textMuted }}>–</span>
                     <input type="time" value={s.close}
                       onChange={e => setHourState(prev => ({ ...prev, [i]: { ...prev[i], close: e.target.value } }))}
-                      className="bg-[#0A0F0D] border border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-green-500/50" />
+                      className="rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-green-500/50"
+                      style={inputStyle} />
                   </>
                 )}
-                <button disabled={hoursPending} onClick={() => handleHourSave(i)}
-                  className="ml-auto text-xs text-green-400 border border-green-500/30 px-3 py-1 rounded-lg hover:bg-green-500/10 transition-all disabled:opacity-50">
+                <Button
+                  disabled={hoursPending} onClick={() => handleHourSave(i)}
+                  variant="success" size="sm" className="ml-auto"
+                >
                   Save
-                </button>
+                </Button>
               </div>
             )
           })}
         </div>
-        {hourErr && <p className="text-sm text-red-400 mt-2">{hourErr}</p>}
+        {hourErr && <p className="text-sm mt-2" style={{ color: C.red }}>{hourErr}</p>}
       </section>
     </div>
   )
