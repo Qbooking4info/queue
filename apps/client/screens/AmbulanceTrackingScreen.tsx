@@ -225,7 +225,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
-        <TouchableOpacity onPress={backToHome} style={s.backBtn}>
+        <TouchableOpacity onPress={backToHome} accessibilityLabel="Close" hitSlop={8} style={s.backBtn}>
           <Ionicons name="close" size={22} color={t.textMuted} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

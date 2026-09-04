@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, ReactNode } from 'react'
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { AccessibilityInfo, Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from './ThemeContext'
 
 export interface AlertButton {
@@ -38,6 +38,14 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { showAlertImpl = show; return () => { showAlertImpl = null } }, [show])
 
+  // This Modal has no automatic screen-reader announcement the way a real system alert
+  // does -- VoiceOver/TalkBack give no signal that anything appeared unless something
+  // tells them to. Most of what this dialog carries is an error or a destructive
+  // confirmation, so a silent screen reader user would have no idea one popped up.
+  useEffect(() => {
+    if (state) AccessibilityInfo.announceForAccessibility(state.message ? `${state.title}. ${state.message}` : state.title)
+  }, [state])
+
   function press(btn: AlertButton) {
     setState(null)
     btn.onPress?.()
@@ -47,16 +55,16 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     <>
       {children}
       <Modal visible={!!state} transparent animationType="fade" onRequestClose={() => setState(null)}>
-        <View style={st.overlay}>
+        <View style={st.overlay} accessibilityViewIsModal accessible={false}>
           <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[st.title, { color: t.textPrimary }]}>{state?.title}</Text>
+            <Text style={[st.title, { color: t.textPrimary }]} accessibilityRole="header">{state?.title}</Text>
             {!!state?.message && <Text style={[st.message, { color: t.textMuted }]}>{state.message}</Text>}
             <View style={st.buttonRow}>
               {state?.buttons.map((btn, i) => (
                 <TouchableOpacity key={i} onPress={() => press(btn)}
                   style={[st.button, { borderColor: t.cardBorder }]}>
                   <Text style={[st.buttonText, {
-                    color: btn.style === 'destructive' ? '#FF5C5C' : btn.style === 'cancel' ? t.textMuted : t.accent,
+                    color: btn.style === 'destructive' ? t.danger : btn.style === 'cancel' ? t.textMuted : t.accent,
                     fontWeight: btn.style === 'cancel' ? '600' : '800',
                   }]}>
                     {btn.text ?? 'OK'}

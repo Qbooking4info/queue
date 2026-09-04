@@ -109,7 +109,7 @@ export function HospitalClinicsScreen({ navigation }: Props) {
       <View style={s.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
@@ -259,7 +259,7 @@ function CreateClinicModal({ hospitalId, theme: t, onClose, onDone }: { hospital
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Text style={[s.modalTitle, { color: t.textPrimary }]}>New Clinic</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
           </View>
 
           <Text style={[s.modalLabel, { color: t.textMuted }]}>CLINIC NAME</Text>

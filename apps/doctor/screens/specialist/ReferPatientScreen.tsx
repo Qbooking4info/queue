@@ -255,7 +255,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
             <Ionicons name="arrow-back" size={22} color={t.textMuted} />
           </TouchableOpacity>
           <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>Refer {patientName}</Text>

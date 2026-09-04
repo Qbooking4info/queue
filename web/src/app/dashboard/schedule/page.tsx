@@ -163,7 +163,14 @@ function ScheduleContent() {
   return (
     <div>
       <style>{`
-        .schedule-calendar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        /* A week calendar needs its days side by side to be usable, so this scrolls
+           horizontally on a narrow screen instead of reflowing to fewer columns (the
+           WCAG 1.4.10 exception for content that requires 2D layout for meaning).
+           overflow-y stays hidden so the card's rounded corners still clip -- overflow-x
+           can't be set without it, or the shorthand overflow:hidden that used to sit
+           on this same element inline would win over this rule and silently cancel the
+           scroll (inline style always beats a stylesheet, same element or not). */
+        .schedule-calendar { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         @media (max-width: 767px) {
           .schedule-header-actions { flex-direction: column; align-items: stretch !important; }
           .schedule-header-actions button,
@@ -216,9 +223,9 @@ function ScheduleContent() {
           </a>
         </div>
       ) : (
-        <div className="schedule-calendar" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div className="schedule-calendar" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
           {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, 1fr)`,
+          <div style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, minmax(88px, 1fr))`,
             borderBottom: `1px solid ${C.border}` }}>
             <div style={{ padding: '12px', background: C.bgAlt }} />
             {openDayIdxs.map(({ dow, i }) => {
@@ -252,7 +259,7 @@ function ScheduleContent() {
           {/* Time rows */}
           <div style={{ maxHeight: 520, overflowY: 'auto' }}>
             {TIMES.map(time => (
-              <div key={time} style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, 1fr)`,
+              <div key={time} style={{ display: 'grid', gridTemplateColumns: `64px repeat(${openDayIdxs.length}, minmax(88px, 1fr))`,
                 borderBottom: `1px solid ${C.border}`, minHeight: 56 }}>
                 <button onClick={() => openTime(time)}
                   style={{ padding: '8px 10px 0', fontSize: 11, color: C.textMuted, fontWeight: 600,

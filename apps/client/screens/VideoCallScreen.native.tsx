@@ -396,6 +396,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
         <View style={st.ctrlItem}>
           <TouchableOpacity
             onPress={toggleMic}
+            accessibilityLabel={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
             activeOpacity={0.8}
             style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}
           >
@@ -405,7 +406,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
         </View>
 
         <View style={st.ctrlItem}>
-          <TouchableOpacity onPress={handleEndCall} activeOpacity={0.85} style={st.endBtn}>
+          <TouchableOpacity onPress={handleEndCall} accessibilityLabel="End call" activeOpacity={0.85} style={st.endBtn}>
             <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
           </TouchableOpacity>
           <Text style={[st.ctrlLabel, { color: '#FF7A7A' }]}>End</Text>
@@ -414,6 +415,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
         <View style={st.ctrlItem}>
           <TouchableOpacity
             onPress={toggleCamera}
+            accessibilityLabel={camEnabled ? 'Turn off camera' : 'Turn on camera'}
             activeOpacity={0.8}
             style={[st.ctrlBtn, camEnabled && st.ctrlBtnActive]}
           >

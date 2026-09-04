@@ -107,7 +107,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
             which doesn't sync with this in-memory navigation stack on web. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}

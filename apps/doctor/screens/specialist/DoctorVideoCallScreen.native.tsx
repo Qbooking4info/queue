@@ -348,21 +348,21 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       {/* Controls */}
       <View style={st.controls}>
         <View style={st.ctrlItem}>
-          <TouchableOpacity onPress={toggleMic} activeOpacity={0.8} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
+          <TouchableOpacity onPress={toggleMic} accessibilityLabel={micEnabled ? 'Mute microphone' : 'Unmute microphone'} activeOpacity={0.8} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
             <Ionicons name={micEnabled ? 'mic' : 'mic-off'} size={24} color={micEnabled ? '#E8F5EF' : '#050d09'} />
           </TouchableOpacity>
           <Text style={st.ctrlLabel}>{micEnabled ? 'Mute' : 'Unmute'}</Text>
         </View>
 
         <View style={st.ctrlItem}>
-          <TouchableOpacity onPress={handleEndSession} activeOpacity={0.85} style={st.endBtn}>
+          <TouchableOpacity onPress={handleEndSession} accessibilityLabel="End call" activeOpacity={0.85} style={st.endBtn}>
             <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
           </TouchableOpacity>
           <Text style={[st.ctrlLabel, { color: '#FF7A7A' }]}>End</Text>
         </View>
 
         <View style={st.ctrlItem}>
-          <TouchableOpacity onPress={toggleCamera} activeOpacity={0.8} style={[st.ctrlBtn, camEnabled && st.ctrlBtnActive]}>
+          <TouchableOpacity onPress={toggleCamera} accessibilityLabel={camEnabled ? 'Turn off camera' : 'Turn on camera'} activeOpacity={0.8} style={[st.ctrlBtn, camEnabled && st.ctrlBtnActive]}>
             <Ionicons name={camEnabled ? 'videocam' : 'videocam-off'} size={24} color={camEnabled ? '#050d09' : '#E8F5EF'} />
           </TouchableOpacity>
           <Text style={st.ctrlLabel}>{camEnabled ? 'Stop video' : 'Start video'}</Text>

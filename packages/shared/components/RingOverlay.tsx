@@ -7,6 +7,7 @@ import { haptics } from '../lib/haptics'
 import { supabase } from '../lib/supabase'
 import { markNotificationRead } from '../lib/api'
 import { WELLNESS_TIPS } from '../lib/wellness-tips'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 
 interface RingNotif { id: string; title: string; body: string }
 
@@ -51,6 +52,7 @@ export function RingOverlay({ notif, onDismiss }: { notif: RingNotif; onDismiss:
   const { theme: t } = useTheme()
   const [tipIndex, setTipIndex] = useState(0)
   const pulse = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
   const player = useAudioPlayer(require('../assets/sounds/ring.wav'))
 
   useEffect(() => {
@@ -61,7 +63,10 @@ export function RingOverlay({ notif, onDismiss }: { notif: RingNotif; onDismiss:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Indefinite loop while the ring is showing -- gated behind reduce-motion since the
+  // icon and "incoming" text already carry the meaning without the pulse (WCAG 2.2.2).
   useEffect(() => {
+    if (reduceMotion) return
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.15, duration: 500, useNativeDriver: true }),
@@ -70,7 +75,7 @@ export function RingOverlay({ notif, onDismiss }: { notif: RingNotif; onDismiss:
     )
     anim.start()
     return () => anim.stop()
-  }, [pulse])
+  }, [pulse, reduceMotion])
 
   useEffect(() => {
     const interval = setInterval(() => setTipIndex(i => (i + 1) % WELLNESS_TIPS.length), 4000)

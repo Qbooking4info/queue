@@ -8,6 +8,7 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { setConsultStatus, saveConsultVitalsAndNotes } from '@queue/shared/lib/api'
+import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -61,8 +62,12 @@ function fmt12(time: string): string {
 
 function InProgressPulse() {
   const pulse = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
 
+  // Indefinite loop with no stop control (WCAG 2.2.2) -- gated behind reduce-motion since
+  // the dot's color already marks "in progress" without the pulse.
   useEffect(() => {
+    if (reduceMotion) return
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
@@ -71,7 +76,7 @@ function InProgressPulse() {
     )
     anim.start()
     return () => anim.stop()
-  }, [])
+  }, [reduceMotion])
 
   return (
     <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF8C42' }} />
@@ -221,7 +226,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
         {/* Header */}
         <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
             <Ionicons name="arrow-back" size={22} color={t.textMuted} />
           </TouchableOpacity>
           <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>

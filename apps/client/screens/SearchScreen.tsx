@@ -88,7 +88,7 @@ export function SearchScreen({ navigation }: Props) {
             style={[styles.input, { color: t.textPrimary }]}
           />
           {!!q && (
-            <TouchableOpacity onPress={() => setQ('')}>
+            <TouchableOpacity onPress={() => setQ('')} accessibilityLabel="Clear search" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={16} color={t.textMuted} />
             </TouchableOpacity>
           )}
@@ -118,10 +118,12 @@ export function SearchScreen({ navigation }: Props) {
 
           <View style={[styles.viewToggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <TouchableOpacity onPress={() => setViewMode('list')}
+              accessibilityLabel="List view" accessibilityState={{ selected: viewMode === 'list' }}
               style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: t.accentBg }]}>
               <Text style={{ fontSize: 15, color: viewMode === 'list' ? t.accent : t.textMuted }}>≡</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode('map')}
+              accessibilityLabel="Map view" accessibilityState={{ selected: viewMode === 'map' }}
               style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: t.accentBg }]}>
               <Ionicons name="map-outline" size={15} color={viewMode === 'map' ? t.accent : t.textMuted} />
             </TouchableOpacity>

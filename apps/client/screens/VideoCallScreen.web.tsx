@@ -252,15 +252,15 @@ function CallBody({ appId, token, channelName, doctorName, onLeave }: BodyProps)
 
       {/* Controls */}
       <View style={st.controls}>
-        <TouchableOpacity onPress={toggleMic} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
+        <TouchableOpacity onPress={toggleMic} accessibilityLabel={micEnabled ? 'Mute microphone' : 'Unmute microphone'} style={[st.ctrlBtn, !micEnabled && st.ctrlBtnOff]}>
           <Ionicons name={micEnabled ? 'mic-outline' : 'mic-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleEndCall} style={st.endBtn}>
+        <TouchableOpacity onPress={handleEndCall} accessibilityLabel="End call" style={st.endBtn}>
           <Ionicons name="call" size={26} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={toggleCamera} style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}>
+        <TouchableOpacity onPress={toggleCamera} accessibilityLabel={camEnabled ? 'Turn off camera' : 'Turn on camera'} style={[st.ctrlBtn, !camEnabled && st.ctrlBtnOff]}>
           <Ionicons name={camEnabled ? 'videocam-outline' : 'videocam-off-outline'} size={22} color="#fff" />
         </TouchableOpacity>
       </View>

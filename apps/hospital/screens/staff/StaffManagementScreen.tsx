@@ -119,7 +119,7 @@ export function StaffManagementScreen({ navigation }: Props) {
             which doesn't sync with this in-memory navigation stack on web. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
@@ -283,7 +283,7 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Text style={[s.modalTitle, { color: t.textPrimary }]}>Invite staff member</Text>
-                <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+                <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
               </View>
 
               <Text style={[s.modalLabel, { color: t.textMuted }]}>EMAIL</Text>
@@ -403,7 +403,7 @@ function LinkDoctorModal({ theme: t, onClose, onDone }: { theme: any; onClose: (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Text style={[s.modalTitle, { color: t.textPrimary }]}>Link Existing Doctor</Text>
-                <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+                <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
               </View>
 
               {step === 'code' ? (

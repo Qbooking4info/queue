@@ -10,6 +10,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { todayLocalDate } from '@queue/shared/lib/format'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 interface ApptRow {
   id:               string
@@ -32,15 +33,6 @@ interface ApptRow {
 interface Props { navigation: any }
 
 type Tab = 'today' | 'upcoming'
-
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',     color: '#EF9F27', bg: 'rgba(239,159,39,0.12)' },
-  confirmed:   { label: 'Confirmed',   color: '#00C265', bg: 'rgba(0,194,101,0.12)' },
-  checked_in:  { label: 'Checked In',  color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
-  in_progress: { label: 'In Progress', color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
-  completed:   { label: 'Completed',   color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:   { label: 'Cancelled',   color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
-}
 
 function fmt12(time: string): string {
   if (!time) return '—'
@@ -210,6 +202,15 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
 function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
   const { theme: t } = useTheme()
+  const sc = statusBadgeColors(t)
+  const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+    pending:     { label: 'Pending',     color: sc.pending.text,      bg: sc.pending.bg },
+    confirmed:   { label: 'Confirmed',   color: sc.confirmed.text,    bg: sc.confirmed.bg },
+    checked_in:  { label: 'Checked In',  color: sc.checked_in.text,   bg: sc.checked_in.bg },
+    in_progress: { label: 'In Progress', color: sc.in_progress.text,  bg: sc.in_progress.bg },
+    completed:   { label: 'Completed',   color: sc.completed.text,    bg: sc.completed.bg },
+    cancelled:   { label: 'Cancelled',   color: sc.cancelled.text,    bg: sc.cancelled.bg },
+  }
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
   const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'

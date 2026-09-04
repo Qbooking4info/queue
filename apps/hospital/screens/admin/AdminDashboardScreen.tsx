@@ -10,27 +10,31 @@ import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import {
   getRangeStats, getTodayAppointments, getDoctorsOnDuty, fmtLocalDate,
   type RangeStats, type AdminAppointmentRow, type AdminDoctorRow } from '@queue/shared/lib/admin-api'
-
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:           { label: 'Pending',    color: '#EF9F27', bg: 'rgba(239,159,39,0.12)' },
-  pending_approval:  { label: 'Awaiting',   color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
-  confirmed:         { label: 'Confirmed',  color: '#00C265', bg: 'rgba(0,194,101,0.12)' },
-  checked_in:        { label: 'Checked In', color: '#5B9EFF', bg: 'rgba(91,158,255,0.12)' },
-  in_progress:       { label: 'In Progress',color: '#5B9EFF', bg: 'rgba(91,158,255,0.12)' },
-  completed:         { label: 'Completed',  color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:         { label: 'Cancelled',  color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
-  no_show:           { label: 'No Show',    color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
-}
-
-const AVAILABILITY_META: Record<string, { label: string; color: string }> = {
-  on_duty:  { label: 'On duty',  color: '#00C265' },
-  on_break: { label: 'On break', color: '#EF9F27' },
-  off_duty: { label: 'Off duty', color: '#7A9089' },
-}
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 export function AdminDashboardScreen() {
   const { theme: t } = useTheme()
   const { staffProfile } = useAuth()
+  const sc = statusBadgeColors(t)
+  // Was its own hardcoded table -- in_progress and checked_in were BOTH the same blue
+  // here, unlike every sibling screen's orange in_progress; no_show shared cancelled's
+  // red instead of FrontDesk/Staff's gray. sc.* is the single source of truth now, so
+  // this can't drift from those screens again.
+  const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
+    pending:          { label: 'Pending',     color: sc.pending.text,          bg: sc.pending.bg },
+    pending_approval: { label: 'Awaiting',    color: sc.pending_approval.text, bg: sc.pending_approval.bg },
+    confirmed:        { label: 'Confirmed',   color: sc.confirmed.text,        bg: sc.confirmed.bg },
+    checked_in:       { label: 'Checked In',  color: sc.checked_in.text,       bg: sc.checked_in.bg },
+    in_progress:      { label: 'In Progress', color: sc.in_progress.text,      bg: sc.in_progress.bg },
+    completed:        { label: 'Completed',   color: sc.completed.text,        bg: sc.completed.bg },
+    cancelled:        { label: 'Cancelled',   color: sc.cancelled.text,        bg: sc.cancelled.bg },
+    no_show:          { label: 'No Show',     color: sc.no_show.text,          bg: sc.no_show.bg },
+  }
+  const AVAILABILITY_META: Record<string, { label: string; color: string }> = {
+    on_duty:  { label: 'On duty',  color: t.statusOpen.text },
+    on_break: { label: 'On break', color: t.statusBusy.text },
+    off_duty: { label: 'Off duty', color: t.statusNeutral.text },
+  }
 
   const [stats,      setStats]      = useState<RangeStats | null>(null)
   const [appts,      setAppts]      = useState<AdminAppointmentRow[]>([])
@@ -126,7 +130,7 @@ export function AdminDashboardScreen() {
               <Text style={[s.emptyText, { color: t.textMuted }]}>No appointments scheduled for today.</Text>
             </View>
           ) : appts.map(a => {
-            const meta = STATUS_META[a.status] ?? { label: a.status, color: '#888', bg: 'rgba(128,128,128,0.1)' }
+            const meta = STATUS_META[a.status] ?? { label: a.status, color: sc.no_show.text, bg: sc.no_show.bg }
             return (
               <View key={a.id} style={[s.apptCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <View style={{ flex: 1 }}>

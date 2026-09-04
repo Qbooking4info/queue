@@ -15,6 +15,11 @@
   /* Skeleton shimmer — dark (default) */
   --skeleton-a: rgba(255,255,255,0.05);
   --skeleton-b: rgba(255,255,255,0.10);
+  /* Keyboard focus ring. Deliberately NOT --accent: that's forest's #00E87A, and the
+     dashboard's default theme is the light one, where a green ring measures 1.64:1
+     against a white card -- under WCAG 1.4.11's 3:1 floor for focus indicators.
+     Each theme rings in its own accent instead (clinical 4.33:1, forest 10.93:1). */
+  --focus-ring: #1A7FC1;
 }
 
 @media (prefers-color-scheme: light) {
@@ -25,9 +30,19 @@
   }
 }
 
+/* ThemeProvider stamps data-theme=light|dark to match its own toggle. These win over
+   the prefers-color-scheme block above, which only knows the OS setting -- so picking
+   the dark theme on a light-mode OS no longer draws a light shimmer on a dark card. */
 :root[data-theme="light"] {
   --skeleton-a: rgba(0,0,0,0.06);
   --skeleton-b: rgba(0,0,0,0.12);
+  --focus-ring: #1A7FC1;
+}
+
+:root[data-theme="dark"] {
+  --skeleton-a: rgba(255,255,255,0.05);
+  --skeleton-b: rgba(255,255,255,0.10);
+  --focus-ring: #00E87A;
 }
 
 @keyframes shimmer {
@@ -66,6 +81,19 @@ body {
      tablet  : 768px – 1023px
      desktop : ≥ 1024px
    ══════════════════════════════════════════════ */
+
+/* ── Keyboard focus ──────────────────────────────────────────────────────────
+   Inputs and buttons across the dashboard set `outline: none` inline (33 places)
+   or `focus:outline-none` (12 more) to kill the default ring, which also removed
+   it for keyboard users -- leaving no way to tell where focus is, and failing
+   WCAG 2.4.7. :focus-visible only matches keyboard/programmatic focus, never a
+   mouse click, so this restores the ring for people who need it without putting
+   it back on click. Inline styles beat a normal rule, hence !important. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
 /* ── Auth pages' branding panel (login/register/reset-password/staff auth) ──
    Fixed-width (420px) and meant to sit beside the form, not stack above it -- on a

@@ -130,8 +130,8 @@ export default function HospitalsPage() {
 
       {/* Platform-wide totals */}
       {stats && (
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24,
+        <div className="dash-stat-grid-5" style={{
+          marginBottom: 24,
           background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 24px',
         }}>
           <StatChip label="Hospitals" value={stats.hospitals} color={C.text} />

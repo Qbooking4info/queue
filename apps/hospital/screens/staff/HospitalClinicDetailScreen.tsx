@@ -232,7 +232,7 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <View style={s.header}>
         {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
             <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
           </TouchableOpacity>
         ) : null}
@@ -334,7 +334,7 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
           <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <Text style={[s.sectionTitle, { color: t.textPrimary, marginBottom: 0 }]}>Add Doctor</Text>
-              <TouchableOpacity onPress={() => setShowAssign(false)}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowAssign(false)} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
             </View>
             <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 14 }}>
               Assign a doctor already at this hospital, or link a new one by their Doctor ID.

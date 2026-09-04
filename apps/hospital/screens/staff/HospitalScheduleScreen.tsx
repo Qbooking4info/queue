@@ -119,7 +119,7 @@ export function HospitalScheduleScreen({ navigation }: Props) {
       <View style={s.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
@@ -132,9 +132,9 @@ export function HospitalScheduleScreen({ navigation }: Props) {
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 10 }}>
-        <TouchableOpacity onPress={() => shiftWeek(-1)} hitSlop={8}><Ionicons name="chevron-back" size={20} color={t.textPrimary} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => shiftWeek(-1)} accessibilityLabel="Previous week" hitSlop={8}><Ionicons name="chevron-back" size={20} color={t.textPrimary} /></TouchableOpacity>
         <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Week of {fmtLocalDate(weekStart)}</Text>
-        <TouchableOpacity onPress={() => shiftWeek(1)} hitSlop={8}><Ionicons name="chevron-forward" size={20} color={t.textPrimary} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => shiftWeek(1)} accessibilityLabel="Next week" hitSlop={8}><Ionicons name="chevron-forward" size={20} color={t.textPrimary} /></TouchableOpacity>
       </View>
 
       {/* Filters */}
@@ -321,7 +321,7 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
               <>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <Text style={[s.modalTitle, { color: t.textPrimary }]}>Set Schedule</Text>
-                  <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+                  <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
                 </View>
 
                 <Text style={[s.modalLabel, { color: t.textMuted }]}>DOCTOR</Text>

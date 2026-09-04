@@ -102,7 +102,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
             doesn't sync with this in-memory navigation stack on web. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
               <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
@@ -163,7 +163,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
                 <Ionicons name="document-text-outline" size={16} color={t.accent} />
                 <Text numberOfLines={1} style={{ fontSize: 12, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(d.id)} style={{ padding: 4 }}>
+              <TouchableOpacity onPress={() => handleDelete(d.id)} accessibilityLabel={`Delete ${d.title}`} style={{ padding: 4 }}>
                 <Ionicons name="trash-outline" size={15} color={t.danger} />
               </TouchableOpacity>
             </View>
@@ -213,7 +213,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           <View style={{ backgroundColor: t.cardBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingTop: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: t.textPrimary }}>Select Specialty</Text>
-              <TouchableOpacity onPress={() => setPickerOpen(false)}>
+              <TouchableOpacity onPress={() => setPickerOpen(false)} accessibilityLabel="Close" hitSlop={8}>
                 <Ionicons name="close" size={20} color={t.textMuted} />
               </TouchableOpacity>
             </View>

@@ -67,7 +67,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
       <View style={[styles.header, { borderBottomColor: t.cardBorder }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={[styles.backBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Ionicons name="arrow-back" size={18} color={t.accent} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: t.textPrimary }]}>Insurance Details</Text>

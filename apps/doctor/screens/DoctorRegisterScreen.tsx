@@ -111,7 +111,7 @@ export function DoctorRegisterScreen({ navigation }: Props) {
                   secureTextEntry={!showPass} autoCapitalize="none" autoCorrect={false}
                   style={[s.passInput, { color: t.textPrimary }]}
                 />
-                <TouchableOpacity onPress={() => setShowPass(v => !v)} hitSlop={8}>
+                <TouchableOpacity onPress={() => setShowPass(v => !v)} accessibilityLabel={showPass ? 'Hide password' : 'Show password'} hitSlop={8}>
                   <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={16} color={t.textMuted} />
                 </TouchableOpacity>
               </View>

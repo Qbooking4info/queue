@@ -252,7 +252,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={goBack}>
+        <TouchableOpacity onPress={goBack} accessibilityLabel="Go back" hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
         </TouchableOpacity>
         <Text style={[s.stepLabel, { color: t.textMuted }]}>Step {step + 1} of {STEPS.length} · {STEPS[step]}</Text>
@@ -390,6 +390,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                       </View>
                       {clinicNames.length > 1 && (
                         <TouchableOpacity onPress={() => setClinicNames(clinicNames.filter((_, j) => j !== i))}
+                          accessibilityLabel={`Remove clinic ${i + 1}`}
                           style={[s.removeBtn, { borderColor: t.cardBorder }]}>
                           <Ionicons name="remove" size={16} color={t.danger} />
                         </TouchableOpacity>

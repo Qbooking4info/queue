@@ -49,7 +49,7 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 10 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={{ marginRight: 10 }}>
           <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
         </TouchableOpacity>
         <Text style={[st.title, { color: t.textPrimary }]}>{specialtyName ? `${specialtyName} Doctors` : 'Find a Doctor'}</Text>

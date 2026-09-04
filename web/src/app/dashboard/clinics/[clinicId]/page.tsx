@@ -1896,7 +1896,7 @@ export default function ClinicDetailPage() {
           </div>
 
           {/* KPI cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div className="dash-stat-grid-4" style={{ marginBottom: 20 }}>
             {[
               { icon: <Calendar size={18} />, label: 'Total',        value: aStats.total,                       sub: 'appointments' },
               { icon: <CheckCircle2 size={18} />,  label: 'Completed',    value: aStats.completed,                   sub: `${showupRate}% show-up rate` },

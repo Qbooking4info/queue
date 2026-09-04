@@ -599,7 +599,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={goBack} style={s.backBtn}>
+          <TouchableOpacity onPress={goBack} accessibilityLabel="Go back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
             <Ionicons name="arrow-back" size={22} color={t.textMuted} />
           </TouchableOpacity>
           <Text style={[s.title, { color: t.textPrimary }]}>
@@ -691,7 +691,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   style={[s.searchInput, { color: t.textPrimary }]}
                 />
                 {searchText.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchText('')}>
+                  <TouchableOpacity onPress={() => setSearchText('')} accessibilityLabel="Clear search" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={14} color={t.textMuted} />
                   </TouchableOpacity>
                 )}
