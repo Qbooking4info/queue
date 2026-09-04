@@ -2,13 +2,14 @@ import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator } from 'react-native'
+  Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { REGISTERED_VIA_DOCTOR } from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { Button } from '@queue/shared/components/ui/Button'
 
 interface Props { navigation: any }
 
@@ -132,13 +133,7 @@ export function DoctorRegisterScreen({ navigation }: Props) {
               </View>
             )}
 
-            <TouchableOpacity
-              style={[s.btn, { backgroundColor: t.accent }, busy && { opacity: 0.6 }]}
-              onPress={handleRegister} disabled={busy}>
-              {busy
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnText}>Create account</Text>}
-            </TouchableOpacity>
+            <Button label="Create account" onPress={handleRegister} loading={busy} size="lg" style={{ marginTop: t.spacing.sm }} />
 
           </View>
 
@@ -174,8 +169,6 @@ const s = StyleSheet.create({
   passInput: { flex: 1, paddingVertical: 11, fontSize: 14 },
   errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
   errText:   { color: '#F87171', fontSize: 12 },
-  btn:       { borderRadius: 14, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
-  btnText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
   footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   footerText:{ fontSize: 13 },
   footerLink:{ fontSize: 13, fontWeight: '700' },

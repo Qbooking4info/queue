@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import type { AuthSurface } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { Button } from '../components/ui/Button'
 
 // Every app mounts this same screen, so the bits that differ per app are read off
 // route params (set with `initialParams` where the screen is registered) rather than
@@ -115,13 +116,7 @@ export function LoginScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            <TouchableOpacity
-              style={[s.btn, { backgroundColor: t.accent }, busy && { opacity: 0.6 }]}
-              onPress={handleLogin} disabled={busy}>
-              {busy
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnText}>Sign in</Text>}
-            </TouchableOpacity>
+            <Button label="Sign in" onPress={handleLogin} loading={busy} size="lg" style={{ marginTop: t.spacing.xl }} />
 
             <TouchableOpacity onPress={handleForgotPassword} style={s.forgotRow}>
               <Text style={[s.forgotText, { color: t.accent }]}>Forgot password?</Text>
@@ -162,8 +157,6 @@ const s = StyleSheet.create({
   input:      { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
   errBox:     { borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 14 },
   errText:    { color: '#F87171', fontSize: 12 },
-  btn:        { borderRadius: 14, paddingVertical: 13, alignItems: 'center', marginTop: 20 },
-  btnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
   forgotRow:  { alignItems: 'center', marginTop: 14 },
   forgotText: { fontSize: 13, fontWeight: '500' },
   footer:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
