@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
@@ -161,13 +161,18 @@ interface BodyProps {
 function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyProps) {
   const [micEnabled, setMicEnabled] = useState(true)
   const [camEnabled, setCamEnabled] = useState(true)
-  const [elapsed, setElapsed]       = useState(0)
 
   useJoin({ appid: appId, channel: channelName, token, uid })
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micEnabled) as { localMicrophoneTrack: IMicrophoneAudioTrack | null }
   const { localCameraTrack }     = useLocalCameraTrack(camEnabled) as { localCameraTrack: ICameraVideoTrack | null }
-  usePublish([localMicrophoneTrack, localCameraTrack])
+  // usePublish's own effect re-runs whenever this array's REFERENCE changes
+  // (its dependency array closes over the array itself, not its contents) --
+  // memoized so it only actually changes when a track is really replaced,
+  // not on every render this component happens to do for an unrelated reason
+  // (e.g. the elapsed-timer tick, before that was isolated into CallTimer below).
+  const tracksToPublish = useMemo(() => [localMicrophoneTrack, localCameraTrack], [localMicrophoneTrack, localCameraTrack])
+  usePublish(tracksToPublish)
 
   const remoteUsers = useRemoteUsers()
   const connected = remoteUsers.length > 0
@@ -185,26 +190,15 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
     return () => clearTimeout(t)
   }, [connectionState])
 
-  useEffect(() => {
-    if (!connected) { setElapsed(0); return }
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [connected])
-
-  function fmt(s: number) {
-    const m = Math.floor(s / 60)
-    return `${m}:${String(s % 60).padStart(2, '0')}`
-  }
-
-  function toggleMic() {
+  const toggleMic = useCallback(() => {
     localMicrophoneTrack?.setEnabled(!micEnabled)
     setMicEnabled(v => !v)
-  }
+  }, [localMicrophoneTrack, micEnabled])
 
-  function toggleCamera() {
+  const toggleCamera = useCallback(() => {
     localCameraTrack?.setEnabled(!camEnabled)
     setCamEnabled(v => !v)
-  }
+  }, [localCameraTrack, camEnabled])
 
   return (
     <View style={st.container}>
@@ -238,9 +232,7 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
         <Text style={st.headerName}>{patientName}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Ionicons name={connected ? 'ellipse' : 'time-outline'} size={connected ? 8 : 12} color={connected ? '#4ade80' : '#7A9089'} />
-          <Text style={[st.headerStatus, { color: connected ? '#4ade80' : '#7A9089' }]}>
-            {connected ? `Connected · ${fmt(elapsed)}` : 'Waiting for patient…'}
-          </Text>
+          <CallTimer connected={connected} waitingLabel="Waiting for patient…" />
         </View>
       </View>
 
@@ -259,6 +251,29 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
         </TouchableOpacity>
       </View>
     </View>
+  )
+}
+
+// Isolated so its once-a-second tick doesn't re-render CallBody itself --
+// that component hosts the actual video (RemoteUser/LocalVideoTrack) and
+// several reactive Agora hooks, so re-executing its whole function body
+// every second was real, avoidable work on the same thread that also has to
+// handle taps on the mic/camera/end buttons.
+function CallTimer({ connected, waitingLabel }: { connected: boolean; waitingLabel: string }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!connected) { setElapsed(0); return }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [connected])
+  function fmt(s: number) {
+    const m = Math.floor(s / 60)
+    return `${m}:${String(s % 60).padStart(2, '0')}`
+  }
+  return (
+    <Text style={[st.headerStatus, { color: connected ? '#4ade80' : '#7A9089' }]}>
+      {connected ? `Connected · ${fmt(elapsed)}` : waitingLabel}
+    </Text>
   )
 }
 
