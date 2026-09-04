@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import {
@@ -1334,14 +1335,10 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           )}
 
           {step === STEP_CONFIRM && (
-            <TouchableOpacity onPress={() => { haptics.success(); handleConfirm() }} disabled={submitting}
-              style={[s.ctaBtn, { backgroundColor: t.accent, opacity: submitting ? 0.6 : 1, flex: 1 }]}>
-              {submitting
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={[s.ctaBtnText, { color: '#fff' }]}>
-                    {isManual ? 'Submit for Review' : 'Confirm booking'}
-                  </Text>}
-            </TouchableOpacity>
+            <Button
+              label={isManual ? 'Submit for Review' : 'Confirm booking'}
+              onPress={() => { haptics.success(); handleConfirm() }} loading={submitting} style={{ flex: 1 }}
+            />
           )}
         </View>
         </KeyboardAvoidingView>

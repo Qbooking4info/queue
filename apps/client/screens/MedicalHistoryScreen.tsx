@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getCompletedAppointments, updateUserProfile, getMedicalHistory, updateMedicalHistory } from '@queue/shared/lib/api'
 import type { MedicalHistory } from '@queue/shared/lib/api'
@@ -191,10 +192,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 14 }]}>Date of birth</Text>
                 <DateOfBirthSelect value={dob} onChange={setDob} />
 
-                <TouchableOpacity onPress={saveProfile} disabled={saving}
-                  style={[s.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-                  <Text style={s.saveBtnText}>{saving ? 'Saving…' : 'Save changes'}</Text>
-                </TouchableOpacity>
+                <Button label="Save changes" onPress={saveProfile} loading={saving} style={{ marginTop: 14 }} />
               </View>
 
               {/* Conditions */}
@@ -403,8 +401,6 @@ const s = StyleSheet.create({
   pillText:          { fontSize: 11 },
   input:             { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, marginTop: 4 },
   textarea:          { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
-  saveBtn:           { borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 14 },
-  saveBtnText:       { color: '#fff', fontSize: 13, fontWeight: '700' },
   emptyCard:         { borderRadius: 18, borderWidth: 1, padding: 32, alignItems: 'center' },
   emptyTitle:        { fontSize: 15, fontWeight: '700', marginBottom: 6 },
   emptySub:          { fontSize: 12, textAlign: 'center', lineHeight: 18 },

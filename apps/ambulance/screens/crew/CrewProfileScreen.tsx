@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { Button } from '@queue/shared/components/ui/Button'
 
 const ROLE_LABEL: Record<string, string> = {
   driver:     'Driver',
@@ -82,26 +83,15 @@ export function CrewProfileScreen() {
           <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
             <Text style={[s.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
             <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }]}
-                onPress={() => setConfirmVisible(false)}>
-                <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.actionBtn, { flex: 1, borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}
-                onPress={() => { haptics.tap(); handleSignOut() }}
-                disabled={signingOut}
-              >
-                {signingOut
-                  ? <ActivityIndicator size="small" color={t.danger} />
-                  : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>}
-              </TouchableOpacity>
+              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
+              <Button
+                label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
+                loading={signingOut} variant="danger" style={{ flex: 1 }}
+              />
             </View>
           </View>
         ) : (
-          <TouchableOpacity style={[s.signOutBtn, { borderColor: t.dangerBorder }]}
-            onPress={() => setConfirmVisible(true)}>
-            <Text style={s.signOutTxt}>Sign out</Text>
-          </TouchableOpacity>
+          <Button label="Sign out" onPress={() => setConfirmVisible(true)} variant="danger" style={{ marginHorizontal: 16 }} />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -132,7 +122,4 @@ const s = StyleSheet.create({
   row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14 },
   rowLabel:      { fontSize: 13 },
   rowValue:      { fontSize: 13, fontWeight: '600' },
-  actionBtn:     { padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
-  signOutBtn:    { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.1)', marginHorizontal: 16 },
-  signOutTxt:    { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
 })

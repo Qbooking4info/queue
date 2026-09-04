@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import {
   getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus,
   sendLocationPing, nextJobStatus, CREW_STATUS_LABEL,
@@ -345,12 +346,10 @@ export function CrewHomeScreen() {
             </TouchableOpacity>
 
             {nextJobStatus(activeJob.status) ? (
-              <TouchableOpacity onPress={handleAdvanceStatus} disabled={updatingStatus}
-                style={[s.primaryBtn, { backgroundColor: t.accent, opacity: updatingStatus ? 0.6 : 1 }]}>
-                {updatingStatus
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.primaryBtnText}>Mark: {CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}</Text>}
-              </TouchableOpacity>
+              <Button
+                label={`Mark: ${CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}`}
+                onPress={handleAdvanceStatus} loading={updatingStatus} style={{ marginTop: 14 }}
+              />
             ) : (
               <View style={[s.noteBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                 <Text style={[s.noteText, { color: t.accent }]}>

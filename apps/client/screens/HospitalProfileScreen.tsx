@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import { haptics } from '@queue/shared/lib/haptics'
 import { StatusBadge } from '@queue/shared/components/ui/StatusBadge'
@@ -263,11 +264,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
               </View>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
-              onPress={bookInPerson}>
-              <Text style={styles.ctaBtnPrimaryText}>Book Appointment</Text>
-            </TouchableOpacity>
+            <Button label="Book Appointment" onPress={bookInPerson} size="lg" />
           )}
         </View>
       </View>

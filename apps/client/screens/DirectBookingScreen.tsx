@@ -4,10 +4,11 @@
 // 'pending' / 'pending_review', and the doctor confirms or reschedules it
 // themselves from the doctors app's Appointments screen.
 import { useState } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { createDirectAppointment, IndependentDoctorProfile } from '@queue/shared/lib/api'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -140,12 +141,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
             </View>
           ) : null}
 
-          <TouchableOpacity onPress={handleSubmit} disabled={submitting}
-            style={[st.submitBtn, { backgroundColor: submitting ? t.cardBorder : t.accent }]}>
-            {submitting
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={[st.submitBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>Request Appointment</Text>}
-          </TouchableOpacity>
+          <Button label="Request Appointment" onPress={handleSubmit} loading={submitting} style={{ marginHorizontal: 20, marginTop: 20 }} />
           <Text style={{ fontSize: 11, color: t.textMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }}>
             This is a request — the doctor will confirm your exact time or suggest an alternative.
           </Text>
@@ -166,6 +162,4 @@ const st = StyleSheet.create({
   timeChip:     { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, minWidth: '22%', alignItems: 'center' },
   textArea:     { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
   errorBox:     { marginHorizontal: 20, marginTop: 14, padding: 12, borderRadius: 10, borderWidth: 1 },
-  submitBtn:    { marginHorizontal: 20, marginTop: 20, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  submitBtnText:{ fontSize: 14, fontWeight: '700' },
 })

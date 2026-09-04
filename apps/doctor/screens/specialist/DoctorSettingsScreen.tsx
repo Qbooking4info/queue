@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import {
@@ -137,14 +138,7 @@ export function DoctorSettingsScreen({}: Props) {
           <FieldRow theme={t} label="Bio" value={form.bio ?? ''} onChange={v => set('bio', v || null)} placeholder="Brief bio patients will see" multiline last />
         </Section>
 
-        <TouchableOpacity onPress={save} disabled={saving}
-          style={{ backgroundColor: saving ? t.cardBorder : t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginBottom: 20 }}>
-          {saving ? <ActivityIndicator size="small" color="#fff" /> : (
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.id === 'forest' ? '#061208' : '#fff' }}>
-              {saved ? 'Saved ✓' : 'Save Settings'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        <Button label={saved ? 'Saved ✓' : 'Save Settings'} onPress={save} loading={saving} style={{ marginBottom: 20 }} />
 
         <Section theme={t} title="Qualification documents">
           {docs.length === 0 ? (

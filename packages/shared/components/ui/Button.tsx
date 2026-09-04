@@ -4,7 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 interface Props {
   label: string
   onPress?: () => void
-  variant?: 'primary' | 'outline' | 'ghost'
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
   disabled?: boolean
@@ -24,6 +24,13 @@ export function Button({ label, onPress, variant = 'primary', size = 'md', loadi
   const { theme: t } = useTheme()
   const isDisabled = disabled || loading
 
+  // forest's accent (#00E87A) is bright enough that white text on it reads worse than
+  // near-black -- six screens had already independently discovered this and hand-wrote
+  // the same `t.id === 'forest' ? '#061208' : '#fff'` check. Centralizing it here so
+  // every future primary button gets it for free instead of rediscovering it a seventh
+  // time.
+  const onPrimary = t.id === 'forest' ? '#061208' : '#fff'
+
   const containerStyles: ViewStyle = {
     borderRadius: size === 'lg' ? t.radius.lg : size === 'sm' ? t.radius.sm : t.radius.md,
     paddingVertical: size === 'lg' ? t.spacing.lg : size === 'sm' ? t.spacing.sm : t.spacing.md,
@@ -33,17 +40,20 @@ export function Button({ label, onPress, variant = 'primary', size = 'md', loadi
     ...(variant === 'primary' && { backgroundColor: t.accent }),
     ...(variant === 'outline' && { backgroundColor: 'transparent', borderWidth: 1, borderColor: t.cardBorder }),
     ...(variant === 'ghost'   && { backgroundColor: 'transparent' }),
+    // Matches the bordered/tinted destructive button several screens (sign out, delete
+    // account) had already hand-rolled from dangerSubtle/dangerStrong -- not a new look.
+    ...(variant === 'danger'  && { backgroundColor: t.dangerSubtle, borderWidth: 1, borderColor: t.dangerStrong }),
   }
 
   const textStyle: TextStyle = {
     fontSize: size === 'lg' ? t.font.lg : size === 'sm' ? t.font.sm : t.font.md,
     fontWeight: '700',
-    color: variant === 'primary' ? '#fff' : t.textSecondary,
+    color: variant === 'primary' ? onPrimary : variant === 'danger' ? t.danger : t.textSecondary,
   }
 
   return (
     <TouchableOpacity onPress={onPress} disabled={isDisabled} style={[containerStyles, style]} activeOpacity={0.75}>
-      {loading && <ActivityIndicator size="small" color={variant === 'primary' ? '#fff' : t.accent} />}
+      {loading && <ActivityIndicator size="small" color={textStyle.color} />}
       <Text style={textStyle}>{label}</Text>
     </TouchableOpacity>
   )

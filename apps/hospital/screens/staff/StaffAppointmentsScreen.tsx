@@ -9,6 +9,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
+import { Button } from '@queue/shared/components/ui/Button'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -261,10 +262,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                 </View>
                 {canApprove && (
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-                    <TouchableOpacity onPress={() => handleReject(appt)} disabled={!!actioning}
-                      style={[s.actionBtn, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, flex: 1 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={[s.actionText, { color: t.danger }]}>Reject</Text>}
-                    </TouchableOpacity>
+                    <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
                     <TouchableOpacity onPress={() => handleApprove(appt)} disabled={!!actioning}
                       style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)', flex: 2 }]}>
                       {isLoading ? <ActivityIndicator size="small" color={t.accentDark} /> : (

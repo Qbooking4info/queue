@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -268,10 +269,7 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
 
               {error ? <Text style={[s.errorText, { color: t.danger }]}>{error}</Text> : null}
 
-              <TouchableOpacity onPress={handleInvite} disabled={loading}
-                style={[s.modalBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent }]}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>Send Invite</Text>}
-              </TouchableOpacity>
+              <Button label="Send Invite" onPress={handleInvite} loading={loading} />
             </>
           )}
         </View>

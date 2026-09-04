@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Button } from '@queue/shared/components/ui/Button'
 import {
   getHospitals, getHospitalById, getClinicsForHospital, createReferral,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
@@ -478,12 +479,10 @@ export function ReferPatientScreen({ navigation, route }: Props) {
             </View>
           )}
 
-          <TouchableOpacity onPress={submit} disabled={submitting}
-            style={[st.submitBtn, { backgroundColor: t.accent, opacity: submitting ? 0.6 : 1 }]}>
-            {submitting ? <ActivityIndicator color="#fff" /> : (
-              <Text style={st.submitTxt}>{isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}</Text>
-            )}
-          </TouchableOpacity>
+          <Button
+            label={isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}
+            onPress={submit} loading={submitting} size="lg" style={{ marginTop: t.spacing.xl }}
+          />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -505,7 +504,5 @@ const st = StyleSheet.create({
   docRow:      { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
   chip:        { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   noticeBox:   { borderWidth: 1, borderRadius: 12, padding: 12 },
-  submitBtn:   { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 24 },
-  submitTxt:   { color: '#fff', fontSize: 15, fontWeight: '800' },
   completeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 20 },
 })

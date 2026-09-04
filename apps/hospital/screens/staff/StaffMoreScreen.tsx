@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Switch } from 'react-native'
+  Switch } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -110,13 +111,11 @@ export function StaffMoreScreen({ navigation }: Props) {
             <View style={{ padding: 12 }}>
               <Text style={[{ color: t.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }]}>Sign out of your account?</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity onPress={() => setConfirmVisible(false)} style={[s.confirmBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-                  <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { haptics.tap(); handleSignOut() }} disabled={signingOut}
-                  style={[s.confirmBtn, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle, flex: 1 }]}>
-                  {signingOut ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>}
-                </TouchableOpacity>
+                <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
+                <Button
+                  label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
+                  loading={signingOut} variant="danger" style={{ flex: 1 }}
+                />
               </View>
             </View>
           ) : (
@@ -148,5 +147,4 @@ const s = StyleSheet.create({
   menuRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
   menuIcon:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
-  confirmBtn:  { flex: 1, borderRadius: 10, padding: 11, alignItems: 'center', borderWidth: 1 },
 })
