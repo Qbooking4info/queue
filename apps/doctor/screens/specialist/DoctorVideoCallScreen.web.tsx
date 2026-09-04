@@ -16,6 +16,7 @@ import AgoraRTC, {
   type IMicrophoneAudioTrack,
 } from 'agora-rtc-react'
 import { supabase } from '@queue/shared/lib/supabase'
+import { CallErrorBoundary } from '@queue/shared/components/CallErrorBoundary'
 
 // Browser counterpart to DoctorVideoCallScreen.native.tsx -- same token fetch, same
 // /api/virtual/end on hangup, same uid (1, host), just agora-rtc-react's Web SDK
@@ -84,29 +85,30 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     return () => { active = false }
   }, [appointmentId])
 
-  async function handleEndSession() {
+  // Split from the confirm-gated button below so the error boundary can call
+  // this directly -- if the screen already crashed, asking "are you sure?"
+  // before letting the doctor leave is just friction, not a safeguard.
+  async function doEndAndLeave() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (jwt && API_URL) {
+        await fetch(`${API_URL}/api/virtual/end`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        })
+      }
+    } catch (err) {
+      console.warn('[video] failed to end session on leave', err)
+    }
+    navigation.goBack()
+  }
+
+  function handleEndSession() {
     Alert.alert('End session?', 'This will end the call for both you and the patient.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End session',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const jwt = session?.access_token
-            if (jwt && API_URL) {
-              await fetch(`${API_URL}/api/virtual/end`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ appointmentId }),
-              })
-            }
-          } catch (err) {
-            console.warn('[video] failed to end session on leave', err)
-          }
-          navigation.goBack()
-        },
-      },
+      { text: 'End session', style: 'destructive', onPress: doEndAndLeave },
     ])
   }
 
@@ -136,16 +138,18 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AgoraRTCProvider client={agoraClient}>
-      <CallBody
-        appId={tokenData.appId}
-        token={tokenData.token}
-        channelName={tokenData.channelName}
-        uid={tokenData.uid}
-        patientName={patientName}
-        onEnd={handleEndSession}
-      />
-    </AgoraRTCProvider>
+    <CallErrorBoundary onLeave={doEndAndLeave}>
+      <AgoraRTCProvider client={agoraClient}>
+        <CallBody
+          appId={tokenData.appId}
+          token={tokenData.token}
+          channelName={tokenData.channelName}
+          uid={tokenData.uid}
+          patientName={patientName}
+          onEnd={handleEndSession}
+        />
+      </AgoraRTCProvider>
+    </CallErrorBoundary>
   )
 }
 

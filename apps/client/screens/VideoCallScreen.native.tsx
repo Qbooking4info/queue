@@ -13,8 +13,10 @@ import {
 } from 'react-native-agora'
 import { supabase } from '@queue/shared/lib/supabase'
 import { applyAudioProfile, applyVideoProfile, signalFromQuality, SignalLevel } from '@queue/shared/lib/agoraCall'
+import { CallErrorBoundary } from '@queue/shared/components/CallErrorBoundary'
 
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID ?? ''
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 /** "Adaeze Nwachukwu" -> "AN". Falls back to a single glyph for one-word names. */
 function initials(name: string): string {
@@ -273,14 +275,40 @@ export function VideoCallScreen({ navigation, route }: Props) {
     setCamEnabled(true)
   }
 
+  // Split out so the error boundary can call this directly without the
+  // confirm dialog -- if the screen already crashed, "are you sure?" is just
+  // friction, not a safeguard.
+  async function doLeave() {
+    // Real server call now, not just a local goBack -- previously a patient
+    // ending the call here had no server-side effect at all, leaving the
+    // appointment stuck in_progress for the doctor with no way back in.
+    // Best-effort: if this fails, still leave locally -- the doctor's own
+    // End (or the stuck-call rejoin path) covers it.
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      const jwt = authSession?.access_token
+      if (jwt && API_URL) {
+        await fetch(`${API_URL}/api/virtual/end`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        })
+      }
+    } catch (e) {
+      console.warn('[video] failed to end session on leave', e)
+    }
+    navigation.goBack()
+  }
+
   function handleEndCall() {
     Alert.alert('Leave call?', 'End this video consultation?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: () => navigation.goBack() },
+      { text: 'Leave', style: 'destructive', onPress: doLeave },
     ])
   }
 
   return (
+    <CallErrorBoundary onLeave={doLeave}>
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="#050d09" />
 
@@ -395,6 +423,7 @@ export function VideoCallScreen({ navigation, route }: Props) {
         </View>
       </View>
     </View>
+    </CallErrorBoundary>
   )
 }
 

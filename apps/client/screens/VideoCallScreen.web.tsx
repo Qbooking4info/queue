@@ -16,14 +16,17 @@ import AgoraRTC, {
   type IMicrophoneAudioTrack,
 } from 'agora-rtc-react'
 import { supabase } from '@queue/shared/lib/supabase'
+import { CallErrorBoundary } from '@queue/shared/components/CallErrorBoundary'
 
 // Browser counterpart to VideoCallScreen.native.tsx (patient side). The patient never
 // calls /api/virtual/token -- same as native, this reads guest_token straight off
 // virtual_sessions (RLS already permits it: "Patients can read own virtual sessions"),
 // falling back to a Realtime subscription while waiting for the doctor to start the
-// session. Ending the call is client-side only here too -- only the doctor's client
-// calls /api/virtual/end, which is what actually marks the appointment completed.
+// session. Ending IS a real server call though (/api/virtual/end, now open to either
+// party) -- a patient tapping "Leave" here used to only navigate away locally, leaving
+// the appointment stuck in_progress for the doctor with no way back in.
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID ?? ''
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 interface Props {
   navigation: any
@@ -118,16 +121,38 @@ export function VideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AgoraRTCProvider client={agoraClient}>
-      <CallBody
-        appId={AGORA_APP_ID}
-        token={session.guest_token}
-        channelName={session.room_name}
-        doctorName={doctorName}
-        onLeave={() => navigation.goBack()}
-      />
-    </AgoraRTCProvider>
+    <CallErrorBoundary onLeave={handleLeave}>
+      <AgoraRTCProvider client={agoraClient}>
+        <CallBody
+          appId={AGORA_APP_ID}
+          token={session.guest_token}
+          channelName={session.room_name}
+          doctorName={doctorName}
+          onLeave={handleLeave}
+        />
+      </AgoraRTCProvider>
+    </CallErrorBoundary>
   )
+
+  async function handleLeave() {
+    // Best-effort -- if this fails (network blip, already-ended session) the
+    // patient can still always leave locally; the doctor's own End (or the
+    // stuck-call fallback in DoctorAppointmentsScreen) covers it.
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      const jwt = authSession?.access_token
+      if (jwt && API_URL) {
+        await fetch(`${API_URL}/api/virtual/end`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        })
+      }
+    } catch (e) {
+      console.warn('[video] failed to end session on leave', e)
+    }
+    navigation.goBack()
+  }
 }
 
 interface BodyProps {
@@ -135,7 +160,7 @@ interface BodyProps {
   token: string
   channelName: string
   doctorName: string
-  onLeave: () => void
+  onLeave: () => void | Promise<void>
 }
 
 function CallBody({ appId, token, channelName, doctorName, onLeave }: BodyProps) {

@@ -13,6 +13,7 @@ import {
 } from 'react-native-agora'
 import { supabase } from '@queue/shared/lib/supabase'
 import { applyAudioProfile, applyVideoProfile, signalFromQuality, SignalLevel } from '@queue/shared/lib/agoraCall'
+import { CallErrorBoundary } from '@queue/shared/components/CallErrorBoundary'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -219,32 +220,33 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     setCamEnabled(true)
   }
 
-  async function handleEndSession() {
+  // Split out so the error boundary can call this directly without the
+  // confirm dialog -- if the screen already crashed, "are you sure?" is just
+  // friction, not a safeguard.
+  async function doEndAndLeave() {
+    // Best-effort: call end endpoint then navigate back regardless
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (jwt && API_URL) {
+        await fetch(`${API_URL}/api/virtual/end`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        })
+      }
+    } catch (err) {
+      // Teardown is best-effort — the user is leaving either way — but a
+      // silent catch meant a failed session-end was undiagnosable.
+      console.warn('[video] failed to end session on leave', err)
+    }
+    navigation.goBack()
+  }
+
+  function handleEndSession() {
     Alert.alert('End session?', 'This will end the call for both you and the patient.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End session',
-        style: 'destructive',
-        onPress: async () => {
-          // Best-effort: call end endpoint then navigate back regardless
-          try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const jwt = session?.access_token
-            if (jwt && API_URL) {
-              await fetch(`${API_URL}/api/virtual/end`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ appointmentId }),
-              })
-            }
-          } catch (err) {
-            // Teardown is best-effort — the user is leaving either way — but a
-            // silent catch meant a failed session-end was undiagnosable.
-            console.warn('[video] failed to end session on leave', err)
-          }
-          navigation.goBack()
-        },
-      },
+      { text: 'End session', style: 'destructive', onPress: doEndAndLeave },
     ])
   }
 
@@ -281,6 +283,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
+    <CallErrorBoundary onLeave={doEndAndLeave}>
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor="#050d09" />
 
@@ -366,6 +369,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         </View>
       </View>
     </View>
+    </CallErrorBoundary>
   )
 }
 
