@@ -58,7 +58,7 @@ export function BedSpaceCard({ hospitalId, status, updatedAt }: {
               background: stale ? C.red + '22' : C.accentLight,
               color: stale ? C.red : C.accent }}>{meta.label}</span>
           </div>
-          <div style={{ fontSize: 11.5, color: stale ? C.red : C.textMuted, marginTop: 2,
+          <div className={stale ? 'bedspace-flash-text' : undefined} style={{ fontSize: 11.5, color: stale ? C.red : C.textMuted, marginTop: 2,
             display: 'flex', alignItems: 'center', gap: 4, fontWeight: stale ? 600 : 400,
             animation: stale ? 'bedspace-flash 2s ease-in-out infinite' : 'none' }}>
             {stale && <AlertTriangle size={11} />}
@@ -67,7 +67,17 @@ export function BedSpaceCard({ hospitalId, status, updatedAt }: {
         </div>
         <span style={{ color: C.textMuted, fontSize: 16 }}>›</span>
       </button>
-      <style>{`@keyframes bedspace-flash { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }`}</style>
+      <style>{`
+        @keyframes bedspace-flash { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+        /* Runs indefinitely while the bed-space count is stale -- could be minutes or
+           hours on a hospital ops dashboard someone stares at all shift, with no way to
+           pause it (WCAG 2.2.2). Color, the warning icon, and the "tap to update" text
+           already carry the stale state, so turning off just the flash loses no
+           information for anyone who has asked the OS/browser to reduce motion. */
+        @media (prefers-reduced-motion: reduce) {
+          .bedspace-flash-text { animation: none !important; }
+        }
+      `}</style>
 
       {open && (
         <div

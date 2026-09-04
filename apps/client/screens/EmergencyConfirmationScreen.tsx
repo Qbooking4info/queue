@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
 
 interface Props { navigation: any; route: any }
 
@@ -20,18 +21,22 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
   const [queuePos] = useState(1)           // emergency = top of queue
   const [countdown, setCountdown] = useState(slot === 'Now (walk-in)' ? 0 : getMinutes(slot))
   const pulseAnim = useRef(new Animated.Value(1)).current
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => { setTimeout(() => setShow(true), 100) }, [])
 
-  // Pulse animation for the alert icon
+  // Pulse animation for the alert icon -- an indefinite loop, so it's gated behind the
+  // OS's reduce-motion setting (WCAG 2.2.2): the icon, color and text around it already
+  // say this is an emergency without the pulse, and this loop has no way to stop.
   useEffect(() => {
+    if (reduceMotion) return
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.15, duration: 600, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1,    duration: 600, useNativeDriver: true }),
       ])
     ).start()
-  }, [])
+  }, [reduceMotion])
 
   // Countdown timer
   useEffect(() => {

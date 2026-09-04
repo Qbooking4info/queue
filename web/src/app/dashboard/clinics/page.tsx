@@ -491,7 +491,7 @@ export default function ClinicsPage() {
 
       {/* Summary stats */}
       {clinics.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+        <div className="dash-stat-grid-3" style={{ marginBottom: 24 }}>
           {[
             { label: 'Total Clinics', value: clinics.length, color: C.accent },
             { label: 'Admins Assigned', value: totalWithAdmin, color: C.blue },
