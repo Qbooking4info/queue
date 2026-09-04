@@ -4,11 +4,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, Stethoscope, BarChart3, Bell, Check, Eye, EyeOff, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 
 function LoginContent() {
   const router         = useRouter()
   const searchParams   = useSearchParams()
   const justRegistered = searchParams.get('registered') === 'true'
+  const { theme: C }   = useTheme()
 
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -35,9 +38,16 @@ function LoginContent() {
     }
   }
 
+  // Form panel below is now theme-reactive -- it used to hardcode clinical's exact
+  // values (which is why it looked fine to begin with) but never actually read
+  // useTheme(), so a returning user who'd switched their dashboard to forest saw their
+  // own login screen revert to light regardless. The left branding panel is left as
+  // fixed dark brand chrome on purpose, same as mobile's SplashScreen -- pre-login,
+  // there's no dashboard preference to honor yet, and its white-on-dark internals
+  // (like the splash) aren't designed to flip to dark-on-light.
   const inputStyle = (focused: boolean) => ({
-    width: '100%', background: '#FFFFFF', border: `1.5px solid ${focused ? '#1A7FC1' : '#DDE8F5'}`,
-    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#0C2A4A',
+    width: '100%', background: C.card, border: `1.5px solid ${focused ? C.accent : C.border}`,
+    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: C.text,
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
     transition: 'border-color .15s',
   })
@@ -45,7 +55,7 @@ function LoginContent() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Left panel — branding */}
-      <div style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+      <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
         position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
@@ -103,36 +113,36 @@ function LoginContent() {
       </div>
 
       {/* Right panel — form */}
-      <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'center',
+      <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center',
         justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ width: '100%', maxWidth: 400 }}>
 
           {/* Registration success banner */}
           {justRegistered && (
-            <div style={{ marginBottom: 24, padding: '14px 16px', background: '#E6F9EF',
-              border: '1px solid rgba(0,160,80,0.3)', borderRadius: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0A7A40', marginBottom: 3,
+            <div style={{ marginBottom: 24, padding: '14px 16px', background: `${C.accent}1A`,
+              border: `1px solid ${C.accent}4D`, borderRadius: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 3,
                 display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Check size={14} /> Hospital registered successfully!
               </div>
-              <div style={{ fontSize: 12, color: '#1A6040', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>
                 Your hospital is pending verification. Sign in below to access your dashboard while we review your details.
               </div>
             </div>
           )}
 
           <div style={{ marginBottom: 36 }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#0C2A4A', letterSpacing: '-.04em', marginBottom: 6 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: '-.04em', marginBottom: 6 }}>
               Sign in to your hospital
             </div>
-            <div style={{ fontSize: 13, color: '#6A8FAA' }}>
+            <div style={{ fontSize: 13, color: C.textSub }}>
               Enter your admin credentials to access the dashboard.
             </div>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Email address
               </label>
@@ -143,7 +153,7 @@ function LoginContent() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Password
               </label>
@@ -155,33 +165,28 @@ function LoginContent() {
                 <button type="button" onClick={() => setShowPass(v => !v)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6A8FAA' }}>
+                    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: C.textSub }}>
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
-                padding: '10px 14px', fontSize: 13, color: '#E03E3E',
+              <div style={{ background: C.redLight, border: `1px solid ${C.red}66`, borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: C.red,
                 display: 'flex', alignItems: 'center', gap: 6 }}>
                 <AlertTriangle size={14} /> {error}
               </div>
             )}
 
-            <button type="submit" disabled={loading}
-              style={{ width: '100%', background: '#1A7FC1', color: '#FFFFFF', border: 'none',
-                borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                fontFamily: 'inherit', marginTop: 4, transition: 'opacity .15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {loading ? 'Signing in…' : <>Sign in to dashboard <ArrowRight size={15} /></>}
-            </button>
+            <Button type="submit" loading={loading} size="lg" className="w-full mt-1">
+              Sign in to dashboard {!loading && <ArrowRight size={15} />}
+            </Button>
           </form>
 
-          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: '#6A8FAA' }}>
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: C.textSub }}>
             New hospital?{' '}
-            <Link href="/register" style={{ color: '#1A7FC1', fontWeight: 600 }}>Register here</Link>
+            <Link href="/register" style={{ color: C.accent, fontWeight: 600 }}>Register here</Link>
           </div>
 
         </div>

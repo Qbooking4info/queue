@@ -5,6 +5,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { FallbackPanel } from '@queue/shared/components/emergency/FallbackPanel'
 import {
@@ -206,7 +207,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   if (loading || !request) {
     return (
       <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color="#FF5C5C" />
+        <ActivityIndicator color={t.danger} />
       </SafeAreaView>
     )
   }
@@ -214,7 +215,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   const status      = request.status
   const isTerminal   = TERMINAL.includes(status)
   const canCancel    = CANCELLABLE.includes(status)
-  const statusColor  = status === 'completed' ? '#00C265' : status.startsWith('cancelled') || status === 'no_unit_available' ? '#8A8A8A' : '#FF5C5C'
+  const statusColor  = status === 'completed' ? t.accentDark : status.startsWith('cancelled') || status === 'no_unit_available' ? '#8A8A8A' : t.danger
 
   const markers = [
     ...(pickup  ? [{ id: 'pickup', latitude: pickup.lat,  longitude: pickup.lng,  title: 'Pickup location' }] : []),
@@ -248,8 +249,8 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
         </View>
 
         {(status === 'no_unit_available' || deadlinePassed) && (
-          <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-            <Text style={[s.noteText, { color: '#FF5C5C' }]}>
+          <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+            <Text style={[s.noteText, { color: t.danger }]}>
               {status === 'no_unit_available'
                 ? 'No ambulance could be reached.'
                 : "We haven't been able to reach an ambulance yet."}
@@ -293,18 +294,11 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
         </View>
 
         {canCancel && (
-          <TouchableOpacity onPress={handleCancel} disabled={cancelling}
-            style={[s.actionBtn, { borderColor: 'rgba(255,92,92,0.4)', opacity: cancelling ? 0.6 : 1 }]}>
-            {cancelling
-              ? <ActivityIndicator color="#FF5C5C" />
-              : <Text style={[s.actionBtnText, { color: '#FF5C5C' }]}>Cancel request</Text>}
-          </TouchableOpacity>
+          <Button label="Cancel request" onPress={handleCancel} loading={cancelling} variant="danger" />
         )}
 
         {isTerminal && (
-          <TouchableOpacity onPress={backToHome} style={[s.actionBtn, { borderColor: t.cardBorder }]}>
-            <Text style={[s.actionBtnText, { color: t.textPrimary }]}>Back to home</Text>
-          </TouchableOpacity>
+          <Button label="Back to home" onPress={backToHome} variant="outline" />
         )}
 
         <View style={{ height: 32 }} />
@@ -329,6 +323,4 @@ const s = StyleSheet.create({
   detailRow:    { flexDirection: 'row', justifyContent: 'space-between', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
   detailLabel:  { fontSize: 12, flexShrink: 0 },
   detailValue:  { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
-  actionBtn:    { padding: 15, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', marginBottom: 10 },
-  actionBtnText:{ fontSize: 14, fontWeight: '700' },
 })

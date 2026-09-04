@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase }  from '@queue/shared/lib/supabase'
 import { deleteAccount } from '@queue/shared/lib/api'
@@ -117,10 +118,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           {!!pwError   && <Text style={s.errorText}>{pwError}</Text>}
           {pwSuccess   && <Text style={s.successText}>Password changed successfully.</Text>}
 
-          <TouchableOpacity onPress={handleChangePassword} disabled={saving}
-            style={[s.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Update password</Text>}
-          </TouchableOpacity>
+          <Button label="Update password" onPress={handleChangePassword} loading={saving} />
         </View>
 
         {/* MM12: Privacy preference toggles removed — they were static decorations with no backing state */}
@@ -128,11 +126,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
         {/* Danger zone */}
         <Text style={[s.sectionTitle, { color: t.textMuted }]}>Account</Text>
         {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
-        <TouchableOpacity onPress={() => signOut()}
-          style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
-          <Ionicons name="log-out-outline" size={16} color="#FF5C5C" />
-          <Text style={[s.dangerBtnText, { color: '#FF5C5C' }]}>Sign out of all devices</Text>
-        </TouchableOpacity>
+        <Button label="Sign out of all devices" onPress={() => signOut()} variant="danger" icon="log-out-outline" />
         <TouchableOpacity onPress={handleDeleteAccount} style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
           <Ionicons name="trash-outline" size={16} color="rgba(255,92,92,0.8)" />
           <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
@@ -162,8 +156,6 @@ const s = StyleSheet.create({
   input:            { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
   errorText:        { color: '#F87171', fontSize: 12, marginBottom: 8 },
   successText:      { color: '#4ADE80', fontSize: 12, marginBottom: 8 },
-  saveBtn:          { borderRadius: 12, padding: 13, alignItems: 'center' },
-  saveBtnText:      { color: '#fff', fontSize: 13, fontWeight: '700' },
   dangerBtn:        { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 13, borderWidth: 1 },
   dangerBtnText:    { fontSize: 13, fontWeight: '600' },
 })

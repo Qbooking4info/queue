@@ -1,30 +1,40 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { Check, X } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import { updateAppointmentStatus } from './actions'
 
-const NEXT_ACTIONS: Record<string, { label: string; status: string; color: string }[]> = {
-  pending:     [{ label: 'Confirm', status: 'confirmed', color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: 'Cancel', status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  confirmed:   [{ label: 'Check In', status: 'checked_in', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }, { label: 'Cancel', status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  checked_in:  [{ label: 'Start', status: 'in_progress', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }],
-  in_progress: [{ label: 'Complete', status: 'completed', color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: 'No Show', status: 'no_show', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-}
-
+// Never called useTheme() -- every color here was a static Tailwind class
+// (text-green-400, bg-blue-500/10, ...), which can't react to the clinical/forest
+// toggle the rest of the dashboard runs on. Same bug as Button.tsx had, just never
+// caught here since this component has no shared adopter to notice it through.
 export function StatusButton({ appointmentId, currentStatus }: { appointmentId: string; currentStatus: string }) {
+  const { theme: C } = useTheme()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const TERMINAL: Record<string, { label: string; color: string; icon: typeof Check }> = {
-    completed: { label: 'Completed', color: 'text-gray-500 border-white/10 bg-white/5', icon: Check },
-    cancelled:  { label: 'Cancelled', color: 'text-red-400/60 border-red-500/10 bg-red-500/5', icon: X },
-    no_show:    { label: 'No Show',   color: 'text-red-400/60 border-red-500/10 bg-red-500/5', icon: X },
+
+  const NEXT_ACTIONS: Record<string, { label: string; status: string; bg: string; border: string; color: string }[]> = {
+    pending:     [{ label: 'Confirm',  status: 'confirmed',   bg: C.accentLight, border: C.accentBorder, color: C.accent }, { label: 'Cancel', status: 'cancelled', bg: C.redLight, border: `${C.red}4D`, color: C.red }],
+    confirmed:   [{ label: 'Check In', status: 'checked_in',  bg: C.infoBg,      border: C.infoBorder,   color: C.info   }, { label: 'Cancel', status: 'cancelled', bg: C.redLight, border: `${C.red}4D`, color: C.red }],
+    checked_in:  [{ label: 'Start',    status: 'in_progress', bg: C.infoBg,      border: C.infoBorder,   color: C.info   }],
+    in_progress: [{ label: 'Complete', status: 'completed',   bg: C.accentLight, border: C.accentBorder, color: C.accent }, { label: 'No Show', status: 'no_show', bg: C.redLight, border: `${C.red}4D`, color: C.red }],
   }
+  const TERMINAL: Record<string, { label: string; bg: string; border: string; color: string; icon: typeof Check }> = {
+    completed: { label: 'Completed', bg: C.bgAlt,   border: C.border,       color: C.textMuted, icon: Check },
+    cancelled: { label: 'Cancelled', bg: C.redLight, border: `${C.red}1A`, color: `${C.red}99`, icon: X },
+    no_show:   { label: 'No Show',   bg: C.redLight, border: `${C.red}1A`, color: `${C.red}99`, icon: X },
+  }
+
   const actions = NEXT_ACTIONS[currentStatus] ?? []
   if (!actions.length) {
     const terminal = TERMINAL[currentStatus]
     if (!terminal) return null
     const Icon = terminal.icon
     return (
-      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border ${terminal.color}`}>
+      <span
+        className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border"
+        style={{ background: terminal.bg, borderColor: terminal.border, color: terminal.color }}
+      >
         <Icon size={12} />
         {terminal.label}
       </span>
@@ -50,12 +60,14 @@ export function StatusButton({ appointmentId, currentStatus }: { appointmentId: 
             key={action.status}
             disabled={pending}
             onClick={() => handleClick(action.status)}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 ${action.color}`}>
+            className="text-xs font-semibold px-3 py-1.5 rounded-full border transition-all disabled:opacity-50"
+            style={{ background: action.bg, borderColor: action.border, color: action.color }}
+          >
             {pending ? '…' : action.label}
           </button>
         ))}
       </div>
-      {error && <span className="text-xs text-red-400">{error}</span>}
+      {error && <span className="text-xs" style={{ color: C.red }}>{error}</span>}
     </div>
   )
 }

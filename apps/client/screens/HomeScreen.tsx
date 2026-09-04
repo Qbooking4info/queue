@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation, distanceKm } from '@queue/shared/contexts/LocationContext'
 import { HospitalCard } from '@queue/shared/components/hospital/HospitalCard'
@@ -249,15 +250,15 @@ export function HomeScreen({ navigation }: Props) {
         {/* Profile completion banner */}
         {showProfileBanner && (
           <View style={[s.profileBanner, { backgroundColor: '#2A1800', borderColor: 'rgba(239,159,39,0.35)' }]}>
-            <Ionicons name="medical-outline" size={20} color="#EF9F27" />
+            <Ionicons name="medical-outline" size={20} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
-              <Text style={[s.profileBannerTitle, { color: '#EF9F27' }]}>Complete your health profile</Text>
+              <Text style={[s.profileBannerTitle, { color: t.statusBusy.text }]}>Complete your health profile</Text>
               <Text style={[s.profileBannerSub, { color: 'rgba(239,159,39,0.65)' }]}>
                 Missing info affects emergency triage. Takes 30 seconds.
               </Text>
             </View>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Profile') }}
-              style={[s.profileBannerBtn, { backgroundColor: '#EF9F27', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              style={[s.profileBannerBtn, { backgroundColor: t.statusBusy.text, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
               <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete</Text>
               <Ionicons name="arrow-forward" size={12} color="#000" />
             </TouchableOpacity>
@@ -294,10 +295,10 @@ export function HomeScreen({ navigation }: Props) {
                   ))}
                 </View>
               </View>
-              <TouchableOpacity style={[s.bannerBtn, { backgroundColor: t.accent }]}
-                onPress={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: nextAppt }) }}>
-                <Text style={s.bannerBtnText}>View</Text>
-              </TouchableOpacity>
+              <Button
+                label="View" size="sm"
+                onPress={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: nextAppt }) }}
+              />
             </View>
           </View>
         ) : !loading && (
@@ -502,8 +503,6 @@ const s = StyleSheet.create({
   bannerSub:         { fontSize: 11, marginTop: 2 },
   bannerChip:        { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   bannerChipText:    { fontSize: 10, fontWeight: '700' },
-  bannerBtn:         { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
-  bannerBtnText:     { fontSize: 12, fontWeight: '700', color: '#fff' },
   searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 14, borderWidth: 1 },
   bookRow:           { flexDirection: 'row', gap: 8, marginBottom: 16 },
   bookCard:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 12, borderWidth: 1 },

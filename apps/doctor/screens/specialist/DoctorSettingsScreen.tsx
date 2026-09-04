@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import {
@@ -148,14 +149,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           <FieldRow theme={t} label="Bio" value={form.bio ?? ''} onChange={v => set('bio', v || null)} placeholder="Brief bio patients will see" multiline last />
         </Section>
 
-        <TouchableOpacity onPress={save} disabled={saving}
-          style={{ backgroundColor: saving ? t.cardBorder : t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginBottom: 20 }}>
-          {saving ? <ActivityIndicator size="small" color="#fff" /> : (
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.id === 'forest' ? '#061208' : '#fff' }}>
-              {saved ? 'Saved ✓' : 'Save Settings'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        <Button label={saved ? 'Saved ✓' : 'Save Settings'} onPress={save} loading={saving} style={{ marginBottom: 20 }} />
 
         <Section theme={t} title="Qualification documents">
           {docs.length === 0 ? (
@@ -170,7 +164,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
                 <Text numberOfLines={1} style={{ fontSize: 12, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(d.id)} style={{ padding: 4 }}>
-                <Ionicons name="trash-outline" size={15} color="#FF5C5C" />
+                <Ionicons name="trash-outline" size={15} color={t.danger} />
               </TouchableOpacity>
             </View>
           ))}
@@ -202,14 +196,14 @@ export function DoctorSettingsScreen({ navigation }: Props) {
               <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => signOut()}
-              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }}>
-              <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Confirm Sign Out</Text>
+              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }}>
+              <Text style={{ color: t.danger, fontWeight: '700' }}>Confirm Sign Out</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => setConfirmSignOut(true)}
-            style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#FF5C5C' }}>Sign out</Text>
+            style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger }}>Sign out</Text>
           </TouchableOpacity>
         )}
       </ShellScroll>

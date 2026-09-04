@@ -39,7 +39,7 @@ function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; o
         <span style={{
           padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
           background: h.is_verified ? 'rgba(34,197,94,0.12)' : 'rgba(239,159,39,0.12)',
-          color:      h.is_verified ? '#4ade80' : '#EF9F27',
+          color:      h.is_verified ? '#4ade80' : C.amber,
           border:     `1px solid ${h.is_verified ? 'rgba(34,197,94,0.3)' : 'rgba(239,159,39,0.3)'}`,
         }}>
           {h.is_verified ? 'Verified' : 'Pending'}
@@ -49,7 +49,7 @@ function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; o
       <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
         <StatChip label="This Month" value={h.monthly_bookings.toLocaleString()} color={C.accent} />
         <StatChip label="All-Time Completed" value={h.total_completed.toLocaleString()} color="#55A7EB" />
-        <StatChip label="Active Doctors" value={h.active_doctors} color="#EF9F27" />
+        <StatChip label="Active Doctors" value={h.active_doctors} color={C.amber} />
       </div>
 
       {canManage ? (
@@ -137,7 +137,7 @@ export default function HospitalsPage() {
           <StatChip label="Hospitals" value={stats.hospitals} color={C.text} />
           <StatChip label="Verified" value={stats.verified} color={C.accent} />
           <StatChip label={`${monthLabel} Bookings`} value={stats.monthly_bookings.toLocaleString()} color="#55A7EB" />
-          <StatChip label="All-Time Completed" value={stats.total_completed.toLocaleString()} color="#EF9F27" />
+          <StatChip label="All-Time Completed" value={stats.total_completed.toLocaleString()} color={C.amber} />
           <StatChip label="Active Doctors" value={stats.active_doctors} color="#f07070" />
         </div>
       )}

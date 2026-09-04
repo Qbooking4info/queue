@@ -4,10 +4,16 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, AlertTriangle, ArrowRight, CalendarDays, Stethoscope, BarChart3, Bell } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 
+// Form panel below is now theme-reactive (see login/page.tsx, fixed alongside this --
+// identical hardcoded-clinical-values bug). Left branding panel stays fixed dark brand
+// chrome on purpose, same as mobile's SplashScreen.
 export default function RegisterPage() {
   const router   = useRouter()
   const supabase = createClient()
+  const { theme: C } = useTheme()
 
   const [fullName, setFullName]   = useState('')
   const [email, setEmail]         = useState('')
@@ -46,8 +52,8 @@ export default function RegisterPage() {
   }
 
   const inputStyle = (focused: boolean) => ({
-    width: '100%', background: '#FFFFFF', border: `1.5px solid ${focused ? '#1A7FC1' : '#DDE8F5'}`,
-    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#0C2A4A',
+    width: '100%', background: C.card, border: `1.5px solid ${focused ? C.accent : C.border}`,
+    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: C.text,
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
     transition: 'border-color .15s',
   })
@@ -55,7 +61,7 @@ export default function RegisterPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Left panel — branding */}
-      <div style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+      <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
         position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
@@ -113,22 +119,22 @@ export default function RegisterPage() {
       </div>
 
       {/* Right panel — form */}
-      <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'center',
+      <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center',
         justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ width: '100%', maxWidth: 400 }}>
 
           <div style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#0C2A4A', letterSpacing: '-.04em', marginBottom: 6 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: '-.04em', marginBottom: 6 }}>
               Register your hospital
             </div>
-            <div style={{ fontSize: 13, color: '#6A8FAA' }}>
+            <div style={{ fontSize: 13, color: C.textSub }}>
               Create your admin account to get started. Takes less than 5 minutes.
             </div>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Full Name
               </label>
@@ -139,7 +145,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Work Email
               </label>
@@ -150,7 +156,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 Password
               </label>
@@ -163,33 +169,28 @@ export default function RegisterPage() {
                 <button type="button" onClick={() => setShowPass(v => !v)}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6A8FAA' }}>
+                    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: C.textSub }}>
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
-                padding: '10px 14px', fontSize: 13, color: '#E03E3E',
+              <div style={{ background: C.redLight, border: `1px solid ${C.red}66`, borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: C.red,
                 display: 'flex', alignItems: 'center', gap: 6 }}>
                 <AlertTriangle size={14} /> {error}
               </div>
             )}
 
-            <button type="submit" disabled={loading}
-              style={{ width: '100%', background: '#1A7FC1', color: '#FFFFFF', border: 'none',
-                borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                fontFamily: 'inherit', marginTop: 4, transition: 'opacity .15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {loading ? 'Creating account…' : <>Create account <ArrowRight size={15} /></>}
-            </button>
+            <Button type="submit" loading={loading} size="lg" className="w-full mt-1">
+              Create account {!loading && <ArrowRight size={15} />}
+            </Button>
           </form>
 
-          <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: '#6A8FAA' }}>
+          <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: C.textSub }}>
             Already registered?{' '}
-            <Link href="/login" style={{ color: '#1A7FC1', fontWeight: 600 }}>Sign in</Link>
+            <Link href="/login" style={{ color: C.accent, fontWeight: 600 }}>Sign in</Link>
           </div>
         </div>
       </div>

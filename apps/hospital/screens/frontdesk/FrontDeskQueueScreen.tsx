@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -56,7 +57,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:        { label: 'Checked In',        color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
   in_progress:       { label: 'In Progress',       color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:         { label: 'Completed',         color: '#7A9089', bg: 'rgba(122,144,137,0.12)'},
-  cancelled:         { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)'  },
+  cancelled:         { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)'  },
   no_show:           { label: 'No Show',           color: '#888',    bg: 'rgba(128,128,128,0.1)' },
 }
 
@@ -310,9 +311,9 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
           <Text style={[s.statsText, { color: t.textMuted }]}>
             Today: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{appts.length}</Text>
             {'  ·  '}
-            Checked in: <Text style={{ color: '#5B9EFF', fontWeight: '700' }}>{checkedInCount}</Text>
+            Checked in: <Text style={{ color: t.info, fontWeight: '700' }}>{checkedInCount}</Text>
             {'  ·  '}
-            Pending: <Text style={{ color: '#EF9F27', fontWeight: '700' }}>{pendingCount}</Text>
+            Pending: <Text style={{ color: t.statusBusy.text, fontWeight: '700' }}>{pendingCount}</Text>
           </Text>
         </View>
       )}
@@ -428,7 +429,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
     && appt.approval_status !== 'pending_approval'
   const canApprove = appt.approval_status === 'pending_approval'
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyColor = isEmergency ? '#FF5C5C' : appt.urgency === 'urgent' ? '#EF9F27' : null
+  const urgencyColor = isEmergency ? t.danger : appt.urgency === 'urgent' ? t.statusBusy.text : null
   const showVitals = appt.status === 'checked_in' || appt.status === 'in_progress'
   const isRinging = ringing === appt.id
 
@@ -437,8 +438,8 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
       activeOpacity={0.85}
       onPress={() => haptics.tap()}
       style={[s.card, {
-        backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
-        borderColor: isEmergency ? '#FF5C5C' : t.cardBorder,
+        backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
+        borderColor: isEmergency ? t.danger : t.cardBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
       }]}
     >
@@ -454,8 +455,8 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
           {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
           {appt.referred_by && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
-              <Ionicons name="arrow-redo-outline" size={10} color="#5B9EFF" />
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#5B9EFF' }} numberOfLines={1}>
+              <Ionicons name="arrow-redo-outline" size={10} color={t.info} />
+              <Text style={{ fontSize: 10, fontWeight: '700', color: t.info }} numberOfLines={1}>
                 {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
                 {appt.referring_clinic?.name ? ` · ${appt.referring_clinic.name}` : ''}
                 {appt.referring_hospital?.name ? ` · ${appt.referring_hospital.name}` : ''}
@@ -468,9 +469,9 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
             <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
           </View>
           {isEmergency ? (
-            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-              <Ionicons name="alert-circle-outline" size={10} color="#FF5C5C" />
-              <Text style={[s.badgeText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
+            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
+              <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
+              <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
             <View style={[s.badge, { backgroundColor: `${urgencyColor}18` }]}>
@@ -484,34 +485,22 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
       {(canCheckIn || canApprove) && (
         <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
           {canApprove && (
-            <TouchableOpacity onPress={() => onApprove(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-              {isLoading ? <ActivityIndicator size="small" color="#00C265" />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="checkmark" size={13} color="#00C265" />
-                    <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Approve" onPress={() => onApprove(appt)} loading={isLoading}
+              disabled={!!actioning} variant="success" icon="checkmark" size="sm"
+            />
           )}
           {canApprove && (
-            <TouchableOpacity onPress={() => onReject(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-              {isLoading ? <ActivityIndicator size="small" color="#FF5C5C" />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="close" size={13} color="#FF5C5C" />
-                    <Text style={[s.actionText, { color: '#FF5C5C' }]}>Reject</Text>
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Reject" onPress={() => onReject(appt)} loading={isLoading}
+              disabled={!!actioning} variant="danger" icon="close" size="sm"
+            />
           )}
           {canCheckIn && (
-            <TouchableOpacity onPress={() => onCheckIn(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)', flex: 1 }]}>
-              {isLoading ? <ActivityIndicator size="small" color="#5B9EFF" />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={[s.actionText, { color: '#5B9EFF' }]}>Check In</Text>
-                    <Ionicons name="arrow-forward" size={13} color="#5B9EFF" />
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Check In" onPress={() => onCheckIn(appt)} loading={isLoading}
+              disabled={!!actioning} variant="info" icon="arrow-forward" iconPosition="right" size="sm" style={{ flex: 1 }}
+            />
           )}
         </View>
       )}
@@ -535,13 +524,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
 
       {showVitals && (
         <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-          <TouchableOpacity onPress={() => onRecordVitals(appt)}
-            style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="fitness-outline" size={13} color="#5B9EFF" />
-              <Text style={[s.actionText, { color: '#5B9EFF' }]}>Vitals</Text>
-            </View>
-          </TouchableOpacity>
+          <Button label="Vitals" onPress={() => onRecordVitals(appt)} variant="info" icon="fitness-outline" size="sm" style={{ flex: 1 }} />
           {appt.status === 'checked_in' && (
             <TouchableOpacity onPress={() => onMove(appt)}
               style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.3)' }]}>
@@ -553,10 +536,10 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
           )}
           <TouchableOpacity onPress={() => onRing(appt)} disabled={isRinging}
             style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
-            {isRinging ? <ActivityIndicator size="small" color="#EF9F27" />
+            {isRinging ? <ActivityIndicator size="small" color={t.statusBusy.text} />
               : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="notifications-outline" size={13} color="#EF9F27" />
-                  <Text style={[s.actionText, { color: '#EF9F27' }]}>Ring</Text>
+                  <Ionicons name="notifications-outline" size={13} color={t.statusBusy.text} />
+                  <Text style={[s.actionText, { color: t.statusBusy.text }]}>Ring</Text>
                 </View>}
           </TouchableOpacity>
         </View>

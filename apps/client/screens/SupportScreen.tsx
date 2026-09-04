@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -116,10 +117,7 @@ export function SupportScreen({ navigation }: Props) {
                 multiline numberOfLines={4}
                 style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
               />
-              <TouchableOpacity onPress={handleSend} disabled={sending}
-                style={[s.sendBtn, { backgroundColor: t.accent, opacity: query.trim() && !sending ? 1 : 0.4 }]}>
-                <Text style={s.sendBtnText}>{sending ? 'Sending…' : 'Send message'}</Text>
-              </TouchableOpacity>
+              <Button label="Send message" onPress={handleSend} loading={sending} disabled={!query.trim()} />
             </>
           )}
         </View>
@@ -165,8 +163,6 @@ const s = StyleSheet.create({
   contactSub:     { fontSize: 10 },
   card:           { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 16 },
   textarea:       { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
-  sendBtn:        { borderRadius: 12, padding: 13, alignItems: 'center' },
-  sendBtnText:    { color: '#fff', fontSize: 13, fontWeight: '700' },
   sentTitle:      { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   sentSub:        { fontSize: 12, textAlign: 'center', marginBottom: 12 },
   sendAgainBtn:   { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },

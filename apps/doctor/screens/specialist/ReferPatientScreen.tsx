@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Button } from '@queue/shared/components/ui/Button'
 import {
   getHospitals, getHospitalById, getClinicsForHospital, createReferral,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
@@ -335,16 +336,16 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           {isEmergency && (
             <View style={[st.noticeBox, {
               marginTop: 12,
-              backgroundColor: emergencyMaybeClosed ? 'rgba(255,92,92,0.14)' : 'rgba(255,92,92,0.08)',
-              borderColor: 'rgba(255,92,92,0.4)',
+              backgroundColor: emergencyMaybeClosed ? t.dangerBg : t.dangerSubtle,
+              borderColor: t.dangerStrong,
             }]}>
               {emergencyMaybeClosed ? (
-                <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                   <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} may be closed right now.</Text> Emergency
                   referrals are still sent immediately — confirm they can receive the patient before sending.
                 </Text>
               ) : (
-                <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                   Emergency referrals are sent for <Text style={{ fontWeight: '800' }}>right now</Text> — no date or
                   time to pick, and this patient will be prioritized at the receiving side.
                 </Text>
@@ -358,8 +359,8 @@ export function ReferPatientScreen({ navigation, route }: Props) {
                 {isEmergency ? 'Emergency department' : 'Clinic / Department (optional)'}
               </Text>
               {isEmergency ? (
-                <View style={[st.docRow, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.08)' }]}>
-                  <Text style={{ color: '#FF5C5C', fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
+                <View style={[st.docRow, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
+                  <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
                 </View>
               ) : (
                 <>
@@ -385,8 +386,8 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           {loadingClinics && <ActivityIndicator color={t.accent} style={{ marginVertical: 8 }} />}
 
           {noEmergencyClinic && (
-            <View style={[st.noticeBox, { marginTop: 8, backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
-              <Text style={{ fontSize: 12, color: '#FF5C5C', lineHeight: 18 }}>
+            <View style={[st.noticeBox, { marginTop: 8, backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
+              <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                 <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} hasn't set up an Emergency Department.</Text> Choose
                 a different hospital for an emergency referral.
               </Text>
@@ -478,12 +479,10 @@ export function ReferPatientScreen({ navigation, route }: Props) {
             </View>
           )}
 
-          <TouchableOpacity onPress={submit} disabled={submitting}
-            style={[st.submitBtn, { backgroundColor: t.accent, opacity: submitting ? 0.6 : 1 }]}>
-            {submitting ? <ActivityIndicator color="#fff" /> : (
-              <Text style={st.submitTxt}>{isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}</Text>
-            )}
-          </TouchableOpacity>
+          <Button
+            label={isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}
+            onPress={submit} loading={submitting} size="lg" style={{ marginTop: t.spacing.xl }}
+          />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -505,7 +504,5 @@ const st = StyleSheet.create({
   docRow:      { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
   chip:        { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   noticeBox:   { borderWidth: 1, borderRadius: 12, padding: 12 },
-  submitBtn:   { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 24 },
-  submitTxt:   { color: '#fff', fontSize: 15, fontWeight: '800' },
   completeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 20 },
 })

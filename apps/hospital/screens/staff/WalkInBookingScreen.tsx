@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -141,7 +142,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
       <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View style={[s.successIcon, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-            <Ionicons name="checkmark-circle" size={56} color="#00C265" />
+            <Ionicons name="checkmark-circle" size={56} color={t.accentDark} />
           </View>
           <Text style={[s.successTitle, { color: t.textPrimary }]}>Walk-in Registered</Text>
           <Text style={[s.successRef, { color: t.accent }]}>{bookingRef}</Text>
@@ -186,8 +187,8 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
           {foundPatient && (
             <View style={[s.foundBanner, { backgroundColor: 'rgba(0,194,101,0.1)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-              <Ionicons name="person-circle-outline" size={18} color="#00C265" />
-              <Text style={[s.foundText, { color: '#00C265' }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
+              <Ionicons name="person-circle-outline" size={18} color={t.accentDark} />
+              <Text style={[s.foundText, { color: t.accentDark }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
             </View>
           )}
 
@@ -216,7 +217,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>URGENCY</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['routine', 'urgent', 'emergency'] as const).map(u => {
-              const colors = { routine: t.accent, urgent: '#EF9F27', emergency: '#FF5C5C' }
+              const colors = { routine: t.accent, urgent: t.statusBusy.text, emergency: t.danger }
               const color = colors[u]
               const active = urgency === u
               return (
@@ -292,15 +293,10 @@ export function WalkInBookingScreen({ navigation }: Props) {
             </>
           )}
 
-          <TouchableOpacity onPress={handleSubmit} disabled={loading}
-            style={[s.submitBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 28 }]}>
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="person-add-outline" size={18} color="#fff" />
-                <Text style={s.submitText}>Add to Queue</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <Button
+            label="Add to Queue" onPress={handleSubmit} loading={loading}
+            icon="person-add-outline" size="lg" style={{ marginTop: 28 }}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -323,8 +319,6 @@ const s = StyleSheet.create({
   docChip:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, minWidth: 100 },
   docChipText: { fontSize: 12, fontWeight: '700' },
   docSpec:     { fontSize: 10, marginTop: 2 },
-  submitBtn:   { borderRadius: 14, padding: 16, alignItems: 'center' },
-  submitText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
   successIcon: { width: 96, height: 96, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 20 },
   successTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center' },
   successRef:  { fontSize: 20, fontWeight: '800', marginTop: 6, marginBottom: 8 },

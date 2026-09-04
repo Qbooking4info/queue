@@ -211,10 +211,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const bmi = calcBMI(weight, height)
 
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyBg  = isEmergency ? 'rgba(255,92,92,0.12)'
+  const urgencyBg  = isEmergency ? t.dangerSubtle
     : appt.urgency === 'urgent' ? 'rgba(239,159,39,0.12)' : t.accentBg
-  const urgencyCol = isEmergency ? '#FF5C5C'
-    : appt.urgency === 'urgent' ? '#EF9F27' : t.accent
+  const urgencyCol = isEmergency ? t.danger
+    : appt.urgency === 'urgent' ? t.statusBusy.text : t.accent
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -229,9 +229,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {isEmergency && (
-              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-                <Ionicons name="alert-circle-outline" size={10} color="#FF5C5C" />
-                <Text style={[st.statusText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
+              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
+                <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
+                <Text style={[st.statusText, { color: t.danger }]}>EMERGENCY</Text>
               </View>
             )}
             {isInProgress ? (
@@ -252,8 +252,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}
           <View style={[st.heroCard, {
-            backgroundColor: isEmergency ? 'rgba(255,92,92,0.1)' : t.bannerBg,
-            borderColor: isEmergency ? '#FF5C5C' : t.bannerBorder,
+            backgroundColor: isEmergency ? t.dangerSubtle : t.bannerBg,
+            borderColor: isEmergency ? t.danger : t.bannerBorder,
           }]}>
             <View style={st.patientRow}>
               <View style={[st.avatarLg, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
@@ -276,8 +276,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? '#85B7EB' : t.accent} />
-                  <Text style={[st.typeChip, { color: isVirtual ? '#85B7EB' : t.accent }]}>
+                  <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? t.statusVirtual.text : t.accent} />
+                  <Text style={[st.typeChip, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
                     {isVirtual ? 'Virtual' : 'In-person'}
                   </Text>
                 </View>
@@ -339,7 +339,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 {isVirtual ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => {
                       haptics.heavy()
                       navigation.navigate('DoctorVideoCall', {
@@ -348,8 +348,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                       })
                     }}
                   >
-                    <Ionicons name="videocam-outline" size={16} color="#85B7EB" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#85B7EB' }}>Start Video Call</Text>
+                    <Ionicons name="videocam-outline" size={16} color={t.statusVirtual.text} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
                   </TouchableOpacity>
                 ) : canStart ? (
                   <TouchableOpacity

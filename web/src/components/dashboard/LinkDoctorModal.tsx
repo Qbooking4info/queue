@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { SpecialtyRow } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
 
 // The step-code / step-confirm Doctor ID lookup+link flow, with no modal chrome of
 // its own -- reused both standalone (LinkDoctorModal, below) and embedded as a tab
@@ -87,18 +88,8 @@ export function LinkDoctorForm({ clinicId, C, onCancel, onLinked, cancelLabel = 
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-        <button onClick={onCancel} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-          background: C.bgAlt, border: `1px solid ${C.border}`,
-          color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-          {cancelLabel}
-        </button>
-        <button onClick={lookUp} disabled={busy}
-          style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: busy ? C.border : C.accent,
-            color: C.id === 'forest' ? '#061208' : '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Looking up…' : 'Look Up'}
-        </button>
+        <Button onClick={onCancel} variant="outline" size="sm">{cancelLabel}</Button>
+        <Button onClick={lookUp} loading={busy} size="sm">Look Up</Button>
       </div>
     </>
   ) : (
@@ -122,18 +113,8 @@ export function LinkDoctorForm({ clinicId, C, onCancel, onLinked, cancelLabel = 
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-        <button onClick={() => { setStep('code'); setError('') }} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-          background: C.bgAlt, border: `1px solid ${C.border}`,
-          color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-          Back
-        </button>
-        <button onClick={submit} disabled={busy}
-          style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: busy ? C.border : C.accent,
-            color: C.id === 'forest' ? '#061208' : '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Linking…' : 'Confirm & Link'}
-        </button>
+        <Button onClick={() => { setStep('code'); setError('') }} variant="outline" size="sm">Back</Button>
+        <Button onClick={submit} loading={busy} size="sm">Confirm & Link</Button>
       </div>
     </>
   )

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import { haptics } from '@queue/shared/lib/haptics'
 import { StatusBadge } from '@queue/shared/components/ui/StatusBadge'
@@ -121,7 +122,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
         {/* Approval mode notice */}
         {hospital.approval_mode === 'manual' && (
           <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
-            <Ionicons name="clipboard-outline" size={16} color="#EF9F27" style={{ marginTop: 1 }} />
+            <Ionicons name="clipboard-outline" size={16} color={t.statusBusy.text} style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
               requests. You may be asked to describe your symptoms or upload a referral letter.
@@ -263,11 +264,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
               </View>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
-              onPress={bookInPerson}>
-              <Text style={styles.ctaBtnPrimaryText}>Book Appointment</Text>
-            </TouchableOpacity>
+            <Button label="Book Appointment" onPress={bookInPerson} size="lg" />
           )}
         </View>
       </View>

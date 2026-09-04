@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getCompletedAppointments, updateUserProfile, getMedicalHistory, updateMedicalHistory } from '@queue/shared/lib/api'
 import type { MedicalHistory } from '@queue/shared/lib/api'
@@ -154,13 +155,13 @@ export function MedicalHistoryScreen({ navigation }: Props) {
           {tab === 'profile' && (
             <>
               {historyError && (
-                <View style={[s.errorCard, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: '#FF5C5C' }]}>
-                  <Ionicons name="alert-circle-outline" size={18} color="#FF5C5C" style={{ marginRight: 8 }} />
-                  <Text style={[s.errorText, { color: '#FF5C5C' }]}>
+                <View style={[s.errorCard, { backgroundColor: t.dangerSubtle, borderColor: t.danger }]}>
+                  <Ionicons name="alert-circle-outline" size={18} color={t.danger} style={{ marginRight: 8 }} />
+                  <Text style={[s.errorText, { color: t.danger }]}>
                     Couldn't load your conditions, allergies and medications -- this is not the same as having none recorded.
                   </Text>
                   <TouchableOpacity onPress={load}>
-                    <Text style={[s.errorRetry, { color: '#FF5C5C' }]}>Retry</Text>
+                    <Text style={[s.errorRetry, { color: t.danger }]}>Retry</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -191,10 +192,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <Text style={[s.fieldLabel, { color: t.textMuted, marginTop: 14 }]}>Date of birth</Text>
                 <DateOfBirthSelect value={dob} onChange={setDob} />
 
-                <TouchableOpacity onPress={saveProfile} disabled={saving}
-                  style={[s.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-                  <Text style={s.saveBtnText}>{saving ? 'Saving…' : 'Save changes'}</Text>
-                </TouchableOpacity>
+                <Button label="Save changes" onPress={saveProfile} loading={saving} style={{ marginTop: 14 }} />
               </View>
 
               {/* Conditions */}
@@ -227,8 +225,8 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <View style={s.pillRow}>
                   {ALLERGY_PROMPTS.map(a => (
                     <TouchableOpacity key={a} onPress={() => toggleAllergy(a)}
-                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? '#FF5C5C' : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? 'rgba(255,92,92,0.1)' : t.inputBg }]}>
-                      <Text style={[s.pillText, { color: notes.allergies.includes(a) ? '#FF5C5C' : t.textMuted, fontWeight: notes.allergies.includes(a) ? '700' : '400' }]}>{a}</Text>
+                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? t.danger : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? t.dangerSubtle : t.inputBg }]}>
+                      <Text style={[s.pillText, { color: notes.allergies.includes(a) ? t.danger : t.textMuted, fontWeight: notes.allergies.includes(a) ? '700' : '400' }]}>{a}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -403,8 +401,6 @@ const s = StyleSheet.create({
   pillText:          { fontSize: 11 },
   input:             { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, marginTop: 4 },
   textarea:          { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
-  saveBtn:           { borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 14 },
-  saveBtnText:       { color: '#fff', fontSize: 13, fontWeight: '700' },
   emptyCard:         { borderRadius: 18, borderWidth: 1, padding: 32, alignItems: 'center' },
   emptyTitle:        { fontSize: 15, fontWeight: '700', marginBottom: 6 },
   emptySub:          { fontSize: 12, textAlign: 'center', lineHeight: 18 },

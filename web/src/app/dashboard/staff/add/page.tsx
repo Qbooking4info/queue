@@ -3,6 +3,7 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Stethoscope, Check } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 import { addStaff, addCrewMember } from '../actions'
 
 const CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
@@ -98,10 +99,7 @@ export default function AddStaffPage() {
                 style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
                 Cancel
               </Link>
-              <button type="submit" disabled={adminPending}
-                style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: adminPending ? 'not-allowed' : 'pointer', opacity: adminPending ? 0.6 : 1, fontFamily: 'inherit' }}>
-                {adminPending ? 'Sending Invite…' : 'Send Invite'}
-              </button>
+              <Button type="submit" loading={adminPending} className="flex-1">Send Invite</Button>
             </div>
           </form>
         </>
@@ -174,10 +172,7 @@ export default function AddStaffPage() {
                     style={{ flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 12, border: `1px solid ${C.borderMed}`, fontSize: 13, color: C.textSub, textDecoration: 'none' }}>
                     Cancel
                   </Link>
-                  <button type="submit" disabled={crewPending}
-                    style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: crewPending ? 'not-allowed' : 'pointer', opacity: crewPending ? 0.6 : 1, fontFamily: 'inherit' }}>
-                    {crewPending ? 'Creating…' : 'Create Crew Login'}
-                  </button>
+                  <Button type="submit" loading={crewPending} className="flex-1">Create Crew Login</Button>
                 </div>
               </form>
             </>

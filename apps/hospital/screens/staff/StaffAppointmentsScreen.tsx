@@ -9,6 +9,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
+import { Button } from '@queue/shared/components/ui/Button'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -39,7 +40,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:       { label: 'Checked In',        color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
   in_progress:      { label: 'In Progress',       color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:        { label: 'Completed',         color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:        { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)' },
+  cancelled:        { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
   no_show:          { label: 'No Show',           color: '#888',    bg: 'rgba(128,128,128,0.1)' },
 }
 
@@ -236,7 +237,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
             const isEmergency = appt.urgency === 'emergency'
 
             return (
-              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg, borderColor: isEmergency ? '#FF5C5C' : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
+              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg, borderColor: isEmergency ? t.danger : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
                 <View style={s.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in'}</Text>
@@ -252,8 +253,8 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                       <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
                     </View>
                     {isEmergency && (
-                      <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: '#FF5C5C' }]}>
-                        <Text style={[s.badgeText, { color: '#FF5C5C' }]}>EMERGENCY</Text>
+                      <View style={[s.badge, { backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
+                        <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
                       </View>
                     )}
                     {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
@@ -261,19 +262,11 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                 </View>
                 {canApprove && (
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-                    <TouchableOpacity onPress={() => handleReject(appt)} disabled={!!actioning}
-                      style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)', flex: 1 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color="#FF5C5C" /> : <Text style={[s.actionText, { color: '#FF5C5C' }]}>Reject</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleApprove(appt)} disabled={!!actioning}
-                      style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)', flex: 2 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color="#00C265" /> : (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="checkmark" size={13} color="#00C265" />
-                          <Text style={[s.actionText, { color: '#00C265' }]}>Approve</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
+                    <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
+                    <Button
+                      label="Approve" onPress={() => handleApprove(appt)} loading={isLoading}
+                      disabled={!!actioning} variant="success" icon="checkmark" size="sm" style={{ flex: 2 }}
+                    />
                   </View>
                 )}
               </View>
@@ -304,8 +297,6 @@ const s = StyleSheet.create({
   badgeText:  { fontSize: 10, fontWeight: '700' },
   ref:        { fontSize: 9, fontWeight: '600', marginTop: 2 },
   actions:    { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: 1 },
-  actionBtn:  { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
-  actionText: { fontSize: 13, fontWeight: '700' },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
   emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+  KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -88,8 +89,8 @@ export function HospitalRegisterScreen({ navigation }: Props) {
             </Text>
 
             {error ? (
-              <View style={[s.errorBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
-                <Ionicons name="alert-circle-outline" size={14} color="#FF5C5C" />
+              <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
                 <Text style={s.errorText}>{error}</Text>
               </View>
             ) : null}
@@ -109,12 +110,7 @@ export function HospitalRegisterScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={handleSubmit} disabled={loading}
-              style={[s.btn, { backgroundColor: loading ? `${t.accent}80` : t.accent }]}>
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnText}>Continue</Text>}
-            </TouchableOpacity>
+            <Button label="Continue" onPress={handleSubmit} loading={loading} style={{ marginTop: t.spacing.sm }} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -149,6 +145,4 @@ const s = StyleSheet.create({
   errorText:   { fontSize: 13, color: '#FF5C5C', flex: 1 },
   input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
   inputText:   { fontSize: 14, flex: 1 },
-  btn:         { borderRadius: 14, padding: 15, alignItems: 'center', marginTop: 8 },
-  btnText:     { fontSize: 15, fontWeight: '800', color: '#fff' },
 })

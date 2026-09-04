@@ -79,7 +79,7 @@ export function JobPatientMap({ requestId, pickup, etaSeconds, unitPos, label = 
   return (
     <View style={st.wrap}>
       <View style={st.headRow}>
-        <Ionicons name={live ? 'navigate' : 'pin'} size={14} color={live ? '#00C265' : t.textMuted} />
+        <Ionicons name={live ? 'navigate' : 'pin'} size={14} color={live ? t.accentDark : t.textMuted} />
         <Text style={[st.headText, { color: t.textSecondary }]}>
           {live ? 'Live patient position' : 'Booked pickup point'}
         </Text>

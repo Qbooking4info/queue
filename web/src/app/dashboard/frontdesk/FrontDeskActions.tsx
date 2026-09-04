@@ -1,22 +1,35 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { Check, X, LogIn, Play } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
 import { updateAppointmentStatus, approvePendingApprovalAppointment, rejectPendingApprovalAppointment } from '../appointments/actions'
 
-const NEXT: Record<string, { label: React.ReactNode; status: string; color: string }[]> = {
-  pending:    [{ label: <span className="inline-flex items-center gap-1"><Check size={12} /> Confirm</span>,   status: 'confirmed',  color: 'text-green-400 border-green-500/30 bg-green-500/10 hover:bg-green-500/20' }, { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  confirmed:  [{ label: <span className="inline-flex items-center gap-1"><LogIn size={12} /> Check In</span>, status: 'checked_in', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' },  { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', color: 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20' }],
-  checked_in: [{ label: <span className="inline-flex items-center gap-1"><Play size={12} /> Start</span>,    status: 'in_progress', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' }],
-}
-
+// Never called useTheme() -- same bug as StatusButton.tsx (its appointments/ sibling,
+// fixed alongside this one): every color was a static Tailwind class, frozen
+// regardless of the clinical/forest toggle.
 export function FrontDeskActions({ appointmentId, currentStatus, approvalStatus, bookingRef }: {
   appointmentId: string
   currentStatus: string
   approvalStatus: string | null
   bookingRef: string
 }) {
+  const { theme: C } = useTheme()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  const NEXT: Record<string, { label: React.ReactNode; status: string; bg: string; border: string; color: string }[]> = {
+    pending: [
+      { label: <span className="inline-flex items-center gap-1"><Check size={12} /> Confirm</span>, status: 'confirmed', bg: C.accentLight, border: C.accentBorder, color: C.accent },
+      { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', bg: C.redLight, border: `${C.red}4D`, color: C.red },
+    ],
+    confirmed: [
+      { label: <span className="inline-flex items-center gap-1"><LogIn size={12} /> Check In</span>, status: 'checked_in', bg: C.infoBg, border: C.infoBorder, color: C.info },
+      { label: <span className="inline-flex items-center gap-1"><X size={12} /> Cancel</span>, status: 'cancelled', bg: C.redLight, border: `${C.red}4D`, color: C.red },
+    ],
+    checked_in: [
+      { label: <span className="inline-flex items-center gap-1"><Play size={12} /> Start</span>, status: 'in_progress', bg: C.infoBg, border: C.infoBorder, color: C.info },
+    ],
+  }
   const actions = NEXT[currentStatus] ?? []
   if (!actions.length) return null
 
@@ -46,12 +59,13 @@ export function FrontDeskActions({ appointmentId, currentStatus, approvalStatus,
       <div className="flex gap-2">
         {actions.map(a => (
           <button key={a.status} disabled={pending} onClick={() => handleClick(a.status)}
-            className={`text-xs font-semibold px-4 py-1.5 rounded-full border transition-all disabled:opacity-50 ${a.color}`}>
+            className="text-xs font-semibold px-4 py-1.5 rounded-full border transition-all disabled:opacity-50"
+            style={{ background: a.bg, borderColor: a.border, color: a.color }}>
             {pending ? '…' : a.label}
           </button>
         ))}
       </div>
-      {error && <span className="text-xs text-red-400">{error}</span>}
+      {error && <span className="text-xs" style={{ color: C.red }}>{error}</span>}
     </div>
   )
 }

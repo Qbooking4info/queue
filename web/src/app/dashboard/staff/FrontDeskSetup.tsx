@@ -2,6 +2,7 @@
 import { useActionState, useState } from 'react'
 import { Check } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 import { setupFrontDeskLogin } from './actions'
 
 export default function FrontDeskSetup() {
@@ -57,10 +58,7 @@ export default function FrontDeskSetup() {
         </div>
         {err && <p style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{err}</p>}
         <form action={action}>
-          <button type="submit" disabled={pending}
-            style={{ padding: '8px 16px', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, borderRadius: 12, border: 'none', cursor: pending ? 'not-allowed' : 'pointer', opacity: pending ? 0.6 : 1, fontFamily: 'inherit' }}>
-            {pending ? 'Creating…' : 'Create Front Desk Login'}
-          </button>
+          <Button type="submit" loading={pending} size="sm">Create Front Desk Login</Button>
         </form>
       </div>
     </div>

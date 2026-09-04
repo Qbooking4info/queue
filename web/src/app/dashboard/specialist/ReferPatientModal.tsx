@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 import {
   type DayHours, defaultDayHours, isOpenNow, hourlySlotsForDate, nextOpenDays,
 } from '@/lib/operating-hours'
@@ -64,6 +66,7 @@ export function ReferPatientModal({
   // trigger instead of the default full-width button.
   renderTrigger?: (open: () => void) => ReactNode
 }) {
+  const { theme: C } = useTheme()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'same' | 'other'>('same')
@@ -218,34 +221,47 @@ export function ReferPatientModal({
     setReason(''); setReferralReason(''); setUrgency('routine'); setError(''); setSuccess(null)
   }
 
+  // Never called useTheme() before -- every color here was a static Tailwind class or a
+  // literal hex (#0E1512/#7A9089/#0A0F0D/#4A6058), so this whole modal was permanently
+  // dark regardless of the clinical/forest toggle, unlike every sibling modal in this
+  // codebase. Mapped onto the closest real theme token throughout; the red tints keep
+  // their original distinct opacities (0.08 vs 0.15 vs 0.25 vs 0.4 read as different
+  // visual weights on purpose) via hex-alpha suffixes on C.red rather than collapsing
+  // them onto one token. Input focus rings are left as the static Tailwind green --
+  // transient, interaction-only, not worth per-input focus-state tracking here.
+  const inputClass = "w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50"
+  const inputStyle = { background: C.bg, border: `1px solid ${C.border}`, color: C.text }
+  const labelStyle = { color: C.textSub }
+
   return (
     <>
       {renderTrigger ? renderTrigger(() => setOpen(true)) : (
-        <button onClick={() => setOpen(true)}
-          className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
+        <Button onClick={() => setOpen(true)} variant="outline" className="w-full">
           {isInProgress ? 'Refer & End Consultation' : 'Refer Patient'}
-        </button>
+        </Button>
       )}
 
       {open && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={reset}>
-          <div className="bg-[#0E1512] border border-white/10 rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto"
+            style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}
+            onClick={e => e.stopPropagation()}>
             {success ? (
               <div className="text-center py-6">
                 <div className="text-2xl mb-2">✓</div>
                 <div className="font-bold text-base mb-1">Referral sent</div>
-                <div className="text-sm text-[#7A9089] mb-4">
+                <div className="text-sm mb-4" style={labelStyle}>
                   {success.approvalStatus === 'pending_approval'
                     ? `Booking ${success.bookingRef} is awaiting the receiving side's approval.`
                     : `Booking ${success.bookingRef} is confirmed at ${activeHospital?.name}.`}
                   {success.originalCompleted && ' This consultation has been marked complete.'}
                 </div>
-                <button onClick={reset} className="px-4 py-2 bg-green-500 hover:bg-green-400 text-white font-bold text-sm rounded-xl">Done</button>
+                <Button onClick={reset}>Done</Button>
               </div>
             ) : (
               <>
                 <h2 className="font-bold text-base mb-1">Refer {patientName}</h2>
-                <p className="text-xs text-[#7A9089] mb-4">
+                <p className="text-xs mb-4" style={labelStyle}>
                   {isInProgress
                     ? "Book this patient elsewhere for further care. Sending this referral also marks this consultation complete."
                     : "Book this patient into another clinic or hospital. They'll be notified once it's confirmed."}
@@ -253,61 +269,70 @@ export function ReferPatientModal({
 
                 <div className="flex gap-2 mb-4">
                   <button onClick={() => switchMode('same')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border ${mode === 'same' ? 'bg-green-500/15 border-green-500/40 text-green-400' : 'bg-white/5 border-white/10 text-[#7A9089]'}`}>
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border"
+                    style={mode === 'same'
+                      ? { background: C.accentLight, borderColor: C.accentBorder, color: C.accent }
+                      : { background: C.bgAlt, borderColor: C.border, color: C.textSub }}>
                     Same Hospital
                   </button>
                   <button onClick={() => switchMode('other')}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold border ${mode === 'other' ? 'bg-green-500/15 border-green-500/40 text-green-400' : 'bg-white/5 border-white/10 text-[#7A9089]'}`}>
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border"
+                    style={mode === 'other'
+                      ? { background: C.accentLight, borderColor: C.accentBorder, color: C.accent }
+                      : { background: C.bgAlt, borderColor: C.border, color: C.textSub }}>
                     Different Hospital
                   </button>
                 </div>
 
                 {mode === 'other' && (
                   <>
-                    <label className="text-xs text-[#7A9089] mb-1.5 block">Receiving hospital</label>
+                    <label className="text-xs mb-1.5 block" style={labelStyle}>Receiving hospital</label>
                     {!activeHospital ? (
                       <>
                         <input
                           value={search} onChange={e => setSearch(e.target.value)}
                           placeholder="Search hospitals…"
-                          className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50 mb-2"
+                          className={`${inputClass} mb-2`}
+                          style={inputStyle}
                         />
                         <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5 mb-3">
                           {searchResults.map(h => (
                             <button key={h.id} onClick={() => loadHospital(h.id)}
-                              className="text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm">
+                              className="text-left px-3 py-2 rounded-lg border text-sm"
+                              style={{ background: C.bgAlt, borderColor: C.border }}>
                               <div className="font-semibold">{h.name}</div>
-                              <div className="text-xs text-[#7A9089]">{[h.city, h.state].filter(Boolean).join(', ') || '—'}</div>
+                              <div className="text-xs" style={labelStyle}>{[h.city, h.state].filter(Boolean).join(', ') || '—'}</div>
                             </button>
                           ))}
-                          {searchResults.length === 0 && <div className="text-xs text-[#4A6058] px-1 py-2">No hospitals found.</div>}
+                          {searchResults.length === 0 && <div className="text-xs px-1 py-2" style={{ color: C.textMuted }}>No hospitals found.</div>}
                         </div>
                       </>
                     ) : null}
                   </>
                 )}
 
-                {loadingHospital && <div className="text-xs text-[#7A9089] mb-3">Loading…</div>}
+                {loadingHospital && <div className="text-xs mb-3" style={labelStyle}>Loading…</div>}
 
                 {activeHospital && (
-                  <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/5 border border-green-500/30 mb-3">
+                  <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border mb-3"
+                    style={{ background: C.bgAlt, borderColor: C.accentBorder }}>
                     <div>
                       <div className="font-semibold text-sm">{activeHospital.name}</div>
                       {mode === 'other' && (
-                        <div className="text-xs text-[#7A9089]">{[activeHospital.city, activeHospital.state].filter(Boolean).join(', ') || '—'}</div>
+                        <div className="text-xs" style={labelStyle}>{[activeHospital.city, activeHospital.state].filter(Boolean).join(', ') || '—'}</div>
                       )}
                     </div>
                     {mode === 'other' && (
                       <button onClick={() => { setActiveHospital(null); setClinics([]); setSelectedClinicId(''); setSelectedDoctorId('') }}
-                        className="text-xs text-[#7A9089] hover:text-white">Change</button>
+                        className="text-xs" style={labelStyle}>Change</button>
                     )}
                   </div>
                 )}
 
                 <div className="mt-3">
-                  <label className="text-xs text-[#7A9089] mb-1.5 block">Urgency</label>
+                  <label className="text-xs mb-1.5 block" style={labelStyle}>Urgency</label>
                   <select value={urgency} onChange={e => setUrgency(e.target.value as any)}
-                    className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                    className={inputClass} style={inputStyle}>
                     <option value="routine">Routine</option>
                     <option value="urgent">Urgent</option>
                     <option value="emergency">Emergency</option>
@@ -315,9 +340,10 @@ export function ReferPatientModal({
                 </div>
 
                 {isEmergency && (
-                  <div className={`mt-3 rounded-xl px-3 py-2.5 border text-xs leading-relaxed ${
-                    emergencyMaybeClosed ? 'bg-red-500/15 border-red-500/40 text-red-300' : 'bg-red-500/8 border-red-500/25 text-red-300'
-                  }`}>
+                  <div className="mt-3 rounded-xl px-3 py-2.5 border text-xs leading-relaxed"
+                    style={emergencyMaybeClosed
+                      ? { background: `${C.red}26`, borderColor: `${C.red}66`, color: C.red }
+                      : { background: `${C.red}14`, borderColor: `${C.red}40`, color: C.red }}>
                     {emergencyMaybeClosed ? (
                       <><span className="font-bold">{activeHospital?.name} may be closed right now.</span> Emergency referrals are still sent immediately — confirm they can receive the patient before sending.</>
                     ) : (
@@ -328,14 +354,15 @@ export function ReferPatientModal({
 
                 {activeHospital && visibleClinics.length > 0 && (
                   <div className="mt-3">
-                    <label className="text-xs text-[#7A9089] mb-1.5 block">{isEmergency ? 'Emergency department' : 'Clinic / Department (optional)'}</label>
+                    <label className="text-xs mb-1.5 block" style={labelStyle}>{isEmergency ? 'Emergency department' : 'Clinic / Department (optional)'}</label>
                     {isEmergency ? (
-                      <div className="px-3 py-2.5 rounded-xl bg-red-500/8 border border-red-500/25 text-sm font-semibold">
+                      <div className="px-3 py-2.5 rounded-xl border text-sm font-semibold"
+                        style={{ background: `${C.red}14`, borderColor: `${C.red}40` }}>
                         {emergencyClinic?.name}
                       </div>
                     ) : (
                       <select value={selectedClinicId} onChange={e => { setSelectedClinicId(e.target.value); setSelectedDoctorId('') }}
-                        className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                        className={inputClass} style={inputStyle}>
                         <option value="">Any clinic</option>
                         {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
@@ -344,16 +371,17 @@ export function ReferPatientModal({
                 )}
 
                 {noEmergencyClinic && (
-                  <div className="mt-3 text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2.5">
+                  <div className="mt-3 text-xs rounded-xl px-3 py-2.5 border"
+                    style={{ background: `${C.red}1A`, borderColor: `${C.red}40`, color: C.red }}>
                     <span className="font-bold">{activeHospital?.name} hasn't set up an Emergency Department.</span> Choose a different hospital for an emergency referral.
                   </div>
                 )}
 
                 {activeHospital && filteredDoctors.length > 0 && (
                   <div className="mt-3">
-                    <label className="text-xs text-[#7A9089] mb-1.5 block">Receiving doctor (optional)</label>
+                    <label className="text-xs mb-1.5 block" style={labelStyle}>Receiving doctor (optional)</label>
                     <select value={selectedDoctorId} onChange={e => setSelectedDoctorId(e.target.value)}
-                      className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                      className={inputClass} style={inputStyle}>
                       <option value="">No preference — hospital assigns</option>
                       {filteredDoctors.map(d => (
                         <option key={d.id} value={d.id}>{[d.title, d.full_name].filter(Boolean).join(' ')}{d.specialty ? ` · ${d.specialty.name}` : ''}</option>
@@ -365,53 +393,57 @@ export function ReferPatientModal({
                 {!isEmergency && (
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
-                      <label className="text-xs text-[#7A9089] mb-1.5 block">Date</label>
+                      <label className="text-xs mb-1.5 block" style={labelStyle}>Date</label>
                       {openDates.length > 0 ? (
                         <select value={date} onChange={e => setDate(e.target.value)}
-                          className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                          className={inputClass} style={inputStyle}>
                           {openDates.map(d => <option key={d.iso} value={d.iso}>{d.label}</option>)}
                         </select>
                       ) : (
-                        <div className="text-xs text-[#4A6058] px-1 py-2.5">No upcoming open day found.</div>
+                        <div className="text-xs px-1 py-2.5" style={{ color: C.textMuted }}>No upcoming open day found.</div>
                       )}
                     </div>
                     <div>
-                      <label className="text-xs text-[#7A9089] mb-1.5 block">Preferred time</label>
+                      <label className="text-xs mb-1.5 block" style={labelStyle}>Preferred time</label>
                       {timeOptions.length > 0 ? (
                         <select value={startTime} onChange={e => setStartTime(e.target.value)}
-                          className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50">
+                          className={inputClass} style={inputStyle}>
                           {timeOptions.map(tm => <option key={tm} value={tm}>{fmt12(tm)}</option>)}
                         </select>
                       ) : (
-                        <div className="text-xs text-[#4A6058] px-1 py-2.5">Closed this day.</div>
+                        <div className="text-xs px-1 py-2.5" style={{ color: C.textMuted }}>Closed this day.</div>
                       )}
                     </div>
                   </div>
                 )}
 
                 <div className="mt-3">
-                  <label className="text-xs text-[#7A9089] mb-1.5 block">Reason for visit (optional)</label>
+                  <label className="text-xs mb-1.5 block" style={labelStyle}>Reason for visit (optional)</label>
                   <input value={reason} onChange={e => setReason(e.target.value)}
                     placeholder="e.g. Follow-up cardiology consult"
-                    className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50" />
+                    className={inputClass} style={inputStyle} />
                 </div>
 
                 <div className="mt-3">
-                  <label className="text-xs text-[#7A9089] mb-1.5 block">Reason for referral *</label>
+                  <label className="text-xs mb-1.5 block" style={labelStyle}>Reason for referral *</label>
                   <textarea value={referralReason} onChange={e => setReferralReason(e.target.value)}
                     rows={3}
                     placeholder="Why is this patient being referred? Visible to the receiving side."
-                    className="w-full bg-[#0A0F0D] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500/50 resize-none" />
+                    className={`${inputClass} resize-none`} style={inputStyle} />
                 </div>
 
-                {error && <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</div>}
+                {error && (
+                  <div className="mt-3 text-xs rounded-lg px-3 py-2 border"
+                    style={{ background: `${C.red}1A`, borderColor: `${C.red}33`, color: C.red }}>
+                    {error}
+                  </div>
+                )}
 
                 <div className="flex gap-2 mt-4">
-                  <button onClick={reset} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold rounded-xl">Cancel</button>
-                  <button onClick={submit} disabled={submitting || !activeHospital}
-                    className="flex-1 py-2.5 bg-green-500 hover:bg-green-400 disabled:opacity-60 text-white font-bold text-sm rounded-xl">
-                    {submitting ? 'Sending…' : isInProgress ? 'Refer & Complete' : 'Send Referral'}
-                  </button>
+                  <Button onClick={reset} variant="outline" className="flex-1">Cancel</Button>
+                  <Button onClick={submit} loading={submitting} disabled={!activeHospital} className="flex-1">
+                    {isInProgress ? 'Refer & Complete' : 'Send Referral'}
+                  </Button>
                 </div>
               </>
             )}

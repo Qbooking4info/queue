@@ -169,7 +169,7 @@ export function ProfileScreen({ navigation }: Props) {
         {(staffProfile || doctorProfile) && (
           <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(true) }}
             style={[styles.menuItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 8 }]}>
-            <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+            <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.menuLabel, { color: t.textPrimary }]}>
                 Switch to {doctorProfile ? 'Doctor' : 'Staff'} Mode
@@ -178,7 +178,7 @@ export function ProfileScreen({ navigation }: Props) {
                 {doctorProfile ? 'Access your specialist queue' : 'Access the hospital portal'}
               </Text>
             </View>
-            <Text style={[styles.menuArrow, { color: '#5B9EFF' }]}>›</Text>
+            <Text style={[styles.menuArrow, { color: t.info }]}>›</Text>
           </TouchableOpacity>
         )}
 

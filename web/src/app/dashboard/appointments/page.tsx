@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
+import { Button } from '@/components/ui/button'
 import { VitalsModal } from '@/components/dashboard/VitalsModal'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
@@ -35,7 +36,7 @@ function filterLabel(f: string) {
 }
 function urgencyColor(u: string | undefined, C: any) {
   if (u === 'emergency') return { bg: C.redLight, text: C.red, border: `${C.red}4D` }
-  if (u === 'urgent')    return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
+  if (u === 'urgent')    return { bg: 'rgba(239,159,39,0.12)', text: C.amber, border: 'rgba(239,159,39,0.3)' }
   return null
 }
 function IconLabel({ icon: Icon, children, size = 12 }: { icon: LucideIcon; children: React.ReactNode; size?: number }) {
@@ -302,21 +303,10 @@ function WalkInModal({
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
-                <button onClick={handleCreate} disabled={loading || !name.trim()}
-                  style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
-                    background: name.trim() ? C.accent : C.bgAlt,
-                    color: name.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    cursor: loading || !name.trim() ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Creating…' : 'Create Booking'}
-                </button>
+                <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+                <Button onClick={handleCreate} loading={loading} disabled={!name.trim()} style={{ flex: 2 }}>
+                  Create Booking
+                </Button>
               </div>
             </>
           )}
@@ -419,21 +409,13 @@ function AssignDoctorModal({
           </div>
         )}
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={handleAssign} disabled={!selected || selected === currentDoctorId || saving}
-            style={{ flex: 2, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: selected && selected !== currentDoctorId ? C.accent : C.bgAlt,
-              color: selected && selected !== currentDoctorId ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-              border: 'none', fontSize: 13, fontWeight: 700,
-              cursor: !selected || selected === currentDoctorId || saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.7 : 1 }}>
-            {saving ? (isReassign ? 'Reassigning…' : 'Assigning…') : (isReassign ? 'Reassign Doctor' : 'Assign Doctor')}
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button
+            onClick={handleAssign} loading={saving}
+            disabled={!selected || selected === currentDoctorId} style={{ flex: 2 }}
+          >
+            {isReassign ? 'Reassign Doctor' : 'Assign Doctor'}
+          </Button>
         </div>
       </div>
     </div>
@@ -483,21 +465,10 @@ function RejectModal({
             borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
             outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={handleReject} disabled={saving || !note.trim()}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: note.trim() ? 'rgba(220,60,60,0.15)' : C.bgAlt,
-              border: note.trim() ? '1px solid rgba(220,60,60,0.3)' : `1px solid ${C.border}`,
-              color: note.trim() ? '#f07070' : C.textMuted,
-              fontSize: 13, fontWeight: 700,
-              cursor: !note.trim() || saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Rejecting…' : 'Reject & Refund'}
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleReject} loading={saving} disabled={!note.trim()} variant="danger" style={{ flex: 1 }}>
+            Reject & Refund
+          </Button>
         </div>
       </div>
     </div>
@@ -562,7 +533,7 @@ function DetailPanel({
           )}
           {appt.approval_note && (
             <div style={{ background: 'rgba(239,159,39,0.1)', border: '1px solid rgba(239,159,39,0.25)',
-              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#EF9F27',
+              borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.amber,
               display: 'flex', alignItems: 'center', gap: 6 }}>
               <ClipboardList size={14} /> {appt.approval_note}
             </div>
@@ -774,7 +745,7 @@ export default function AppointmentsPage() {
             {!isDoctor && ' · all clinics'}
             {!isDoctor && pendingApproval > 0 && (
               <span style={{ marginLeft: 10, background: 'rgba(239,159,39,0.15)',
-                border: '1px solid rgba(239,159,39,0.3)', color: '#EF9F27',
+                border: '1px solid rgba(239,159,39,0.3)', color: C.amber,
                 ...T.caption, fontWeight: 700, padding: '2px 9px', borderRadius: 99 }}>
                 {pendingApproval} pending approval
               </span>
@@ -926,7 +897,7 @@ export default function AppointmentsPage() {
                   <td className="appt-col-clinic" style={{ padding: '10px 12px' }}>
                     {a.clinic_name ? (
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-                        background: 'rgba(180,156,240,0.12)', color: '#B49CF0',
+                        background: 'rgba(180,156,240,0.12)', color: C.purple,
                         border: '1px solid rgba(180,156,240,0.25)', whiteSpace: 'nowrap' }}>
                         {a.clinic_name}
                       </span>
@@ -943,14 +914,14 @@ export default function AppointmentsPage() {
                         {a.doctor_name.split(' ').slice(-1)[0].slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: needsAssign ? '#EF9F27' : C.text }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: needsAssign ? C.amber : C.text }}>
                           {needsAssign ? <IconLabel icon={AlertTriangle} size={11}>Unassigned</IconLabel> : a.assigned_doctor_name ?? a.doctor_name}
                         </div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>
                           {a.booking_mode === 'referral' ? <IconLabel icon={ArrowUpRight} size={10}>Referral</IconLabel> : a.booking_mode === 'walkin' ? <IconLabel icon={Footprints} size={10}>Walk-in</IconLabel> : a.booking_mode === 'hospital' ? <IconLabel icon={Building2} size={10}>OPD</IconLabel> : <IconLabel icon={Stethoscope} size={10}>Direct</IconLabel>}
                         </div>
                         {a.booking_mode === 'referral' && a.referred_by_doctor_name && (
-                          <div style={{ fontSize: 10, color: '#5B9EFF', marginTop: 2 }}>
+                          <div style={{ fontSize: 10, color: C.info, marginTop: 2 }}>
                             {a.referred_by_doctor_name}
                             {a.referring_clinic_name ? ` · ${a.referring_clinic_name}` : ''}
                             {a.referring_hospital_name ? ` · ${a.referring_hospital_name}` : ''}
@@ -980,7 +951,7 @@ export default function AppointmentsPage() {
                     <Badge status={a.status} />
                     {needsApproval && (
                       <div style={{ marginTop: 4, fontSize: 10, fontWeight: 700,
-                        color: '#EF9F27', background: 'rgba(239,159,39,0.1)',
+                        color: C.amber, background: 'rgba(239,159,39,0.1)',
                         borderRadius: 6, padding: '2px 6px', display: 'inline-block' }}>
                         AWAITING REVIEW
                       </div>
@@ -1037,7 +1008,7 @@ export default function AppointmentsPage() {
                             style={{ ...btnBase, fontWeight: 700,
                               border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
                               background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
-                              color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                              color: hasDoctor ? C.textMuted : C.amber }}>
                             {hasDoctor ? 'Reassign' : 'Assign Dr.'}
                           </button>
                         )}
@@ -1131,7 +1102,7 @@ export default function AppointmentsPage() {
               <div className="appt-card-status">
                 <Badge status={a.status} />
                 {needsApproval && (
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#EF9F27', marginTop: 3, textAlign: 'right' }}>REVIEW</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: C.amber, marginTop: 3, textAlign: 'right' }}>REVIEW</div>
                 )}
               </div>
 
@@ -1143,10 +1114,10 @@ export default function AppointmentsPage() {
                   ? <Video size={11} color={C.blue} />
                   : <Building2 size={11} color={C.textMuted} />}
                 <span style={{ fontSize: 11, color: C.textSub }}>
-                  {needsAssign ? <span style={{ color: '#EF9F27' }}>Unassigned</span> : docName}
+                  {needsAssign ? <span style={{ color: C.amber }}>Unassigned</span> : docName}
                 </span>
                 {a.booking_mode === 'referral' && (
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#5B9EFF', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: C.info, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                     <ArrowUpRight size={10} /> Referral
                   </span>
                 )}
@@ -1183,7 +1154,7 @@ export default function AppointmentsPage() {
                   <button onClick={() => setAssignAppt(a)} disabled={isPending}
                     style={{ ...btnBase, border: hasDoctor ? `1px solid ${C.border}` : '1px solid rgba(239,159,39,0.3)',
                       background: hasDoctor ? C.bgAlt : 'rgba(239,159,39,0.1)',
-                      color: hasDoctor ? C.textMuted : '#EF9F27' }}>
+                      color: hasDoctor ? C.textMuted : C.amber }}>
                     {hasDoctor ? 'Reassign' : 'Assign Dr.'}
                   </button>
                 )}

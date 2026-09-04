@@ -6,6 +6,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { AlertTriangle, ArrowRight, X, RefreshCw, Check } from 'lucide-react'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
+import { Button } from '@/components/ui/button'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -347,20 +348,10 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
-                <button onClick={handleCreate} disabled={loading || !clinicName.trim()}
-                  style={{ flex: 2, padding: '11px', borderRadius: 10, cursor: loading || !clinicName.trim() ? 'not-allowed' : 'pointer',
-                    background: clinicName.trim() ? C.accent : C.bgAlt,
-                    color: clinicName.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Creating…' : skipAdmin ? 'Create Clinic' : 'Create Clinic & Account'}
-                </button>
+                <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+                <Button onClick={handleCreate} loading={loading} disabled={!clinicName.trim()} style={{ flex: 2 }}>
+                  {skipAdmin ? 'Create Clinic' : 'Create Clinic & Account'}
+                </Button>
               </div>
             </div>
           ) : (
@@ -571,7 +562,7 @@ export default function ClinicsPage() {
           <div style={{ width: '100%', maxWidth: 420, background: C.card,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="1.5" style={{display:"block",margin:"0 auto 14px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="1.5" style={{display:"block",margin:"0 auto 14px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.text, textAlign: 'center', marginBottom: 8 }}>
               Delete &ldquo;{deleteTarget.name}&rdquo;?
             </div>
@@ -589,12 +580,7 @@ export default function ClinicsPage() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => { setDeleteTarget(null); setDeleteError('') }}
-                style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                Cancel
-              </button>
+              <Button onClick={() => { setDeleteTarget(null); setDeleteError('') }} variant="outline" style={{ flex: 1 }}>Cancel</Button>
               <button onClick={handleDelete} disabled={deleting}
                 style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: deleting ? 'not-allowed' : 'pointer',
                   background: 'rgba(220,60,60,0.85)', border: 'none',

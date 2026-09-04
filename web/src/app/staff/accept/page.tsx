@@ -3,16 +3,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, ArrowRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-
-const inputStyle = (focused: boolean): React.CSSProperties => ({
-  width: '100%', background: '#FFFFFF', border: `1.5px solid ${focused ? '#1A7FC1' : '#DDE8F5'}`,
-  borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#0C2A4A',
-  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color .15s',
-})
+import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
+import type { Theme } from '@/contexts/ThemeContext'
 
 function LeftPanel() {
   return (
-    <div style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+    <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
       flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
       position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
@@ -49,9 +46,23 @@ function LeftPanel() {
   )
 }
 
+// Form panel below is now theme-reactive (see login/page.tsx, fixed alongside this --
+// identical hardcoded-clinical-values bug, plus inputStyle lived at module scope here,
+// which useTheme() -- a hook -- can't reach; moved inside the component). LeftPanel
+// stays fixed dark brand chrome on purpose, same as mobile's SplashScreen.
+function inputStyleFor(C: Theme) {
+  return (focused: boolean): React.CSSProperties => ({
+    width: '100%', background: C.card, border: `1.5px solid ${focused ? C.accent : C.border}`,
+    borderRadius: 10, padding: '12px 14px', fontSize: 14, color: C.text,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color .15s',
+  })
+}
+
 export default function AcceptInvitePage() {
   const router   = useRouter()
   const supabase = createClient()
+  const { theme: C } = useTheme()
+  const inputStyle = inputStyleFor(C)
 
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -129,8 +140,8 @@ export default function AcceptInvitePage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
         <LeftPanel />
-        <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 14, color: '#6A8FAA' }}>Setting up your account…</div>
+        <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 14, color: C.textSub }}>Setting up your account…</div>
         </div>
       </div>
     )
@@ -139,24 +150,24 @@ export default function AcceptInvitePage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <LeftPanel />
-      <div style={{ flex: 1, background: '#F4F8FC', display: 'flex', alignItems: 'center',
+      <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center',
         justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ width: '100%', maxWidth: 400 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56,
-            borderRadius: 16, background: '#EAF4FC', border: '1px solid rgba(26,127,193,0.2)', marginBottom: 24 }}>
-            <Sparkles size={24} style={{ color: '#1A7FC1' }} />
+            borderRadius: 16, background: C.accentLight, border: `1px solid ${C.accentBorder}`, marginBottom: 24 }}>
+            <Sparkles size={24} style={{ color: C.accent }} />
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#0C2A4A', letterSpacing: '-.04em', marginBottom: 4 }}>
+          <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: '-.04em', marginBottom: 4 }}>
             Welcome to Queue
           </div>
-          <div style={{ fontSize: 13, color: '#6A8FAA', marginBottom: 4 }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 4 }}>
             Set your name and password to access the portal.
           </div>
-          {email && <div style={{ fontSize: 12, color: '#6A8FAA', marginBottom: 28 }}>{email}</div>}
+          {email && <div style={{ fontSize: 12, color: C.textSub, marginBottom: 28 }}>{email}</div>}
 
           {error && (
-            <div style={{ background: '#FEF0F0', border: '1px solid #F5C6C6', borderRadius: 8,
-              padding: '10px 14px', fontSize: 13, color: '#E03E3E',
+            <div style={{ background: C.redLight, border: `1px solid ${C.red}66`, borderRadius: 8,
+              padding: '10px 14px', fontSize: 13, color: C.red,
               display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
               <AlertTriangle size={14} /> {error}
             </div>
@@ -164,7 +175,7 @@ export default function AcceptInvitePage() {
 
           <form onSubmit={handleComplete} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>Full Name *</label>
               <input value={fullName} onChange={e => setFullName(e.target.value)}
                 placeholder="Dr. Amaka Okafor" required autoFocus
@@ -172,7 +183,7 @@ export default function AcceptInvitePage() {
                 style={inputStyle(nameFocus)} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>Set Password *</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="Min. 8 characters" required
@@ -180,7 +191,7 @@ export default function AcceptInvitePage() {
                 style={inputStyle(passFocus)} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2A5070',
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.textSub,
                 marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em' }}>Confirm Password *</label>
               <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
                 placeholder="Repeat password" required
@@ -188,13 +199,9 @@ export default function AcceptInvitePage() {
                 style={inputStyle(confFocus)} />
             </div>
 
-            <button type="submit" disabled={loading}
-              style={{ width: '100%', background: '#1A7FC1', color: '#FFFFFF', border: 'none',
-                borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                fontFamily: 'inherit', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {loading ? 'Saving…' : <>Go to Dashboard <ArrowRight size={15} /></>}
-            </button>
+            <Button type="submit" loading={loading} size="lg" className="w-full mt-1">
+              Go to Dashboard {!loading && <ArrowRight size={15} />}
+            </Button>
           </form>
         </div>
       </div>

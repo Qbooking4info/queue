@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { createClient } from '@/lib/supabase/client'
 import type { SpecialtyRow, HospitalService } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -149,18 +150,10 @@ function ServiceModal({
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            style={{ flex: 2, padding: '11px', borderRadius: 10, cursor: 'pointer',
-              background: C.accent, border: 'none', fontFamily: 'inherit',
-              color: '#fff', fontSize: 13, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Service'}
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleSave} loading={saving} style={{ flex: 2 }}>
+            {editing ? 'Save Changes' : 'Add Service'}
+          </Button>
         </div>
       </div>
     </div>
@@ -448,7 +441,7 @@ export default function ServicesPage() {
                     )}
                     {s.virtual_price != null && (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px',
-                        borderRadius: 99, background: 'rgba(91,158,255,0.12)', color: '#5B9EFF' }}>
+                        borderRadius: 99, background: C.infoSubtle, color: C.info }}>
                         {fmtPrice(s.virtual_price)}
                       </span>
                     )}
@@ -562,18 +555,8 @@ export default function ServicesPage() {
               Existing appointments using this specialty will not be affected.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setRemoveSpecConfirm(null)}
-                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={() => handleRemoveSpecialty(removeSpecConfirm)}
-                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-                  background: 'rgba(220,60,60,0.12)', border: '1px solid rgba(220,60,60,0.3)',
-                  color: '#f07070', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
-                Remove
-              </button>
+              <Button onClick={() => setRemoveSpecConfirm(null)} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+              <Button onClick={() => handleRemoveSpecialty(removeSpecConfirm)} variant="danger" style={{ flex: 1 }}>Remove</Button>
             </div>
           </div>
         </div>
@@ -608,18 +591,8 @@ export default function ServicesPage() {
               This cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setDeleteConfirm(null)}
-                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={() => handleDeleteService(deleteConfirm)}
-                style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-                  background: 'rgba(220,60,60,0.12)', border: '1px solid rgba(220,60,60,0.3)',
-                  color: '#f07070', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
-                Delete
-              </button>
+              <Button onClick={() => setDeleteConfirm(null)} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+              <Button onClick={() => handleDeleteService(deleteConfirm)} variant="danger" style={{ flex: 1 }}>Delete</Button>
             </div>
           </div>
         </div>

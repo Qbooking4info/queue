@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
 import {
@@ -223,12 +224,10 @@ export function DependentsScreen({ navigation }: Props) {
               <Text style={[s.depName, { color: t.textPrimary, marginTop: 4 }]}>{managedBy.caretaker.full_name}</Text>
               <Text style={[s.depMeta, { color: t.textMuted }]}>{managedBy.relationship}</Text>
               {canSelfUnlink ? (
-                <TouchableOpacity onPress={confirmUnlinkSelf} disabled={unlinking === managedBy.linkId}
-                  style={[s.unlinkBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.07)', marginTop: 12 }]}>
-                  {unlinking === managedBy.linkId
-                    ? <ActivityIndicator color="#FF5C5C" size="small" />
-                    : <Text style={s.unlinkBtnText}>Unlink my account</Text>}
-                </TouchableOpacity>
+                <Button
+                  label="Unlink my account" onPress={confirmUnlinkSelf}
+                  loading={unlinking === managedBy.linkId} variant="danger" style={{ marginTop: 12 }}
+                />
               ) : (
                 <Text style={[s.helpText, { color: t.textMuted, marginTop: 10, marginBottom: 0 }]}>
                   You can unlink your own account once you turn 18.
@@ -329,8 +328,6 @@ const s = StyleSheet.create({
   switchLink:     { fontSize: 12, fontWeight: '700' },
   managedByCard:  { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 20 },
   managedByLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  unlinkBtn:      { borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1 },
-  unlinkBtnText:  { color: '#FF5C5C', fontSize: 13, fontWeight: '700' },
   noCaretakerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 20 },
   noCaretakerText:{ fontSize: 12 },
 })

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { Button } from '@queue/shared/components/ui/Button'
 
 // Where a doctor lands between signing up and being linked to a hospital. That gap is
 // structural, not a bug: `doctors.hospital_id` is NOT NULL, so no row can exist for a
@@ -81,18 +82,9 @@ export function DoctorOnboardingScreen() {
           ))}
         </View>
 
-        <TouchableOpacity
-          onPress={handleCheckAgain} disabled={checking} activeOpacity={0.85}
-          style={[s.btn, { backgroundColor: t.accent }, checking && { opacity: 0.6 }]}>
-          {checking
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={s.btnText}>I've been linked — check again</Text>}
-        </TouchableOpacity>
+        <Button label="I've been linked — check again" onPress={handleCheckAgain} loading={checking} size="lg" style={{ marginTop: t.spacing.sm }} />
 
-        <TouchableOpacity onPress={() => { void signOut() }} activeOpacity={0.8}
-          style={[s.btnGhost, { borderColor: t.cardBorder }]}>
-          <Text style={[s.btnGhostText, { color: t.textPrimary }]}>Sign out</Text>
-        </TouchableOpacity>
+        <Button label="Sign out" onPress={() => { void signOut() }} variant="outline" size="lg" style={{ marginTop: t.spacing.md }} />
 
       </ScrollView>
     </SafeAreaView>
@@ -115,8 +107,4 @@ const s = StyleSheet.create({
   stepNum:     { width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   stepNumText: { fontSize: 11, fontWeight: '800' },
   stepText:    { flex: 1, fontSize: 12, lineHeight: 18 },
-  btn:         { borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 6 },
-  btnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },
-  btnGhost:    { borderRadius: 14, paddingVertical: 13, alignItems: 'center', borderWidth: 1, marginTop: 10 },
-  btnGhostText:{ fontSize: 14, fontWeight: '600' },
 })

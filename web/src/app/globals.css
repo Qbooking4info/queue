@@ -67,6 +67,15 @@ body {
      desktop : ≥ 1024px
    ══════════════════════════════════════════════ */
 
+/* ── Auth pages' branding panel (login/register/reset-password/staff auth) ──
+   Fixed-width (420px) and meant to sit beside the form, not stack above it -- on a
+   phone-width screen it was wider than the viewport itself and pushed the actual
+   form (email, password, submit) completely off-screen with no way to reach it.
+   Hidden below tablet width; the form panel already goes full-width on its own. */
+@media (max-width: 767px) {
+  .auth-branding-panel { display: none !important; }
+}
+
 /* ── Sidebar drawer (phone only) ── */
 @media (max-width: 767px) {
   .q-sidebar {

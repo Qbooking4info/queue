@@ -1,9 +1,20 @@
 'use client'
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+// Structural scale, not color -- identical across both palettes, and numerically
+// mirrored in packages/shared/contexts/ThemeContext.tsx's own `scale` (mobile) so a
+// card or button is the same size on web and mobile even though the two token
+// systems aren't code-shared (web isn't in the npm workspace @queue/shared lives in).
+const scale = {
+  spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
+  radius:  { sm: 10, md: 14, lg: 20, pill: 99 },
+  font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 26 },
+}
+
 export const themes = {
   forest: {
     id: 'forest' as const,
+    ...scale,
     bg:           '#0A0F0D',
     bgAlt:        '#0D1410',
     card:         '#111915',
@@ -26,6 +37,20 @@ export const themes = {
     amberLight:   'rgba(239,159,39,0.14)',
     blue:         '#85B7EB',
     blueLight:    'rgba(55,138,221,0.14)',
+    // Distinct from `blue` above -- pages reaching for a "confirmed/info" accent
+    // independently settled on this brighter shade rather than `blue`. Same value in
+    // both palettes: it was already used directly on a light dashboard card with no
+    // complaint, so there was never a real dark/light split for it to inherit, unlike
+    // amber/red/purple above which visibly needed a muted light-mode counterpart.
+    info:         '#5B9EFF',
+    // Same reasoning as mobile's dangerBg/Subtle/Border: real rgba(91,158,255,*)
+    // usage on both platforms clustered at these three opacities (0.14 already matches
+    // the amberLight/blueLight convention above; 0.12 and 0.3 are each cluster's
+    // dominant value). No `danger` equivalent here -- rgba(255,92,92,*) never actually
+    // appears on web, only on mobile.
+    infoBg:       'rgba(91,158,255,0.14)',
+    infoSubtle:   'rgba(91,158,255,0.12)',
+    infoBorder:   'rgba(91,158,255,0.3)',
     purple:       '#B49CF0',
     purpleLight:  'rgba(140,100,240,0.14)',
     rowAlt:       '#131A16',
@@ -34,6 +59,7 @@ export const themes = {
   },
   clinical: {
     id: 'clinical' as const,
+    ...scale,
     bg:           '#F4F8FC',
     bgAlt:        '#EEF4FA',
     card:         '#FFFFFF',
@@ -56,6 +82,10 @@ export const themes = {
     amberLight:   '#FEF8E7',
     blue:         '#1A5FAB',
     blueLight:    '#EEF4FC',
+    info:         '#5B9EFF',
+    infoBg:       'rgba(91,158,255,0.14)',
+    infoSubtle:   'rgba(91,158,255,0.12)',
+    infoBorder:   'rgba(91,158,255,0.3)',
     purple:       '#5C35A8',
     purpleLight:  '#F2EEFF',
     rowAlt:       '#FAFCFB',

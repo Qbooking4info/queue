@@ -9,6 +9,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
+import { Button } from '@queue/shared/components/ui/Button'
 
 interface Props { navigation?: any }
 
@@ -119,7 +120,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           {(doctor?.avg_rating ?? 0) > 0 && (
             <View style={st.ratingRow}>
               {[0, 1, 2, 3, 4].map(i => (
-                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? '#EF9F27' : t.textMuted} />
+                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? t.statusBusy.text : t.textMuted} />
               ))}
               <Text style={[st.ratingNum, { color: t.textMuted }]}>
                 {doctor!.avg_rating!.toFixed(1)} ({doctor!.review_count ?? 0} reviews)
@@ -177,7 +178,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
         {/* Switch to Patient Mode */}
         <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
           style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14 }]}>
-          <Ionicons name="swap-horizontal-outline" size={18} color="#5B9EFF" />
+          <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
           <View style={{ flex: 1 }}>
             <Text style={[st.rowLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
             <Text style={[{ fontSize: 11, color: t.textMuted, marginTop: 1 }]}>Book appointments as a patient</Text>
@@ -201,34 +202,18 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
         {/* Sign out */}
         {confirmVisible ? (
-          <View style={[st.section, { backgroundColor: 'rgba(255,92,92,0.07)', borderColor: 'rgba(255,92,92,0.25)', marginHorizontal: 16, marginBottom: 12 }]}>
-            <Text style={[st.sectionTitle, { color: '#FF5C5C', borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
+          <View style={[st.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, marginHorizontal: 16, marginBottom: 12 }]}>
+            <Text style={[st.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
             <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <TouchableOpacity
-                style={[st.actionBtn, { flex: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }]}
-                onPress={() => setConfirmVisible(false)}
-              >
-                <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[st.actionBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }]}
-                onPress={() => { haptics.tap(); handleSignOut() }}
-                disabled={signingOut}
-              >
-                {signingOut
-                  ? <ActivityIndicator size="small" color="#FF5C5C" />
-                  : <Text style={{ color: '#FF5C5C', fontWeight: '700' }}>Sign out</Text>
-                }
-              </TouchableOpacity>
+              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
+              <Button
+                label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
+                loading={signingOut} variant="danger" style={{ flex: 1 }}
+              />
             </View>
           </View>
         ) : (
-          <TouchableOpacity
-            style={[st.signOutBtn, { borderColor: 'rgba(255,92,92,0.3)', marginHorizontal: 16 }]}
-            onPress={() => setConfirmVisible(true)}
-          >
-            <Text style={st.signOutTxt}>Sign out</Text>
-          </TouchableOpacity>
+          <Button label="Sign out" onPress={() => setConfirmVisible(true)} variant="danger" style={{ marginHorizontal: 16 }} />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -271,7 +256,4 @@ const st = StyleSheet.create({
   rowLabel:        { fontSize: 13 },
   rowValue:        { fontSize: 13, fontWeight: '600' },
   bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
-  actionBtn:       { padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
-  signOutBtn:      { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.06)' },
-  signOutTxt:      { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
 })

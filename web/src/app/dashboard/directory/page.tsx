@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Phone, Plus, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 
 /**
  * Emergency fallback directory.
@@ -157,10 +158,9 @@ export default function DirectoryPage() {
             <input style={input} placeholder="What happened on the call" value={f.verification_note} onChange={e => setF({ ...f, verification_note: e.target.value })} />
           </div>
         </div>
-        <button onClick={add} disabled={adding}
-          style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: C.accent, color: '#fff', opacity: adding ? 0.6 : 1 }}>
-          <Plus size={14} /> {adding ? 'Adding…' : 'Add number'}
-        </button>
+        <Button onClick={add} loading={adding} size="sm" className="mt-3">
+          {!adding && <Plus size={14} />} Add number
+        </Button>
       </div>
 
       {loading ? (
