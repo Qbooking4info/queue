@@ -37,7 +37,11 @@ const forest = {
   accentBorder:'rgba(0,232,122,0.28)',
   textPrimary: '#E8F5EE',
   textSecondary:'#7ABDA0',
-  textMuted:   '#4A7060',
+  // Lightened from #4A7060, which sat at 3.09:1 against inputBg -- below the WCAG AA
+  // 4.5:1 floor for body text, and this token carries timestamps, helper copy and
+  // empty-state text. #658B7B clears 4.5:1 on all three surfaces it renders on
+  // (canvasBg 5.09, cardBg 4.71, inputBg 4.52).
+  textMuted:   '#658B7B',
   // Solid semantic colors for buttons/icons/banners -- distinct from the statusX
   // trios below, which are specifically for queue-status badges (bg+text+border at
   // one fixed opacity). danger/info were never named before this: every screen that
@@ -91,8 +95,14 @@ const clinical = {
   // screen (AppointmentDetailScreen) and multiple web dashboard pages independently
   // reached for as "the readable red on a light background", so it's a documented
   // choice, not a guess.
-  danger:      '#DC2626',
-  info:        '#5B9EFF',
+  // Both darkened for WCAG AA. These aren't only read on the card -- Button's `danger`
+  // and `info` variants paint them on their OWN tinted fill (dangerSubtle/infoSubtle
+  // composited over the card), which pulls the background toward the text hue and costs
+  // roughly half a point of contrast. Solved against that composite, not against white:
+  //   danger #CD1717 on #FCE9E9 = 4.53:1   (was #DC2626 at 4.13:1)
+  //   info   #2568C9 on #EBF3FF = 4.55:1   (was #5B9EFF at 2.42:1 -- the worst in the app)
+  danger:      '#CD1717',
+  info:        '#2568C9',
   // Same opacities as forest, but built from clinical's OWN solid danger RGB
   // (220,38,38, i.e. #DC2626) rather than forest's -- these never existed as literals
   // in light mode before (every existing occurrence was a dark-mode-only literal), so
@@ -108,7 +118,10 @@ const clinical = {
   infoBorder:    'rgba(91,158,255,0.3)',
   textPrimary: '#0C2A4A',
   textSecondary:'#2A5070',
-  textMuted:   '#6A8FAA',
+  // Darkened from #6A8FAA (3.21:1 on canvasBg). Had to clear AA against the *canvas*,
+  // not the card -- an obvious-looking #5A7A8A passes on white at 4.58:1 and quietly
+  // fails on canvasBg at 4.29:1. #4F748F clears both (4.97 / 4.66).
+  textMuted:   '#4F748F',
   statusOpen:     { bg:'#E6F7EE', text:'#085041', border:'rgba(0,168,84,0.3)' },
   statusBusy:     { bg:'#FEF8E7', text:'#633806', border:'rgba(196,127,0,0.3)' },
   statusVirtual:  { bg:'#E6F1FB', text:'#0C447C', border:'rgba(26,95,165,0.3)' },

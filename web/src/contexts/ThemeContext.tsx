@@ -26,11 +26,18 @@ export const themes = {
     sidebarHov:   '#0C1C10',
     accent:       '#00E87A',
     accentLight:  'rgba(0,232,122,0.14)',
+    // Mirrors mobile's accentDark. Button's `success` variant needs a text colour that
+    // clears AA on accentLight; here it measures 5.66:1 (the brand accent would too on
+    // this dark ground, but clinical's accent does not, so both use accentDark).
+    accentDark:   '#00C265',
     accentMid:    'rgba(0,232,122,0.10)',
     accentBorder: 'rgba(0,232,122,0.28)',
     text:         '#E8F5EE',
     textSub:      '#6AAE8A',
-    textMuted:    '#3D6050',
+    // #3D6050 was the worst contrast in the product at 2.44:1 against cardAlt -- barely
+    // above the 3:1 floor for *large* text, used for body-sized meta copy. #6A8D7D
+    // clears 4.5:1 on every surface it lands on (bg 5.26 ... cardAlt 4.67).
+    textMuted:    '#6A8D7D',
     red:          '#F07070',
     redLight:     'rgba(226,75,74,0.14)',
     amber:        '#EF9F27',
@@ -71,18 +78,25 @@ export const themes = {
     sidebarHov:   '#13395E',
     accent:       '#1A7FC1',
     accentLight:  '#E6F1FB',
+    accentDark:   '#0E5A8A',
     accentMid:    'rgba(26,127,193,0.12)',
     accentBorder: 'rgba(26,127,193,0.30)',
     text:         '#0C2A4A',
     textSub:      '#2A5070',
-    textMuted:    '#6A8FAA',
-    red:          '#E03E3E',
+    // textMuted darkened to clear AA against the lightest surface it renders on (bgAlt),
+    // not just the card. red darkened because Button's `danger` variant paints it on
+    // redLight (#FEF0F0), where #E03E3E measured 3.84:1.
+    textMuted:    '#4C718C',
+    red:          '#D12F2F',
     redLight:     '#FEF0F0',
     amber:        '#C47F00',
     amberLight:   '#FEF8E7',
     blue:         '#1A5FAB',
     blueLight:    '#EEF4FC',
-    info:         '#5B9EFF',
+    // Darkened to match mobile's clinical `info` for the same reason: #5B9EFF measured
+    // 2.70:1 on a white card, and 2.42:1 on its own infoSubtle tint. Same value both
+    // platforms so an "info" pill reads identically in the app and the dashboard.
+    info:         '#2568C9',
     infoBg:       'rgba(91,158,255,0.14)',
     infoSubtle:   'rgba(91,158,255,0.12)',
     infoBorder:   'rgba(91,158,255,0.3)',
@@ -120,6 +134,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem(STORAGE_KEY) as ThemeId | null
     if (saved && saved in themes) setThemeId(saved)
   }, [])
+
+  // Mirror the active theme onto the document as data-theme, so plain CSS can react
+  // to the toggle too. Everything themed on this dashboard reads useTheme() into an
+  // inline style, which works for components but leaves globals.css blind -- it already
+  // carried a `:root[data-theme="light"]` block (skeleton shimmer) that never matched
+  // anything because nobody stamped the attribute. Written in an effect rather than
+  // during render so the server-rendered HTML and the first client render stay
+  // identical; light/dark rather than clinical/forest to match that existing block.
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeId === 'forest' ? 'dark' : 'light'
+  }, [themeId])
 
   const toggleTheme = () => setThemeId(id => {
     const next = id === 'forest' ? 'clinical' : 'forest'

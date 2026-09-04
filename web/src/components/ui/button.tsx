@@ -39,7 +39,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       // Same "Approve"/positive-action tint mobile's Button gained -- built from the
       // theme's own accent (green in forest, blue in clinical), not a universal green,
       // matching what StatusButton/FrontDeskActions/SettingsForm already hand-rolled.
-      success: { background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}` },
+      // Text is accentDark, not accent: on accentLight the brand accent measured 3.78:1,
+      // below the AA floor. accentDark is an existing token and clears it at 6.44:1,
+      // so the fix costs no new colour and leaves the brand accent untouched.
+      success: { background: C.accentLight, color: C.accentDark, border: `1px solid ${C.accentBorder}` },
       info:    { background: C.infoBg, color: C.info, border: `1px solid ${C.infoBorder}` },
     }[variant]
     return (
