@@ -12,7 +12,6 @@ import type {
   ClinicDetail, ClinicStaffMember, AdminDoctor, AdminAppointment, DayHours,
 } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
-import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { LinkDoctorForm } from '@/components/dashboard/LinkDoctorModal'
 import { HoursEditor } from '@/components/dashboard/HoursEditor'
 import {
@@ -371,7 +370,7 @@ function AssignDoctorModal({
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const res = await fetch('/api/doctors/unassigned')
+      const res = await fetch(`/api/doctors/unassigned?clinicId=${clinicId}`)
       setPool(res.ok ? (await res.json()).doctors : [])
       setLoading(false)
     }
@@ -880,13 +879,21 @@ export default function ClinicDetailPage() {
   const [rejectNote,       setRejectNote]       = useState('')
   const [rejectSaving,     setRejectSaving]     = useState(false)
   const [managingStaff,    setManagingStaff]    = useState<ClinicStaffMember | null>(null)
-  const [managingDoctor,   setManagingDoctor]   = useState<AdminDoctor | null>(null)
   const [clinicHours,      setClinicHours]      = useState<DayHours[]>([])
   const [hospitalHours,    setHospitalHours]    = useState<DayHours[]>([])
   const [hoursIsCustom,    setHoursIsCustom]    = useState(false)
   const [showHours,        setShowHours]        = useState(false)
   const canManageStaff = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
+  // Staff (front desk / sub-admin) additions stay admin-only -- a sub-admin
+  // shouldn't be able to hand out another sub-admin's access or add front
+  // desk officers on their own authority.
   const canAddStaffOrDoctor = role === 'super_admin' || role === 'hospital_admin'
+  // Doctors are different: a clinic's own sub-admin managing *their* clinic is
+  // exactly who should be able to add a doctor to it, not just the hospital
+  // admin. The API (POST /api/doctors/link) independently forces a clinic_admin's
+  // link into their own clinicId regardless of what this page sends, so this is
+  // just the matching UI-level permission, not the enforcement.
+  const canAddDoctor = role === 'super_admin' || role === 'hospital_admin' || role === 'clinic_admin'
 
   // analytics range — separate from appointments range
   const [aRange,  setARange]  = useState<DateRangeKey>('this_month')
@@ -1366,7 +1373,7 @@ export default function ClinicDetailPage() {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {doctors.length} Doctor{doctors.length !== 1 ? 's' : ''} · {clinic?.name}
             </div>
-            {canAddStaffOrDoctor && (
+            {canAddDoctor && (
               <button onClick={() => setShowAssign(true)}
                 style={{ background: col.text, color: '#061208', border: 'none',
                   borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700,
@@ -1388,7 +1395,7 @@ export default function ClinicDetailPage() {
               <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
                 Assign existing hospital doctors or add new ones directly to this clinic.
               </div>
-              {canAddStaffOrDoctor && (
+              {canAddDoctor && (
                 <button onClick={() => setShowAssign(true)}
                   style={{ background: col.text, color: '#061208', border: 'none',
                     borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 700,
@@ -1437,14 +1444,39 @@ export default function ClinicDetailPage() {
                         <Monitor size={11} /> Virtual
                       </span>
                     )}
+                    {doc.is_active_here && (
+                      <span style={{ fontSize: 11, background: `${col.text}18`, border: 'none',
+                        borderRadius: 8, padding: '3px 10px', color: col.text, fontWeight: 700 }}>
+                        Active here
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {canManageStaff && (
-                      <button onClick={() => setManagingDoctor(doc)}
+                      <button onClick={async () => {
+                        if (doc.is_active && !confirm(`Deactivate ${doc.full_name}? They'll stop appearing in bookings and queues at this hospital until reactivated.`)) return
+                        const res = await fetch(`/api/doctors/${doc.id}`, {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ is_active: !doc.is_active }),
+                        })
+                        if (res.ok) setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, is_active: !d.is_active } : d))
+                      }}
                         style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
-                          background: col.bg, border: 'none',
+                          background: doc.is_active ? col.bg : 'transparent',
+                          border: doc.is_active ? 'none' : `1px solid ${C.border}`,
+                          color: doc.is_active ? col.text : C.textMuted, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        {doc.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
+                    {canManageStaff && !doc.is_active_here && (
+                      <button onClick={async () => {
+                        const res = await fetch(`/api/clinics/${clinicId}/doctors/${doc.id}`, { method: 'PATCH' })
+                        if (res.ok) setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, is_active_here: true } : d))
+                      }}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
+                          background: 'transparent', border: `1px solid ${col.text}`,
                           color: col.text, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
-                        Manage
+                        Set Active
                       </button>
                     )}
                     <button onClick={async () => {
@@ -2021,17 +2053,6 @@ export default function ClinicDetailPage() {
           onClose={() => setManagingStaff(null)}
           onRemoved={() => { setStaff(prev => prev.filter(s => s.id !== managingStaff!.id)); setManagingStaff(null) }}
           onUpdated={(updated) => { setStaff(prev => prev.map(s => s.id === updated.id ? updated : s)); setManagingStaff(null) }}
-        />
-      )}
-
-      {/* ── Manage Doctor Modal ──────────────────────────────────────────── */}
-      {managingDoctor && (
-        <ManageDoctorModal
-          doctor={managingDoctor}
-          col={col}
-          C={C}
-          onClose={() => setManagingDoctor(null)}
-          onUpdated={(updated) => { setDoctors(prev => prev.map(d => d.id === updated.id ? updated : d)); setManagingDoctor(null) }}
         />
       )}
 

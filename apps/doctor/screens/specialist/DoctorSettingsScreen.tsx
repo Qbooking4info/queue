@@ -14,7 +14,7 @@ import {
 } from '@queue/shared/lib/api'
 import { ShellScroll } from '@queue/shared/components/AppShell'
 
-interface Props { navigation: any }
+interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean; navigate: (name: string) => void } }
 
 const DEFAULTS: DoctorProfileSettings = {
   title: null, specialty_id: null, level: null, bio: null, qualification: null, years_experience: null,
@@ -22,7 +22,7 @@ const DEFAULTS: DoctorProfileSettings = {
   accepts_direct_virtual: false, accepts_direct_home_visit: false, show_phone_to_patients: false,
 }
 
-export function DoctorSettingsScreen({}: Props) {
+export function DoctorSettingsScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
   const { user, doctorProfile, signOut } = useAuth()
   const [form, setForm] = useState<DoctorProfileSettings>(DEFAULTS)
@@ -96,7 +96,18 @@ export function DoctorSettingsScreen({}: Props) {
   return (
     <>
       <ShellScroll>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>Settings</Text>
+        {/* Settings is pushed as its own stack screen above the tab bar (not a tab
+            itself), so without this there is no way back to Dashboard at all --
+            no header, no tab bar, nothing but the browser's own back button, which
+            doesn't sync with this in-memory navigation stack on web. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          {navigation.canGoBack?.() ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Settings</Text>
+        </View>
         <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
           Your independent, hospital-agnostic profile — what patients see when booking you directly.
         </Text>

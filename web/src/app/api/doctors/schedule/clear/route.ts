@@ -1,16 +1,33 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { getServerUser } from '@/lib/supabase/auth-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { todayLocalDate } from '@/lib/dashboard-utils'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 // DELETE all unbooked future slots for a doctor.
 // Separated from the main schedule endpoint because it is destructive.
 // Requires hospital_admin with role "admin" or "owner" — clinic_admin cannot clear.
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return Errors.unauthenticated()
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
+  // getServerUser checks Authorization: Bearer first, falls back to the SSR
+  // cookie session -- the cookie-only createClient() check this replaced would
+  // silently 401 any cross-origin Bearer-token caller (the mobile app) even
+  // once CORS is fixed, since no cookie is ever sent cross-origin.
+  const user = await getServerUser(req)
+  if (!user) return Errors.unauthenticated()
 
   const db = createAdminClient()
 

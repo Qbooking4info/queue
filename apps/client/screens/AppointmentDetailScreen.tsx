@@ -130,6 +130,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const isInPerson  = !isVirtual
   const isUpcoming  = ['confirmed', 'pending', 'checked_in', 'in_progress'].includes(appt.status)
   const isConfirmed = ['confirmed', 'checked_in'].includes(appt.status)
+  // Separate from isConfirmed (which also gates the in-person queue banner
+  // below, a different concern): a virtual call already 'in_progress' --
+  // started by the doctor, or left stuck after a disconnect -- has no other
+  // way back in without this, since isConfirmed alone would hide the Join
+  // banner the instant the doctor starts the call.
+  const canJoinVirtual = isVirtual && ['confirmed', 'checked_in', 'in_progress'].includes(appt.status)
   const isMissed    = appt.status === 'no_show'
   const canReschedule = (isUpcoming || isMissed) && appt.rescheduleCount < 1
   const showPass    = isUpcoming && !cancelled && !isPendingReview && !isRejected
@@ -414,7 +420,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         )}
 
         {/* Virtual join banner */}
-        {isVirtual && isConfirmed && !cancelled && (
+        {canJoinVirtual && !cancelled && (
           <TouchableOpacity
             style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: t.infoBorder }]}
             onPress={() => navigation.navigate('VideoCall', {

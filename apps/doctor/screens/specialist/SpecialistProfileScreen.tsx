@@ -101,6 +101,12 @@ export function SpecialistProfileScreen({ navigation }: Props) {
             <Text style={[st.avatarText, { color: t.accent }]}>{initials}</Text>
           </View>
           <Text style={[st.docName, { color: t.textPrimary }]}>{doctor?.full_name ?? user?.full_name ?? '—'}</Text>
+          {user?.doctor_code && (
+            <View style={[st.idPill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <Ionicons name="key-outline" size={11} color={t.accent} />
+              <Text selectable style={[st.idPillText, { color: t.accent }]}>{user.doctor_code}</Text>
+            </View>
+          )}
           {doctor?.specialty && (
             <Text style={[st.specialty, { color: t.accent }]}>{(doctor.specialty as any).name}</Text>
           )}
@@ -231,6 +237,8 @@ const st = StyleSheet.create({
   avatar:          { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
   avatarText:      { fontSize: 26, fontWeight: '800' },
   docName:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  idPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 99, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
+  idPillText:      { fontSize: 12, fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1.5 },
   specialty:       { fontSize: 13, fontWeight: '700', marginTop: 4 },
   qual:            { fontSize: 12, marginTop: 3, textAlign: 'center' },
   email:           { fontSize: 11, marginTop: 6 },

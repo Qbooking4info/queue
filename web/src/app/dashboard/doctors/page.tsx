@@ -6,7 +6,6 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
-import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { LinkDoctorModal } from '@/components/dashboard/LinkDoctorModal'
 
 const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
@@ -19,11 +18,29 @@ export default function DoctorsPage() {
   const { theme: C } = useTheme()
   const { doctors, stats, loading, reload, role, clinicId } = useAdmin()
   const router = useRouter()
-  const [managingDoctor, setManagingDoctor] = useState<AdminDoctor | null>(null)
   const [linking, setLinking] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const isFrontDesk = role === 'front_desk'
-  const canAddDoctor = role === 'hospital_admin' || role === 'super_admin'
+  const canAddDoctor = role === 'hospital_admin' || role === 'super_admin' || role === 'clinic_admin'
+  const canManage = role === 'hospital_admin' || role === 'super_admin' || role === 'clinic_admin'
+
+  // The only lever staff have over a doctor's account -- activate/deactivate
+  // at this hospital. Everything else about their profile is theirs alone
+  // to edit (they're independent, self-registered accounts) -- see
+  // PATCH /api/doctors/[id]'s own comment for why the old "Edit Profile" /
+  // password-reset capability was removed.
+  async function toggleActive(d: AdminDoctor) {
+    if (d.is_active && !confirm(`Deactivate ${d.full_name}? They'll stop appearing in bookings and queues at this hospital until reactivated.`)) return
+    setTogglingId(d.id)
+    const res = await fetch(`/api/doctors/${d.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !d.is_active }),
+    })
+    setTogglingId(null)
+    if (res.ok) reload()
+  }
 
   useEffect(() => {
     // Doctors (role=doctor) shouldn't access the full doctors list
@@ -140,28 +157,23 @@ export default function DoctorsPage() {
                       color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                       View Schedule
                     </button>
-                    <button onClick={() => setManagingDoctor(d)}
-                      style={{ flex: 1, padding: '9px', borderRadius: 10,
-                      border: `1px solid ${C.accentBorder}`, background: C.accentLight,
-                      color: C.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                      Edit Profile
-                    </button>
+                    {canManage && (
+                      <button onClick={() => toggleActive(d)} disabled={togglingId === d.id}
+                        style={{ flex: 1, padding: '9px', borderRadius: 10,
+                        border: `1px solid ${d.is_active ? C.border : C.accentBorder}`,
+                        background: d.is_active ? C.card : C.accentLight,
+                        color: d.is_active ? C.textSub : C.accent,
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        opacity: togglingId === d.id ? 0.6 : 1 }}>
+                        {togglingId === d.id ? 'Saving…' : d.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             )
           })}
         </div>
-      )}
-
-      {managingDoctor && (
-        <ManageDoctorModal
-          doctor={managingDoctor}
-          col={{ bg: C.accentLight, text: C.accent }}
-          C={C}
-          onClose={() => setManagingDoctor(null)}
-          onUpdated={() => { reload(); setManagingDoctor(null) }}
-        />
       )}
 
       {linking && (

@@ -3,6 +3,14 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 // POST /api/doctors/link -- links an existing, independently-registered doctor
 // account (from the doctors/ app) to the caller's hospital, given the doctor's own
@@ -31,7 +39,13 @@ import { checkRateLimit } from '@/lib/rate-limit'
 // bio, years_experience, mdcn_number, avatar_url -- still auto-transfers from their
 // existing profile with no admin input, exactly like POST already did.
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
+  const auth = await requireRole(['hospital_admin', 'super_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -71,7 +85,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
+  const auth = await requireRole(['hospital_admin', 'super_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -81,6 +101,17 @@ export async function POST(req: NextRequest) {
 
   if (!doctorCode?.trim()) {
     return Errors.validation('doctorCode is required')
+  }
+
+  // A clinic_admin's whole access is scoped to their own clinic -- same rule
+  // clinics/[clinicId]/doctors/route.ts already enforces for assign/unassign.
+  // Ignore whatever clinicId the client sent (or omitted) and use their own,
+  // so a subadmin can never land a doctor in a clinic they don't manage, or
+  // hospital-wide (clinicId null) where they'd have no way to reach them again.
+  let effectiveClinicId: string | null = clinicId || null
+  if (caller.role === 'clinic_admin') {
+    if (!caller.clinicId) return Errors.forbidden('Your account is not assigned to a clinic')
+    effectiveClinicId = caller.clinicId
   }
 
   const { data: account } = await db
@@ -111,11 +142,19 @@ export async function POST(req: NextRequest) {
   if (existing) {
     const { error } = await db.from('doctors')
       .update({
-        is_active: true, clinic_id: clinicId || null, availability_status: 'off_duty',
+        is_active: true, clinic_id: effectiveClinicId, availability_status: 'off_duty',
         ...(specialtyId ? { specialty_id: specialtyId } : {}),
       })
       .eq('id', existing.id)
     if (error) return Errors.internal(error.message)
+    // Record the assignment pool membership alongside the active pointer --
+    // a doctor can now be assigned to several clinics (doctor_clinics,
+    // 20260903000001); linking still sets THIS clinic active directly,
+    // matching the pre-multi-clinic behaviour for a first/only clinic.
+    if (effectiveClinicId) {
+      await db.from('doctor_clinics')
+        .upsert({ doctor_id: existing.id, clinic_id: effectiveClinicId }, { onConflict: 'doctor_id,clinic_id', ignoreDuplicates: true })
+    }
     return NextResponse.json({ id: existing.id, relinked: true })
   }
 
@@ -157,7 +196,7 @@ export async function POST(req: NextRequest) {
     .from('doctors')
     .insert({
       hospital_id: caller.hospitalId,
-      clinic_id: clinicId || null,
+      clinic_id: effectiveClinicId,
       user_id: account.id,
       is_active: true,
       // Newly linked at THIS hospital -- off_duty (not the doctors table's
@@ -180,6 +219,11 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return Errors.internal(error.message)
+
+  if (effectiveClinicId) {
+    // Brand-new doctors row -- no prior membership possible, plain insert is safe.
+    await db.from('doctor_clinics').insert({ doctor_id: data.id, clinic_id: effectiveClinicId })
+  }
 
   return NextResponse.json({ id: data.id, relinked: false })
 }

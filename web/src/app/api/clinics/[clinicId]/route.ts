@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { safePatientName, calcAge } from '@/lib/dashboard-utils'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 interface DayHours { day: number; open: string; close: string; closed: boolean }
 
@@ -35,8 +43,14 @@ async function assertOwnClinic(
 // getClinicDoctors/getClinicStaff/getClinicAppointments/getClinicRangeStats/
 // getClinicHours/getHospitalHours into one call (Task 15) -- the page always
 // fetched all seven together.
-export async function GET(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+export async function GET(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handleGET(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params
@@ -49,11 +63,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
   const from = searchParams.get('from')
   const to = searchParams.get('to')
 
+  // Operational -- who is CURRENTLY ACTIVE here, for the appointments/stats
+  // queries below. Deliberately NOT membership-based: a doctor merely
+  // assigned to this clinic but active elsewhere shouldn't surface in this
+  // clinic's queue/appointment activity. Left unchanged by multi-clinic.
   const { data: docs } = await db.from('doctors').select('id').eq('clinic_id', clinicId)
   const doctorIds = (docs as any[] ?? []).map((d: any) => d.id)
   const orFilter = doctorIds.length > 0
     ? `clinic_id.eq.${clinicId},doctor_id.in.(${doctorIds.join(',')})`
     : `clinic_id.eq.${clinicId}`
+
+  // Management -- who is ASSIGNED here (doctor_clinics membership), for the
+  // "Doctors in this clinic" panel below, which now shows everyone assigned
+  // regardless of where they're currently active (see is_active_here).
+  const { data: memberRows } = await db.from('doctor_clinics').select('doctor_id').eq('clinic_id', clinicId)
+  const memberIds = (memberRows ?? []).map(m => m.doctor_id)
 
   const [
     { data: clinic },
@@ -65,11 +89,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
     { data: hospitalHoursRows },
   ] = await Promise.all([
     db.from('hospital_clinics').select('*').eq('id', clinicId).single(),
-    db.from('doctors').select(`
-        id, full_name, email, title, avg_rating, review_count, is_active,
-        accepts_virtual, consultation_fee, years_experience, clinic_id, availability_status,
-        specialty:specialties!doctors_specialty_id_fkey(name)
-      `).eq('clinic_id', clinicId).eq('is_active', true).order('full_name'),
+    memberIds.length > 0
+      ? db.from('doctors').select(`
+          id, full_name, email, title, avg_rating, review_count, is_active,
+          accepts_virtual, consultation_fee, years_experience, clinic_id, availability_status,
+          specialty:specialties!doctors_specialty_id_fkey(name)
+        `).in('id', memberIds).eq('is_active', true).order('full_name')
+      : Promise.resolve({ data: [] as any[] }),
     db.from('clinic_admins').select('id, user_id, role, is_active, created_at, users(full_name, email)')
       .eq('clinic_id', clinicId).eq('is_active', true).order('created_at'),
     from && to
@@ -163,6 +189,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ clin
       is_active: d.is_active, accepts_virtual: d.accepts_virtual,
       consultation_fee: d.consultation_fee, years_experience: d.years_experience,
       clinic_id: d.clinic_id ?? null,
+      is_active_here: d.clinic_id === clinicId,
       availability_status: d.availability_status ?? 'on_duty',
     })),
     staff: ((staffRows ?? []) as any[]).map(r => ({
@@ -192,8 +219,14 @@ type PatchBody =
   | { action: 'update_hours'; hours: DayHours[] }
   | { action: 'clear_hours' }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'])
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handlePATCH(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params
@@ -315,8 +348,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
-  const auth = await requireRole(['super_admin', 'hospital_admin'])
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ clinicId: string }> }) {
+  const res = await handleDELETE(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ clinicId: string }> }) {
+  const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   const { clinicId } = await params

@@ -180,6 +180,12 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
           {appt.status === 'confirmed' && appt.type === 'virtual' && (
             <ActionBtn label="Join Call" theme={t} primary disabled={busy} onPress={onJoinCall} />
           )}
+          {/* A call already in progress (started here or from another device/tab,
+              or left stuck after a disconnect) has no other way back in -- without
+              this, an interrupted call could never be resumed or properly ended. */}
+          {appt.status === 'in_progress' && appt.type === 'virtual' && (
+            <ActionBtn label="Rejoin Call" theme={t} primary disabled={busy} onPress={onJoinCall} />
+          )}
           {appt.status === 'confirmed' && appt.type === 'home_visit' && (
             <ActionBtn label="Start Visit" theme={t} primary disabled={busy} onPress={onStart} />
           )}

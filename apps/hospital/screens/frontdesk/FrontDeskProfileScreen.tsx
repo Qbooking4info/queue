@@ -47,7 +47,19 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
+        {/* Profile is pushed as its own stack screen above the tab bar (not a tab
+            itself, reached from StaffMore), so without this there is no way back to
+            the dashboard at all -- no native header, no tab bar, nothing but the
+            browser's own back button, which doesn't sync with this in-memory
+            navigation stack on web. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 16 }}>
+          {navigation?.canGoBack?.() ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={[s.title, { color: t.textPrimary, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Profile</Text>
+        </View>
 
         {/* Staff card */}
         <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

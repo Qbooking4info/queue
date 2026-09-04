@@ -32,6 +32,10 @@ import { StaffMoreScreen }         from './screens/staff/StaffMoreScreen'
 import { StaffAnalyticsScreen }    from './screens/staff/StaffAnalyticsScreen'
 import { StaffManagementScreen }   from './screens/staff/StaffManagementScreen'
 import { HospitalSettingsScreen }  from './screens/staff/HospitalSettingsScreen'
+import { HospitalClinicsScreen }       from './screens/staff/HospitalClinicsScreen'
+import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetailScreen'
+import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
+import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
 
 const AuthStack   = createNativeStackNavigator()
 const StaffTab    = createBottomTabNavigator()
@@ -82,6 +86,10 @@ function StaffStack() {
       <StaffStackN.Screen name="StaffAnalytics"     component={StaffAnalyticsScreen   as any} />
       <StaffStackN.Screen name="StaffManagement"    component={StaffManagementScreen  as any} />
       <StaffStackN.Screen name="HospitalSettings"   component={HospitalSettingsScreen as any} />
+      <StaffStackN.Screen name="HospitalClinics"       component={HospitalClinicsScreen as any} />
+      <StaffStackN.Screen name="HospitalClinicDetail"  component={HospitalClinicDetailScreen as any} />
+      <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
+      <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
       <StaffStackN.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </StaffStackN.Navigator>
   )

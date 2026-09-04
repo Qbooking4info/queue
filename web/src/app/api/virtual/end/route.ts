@@ -4,7 +4,10 @@ import { getServerUser } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
-// POST { appointmentId } — doctor ends the call.
+// POST { appointmentId } — either party on the call can end it (previously
+// doctor-only; a patient tapping "End" only navigated away locally with no
+// server effect at all, leaving the appointment stuck in_progress for the
+// doctor -- exactly the stuck-call scenario fixed elsewhere this session).
 // Sets virtual_sessions.ended_at, calculates duration_secs, marks appointment completed.
 //
 // Called cross-origin by the doctors/mobile apps -- needs real CORS handling
@@ -31,7 +34,7 @@ async function handlePOST(req: NextRequest) {
 
   const { data: appt } = await db
     .from('appointments')
-    .select('id, doctor_id, doctor_user_id')
+    .select('id, doctor_id, doctor_user_id, patient_id')
     .eq('id', appointmentId)
     .single()
 
@@ -57,7 +60,13 @@ async function handlePOST(req: NextRequest) {
     }
   }
 
-  if (!callerIsDoctor) return Errors.forbidden()
+  let callerIsPatient = false
+  if (!callerIsDoctor && appt.patient_id) {
+    const { data: patUser } = await db.from('users').select('auth_id').eq('id', appt.patient_id).single()
+    callerIsPatient = patUser?.auth_id === user.id
+  }
+
+  if (!callerIsDoctor && !callerIsPatient) return Errors.forbidden()
 
   const now = new Date().toISOString()
 

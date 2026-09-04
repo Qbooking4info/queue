@@ -3,8 +3,22 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getClinicsForHospital } from '@/lib/admin-api'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
   const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
@@ -16,9 +30,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
   // BC4: clinic creation requires hospital_admin or super_admin — front_desk and
   // clinic_admin must not be able to create clinics for hospitals they don't own.
-  const auth = await requireRole(['hospital_admin', 'super_admin'])
+  // requireRole must be given `req` -- without it, it can't see the
+  // Authorization: Bearer header a cross-origin mobile caller sends, and
+  // silently falls back to a cookie-only check that always fails for them
+  // even once CORS allows the request through.
+  const auth = await requireRole(['hospital_admin', 'super_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
 

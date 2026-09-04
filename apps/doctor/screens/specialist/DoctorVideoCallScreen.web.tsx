@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
@@ -16,6 +16,7 @@ import AgoraRTC, {
   type IMicrophoneAudioTrack,
 } from 'agora-rtc-react'
 import { supabase } from '@queue/shared/lib/supabase'
+import { CallErrorBoundary } from '@queue/shared/components/CallErrorBoundary'
 
 // Browser counterpart to DoctorVideoCallScreen.native.tsx -- same token fetch, same
 // /api/virtual/end on hangup, same uid (1, host), just agora-rtc-react's Web SDK
@@ -42,6 +43,18 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   const [phase, setPhase]   = useState<'loading' | 'active' | 'error'>('loading')
   const [error, setError]   = useState<string | null>(null)
   const [tokenData, setTokenData] = useState<TokenResponse | null>(null)
+
+  // Must be called unconditionally, before either early return below -- it
+  // previously lived inline in the final JSX (`<AgoraRTCProvider
+  // client={useMemo(...)}>`), which only runs once phase === 'active'. The
+  // 'loading'/'error' early returns skipped this useMemo entirely on those
+  // renders; the moment the token arrived and phase flipped to 'active',
+  // the next render called it for the first time, changing the hook count
+  // between renders -- React throws "Rendered more hooks than during the
+  // previous render" with no error boundary above this screen, i.e. the
+  // call looks "in progress" (the token fetch succeeded) but the interface
+  // never renders. Same bug, same fix as VideoCallScreen.web.tsx (patient side).
+  const agoraClient = useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])
 
   useEffect(() => {
     let active = true
@@ -72,29 +85,30 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     return () => { active = false }
   }, [appointmentId])
 
-  async function handleEndSession() {
+  // Split from the confirm-gated button below so the error boundary can call
+  // this directly -- if the screen already crashed, asking "are you sure?"
+  // before letting the doctor leave is just friction, not a safeguard.
+  async function doEndAndLeave() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (jwt && API_URL) {
+        await fetch(`${API_URL}/api/virtual/end`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        })
+      }
+    } catch (err) {
+      console.warn('[video] failed to end session on leave', err)
+    }
+    navigation.goBack()
+  }
+
+  function handleEndSession() {
     Alert.alert('End session?', 'This will end the call for both you and the patient.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End session',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const jwt = session?.access_token
-            if (jwt && API_URL) {
-              await fetch(`${API_URL}/api/virtual/end`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ appointmentId }),
-              })
-            }
-          } catch (err) {
-            console.warn('[video] failed to end session on leave', err)
-          }
-          navigation.goBack()
-        },
-      },
+      { text: 'End session', style: 'destructive', onPress: doEndAndLeave },
     ])
   }
 
@@ -124,16 +138,18 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AgoraRTCProvider client={useMemo(() => AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' }), [])}>
-      <CallBody
-        appId={tokenData.appId}
-        token={tokenData.token}
-        channelName={tokenData.channelName}
-        uid={tokenData.uid}
-        patientName={patientName}
-        onEnd={handleEndSession}
-      />
-    </AgoraRTCProvider>
+    <CallErrorBoundary onLeave={doEndAndLeave}>
+      <AgoraRTCProvider client={agoraClient}>
+        <CallBody
+          appId={tokenData.appId}
+          token={tokenData.token}
+          channelName={tokenData.channelName}
+          uid={tokenData.uid}
+          patientName={patientName}
+          onEnd={handleEndSession}
+        />
+      </AgoraRTCProvider>
+    </CallErrorBoundary>
   )
 }
 
@@ -149,13 +165,18 @@ interface BodyProps {
 function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyProps) {
   const [micEnabled, setMicEnabled] = useState(true)
   const [camEnabled, setCamEnabled] = useState(true)
-  const [elapsed, setElapsed]       = useState(0)
 
   useJoin({ appid: appId, channel: channelName, token, uid })
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micEnabled) as { localMicrophoneTrack: IMicrophoneAudioTrack | null }
   const { localCameraTrack }     = useLocalCameraTrack(camEnabled) as { localCameraTrack: ICameraVideoTrack | null }
-  usePublish([localMicrophoneTrack, localCameraTrack])
+  // usePublish's own effect re-runs whenever this array's REFERENCE changes
+  // (its dependency array closes over the array itself, not its contents) --
+  // memoized so it only actually changes when a track is really replaced,
+  // not on every render this component happens to do for an unrelated reason
+  // (e.g. the elapsed-timer tick, before that was isolated into CallTimer below).
+  const tracksToPublish = useMemo(() => [localMicrophoneTrack, localCameraTrack], [localMicrophoneTrack, localCameraTrack])
+  usePublish(tracksToPublish)
 
   const remoteUsers = useRemoteUsers()
   const connected = remoteUsers.length > 0
@@ -173,26 +194,15 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
     return () => clearTimeout(t)
   }, [connectionState])
 
-  useEffect(() => {
-    if (!connected) { setElapsed(0); return }
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [connected])
-
-  function fmt(s: number) {
-    const m = Math.floor(s / 60)
-    return `${m}:${String(s % 60).padStart(2, '0')}`
-  }
-
-  function toggleMic() {
+  const toggleMic = useCallback(() => {
     localMicrophoneTrack?.setEnabled(!micEnabled)
     setMicEnabled(v => !v)
-  }
+  }, [localMicrophoneTrack, micEnabled])
 
-  function toggleCamera() {
+  const toggleCamera = useCallback(() => {
     localCameraTrack?.setEnabled(!camEnabled)
     setCamEnabled(v => !v)
-  }
+  }, [localCameraTrack, camEnabled])
 
   return (
     <View style={st.container}>
@@ -226,9 +236,7 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
         <Text style={st.headerName}>{patientName}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Ionicons name={connected ? 'ellipse' : 'time-outline'} size={connected ? 8 : 12} color={connected ? '#4ade80' : '#7A9089'} />
-          <Text style={[st.headerStatus, { color: connected ? '#4ade80' : '#7A9089' }]}>
-            {connected ? `Connected · ${fmt(elapsed)}` : 'Waiting for patient…'}
-          </Text>
+          <CallTimer connected={connected} waitingLabel="Waiting for patient…" />
         </View>
       </View>
 
@@ -247,6 +255,29 @@ function CallBody({ appId, token, channelName, uid, patientName, onEnd }: BodyPr
         </TouchableOpacity>
       </View>
     </View>
+  )
+}
+
+// Isolated so its once-a-second tick doesn't re-render CallBody itself --
+// that component hosts the actual video (RemoteUser/LocalVideoTrack) and
+// several reactive Agora hooks, so re-executing its whole function body
+// every second was real, avoidable work on the same thread that also has to
+// handle taps on the mic/camera/end buttons.
+function CallTimer({ connected, waitingLabel }: { connected: boolean; waitingLabel: string }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!connected) { setElapsed(0); return }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [connected])
+  function fmt(s: number) {
+    const m = Math.floor(s / 60)
+    return `${m}:${String(s % 60).padStart(2, '0')}`
+  }
+  return (
+    <Text style={[st.headerStatus, { color: connected ? '#4ade80' : '#7A9089' }]}>
+      {connected ? `Connected · ${fmt(elapsed)}` : waitingLabel}
+    </Text>
   )
 }
 

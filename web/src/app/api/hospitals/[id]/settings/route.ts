@@ -2,6 +2,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+// This route's auth already correctly forwards `req` to requireRole (so a
+// Bearer-token mobile caller resolves fine) -- CORS was the only gap, and
+// without it HospitalSettingsScreen's save action has been silently failing
+// with "Failed to fetch" on any browser build of the hospital app.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 export interface DayHours { day: number; open: string; close: string; closed: boolean }
 
@@ -45,7 +57,13 @@ const EDITABLE_SETTINGS = [
 // getHospitalSettings/updateHospitalSettings/getHospitalHours/
 // updateHospitalHours (Task 15). Restricted to the roles that actually see
 // the settings page (Sidebar only links to it for super_admin/hospital_admin).
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const res = await handleGET(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
@@ -67,7 +85,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const res = await handlePATCH(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(['super_admin', 'hospital_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth

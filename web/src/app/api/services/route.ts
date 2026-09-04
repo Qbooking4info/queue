@@ -2,14 +2,32 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Queue Hospital app running in a browser
+// (localhost:8096 -> localhost:3000) -- needs real CORS handling (preflight
+// OPTIONS + headers on every response), same as virtual/token and onboarding.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 // GET /api/services -- replaces admin-api.ts's getHospitalServices/
 // getRegisteredSpecialties (Task 15). Scoped to the caller's own hospital
 // (and clinic, for clinic_admin/front_desk). getAllSpecialties is not
 // bundled here -- specialties has a public read policy, fetched by the
 // page via the caller's own RLS-bound client instead.
-export async function GET() {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
+  // requireRole must be given `req` -- without it, it can't see the
+  // Authorization: Bearer header a cross-origin mobile caller sends, and
+  // silently falls back to a cookie-only check that always fails for them
+  // even once CORS allows the request through.
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
@@ -58,7 +76,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'])
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()

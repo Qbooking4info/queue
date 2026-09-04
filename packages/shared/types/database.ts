@@ -1190,6 +1190,42 @@ export type Database = {
           },
         ]
       }
+      doctor_clinics: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          doctor_id: string
+          id: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          doctor_id: string
+          id?: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          doctor_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_clinics_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "hospital_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_clinics_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doctor_profiles: {
         Row: {
           accepts_direct_home_visit: boolean

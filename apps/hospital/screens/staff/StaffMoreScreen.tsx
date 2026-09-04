@@ -20,17 +20,21 @@ export function StaffMoreScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
   const { staffProfile, setStaffMode, signOut } = useAuth()
   const [hospitalName,   setHospitalName]   = useState<string | null>(null)
+  const [clinicModel,    setClinicModel]    = useState<string | null>(null)
   const [signingOut,     setSigningOut]      = useState(false)
   const [confirmVisible, setConfirmVisible]  = useState(false)
 
   const isAdmin = staffProfile?.role === 'hospital_admin'
+  const isClinicAdmin = staffProfile?.role === 'clinic_admin'
   const initials = staffProfile?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
     ;supabase
-      .from('hospitals').select('name').eq('id', staffProfile.hospitalId).single()
-      .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
+      .from('hospitals').select('name, clinic_model').eq('id', staffProfile.hospitalId).single()
+      .then(({ data }: { data: { name: string; clinic_model: string | null } | null }) => {
+        if (data) { setHospitalName(data.name); setClinicModel(data.clinic_model) }
+      })
   }, [staffProfile?.hospitalId])
 
   async function handleSignOut() {
@@ -39,9 +43,22 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    // Staff Management also holds doctor-linking (see StaffManagementScreen's
+    // own role check for what a sub-admin can and can't do once inside it) --
+    // a clinic's own sub-admin needs to reach it to add a doctor to their
+    // clinic, same as web's clinic-detail page already lets them.
+    ...(isAdmin || isClinicAdmin ? [
+      { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
+    ] : []),
     ...(isAdmin ? [
       { icon: 'analytics-outline', label: 'Analytics', onPress: () => navigation.navigate('StaffAnalytics') },
-      { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
+      // Only hospitals onboarded with the multi-clinic model have clinics to manage --
+      // mirrors web's Sidebar.tsx, which hides its own Clinics nav item the same way.
+      ...(clinicModel === 'multi' ? [
+        { icon: 'business-outline', label: 'Clinics', onPress: () => navigation.navigate('HospitalClinics') },
+      ] : []),
+      { icon: 'medkit-outline', label: 'Services & Specialties', onPress: () => navigation.navigate('HospitalServices') },
+      { icon: 'calendar-outline', label: 'Doctor Schedule', onPress: () => navigation.navigate('HospitalSchedule') },
       { icon: 'settings-outline', label: 'Hospital Settings', onPress: () => navigation.navigate('HospitalSettings') },
     ] : []),
   ]
