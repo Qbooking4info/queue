@@ -206,7 +206,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   style={[
                     s.card,
                     {
-                      backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+                      backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
                       borderColor: isEmergency ? t.danger : isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
                       borderLeftWidth: isEmergency ? 4 : 1,
                     },

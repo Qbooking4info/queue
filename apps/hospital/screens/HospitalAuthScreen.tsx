@@ -48,7 +48,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
 
           <View style={s.content}>
             {/* Header */}
-            <View style={[s.iconWrap, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: 'rgba(91,158,255,0.3)' }]}>
+            <View style={[s.iconWrap, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: t.infoBorder }]}>
               <Ionicons name="business-outline" size={30} color={t.info} />
             </View>
             <Text style={[s.title, { color: t.textPrimary }]}>Staff Portal</Text>
@@ -60,7 +60,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
 
             {/* Login form */}
             {error ? (
-              <View style={[s.errorBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+              <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
                 <Text style={s.errorText}>{error}</Text>
               </View>

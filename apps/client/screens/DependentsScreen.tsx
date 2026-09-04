@@ -224,7 +224,7 @@ export function DependentsScreen({ navigation }: Props) {
               <Text style={[s.depMeta, { color: t.textMuted }]}>{managedBy.relationship}</Text>
               {canSelfUnlink ? (
                 <TouchableOpacity onPress={confirmUnlinkSelf} disabled={unlinking === managedBy.linkId}
-                  style={[s.unlinkBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.07)', marginTop: 12 }]}>
+                  style={[s.unlinkBtn, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle, marginTop: 12 }]}>
                   {unlinking === managedBy.linkId
                     ? <ActivityIndicator color={t.danger} size="small" />
                     : <Text style={s.unlinkBtnText}>Unlink my account</Text>}

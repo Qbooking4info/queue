@@ -39,7 +39,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:  { label: 'Checked In',  color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
   in_progress: { label: 'In Progress', color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:   { label: 'Completed',   color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:   { label: 'Cancelled',   color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)' },
+  cancelled:   { label: 'Cancelled',   color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
 }
 
 function fmt12(time: string): string {
@@ -220,7 +220,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
     <TouchableOpacity
       activeOpacity={0.8}
       style={[st.card, {
-        backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+        backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
         borderColor: isEmergency ? t.danger : t.cardBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
       }]}
@@ -231,7 +231,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
     >
       {/* Avatar */}
       <View style={[st.avatar, {
-        backgroundColor: isEmergency ? 'rgba(255,92,92,0.14)' : t.accentBgMid,
+        backgroundColor: isEmergency ? t.dangerBg : t.accentBgMid,
         borderColor: isEmergency ? t.danger : t.accentBorder,
       }]}>
         <Text style={[st.avatarText, { color: isEmergency ? t.danger : t.accent }]}>{initials}</Text>
@@ -244,7 +244,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
             {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {isEmergency ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }}>
               <Ionicons name="alert-circle-outline" size={9} color={t.danger} />
               <Text style={{ fontSize: 9, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
             </View>

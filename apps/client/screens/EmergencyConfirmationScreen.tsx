@@ -128,8 +128,8 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
             time they're in transit. */}
         {bedSpaceRisk && (
           <View style={[st.bedSpaceCard, {
-            borderColor: bedSpaceStatus === 'none' ? 'rgba(255,92,92,0.4)' : 'rgba(255,140,66,0.4)',
-            backgroundColor: bedSpaceStatus === 'none' ? 'rgba(255,92,92,0.1)' : 'rgba(255,140,66,0.1)',
+            borderColor: bedSpaceStatus === 'none' ? t.dangerStrong : 'rgba(255,140,66,0.4)',
+            backgroundColor: bedSpaceStatus === 'none' ? t.dangerSubtle : 'rgba(255,140,66,0.1)',
             opacity: show ? 1 : 0,
           }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>

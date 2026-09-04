@@ -195,7 +195,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
         {/* Sign out */}
         {confirmVisible ? (
-          <View style={[st.section, { backgroundColor: 'rgba(255,92,92,0.07)', borderColor: 'rgba(255,92,92,0.25)', marginHorizontal: 16, marginBottom: 12 }]}>
+          <View style={[st.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, marginHorizontal: 16, marginBottom: 12 }]}>
             <Text style={[st.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
             <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
               <TouchableOpacity
@@ -205,7 +205,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
                 <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[st.actionBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }]}
+                style={[st.actionBtn, { flex: 1, borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}
                 onPress={() => { haptics.tap(); handleSignOut() }}
                 disabled={signingOut}
               >
@@ -218,7 +218,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           </View>
         ) : (
           <TouchableOpacity
-            style={[st.signOutBtn, { borderColor: 'rgba(255,92,92,0.3)', marginHorizontal: 16 }]}
+            style={[st.signOutBtn, { borderColor: t.dangerBorder, marginHorizontal: 16 }]}
             onPress={() => setConfirmVisible(true)}
           >
             <Text style={st.signOutTxt}>Sign out</Text>
@@ -264,6 +264,6 @@ const st = StyleSheet.create({
   rowValue:        { fontSize: 13, fontWeight: '600' },
   bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
   actionBtn:       { padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
-  signOutBtn:      { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.06)' },
+  signOutBtn:      { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.1)' },
   signOutTxt:      { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
 })

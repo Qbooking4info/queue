@@ -88,7 +88,7 @@ export function HospitalRegisterScreen({ navigation }: Props) {
             </Text>
 
             {error ? (
-              <View style={[s.errorBanner, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+              <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
                 <Text style={s.errorText}>{error}</Text>
               </View>

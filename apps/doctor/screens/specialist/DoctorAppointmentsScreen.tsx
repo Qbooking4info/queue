@@ -34,7 +34,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   confirmed:   { label: 'Confirmed',            color: '#00C265', bg: 'rgba(0,194,101,0.12)' },
   in_progress: { label: 'In progress',          color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:   { label: 'Completed',            color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:   { label: 'Cancelled',             color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)' },
+  cancelled:   { label: 'Cancelled',             color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
 }
 
 export function DoctorAppointmentsScreen({ navigation }: Props) {
@@ -198,8 +198,8 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
 function ActionBtn({ label, theme: t, onPress, primary, danger, muted, disabled }: {
   label: string; theme: any; onPress: () => void; primary?: boolean; danger?: boolean; muted?: boolean; disabled?: boolean
 }) {
-  const bg = primary ? t.accent : danger ? 'rgba(255,92,92,0.1)' : t.inputBg
-  const border = primary ? t.accent : danger ? 'rgba(255,92,92,0.3)' : t.cardBorder
+  const bg = primary ? t.accent : danger ? t.dangerSubtle : t.inputBg
+  const border = primary ? t.accent : danger ? t.dangerBorder : t.cardBorder
   const color = primary ? (t.id === 'forest' ? '#061208' : '#fff') : danger ? t.danger : t.textSecondary
   return (
     <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}

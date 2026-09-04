@@ -88,7 +88,7 @@ export function StaffMoreScreen({ navigation }: Props) {
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
             style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
-            <View style={[s.menuIcon, { backgroundColor: 'rgba(91,158,255,0.12)' }]}>
+            <View style={[s.menuIcon, { backgroundColor: t.infoSubtle }]}>
               <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
             </View>
             <Text style={[s.menuLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
@@ -114,14 +114,14 @@ export function StaffMoreScreen({ navigation }: Props) {
                   <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { haptics.tap(); handleSignOut() }} disabled={signingOut}
-                  style={[s.confirmBtn, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)', flex: 1 }]}>
+                  style={[s.confirmBtn, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle, flex: 1 }]}>
                   {signingOut ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={{ color: t.danger, fontWeight: '700' }}>Sign out</Text>}
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
             <TouchableOpacity onPress={() => setConfirmVisible(true)} style={s.menuRow}>
-              <View style={[s.menuIcon, { backgroundColor: 'rgba(255,92,92,0.1)' }]}>
+              <View style={[s.menuIcon, { backgroundColor: t.dangerSubtle }]}>
                 <Ionicons name="log-out-outline" size={18} color={t.danger} />
               </View>
               <Text style={[s.menuLabel, { color: t.danger }]}>Sign out</Text>

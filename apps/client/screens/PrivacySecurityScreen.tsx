@@ -129,7 +129,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
         <Text style={[s.sectionTitle, { color: t.textMuted }]}>Account</Text>
         {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
         <TouchableOpacity onPress={() => signOut()}
-          style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
+          style={[s.dangerBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle }]}>
           <Ionicons name="log-out-outline" size={16} color={t.danger} />
           <Text style={[s.dangerBtnText, { color: t.danger }]}>Sign out of all devices</Text>
         </TouchableOpacity>

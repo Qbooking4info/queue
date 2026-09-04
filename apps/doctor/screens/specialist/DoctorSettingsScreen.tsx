@@ -191,13 +191,13 @@ export function DoctorSettingsScreen({}: Props) {
               <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => signOut()}
-              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.1)' }}>
+              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }}>
               <Text style={{ color: t.danger, fontWeight: '700' }}>Confirm Sign Out</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => setConfirmSignOut(true)}
-            style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,92,92,0.3)', backgroundColor: 'rgba(255,92,92,0.06)' }}>
+            style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger }}>Sign out</Text>
           </TouchableOpacity>
         )}

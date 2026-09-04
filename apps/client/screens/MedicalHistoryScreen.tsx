@@ -154,7 +154,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
           {tab === 'profile' && (
             <>
               {historyError && (
-                <View style={[s.errorCard, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: t.danger }]}>
+                <View style={[s.errorCard, { backgroundColor: t.dangerSubtle, borderColor: t.danger }]}>
                   <Ionicons name="alert-circle-outline" size={18} color={t.danger} style={{ marginRight: 8 }} />
                   <Text style={[s.errorText, { color: t.danger }]}>
                     Couldn't load your conditions, allergies and medications -- this is not the same as having none recorded.
@@ -227,7 +227,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
                 <View style={s.pillRow}>
                   {ALLERGY_PROMPTS.map(a => (
                     <TouchableOpacity key={a} onPress={() => toggleAllergy(a)}
-                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? t.danger : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? 'rgba(255,92,92,0.1)' : t.inputBg }]}>
+                      style={[s.pill, { borderColor: notes.allergies.includes(a) ? t.danger : t.cardBorder, backgroundColor: notes.allergies.includes(a) ? t.dangerSubtle : t.inputBg }]}>
                       <Text style={[s.pillText, { color: notes.allergies.includes(a) ? t.danger : t.textMuted, fontWeight: notes.allergies.includes(a) ? '700' : '400' }]}>{a}</Text>
                     </TouchableOpacity>
                   ))}

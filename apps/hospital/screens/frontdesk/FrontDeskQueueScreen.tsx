@@ -56,7 +56,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:        { label: 'Checked In',        color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
   in_progress:       { label: 'In Progress',       color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:         { label: 'Completed',         color: '#7A9089', bg: 'rgba(122,144,137,0.12)'},
-  cancelled:         { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)'  },
+  cancelled:         { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)'  },
   no_show:           { label: 'No Show',           color: '#888',    bg: 'rgba(128,128,128,0.1)' },
 }
 
@@ -437,7 +437,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
       activeOpacity={0.85}
       onPress={() => haptics.tap()}
       style={[s.card, {
-        backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg,
+        backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
         borderColor: isEmergency ? t.danger : t.cardBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
       }]}
@@ -468,7 +468,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
             <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
           </View>
           {isEmergency ? (
-            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }]}>
+            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
               <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
               <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
             </View>
@@ -495,7 +495,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
           )}
           {canApprove && (
             <TouchableOpacity onPress={() => onReject(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+              style={[s.actionBtn, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
               {isLoading ? <ActivityIndicator size="small" color={t.danger} />
                 : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="close" size={13} color={t.danger} />
@@ -505,7 +505,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
           )}
           {canCheckIn && (
             <TouchableOpacity onPress={() => onCheckIn(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)', flex: 1 }]}>
+              style={[s.actionBtn, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder, flex: 1 }]}>
               {isLoading ? <ActivityIndicator size="small" color={t.info} />
                 : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={[s.actionText, { color: t.info }]}>Check In</Text>
@@ -536,7 +536,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
       {showVitals && (
         <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
           <TouchableOpacity onPress={() => onRecordVitals(appt)}
-            style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(91,158,255,0.12)', borderColor: 'rgba(91,158,255,0.3)' }]}>
+            style={[s.actionBtn, { flex: 1, backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="fitness-outline" size={13} color={t.info} />
               <Text style={[s.actionText, { color: t.info }]}>Vitals</Text>

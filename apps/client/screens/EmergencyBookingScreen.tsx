@@ -90,7 +90,7 @@ function BedSpaceAck({ selectedHospital, needsAck, acked, onToggle, t }: {
   const isNone = selectedHospital.bed_space_status === 'none'
   const color = isNone ? t.danger : '#FF8C42'
   return (
-    <View style={[s.bedSpaceWarnBox, { borderColor: color, backgroundColor: isNone ? 'rgba(255,92,92,0.08)' : 'rgba(255,140,66,0.08)' }]}>
+    <View style={[s.bedSpaceWarnBox, { borderColor: color, backgroundColor: isNone ? t.dangerSubtle : 'rgba(255,140,66,0.08)' }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         <Ionicons name="warning-outline" size={17} color={color} />
         <Text style={[s.bedSpaceWarnTitle, { color }]}>
@@ -330,7 +330,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       {/* ── Step 0: Triage ───────────────────────────────────── */}
       {step === 0 && (
         <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
-          <View style={[s.alertBanner, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.25)' }]}>
+          <View style={[s.alertBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
             <Ionicons name="alert-circle-outline" size={20} color={t.statusBusy.text} />
             <Text style={[s.alertText, { color: t.danger }]}>
               If life-threatening, call <Text style={{ fontWeight: '900' }}>112</Text> immediately.
@@ -343,7 +343,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               <TouchableOpacity key={sym} onPress={() => setSymptom(symptom === sym ? '' : sym)}
                 style={[s.symptomChip, {
                   borderColor:     symptom === sym ? t.danger : t.cardBorder,
-                  backgroundColor: symptom === sym ? 'rgba(255,92,92,0.1)' : t.cardBg,
+                  backgroundColor: symptom === sym ? t.dangerSubtle : t.cardBg,
                 }]}>
                 <Text style={[s.symptomText, { color: symptom === sym ? t.danger : t.textSecondary }]}>{sym}</Text>
               </TouchableOpacity>
@@ -409,7 +409,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
               <TouchableOpacity key={opt} onPress={() => setArrival(opt)}
                 style={[s.slotChip, {
                   borderColor:     arrival === opt ? t.danger : t.cardBorder,
-                  backgroundColor: arrival === opt ? 'rgba(255,92,92,0.1)' : t.cardBg,
+                  backgroundColor: arrival === opt ? t.dangerSubtle : t.cardBg,
                 }]}>
                 <Text style={[s.slotText, { color: arrival === opt ? t.danger : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
                   {opt}
@@ -420,7 +420,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
 
           {arrival === AMBULANCE_ARRIVAL ? (
             <>
-              <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+              <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Text style={[s.noteText, { color: t.danger }]}>
                   An ambulance will be dispatched to your current location immediately after you confirm.
                   The nearest available crew decides the receiving hospital based on your condition and
@@ -469,7 +469,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                     onPress={() => setSelectedHospital(selectedHospital?.id === h.id ? null : h)}
                     style={[s.hospitalCard, {
                       borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
-                      backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
+                      backgroundColor: selectedHospital?.id === h.id ? t.dangerSubtle : t.cardBg,
                     }]}>
                     <View style={s.hospitalTop}>
                       <View style={[s.hospitalAvatar, { backgroundColor: h.avatarBg }]}>
@@ -504,7 +504,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
           {loadingHospitals ? (
             <ActivityIndicator color={t.danger} style={{ marginTop: 20 }} />
           ) : hospitals.length === 0 ? (
-            <View style={[s.noHospitalsBox, { borderColor: 'rgba(255,92,92,0.35)', backgroundColor: 'rgba(255,92,92,0.06)' }]}>
+            <View style={[s.noHospitalsBox, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
               <Ionicons name="alert-circle-outline" size={28} color={t.danger} style={{ marginBottom: 8 }} />
               <Text style={[s.noHospitalsTitle, { color: t.danger }]}>No hospitals currently available</Text>
               <Text style={[s.noHospitalsText, { color: t.textMuted }]}>
@@ -518,7 +518,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                 onPress={() => setSelectedHospital(h)}
                 style={[s.hospitalCard, {
                   borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
-                  backgroundColor: selectedHospital?.id === h.id ? 'rgba(255,92,92,0.06)' : t.cardBg,
+                  backgroundColor: selectedHospital?.id === h.id ? t.dangerSubtle : t.cardBg,
                 }]}>
                 <View style={s.hospitalTop}>
                   <View style={[s.hospitalAvatar, { backgroundColor: h.avatarBg }]}>
@@ -636,8 +636,8 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             return (
               <TouchableOpacity key={p.id} onPress={() => setPaymentMethod(p.id)}
                 style={[s.payRow, {
-                  backgroundColor: active ? 'rgba(255,92,92,0.08)' : t.cardBg,
-                  borderColor:     active ? 'rgba(255,92,92,0.4)'  : t.cardBorder,
+                  backgroundColor: active ? t.dangerSubtle : t.cardBg,
+                  borderColor:     active ? t.dangerStrong  : t.cardBorder,
                 }]}>
                 <Ionicons name={p.icon} size={20} color={active ? t.danger : t.textSecondary} />
                 <View style={{ flex: 1 }}>

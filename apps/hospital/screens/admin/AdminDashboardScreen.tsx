@@ -18,8 +18,8 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:        { label: 'Checked In', color: '#5B9EFF', bg: 'rgba(91,158,255,0.12)' },
   in_progress:       { label: 'In Progress',color: '#5B9EFF', bg: 'rgba(91,158,255,0.12)' },
   completed:         { label: 'Completed',  color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:         { label: 'Cancelled',  color: '#FF5C5C', bg: 'rgba(255,92,92,0.12)' },
-  no_show:           { label: 'No Show',    color: '#FF5C5C', bg: 'rgba(255,92,92,0.12)' },
+  cancelled:         { label: 'Cancelled',  color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
+  no_show:           { label: 'No Show',    color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
 }
 
 const AVAILABILITY_META: Record<string, { label: string; color: string }> = {

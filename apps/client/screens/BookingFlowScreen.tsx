@@ -823,7 +823,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   const active = urgency === id
                   const danger = id === 'emergency'
                   const activeColor = danger ? t.danger : t.accent
-                  const activeBg    = danger ? 'rgba(255,92,92,0.08)' : t.accentBg
+                  const activeBg    = danger ? t.dangerSubtle : t.accentBg
                   return (
                     <TouchableOpacity key={id} onPress={() => setUrgency(id)}
                       style={[s.urgRow, {
@@ -849,8 +849,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               {isEmergency && (
                 <View style={[s.noticeBox, {
                   marginTop: 12,
-                  backgroundColor: hospitalOpenNow === false ? 'rgba(255,92,92,0.1)' : 'rgba(255,92,92,0.06)',
-                  borderColor: 'rgba(255,92,92,0.35)',
+                  backgroundColor: hospitalOpenNow === false ? t.dangerSubtle : t.dangerSubtle,
+                  borderColor: t.dangerStrong,
                 }]}>
                   {hospitalOpenNow === false ? (
                     <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
@@ -882,7 +882,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
 
                   {noEmergencyClinic && (
-                    <View style={[s.noticeBox, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)', marginBottom: 12 }]}>
+                    <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginBottom: 12 }]}>
                       <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '800' }}>{hospital?.name} hasn't set up an Emergency Department.</Text> Please
                         go back and choose a different hospital for an emergency booking.
@@ -907,7 +907,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                             <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
                               <Text style={[s.urgLabel, { color: active ? t.accent : t.textPrimary }]}>{clinic.name}</Text>
                               {isEmergency ? (
-                                <View style={[s.miniTag, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
+                                <View style={[s.miniTag, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Ionicons name="alert-circle-outline" size={9} color={t.danger} /><Text style={{ fontSize: 9, fontWeight: '700', color: t.danger }}>Emergency</Text></View>
                                 </View>
                               ) : clinic.is_opd ? (
@@ -953,7 +953,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   )}
 
                   {clinicRestrictionReason && (
-                    <View style={[s.noticeBox, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)', marginTop: 4 }]}>
+                    <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginTop: 4 }]}>
                       <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '800' }}>Can't book this clinic.</Text> {clinicRestrictionReason.reason}
                       </Text>

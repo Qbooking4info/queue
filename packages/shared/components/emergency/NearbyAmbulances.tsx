@@ -73,7 +73,7 @@ export function NearbyAmbulances({ coords, style }: Props) {
 
   if (units.length === 0) {
     return (
-      <View style={[st.emptyBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }, style]}>
+      <View style={[st.emptyBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }, style]}>
         <Ionicons name="alert-circle-outline" size={16} color={t.danger} />
         <Text style={[st.emptyText, { color: t.danger }]}>
           No ambulances are on duty near you right now. You can still request one, but start

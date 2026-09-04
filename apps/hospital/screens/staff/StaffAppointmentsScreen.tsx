@@ -39,7 +39,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   checked_in:       { label: 'Checked In',        color: '#5B9EFF', bg: 'rgba(91,158,255,0.14)' },
   in_progress:      { label: 'In Progress',       color: '#FF8C42', bg: 'rgba(255,140,66,0.14)' },
   completed:        { label: 'Completed',         color: '#7A9089', bg: 'rgba(122,144,137,0.12)' },
-  cancelled:        { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.10)' },
+  cancelled:        { label: 'Cancelled',         color: '#FF5C5C', bg: 'rgba(255,92,92,0.1)' },
   no_show:          { label: 'No Show',           color: '#888',    bg: 'rgba(128,128,128,0.1)' },
 }
 
@@ -236,7 +236,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
             const isEmergency = appt.urgency === 'emergency'
 
             return (
-              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? 'rgba(255,92,92,0.06)' : t.cardBg, borderColor: isEmergency ? t.danger : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
+              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg, borderColor: isEmergency ? t.danger : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
                 <View style={s.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in'}</Text>
@@ -252,7 +252,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                       <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
                     </View>
                     {isEmergency && (
-                      <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }]}>
+                      <View style={[s.badge, { backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
                         <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
                       </View>
                     )}
@@ -262,7 +262,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                 {canApprove && (
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
                     <TouchableOpacity onPress={() => handleReject(appt)} disabled={!!actioning}
-                      style={[s.actionBtn, { backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.3)', flex: 1 }]}>
+                      style={[s.actionBtn, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, flex: 1 }]}>
                       {isLoading ? <ActivityIndicator size="small" color={t.danger} /> : <Text style={[s.actionText, { color: t.danger }]}>Reject</Text>}
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleApprove(appt)} disabled={!!actioning}

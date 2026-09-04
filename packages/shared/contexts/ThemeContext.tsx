@@ -37,6 +37,21 @@ const forest = {
   // to read fine on both a dark mobile screen and a white web dashboard card.
   danger:      '#FF5C5C',
   info:        '#5B9EFF',
+  // Tint/border variants at the opacities screens actually reach for, not an invented
+  // ramp. Real usage of rgba(255,92,92,*) alone spanned 14 distinct opacity values
+  // (0.06 through 0.8); these four are the ones with a real cluster behind them --
+  // dangerBg reuses the SAME 0.14 the statusX trios below already use for bg (exact
+  // match, not a new number), dangerSubtle/Border/Strong pick each cluster's dominant
+  // value (0.1, 0.3, 0.4). A handful of clear outliers (0.15/0.2/0.7/0.8, ~8 call
+  // sites, most likely full-screen backdrop dims, not brand-color tints) are
+  // deliberately left as their own literals rather than forced onto a nearby tier.
+  dangerBg:      'rgba(255,92,92,0.14)',
+  dangerSubtle:  'rgba(255,92,92,0.1)',
+  dangerBorder:  'rgba(255,92,92,0.3)',
+  dangerStrong:  'rgba(255,92,92,0.4)',
+  infoBg:        'rgba(91,158,255,0.14)',
+  infoSubtle:    'rgba(91,158,255,0.12)',
+  infoBorder:    'rgba(91,158,255,0.3)',
   statusOpen:     { bg:'rgba(0,232,122,0.14)',  text:'#5DCAA5', border:'rgba(0,232,122,0.28)' },
   statusBusy:     { bg:'rgba(239,159,39,0.14)', text:'#EF9F27', border:'rgba(239,159,39,0.28)' },
   statusVirtual:  { bg:'rgba(55,138,221,0.14)', text:'#85B7EB', border:'rgba(55,138,221,0.28)' },
@@ -66,6 +81,19 @@ const clinical = {
   // choice, not a guess.
   danger:      '#DC2626',
   info:        '#5B9EFF',
+  // Same opacities as forest, but built from clinical's OWN solid danger RGB
+  // (220,38,38, i.e. #DC2626) rather than forest's -- these never existed as literals
+  // in light mode before (every existing occurrence was a dark-mode-only literal), so
+  // rather than washing out forest's brighter red at low opacity against a white
+  // background, this follows the same forest/clinical relationship already
+  // established by danger's own solid value and by every statusX pair below.
+  dangerBg:      'rgba(220,38,38,0.14)',
+  dangerSubtle:  'rgba(220,38,38,0.1)',
+  dangerBorder:  'rgba(220,38,38,0.3)',
+  dangerStrong:  'rgba(220,38,38,0.4)',
+  infoBg:        'rgba(91,158,255,0.14)',
+  infoSubtle:    'rgba(91,158,255,0.12)',
+  infoBorder:    'rgba(91,158,255,0.3)',
   textPrimary: '#0C2A4A',
   textSecondary:'#2A5070',
   textMuted:   '#6A8FAA',

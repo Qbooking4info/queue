@@ -26,7 +26,7 @@ function displayStatus(appt: { status: string; approval_status?: string | null }
 function statusColor(s: string) {
   if (s === 'pending')          return { bg: 'rgba(239,159,39,0.10)', text: '#EF9F27', border: 'rgba(239,159,39,0.25)' }
   if (s === 'pending_approval') return { bg: 'rgba(167,139,250,0.12)', text: '#A78BFA', border: 'rgba(167,139,250,0.3)' }
-  if (s === 'confirmed')        return { bg: 'rgba(91,158,255,0.10)', text: '#5B9EFF', border: 'rgba(91,158,255,0.25)' }
+  if (s === 'confirmed')        return { bg: 'rgba(91,158,255,0.10)', text: '#5B9EFF', border: 'rgba(91,158,255,0.3)' }
   if (s === 'checked_in')       return { bg: 'rgba(59,130,246,0.12)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
   if (s === 'in_progress')      return { bg: 'rgba(239,159,39,0.12)', text: '#EF9F27', border: 'rgba(239,159,39,0.3)' }
   if (s === 'completed')        return { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80', border: 'rgba(34,197,94,0.3)' }
@@ -331,7 +331,7 @@ export default function QueuePage() {
                       <button onClick={open} disabled={isUpdating}
                         style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700,
                           cursor: isUpdating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-                          background: 'rgba(91,158,255,0.12)', color: C.info, border: '1px solid rgba(91,158,255,0.3)',
+                          background: C.infoSubtle, color: C.info, border: '1px solid rgba(91,158,255,0.3)',
                           fontFamily: 'inherit', opacity: isUpdating ? 0.6 : 1, transition: 'opacity .15s' }}>
                         Refer
                       </button>

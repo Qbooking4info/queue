@@ -248,7 +248,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
         </View>
 
         {(status === 'no_unit_available' || deadlinePassed) && (
-          <View style={[s.noteBox, { backgroundColor: 'rgba(255,92,92,0.08)', borderColor: 'rgba(255,92,92,0.3)' }]}>
+          <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
             <Text style={[s.noteText, { color: t.danger }]}>
               {status === 'no_unit_available'
                 ? 'No ambulance could be reached.'
@@ -294,7 +294,7 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
         {canCancel && (
           <TouchableOpacity onPress={handleCancel} disabled={cancelling}
-            style={[s.actionBtn, { borderColor: 'rgba(255,92,92,0.4)', opacity: cancelling ? 0.6 : 1 }]}>
+            style={[s.actionBtn, { borderColor: t.dangerStrong, opacity: cancelling ? 0.6 : 1 }]}>
             {cancelling
               ? <ActivityIndicator color={t.danger} />
               : <Text style={[s.actionBtnText, { color: t.danger }]}>Cancel request</Text>}

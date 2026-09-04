@@ -335,8 +335,8 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           {isEmergency && (
             <View style={[st.noticeBox, {
               marginTop: 12,
-              backgroundColor: emergencyMaybeClosed ? 'rgba(255,92,92,0.14)' : 'rgba(255,92,92,0.08)',
-              borderColor: 'rgba(255,92,92,0.4)',
+              backgroundColor: emergencyMaybeClosed ? t.dangerBg : t.dangerSubtle,
+              borderColor: t.dangerStrong,
             }]}>
               {emergencyMaybeClosed ? (
                 <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
@@ -358,7 +358,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
                 {isEmergency ? 'Emergency department' : 'Clinic / Department (optional)'}
               </Text>
               {isEmergency ? (
-                <View style={[st.docRow, { borderColor: 'rgba(255,92,92,0.4)', backgroundColor: 'rgba(255,92,92,0.08)' }]}>
+                <View style={[st.docRow, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
                   <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
                 </View>
               ) : (
@@ -385,7 +385,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           {loadingClinics && <ActivityIndicator color={t.accent} style={{ marginVertical: 8 }} />}
 
           {noEmergencyClinic && (
-            <View style={[st.noticeBox, { marginTop: 8, backgroundColor: 'rgba(255,92,92,0.1)', borderColor: 'rgba(255,92,92,0.35)' }]}>
+            <View style={[st.noticeBox, { marginTop: 8, backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
               <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                 <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} hasn't set up an Emergency Department.</Text> Choose
                 a different hospital for an emergency referral.

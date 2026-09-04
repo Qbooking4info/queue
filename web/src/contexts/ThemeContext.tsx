@@ -43,6 +43,14 @@ export const themes = {
     // complaint, so there was never a real dark/light split for it to inherit, unlike
     // amber/red/purple above which visibly needed a muted light-mode counterpart.
     info:         '#5B9EFF',
+    // Same reasoning as mobile's dangerBg/Subtle/Border: real rgba(91,158,255,*)
+    // usage on both platforms clustered at these three opacities (0.14 already matches
+    // the amberLight/blueLight convention above; 0.12 and 0.3 are each cluster's
+    // dominant value). No `danger` equivalent here -- rgba(255,92,92,*) never actually
+    // appears on web, only on mobile.
+    infoBg:       'rgba(91,158,255,0.14)',
+    infoSubtle:   'rgba(91,158,255,0.12)',
+    infoBorder:   'rgba(91,158,255,0.3)',
     purple:       '#B49CF0',
     purpleLight:  'rgba(140,100,240,0.14)',
     rowAlt:       '#131A16',
@@ -75,6 +83,9 @@ export const themes = {
     blue:         '#1A5FAB',
     blueLight:    '#EEF4FC',
     info:         '#5B9EFF',
+    infoBg:       'rgba(91,158,255,0.14)',
+    infoSubtle:   'rgba(91,158,255,0.12)',
+    infoBorder:   'rgba(91,158,255,0.3)',
     purple:       '#5C35A8',
     purpleLight:  '#F2EEFF',
     rowAlt:       '#FAFCFB',

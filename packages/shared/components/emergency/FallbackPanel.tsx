@@ -54,8 +54,8 @@ export function FallbackPanel({ variant = 'calm', state, title }: Props) {
 
   return (
     <View style={[s.card, {
-      borderColor: urgent ? 'rgba(255,92,92,0.4)' : t.cardBorder,
-      backgroundColor: urgent ? 'rgba(255,92,92,0.08)' : t.cardBg,
+      borderColor: urgent ? t.dangerStrong : t.cardBorder,
+      backgroundColor: urgent ? t.dangerSubtle : t.cardBg,
       borderWidth: urgent ? 1.5 : 1,
     }]}>
       <View style={s.header}>
@@ -81,8 +81,8 @@ export function FallbackPanel({ variant = 'calm', state, title }: Props) {
             </Text>
           </View>
           <View style={[s.phonePill, {
-            borderColor: urgent ? 'rgba(255,92,92,0.4)' : t.cardBorder,
-            backgroundColor: urgent ? 'rgba(255,92,92,0.12)' : 'transparent',
+            borderColor: urgent ? t.dangerStrong : t.cardBorder,
+            backgroundColor: urgent ? t.dangerSubtle : 'transparent',
           }]}>
             <Ionicons name="call" size={13} color={urgent ? t.danger : t.textPrimary} />
             <Text style={[s.phone, { color: urgent ? t.danger : t.textPrimary }]}>{c.phone}</Text>

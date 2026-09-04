@@ -211,7 +211,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const bmi = calcBMI(weight, height)
 
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyBg  = isEmergency ? 'rgba(255,92,92,0.12)'
+  const urgencyBg  = isEmergency ? t.dangerSubtle
     : appt.urgency === 'urgent' ? 'rgba(239,159,39,0.12)' : t.accentBg
   const urgencyCol = isEmergency ? t.danger
     : appt.urgency === 'urgent' ? t.statusBusy.text : t.accent
@@ -229,7 +229,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {isEmergency && (
-              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,92,92,0.14)', borderWidth: 1, borderColor: t.danger }]}>
+              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
                 <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
                 <Text style={[st.statusText, { color: t.danger }]}>EMERGENCY</Text>
               </View>
@@ -252,7 +252,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}
           <View style={[st.heroCard, {
-            backgroundColor: isEmergency ? 'rgba(255,92,92,0.1)' : t.bannerBg,
+            backgroundColor: isEmergency ? t.dangerSubtle : t.bannerBg,
             borderColor: isEmergency ? t.danger : t.bannerBorder,
           }]}>
             <View style={st.patientRow}>
@@ -339,7 +339,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 {isVirtual ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: 'rgba(91,158,255,0.35)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => {
                       haptics.heavy()
                       navigation.navigate('DoctorVideoCall', {
