@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -550,19 +551,11 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
 
       {/* Bottom nav */}
       <View style={[s.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
-        <TouchableOpacity onPress={goBack} style={[s.backBtn, { borderColor: t.cardBorder }]}>
-          <Ionicons name="arrow-back" size={18} color={t.textPrimary} />
-          <Text style={[s.backBtnText, { color: t.textPrimary }]}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={goNext} disabled={submitting}
-          style={[s.nextBtn, { backgroundColor: submitting ? `${t.accent}88` : t.accent }]}>
-          {submitting ? <ActivityIndicator color="#fff" /> : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={s.nextBtnText}>{step === STEPS.length - 1 ? 'Register' : 'Continue'}</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
+        <Button label="Back" onPress={goBack} variant="outline" icon="arrow-back" />
+        <Button
+          label={step === STEPS.length - 1 ? 'Register' : 'Continue'} onPress={goNext} loading={submitting}
+          icon="arrow-forward" iconPosition="right" style={{ flex: 1 }}
+        />
       </View>
     </SafeAreaView>
   )
@@ -628,10 +621,6 @@ const s = StyleSheet.create({
   infoBanner:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
   infoText:    { flex: 1, fontSize: 12, lineHeight: 18 },
   footer:      { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1 },
-  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 13 },
-  backBtnText: { fontSize: 14, fontWeight: '700' },
-  nextBtn:     { flex: 1, borderRadius: 12, padding: 14, alignItems: 'center' },
-  nextBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
   doneTitle:   { fontSize: 26, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center', marginBottom: 10 },
   doneSub:     { fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   doneBtn:     { borderRadius: 14, paddingHorizontal: 40, paddingVertical: 14 },

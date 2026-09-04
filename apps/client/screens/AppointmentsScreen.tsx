@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getPatientAppointments } from '@queue/shared/lib/api'
 import type { AppointmentWithRelations } from '@queue/shared/lib/api'
@@ -175,12 +176,10 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                     : `You have no ${filter} appointments.`}
                 </Text>
                 {filter === 'upcoming' && (
-                  <TouchableOpacity
-                    onPress={() => { haptics.tap(); navigation?.navigate('BookingFlow', {}) }}
-                    style={[s.bookNowBtn, { backgroundColor: t.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                    <Text style={s.bookNowText}>Book an appointment</Text>
-                    <Ionicons name="arrow-forward" size={16} color={s.bookNowText.color as string} />
-                  </TouchableOpacity>
+                  <Button
+                    label="Book an appointment" onPress={() => { haptics.tap(); navigation?.navigate('BookingFlow', {}) }}
+                    icon="arrow-forward" iconPosition="right"
+                  />
                 )}
               </View>
             )}
@@ -322,8 +321,6 @@ const s = StyleSheet.create({
   emptyIcon:     { fontSize: 52, marginBottom: 12 },
   emptyTitle:    { fontSize: 17, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
-  bookNowBtn:    { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
-  bookNowText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
   // Card
   card:          { borderRadius: 16, marginBottom: 10, borderWidth: 1, overflow: 'hidden' },
   refRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },

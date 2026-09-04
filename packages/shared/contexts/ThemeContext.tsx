@@ -24,6 +24,16 @@ const forest = {
   accentDark:  '#00C265',
   accentBg:    'rgba(0,232,122,0.12)',
   accentBgMid: 'rgba(0,232,122,0.08)',
+  // Not the same RGB as accentBg above -- these are built from accentDark
+  // (0,194,101), which several screens' hand-rolled "Approve" buttons already
+  // tinted their bg/border from at exactly these opacities. Named `success`
+  // since that's the actual semantic (a positive/approve action), even though it
+  // happens to reuse the theme's own darker accent shade rather than a universal
+  // green -- in clinical below, accentDark is a blue, and successSubtle/Border
+  // follow it there too, preserving whatever that button already looked like
+  // rather than introducing a third, always-green hue no existing screen used.
+  successSubtle: 'rgba(0,194,101,0.12)',
+  successBorder: 'rgba(0,194,101,0.3)',
   accentBorder:'rgba(0,232,122,0.28)',
   textPrimary: '#E8F5EE',
   textSecondary:'#7ABDA0',
@@ -75,6 +85,8 @@ const clinical = {
   accentBg:    '#E6F1FB',
   accentBgMid: 'rgba(26,127,193,0.12)',
   accentBorder:'rgba(26,127,193,0.30)',
+  successSubtle: 'rgba(14,90,138,0.12)',
+  successBorder: 'rgba(14,90,138,0.3)',
   // '#DC2626' isn't invented for this -- it's already the exact literal one mobile
   // screen (AppointmentDetailScreen) and multiple web dashboard pages independently
   // reached for as "the readable red on a light background", so it's a documented

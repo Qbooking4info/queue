@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Check, Clock, MapPin, Phone, ArrowLeft } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 
 interface Alert {
   id: string
@@ -167,18 +168,9 @@ export function AlertsInbox({ alerts }: { alerts: Alert[] }) {
                   </div>
 
                   {!done && (
-                    <button
-                      onClick={() => acknowledge(a.id)}
-                      disabled={busy === a.id}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                        fontSize: 12, fontWeight: 700, padding: '8px 12px', borderRadius: 10,
-                        cursor: busy === a.id ? 'default' : 'pointer', opacity: busy === a.id ? 0.5 : 1,
-                        color: C.text, background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                      }}
-                    >
-                      <Check size={13} /> {busy === a.id ? '…' : 'Acknowledge'}
-                    </button>
+                    <Button onClick={() => acknowledge(a.id)} loading={busy === a.id} variant="outline" size="sm" className="flex-shrink-0">
+                      {busy !== a.id && <Check size={13} />} Acknowledge
+                    </Button>
                   )}
                 </div>
               </div>

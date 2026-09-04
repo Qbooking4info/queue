@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -484,34 +485,22 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
       {(canCheckIn || canApprove) && (
         <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
           {canApprove && (
-            <TouchableOpacity onPress={() => onApprove(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-              {isLoading ? <ActivityIndicator size="small" color={t.accentDark} />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="checkmark" size={13} color={t.accentDark} />
-                    <Text style={[s.actionText, { color: t.accentDark }]}>Approve</Text>
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Approve" onPress={() => onApprove(appt)} loading={isLoading}
+              disabled={!!actioning} variant="success" icon="checkmark" size="sm"
+            />
           )}
           {canApprove && (
-            <TouchableOpacity onPress={() => onReject(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-              {isLoading ? <ActivityIndicator size="small" color={t.danger} />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="close" size={13} color={t.danger} />
-                    <Text style={[s.actionText, { color: t.danger }]}>Reject</Text>
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Reject" onPress={() => onReject(appt)} loading={isLoading}
+              disabled={!!actioning} variant="danger" icon="close" size="sm"
+            />
           )}
           {canCheckIn && (
-            <TouchableOpacity onPress={() => onCheckIn(appt)} disabled={!!actioning}
-              style={[s.actionBtn, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder, flex: 1 }]}>
-              {isLoading ? <ActivityIndicator size="small" color={t.info} />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={[s.actionText, { color: t.info }]}>Check In</Text>
-                    <Ionicons name="arrow-forward" size={13} color={t.info} />
-                  </View>}
-            </TouchableOpacity>
+            <Button
+              label="Check In" onPress={() => onCheckIn(appt)} loading={isLoading}
+              disabled={!!actioning} variant="info" icon="arrow-forward" iconPosition="right" size="sm" style={{ flex: 1 }}
+            />
           )}
         </View>
       )}
@@ -535,13 +524,7 @@ function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn
 
       {showVitals && (
         <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-          <TouchableOpacity onPress={() => onRecordVitals(appt)}
-            style={[s.actionBtn, { flex: 1, backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="fitness-outline" size={13} color={t.info} />
-              <Text style={[s.actionText, { color: t.info }]}>Vitals</Text>
-            </View>
-          </TouchableOpacity>
+          <Button label="Vitals" onPress={() => onRecordVitals(appt)} variant="info" icon="fitness-outline" size="sm" style={{ flex: 1 }} />
           {appt.status === 'checked_in' && (
             <TouchableOpacity onPress={() => onMove(appt)}
               style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.3)' }]}>

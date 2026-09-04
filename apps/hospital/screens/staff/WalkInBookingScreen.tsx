@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -292,15 +293,10 @@ export function WalkInBookingScreen({ navigation }: Props) {
             </>
           )}
 
-          <TouchableOpacity onPress={handleSubmit} disabled={loading}
-            style={[s.submitBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 28 }]}>
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="person-add-outline" size={18} color="#fff" />
-                <Text style={s.submitText}>Add to Queue</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <Button
+            label="Add to Queue" onPress={handleSubmit} loading={loading}
+            icon="person-add-outline" size="lg" style={{ marginTop: 28 }}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -323,8 +319,6 @@ const s = StyleSheet.create({
   docChip:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, minWidth: 100 },
   docChipText: { fontSize: 12, fontWeight: '700' },
   docSpec:     { fontSize: 10, marginTop: 2 },
-  submitBtn:   { borderRadius: 14, padding: 16, alignItems: 'center' },
-  submitText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
   successIcon: { width: 96, height: 96, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 20 },
   successTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center' },
   successRef:  { fontSize: 20, fontWeight: '800', marginTop: 6, marginBottom: 8 },

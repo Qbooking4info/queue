@@ -263,15 +263,10 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                 {canApprove && (
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
                     <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => handleApprove(appt)} disabled={!!actioning}
-                      style={[s.actionBtn, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)', flex: 2 }]}>
-                      {isLoading ? <ActivityIndicator size="small" color={t.accentDark} /> : (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name="checkmark" size={13} color={t.accentDark} />
-                          <Text style={[s.actionText, { color: t.accentDark }]}>Approve</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
+                    <Button
+                      label="Approve" onPress={() => handleApprove(appt)} loading={isLoading}
+                      disabled={!!actioning} variant="success" icon="checkmark" size="sm" style={{ flex: 2 }}
+                    />
                   </View>
                 )}
               </View>
@@ -302,8 +297,6 @@ const s = StyleSheet.create({
   badgeText:  { fontSize: 10, fontWeight: '700' },
   ref:        { fontSize: 9, fontWeight: '600', marginTop: 2 },
   actions:    { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: 1 },
-  actionBtn:  { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
-  actionText: { fontSize: 13, fontWeight: '700' },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
   emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },

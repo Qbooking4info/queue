@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Clipboard, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,6 +8,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import { Stars } from '@queue/shared/components/ui/Stars'
+import { Button } from '@queue/shared/components/ui/Button'
 import { QueuePositionPicker } from '@queue/shared/components/QueuePositionPicker'
 import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
@@ -543,27 +544,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
               {canReschedule && (
-                <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
-                  style={[st.rescheduleBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
-                  {rescheduleLoading
-                    ? <ActivityIndicator size="small" color={t.textPrimary} />
-                    : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
-                        <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
-                      </View>
-                  }
-                </TouchableOpacity>
+                <Button
+                  label="Reschedule" onPress={() => { haptics.tap(); handleReschedule() }}
+                  loading={rescheduleLoading} variant="outline" icon="calendar-outline" style={{ flex: 1 }}
+                />
               )}
-              <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
-                style={[st.cancelBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle, opacity: cancelling ? 0.5 : 1 }]}>
-                {cancelling
-                  ? <ActivityIndicator size="small" color={t.danger} />
-                  : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Ionicons name="close" size={13} color={t.danger} />
-                      <Text style={[st.cancelTxt, { color: t.danger }]}>Cancel</Text>
-                    </View>
-                }
-              </TouchableOpacity>
+              <Button
+                label="Cancel" onPress={() => { haptics.tap(); handleCancel() }}
+                loading={cancelling} variant="danger" icon="close" style={{ flex: 1 }}
+              />
             </View>
           )}
 
@@ -579,43 +568,28 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                 </Text>
               </View>
               {canReschedule ? (
-                <TouchableOpacity onPress={() => { haptics.tap(); handleReschedule() }} disabled={rescheduleLoading}
-                  style={[st.rescheduleBtn, { borderColor: t.dangerBorder, backgroundColor: t.cardBg, opacity: rescheduleLoading ? 0.5 : 1 }]}>
-                  {rescheduleLoading
-                    ? <ActivityIndicator size="small" color={t.textPrimary} />
-                    : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons name="calendar-outline" size={15} color={t.textPrimary} />
-                        <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Reschedule</Text>
-                      </View>
-                  }
-                </TouchableOpacity>
+                <Button
+                  label="Reschedule" onPress={() => { haptics.tap(); handleReschedule() }}
+                  loading={rescheduleLoading} variant="outline" icon="calendar-outline"
+                />
               ) : raw.hospital ? (
-                <TouchableOpacity
+                <Button
+                  label="Book a New Appointment"
                   onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {
                     hospital:    toDisplayHospital(raw.hospital),
                     bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
                   }) }}
-                  style={[st.rescheduleBtn, { borderColor: t.dangerBorder, backgroundColor: t.cardBg }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="add-circle-outline" size={15} color={t.textPrimary} />
-                    <Text style={[st.rescheduleTxt, { color: t.textPrimary }]}>Book a New Appointment</Text>
-                  </View>
-                </TouchableOpacity>
+                  variant="outline" icon="add-circle-outline"
+                />
               ) : null}
             </View>
           )}
 
           {isPendingReview && !cancelled && !isRejected && (
-            <TouchableOpacity onPress={() => { haptics.tap(); handleCancel() }} disabled={cancelling}
-              style={[st.cancelBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle, marginBottom: 12, opacity: cancelling ? 0.5 : 1 }]}>
-              {cancelling
-                ? <ActivityIndicator size="small" color={t.danger} />
-                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons name="close" size={13} color={t.danger} />
-                    <Text style={[st.cancelTxt, { color: t.danger }]}>Withdraw booking request</Text>
-                  </View>
-              }
-            </TouchableOpacity>
+            <Button
+              label="Withdraw booking request" onPress={() => { haptics.tap(); handleCancel() }}
+              loading={cancelling} variant="danger" icon="close" style={{ marginBottom: 12 }}
+            />
           )}
 
           {/* Completed — rate & rebook */}
@@ -768,8 +742,6 @@ const st = StyleSheet.create({
   actions:            { flexDirection: 'row', gap: 10, marginBottom: 12 },
   rescheduleBtn:      { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
   rescheduleTxt:      { fontSize: 13, fontWeight: '600' },
-  cancelBtn:          { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
-  cancelTxt:          { fontSize: 13, fontWeight: '600' },
   // Refund
   refundNote:         { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 12 },
   refundText:         { fontSize: 12, lineHeight: 18 },

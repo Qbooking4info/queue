@@ -340,10 +340,7 @@ export function CrewHomeScreen() {
               etaSeconds={activeJob.eta_seconds}
             />
 
-            <TouchableOpacity onPress={callPatient} style={[s.secondaryBtn, { borderColor: t.cardBorder, marginTop: 14 }]}>
-              <Ionicons name="call-outline" size={16} color={t.textPrimary} />
-              <Text style={[s.secondaryBtnText, { color: t.textPrimary }]}>Call patient</Text>
-            </TouchableOpacity>
+            <Button label="Call patient" onPress={callPatient} variant="outline" icon="call-outline" style={{ marginTop: 14 }} />
 
             {nextJobStatus(activeJob.status) ? (
               <Button
