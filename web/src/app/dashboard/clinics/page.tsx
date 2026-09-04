@@ -6,6 +6,7 @@ import { useAdmin } from '@/contexts/AdminContext'
 import { AlertTriangle, ArrowRight, X, RefreshCw, Check } from 'lucide-react'
 import type { ClinicWithAdmin } from '@/lib/admin-api'
 import { ServiceTagPicker } from '@/components/dashboard/ServiceTagPicker'
+import { Button } from '@/components/ui/button'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -347,20 +348,10 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
-                <button onClick={handleCreate} disabled={loading || !clinicName.trim()}
-                  style={{ flex: 2, padding: '11px', borderRadius: 10, cursor: loading || !clinicName.trim() ? 'not-allowed' : 'pointer',
-                    background: clinicName.trim() ? C.accent : C.bgAlt,
-                    color: clinicName.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Creating…' : skipAdmin ? 'Create Clinic' : 'Create Clinic & Account'}
-                </button>
+                <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+                <Button onClick={handleCreate} loading={loading} disabled={!clinicName.trim()} style={{ flex: 2 }}>
+                  {skipAdmin ? 'Create Clinic' : 'Create Clinic & Account'}
+                </Button>
               </div>
             </div>
           ) : (
@@ -589,12 +580,7 @@ export default function ClinicsPage() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => { setDeleteTarget(null); setDeleteError('') }}
-                style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                Cancel
-              </button>
+              <Button onClick={() => { setDeleteTarget(null); setDeleteError('') }} variant="outline" style={{ flex: 1 }}>Cancel</Button>
               <button onClick={handleDelete} disabled={deleting}
                 style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: deleting ? 'not-allowed' : 'pointer',
                   background: 'rgba(220,60,60,0.85)', border: 'none',

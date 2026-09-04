@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { AdminDoctor } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
 
 function generatePassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -209,11 +210,7 @@ export function ManageDoctorModal({ doctor, col, C, onClose, onUpdated }: {
         )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-            background: C.bgAlt, border: `1px solid ${C.border}`,
-            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
+          <Button onClick={onClose} variant="outline" size="sm">Cancel</Button>
           <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
             style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
               background: saving ? C.border : col.text,

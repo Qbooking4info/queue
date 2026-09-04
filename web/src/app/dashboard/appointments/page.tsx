@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
+import { Button } from '@/components/ui/button'
 import { VitalsModal } from '@/components/dashboard/VitalsModal'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
@@ -302,21 +303,10 @@ function WalkInModal({
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
-                <button onClick={handleCreate} disabled={loading || !name.trim()}
-                  style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
-                    background: name.trim() ? C.accent : C.bgAlt,
-                    color: name.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    cursor: loading || !name.trim() ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.7 : 1 }}>
-                  {loading ? 'Creating…' : 'Create Booking'}
-                </button>
+                <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+                <Button onClick={handleCreate} loading={loading} disabled={!name.trim()} style={{ flex: 2 }}>
+                  Create Booking
+                </Button>
               </div>
             </>
           )}
@@ -419,21 +409,13 @@ function AssignDoctorModal({
           </div>
         )}
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={handleAssign} disabled={!selected || selected === currentDoctorId || saving}
-            style={{ flex: 2, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: selected && selected !== currentDoctorId ? C.accent : C.bgAlt,
-              color: selected && selected !== currentDoctorId ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
-              border: 'none', fontSize: 13, fontWeight: 700,
-              cursor: !selected || selected === currentDoctorId || saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.7 : 1 }}>
-            {saving ? (isReassign ? 'Reassigning…' : 'Assigning…') : (isReassign ? 'Reassign Doctor' : 'Assign Doctor')}
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button
+            onClick={handleAssign} loading={saving}
+            disabled={!selected || selected === currentDoctorId} style={{ flex: 2 }}
+          >
+            {isReassign ? 'Reassign Doctor' : 'Assign Doctor'}
+          </Button>
         </div>
       </div>
     </div>
@@ -483,21 +465,10 @@ function RejectModal({
             borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
             outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
-          <button onClick={handleReject} disabled={saving || !note.trim()}
-            style={{ flex: 1, padding: '10px', borderRadius: 10, fontFamily: 'inherit',
-              background: note.trim() ? 'rgba(220,60,60,0.15)' : C.bgAlt,
-              border: note.trim() ? '1px solid rgba(220,60,60,0.3)' : `1px solid ${C.border}`,
-              color: note.trim() ? '#f07070' : C.textMuted,
-              fontSize: 13, fontWeight: 700,
-              cursor: !note.trim() || saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Rejecting…' : 'Reject & Refund'}
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleReject} loading={saving} disabled={!note.trim()} variant="danger" style={{ flex: 1 }}>
+            Reject & Refund
+          </Button>
         </div>
       </div>
     </div>

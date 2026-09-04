@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Button } from '@/components/ui/button'
 import type { AdminAppointment } from '@/lib/admin-api'
 
 function bmiOf(weightKg: number | null, heightCm: number | null): number | null {
@@ -139,19 +140,8 @@ export function VitalsModal({ appointment, onClose, onSaved }: {
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onClose}
-              style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                background: C.bgAlt, border: `1px solid ${C.border}`,
-                color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-              Cancel
-            </button>
-            <button onClick={handleSave} disabled={saving}
-              style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
-                background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-                border: 'none', fontSize: 13, fontWeight: 700,
-                cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Saving…' : 'Save Vitals'}
-            </button>
+            <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+            <Button onClick={handleSave} loading={saving} style={{ flex: 2 }}>Save Vitals</Button>
           </div>
         </div>
       </div>

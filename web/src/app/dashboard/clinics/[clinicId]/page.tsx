@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Badge } from '@/components/dashboard/Badge'
+import { Button } from '@/components/ui/button'
 import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
@@ -234,12 +235,7 @@ function EditClinicModal({
 
         <div style={{ padding: '16px 24px', borderTop: `1px solid ${C.border}`,
           display: 'flex', gap: 10, flexShrink: 0 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-              background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-              color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
           <button onClick={handleSave} disabled={saving || !name.trim()}
             style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
               background: name.trim() ? col.text : C.bgAlt,
@@ -345,12 +341,7 @@ function EditClinicHoursModal({
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onClose}
-              style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-              Cancel
-            </button>
+            <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
             <button onClick={handleSave} disabled={saving}
               style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
                 background: col.text, color: '#061208',
@@ -633,12 +624,7 @@ function AddStaffModal({
               )}
 
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose}
-                  style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                    background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                    color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                  Cancel
-                </button>
+                <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
                 <button onClick={handleCreate}
                   disabled={loading || !staffName.trim() || !email.trim()}
                   style={{ flex: 2, padding: '11px', borderRadius: 10, fontFamily: 'inherit',
@@ -845,18 +831,9 @@ function ManageStaffModal({ staff, col, C, onClose, onRemoved, onUpdated }: {
         )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-          <button onClick={removeStaff} disabled={saving}
-            style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)',
-              color: '#f07070', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
-            Remove
-          </button>
+          <Button onClick={removeStaff} loading={saving} variant="danger" size="sm">Remove</Button>
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
-            background: C.bgAlt, border: `1px solid ${C.border}`,
-            color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-            Cancel
-          </button>
+          <Button onClick={onClose} variant="outline" size="sm">Cancel</Button>
           <button onClick={tab === 'edit' ? saveProfile : savePassword} disabled={saving}
             style={{ padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
               background: saving ? C.border : col.text,
@@ -2080,20 +2057,10 @@ export default function ClinicDetailPage() {
               This action cannot be undone. Only hospital super admins can perform this action.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setConfirmDelete(false)} disabled={deleting}
-                style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
-                  background: C.bgAlt, border: `1px solid ${C.borderMed}`,
-                  color: C.textSub, fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                  opacity: deleting ? 0.5 : 1 }}>
-                Cancel
-              </button>
-              <button onClick={handleDelete} disabled={deleting}
-                style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: deleting ? 'not-allowed' : 'pointer',
-                  background: 'rgba(220,60,60,0.15)', border: '1px solid rgba(220,60,60,0.3)',
-                  color: '#f07070', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-                  opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? 'Deleting…' : 'Delete Clinic'}
-              </button>
+              <Button onClick={() => setConfirmDelete(false)} disabled={deleting} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+              <Button onClick={handleDelete} loading={deleting} variant="danger" style={{ flex: 1 }}>
+                Delete Clinic
+              </Button>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
 import { ManageDoctorModal } from '@/components/dashboard/ManageDoctorModal'
 import { LinkDoctorModal } from '@/components/dashboard/LinkDoctorModal'
 
@@ -54,12 +55,7 @@ export default function DoctorsPage() {
         </div>
         {canAddDoctor && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setLinking(true)}
-              style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
-                border: 'none', borderRadius: 10, padding: '10px 18px',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              + Add Doctor by ID
-            </button>
+            <Button onClick={() => setLinking(true)}>+ Add Doctor by ID</Button>
           </div>
         )}
       </div>
