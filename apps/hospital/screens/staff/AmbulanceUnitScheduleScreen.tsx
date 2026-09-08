@@ -65,6 +65,8 @@ export function AmbulanceUnitScheduleScreen({ navigation, route }: Props) {
       const crew = await crewRes.json()
       if (fleetRes.ok) setUnit((fleet.ambulances ?? []).find((u: Unit) => u.id === unitId) ?? null)
       if (crewRes.ok) setCrewOptions(crew.crew ?? [])
+    } catch {
+      /* silent -- a failed background load leaves the last-known state on screen */
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -87,6 +89,8 @@ export function AmbulanceUnitScheduleScreen({ navigation, route }: Props) {
       if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to add shift', b?.error); return }
       setStartsAt(''); setEndsAt('')
       await load()
+    } catch {
+      Alert.alert('Failed to add shift', 'Check your connection and try again.')
     } finally { setAddingShift(false) }
   }
 
@@ -94,31 +98,43 @@ export function AmbulanceUnitScheduleScreen({ navigation, route }: Props) {
     Alert.alert('Remove this shift?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
-        const token = await jwt()
-        const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
-        if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to remove shift', b?.error); return }
-        await load()
+        try {
+          const token = await jwt()
+          const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+          if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to remove shift', b?.error); return }
+          await load()
+        } catch {
+          Alert.alert('Failed to remove shift', 'Check your connection and try again.')
+        }
       } },
     ])
   }
 
   async function assignCrew(shiftId: string, hospitalAdminId: string) {
-    const token = await jwt()
-    const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}/crew`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ hospitalAdminId }),
-    })
-    if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to assign crew', b?.error); return }
-    await load()
+    try {
+      const token = await jwt()
+      const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}/crew`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ hospitalAdminId }),
+      })
+      if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to assign crew', b?.error); return }
+      await load()
+    } catch {
+      Alert.alert('Failed to assign crew', 'Check your connection and try again.')
+    }
   }
 
   async function unassignCrew(shiftId: string, hospitalAdminId: string) {
-    const token = await jwt()
-    const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}/crew?hospitalAdminId=${hospitalAdminId}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to remove crew', b?.error); return }
-    await load()
+    try {
+      const token = await jwt()
+      const res = await fetch(`${API_URL}/api/ambulances/fleet/shifts/${shiftId}/crew?hospitalAdminId=${hospitalAdminId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to remove crew', b?.error); return }
+      await load()
+    } catch {
+      Alert.alert('Failed to remove crew', 'Check your connection and try again.')
+    }
   }
 
   return (

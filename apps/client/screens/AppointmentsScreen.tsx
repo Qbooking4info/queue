@@ -99,8 +99,8 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
         <View style={[s.titleRow, { borderBottomColor: t.cardBorder }]}>
           <Text style={[s.title, { color: t.textPrimary }]}>My Bookings</Text>
           {pendingCount > 0 && (
-            <View style={[s.pendingBadge, { backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: t.statusBusy.text }}>
+            <View style={[s.pendingBadge, { backgroundColor: t.statusApproval.bg, borderColor: t.statusApproval.border }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: t.statusApproval.text }}>
                 {pendingCount} awaiting review
               </Text>
             </View>
@@ -132,7 +132,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                 </Text>
                 {f === 'pending review' && pendingCount > 0 && (
-                  <View style={[s.filterDot, { backgroundColor: t.statusBusy.text }]} />
+                  <View style={[s.filterDot, { backgroundColor: t.statusApproval.text }]} />
                 )}
               </TouchableOpacity>
             )

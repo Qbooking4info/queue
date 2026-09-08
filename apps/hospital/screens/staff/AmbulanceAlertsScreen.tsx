@@ -64,6 +64,8 @@ export function AmbulanceAlertsScreen({ navigation }: Props) {
       const res = await fetch(`${API_URL}/api/ambulances/alerts`, { headers: { Authorization: `Bearer ${jwt}` } })
       const body = await res.json()
       if (res.ok) setAlerts(body.alerts ?? [])
+    } catch {
+      /* silent -- a failed background load leaves the last-known state on screen */
     } finally {
       setLoading(false)
       setRefreshing(false)

@@ -44,6 +44,8 @@ export function AmbulanceCoverageScreen({ navigation }: Props) {
       const res = await fetch(`${API_URL}/api/ambulances/coverage`, { headers: { Authorization: `Bearer ${jwt}` } })
       const body = await res.json()
       if (res.ok) { setAttempts(body.attempts ?? []); setDays(body.days ?? 30) }
+    } catch {
+      /* silent -- a failed background load leaves the last-known state on screen */
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -69,7 +71,7 @@ export function AmbulanceCoverageScreen({ navigation }: Props) {
   let diagnosis = ''
   if (attempts.length === 0) diagnosis = 'No dispatch rounds recorded yet — nothing to diagnose.'
   else if (unserved.length === 0) diagnosis = 'Every dispatch round found at least one usable unit.'
-  else if (avgOnDuty !== null && avgOnDuty < 0.5 && activeTotal)
+  else if (avgOnDuty !== null && avgOnDuty < 0.5 && activeTotal != null && activeTotal > 0)
     diagnosis = `Adoption gap: ${activeTotal} unit(s) registered but almost none on duty when calls came in. The fleet exists; it is not signed on.`
   else if (avgNearest !== null && avgNearest > 10000)
     diagnosis = `Coverage gap: when a call went unserved, the nearest unit averaged ${km(avgNearest)} away. You need supply closer to these pickups.`

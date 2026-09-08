@@ -72,6 +72,8 @@ export function AmbulanceFleetScreen({ navigation }: Props) {
         return
       }
       await load()
+    } catch {
+      Alert.alert('Could not change duty status', 'Check your connection and try again.')
     } finally { setDutyBusyId(null) }
   }
 
@@ -79,10 +81,14 @@ export function AmbulanceFleetScreen({ navigation }: Props) {
     Alert.alert('Remove this ambulance?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
-        const token = await jwt()
-        const res = await fetch(`${API_URL}/api/ambulances/fleet/units/${unit.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
-        if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Could not remove unit', b?.error ?? 'Try again.'); return }
-        await load()
+        try {
+          const token = await jwt()
+          const res = await fetch(`${API_URL}/api/ambulances/fleet/units/${unit.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+          if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Could not remove unit', b?.error ?? 'Try again.'); return }
+          await load()
+        } catch {
+          Alert.alert('Could not remove unit', 'Check your connection and try again.')
+        }
       } },
     ])
   }
@@ -154,6 +160,8 @@ function FleetSetupCard({ theme: t, onDone }: { theme: any; onDone: () => void }
       })
       if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to set up fleet', b?.error); return }
       onDone()
+    } catch {
+      Alert.alert('Failed to set up fleet', 'Check your connection and try again.')
     } finally { setBusy(false) }
   }
 
@@ -239,6 +247,8 @@ function AddUnitModal({ theme: t, onClose, onDone }: { theme: any; onClose: () =
       const data = await res.json() as { lat: string; lon: string } | null
       if (!data) { Alert.alert('Address not found', 'Try a more specific query.'); return }
       setLat(parseFloat(data.lat)); setLng(parseFloat(data.lon))
+    } catch {
+      Alert.alert('Could not look up that address', 'Check your connection and try again.')
     } finally { setGeocoding(false) }
   }
 
@@ -254,6 +264,8 @@ function AddUnitModal({ theme: t, onClose, onDone }: { theme: any; onClose: () =
       })
       if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Failed to add unit', b?.error); return }
       onDone()
+    } catch {
+      Alert.alert('Failed to add unit', 'Check your connection and try again.')
     } finally { setBusy(false) }
   }
 

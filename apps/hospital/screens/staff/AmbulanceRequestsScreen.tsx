@@ -7,6 +7,8 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
 interface TransportRequest {
   id: string
   booking_ref: string
@@ -71,23 +73,30 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
   const isAdmin = staffProfile?.role === 'hospital_admin'
   const hospitalId = staffProfile?.hospitalId
 
+  // Routed through GET /api/ambulances rather than a direct
+  // supabase.from('transport_requests') query. RLS does have a working policy for
+  // this table ("Hospital staff can read inbound transports"), so the direct query
+  // isn't actually broken -- but every other screen in this feature (alerts,
+  // coverage) has to go through the API because their tables have RLS enabled with
+  // zero policies, and the API route was already built for this one too. Splitting
+  // "read this one directly, everything else through the API" is the kind of
+  // inconsistency that silently breaks the day someone tightens RLS on this table
+  // without knowing a mobile screen was relying on it staying permissive.
   const load = useCallback(async () => {
     if (!hospitalId) return
-    const { data } = await supabase
-      .from('transport_requests')
-      .select(`
-        id, booking_ref, status, triage_level, symptom_description,
-        eta_seconds, pickup_address, contact_phone, caller_patient_name,
-        patient:users!transport_requests_patient_id_fkey(full_name),
-        dependent:dependents(full_name),
-        unit:ambulances(plate_number, call_sign, vehicle_tier, provider:ambulance_providers(name))
-      `)
-      .eq('destination_hospital_id', hospitalId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-    setRequests((data as any) ?? [])
-    setLoading(false)
-    setRefreshing(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      if (!jwt) return
+      const res = await fetch(`${API_URL}/api/ambulances`, { headers: { Authorization: `Bearer ${jwt}` } })
+      const body = await res.json()
+      if (res.ok) setRequests(body.requests ?? [])
+    } catch {
+      /* silent -- a failed background load leaves the last-known state on screen */
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }, [hospitalId])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
