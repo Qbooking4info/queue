@@ -15,8 +15,19 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 
 type Range = 'today' | 'week' | 'month' | 'year'
 
-interface Stats { total: number; completed: number; cancelled: number; pending: number }
+interface DoctorWaitConsultStats { doctorId: string; doctorName: string; avgWaitMinutes: number | null; avgConsultMinutes: number | null; sampleSize: number }
+interface Stats {
+  total: number; completed: number; cancelled: number; pending: number
+  avgWaitMinutes: number | null; avgConsultMinutes: number | null
+  doctorStats: DoctorWaitConsultStats[]
+}
 interface SpecialtyRow { name: string; count: number; pct: number }
+
+function fmtMinutes(m: number | null): string {
+  if (m == null) return '—'
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
 
 const SPEC_COLORS = ['#00E87A','#5B9EFF','#A78BFA','#EF9F27','#FF8C42']
 
@@ -27,7 +38,7 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
   const { staffProfile } = useAuth()
 
   const [range,      setRange]      = useState<Range>('month')
-  const [stats,      setStats]      = useState<Stats>({ total: 0, completed: 0, cancelled: 0, pending: 0 })
+  const [stats,      setStats]      = useState<Stats>({ total: 0, completed: 0, cancelled: 0, pending: 0, avgWaitMinutes: null, avgConsultMinutes: null, doctorStats: [] })
   const [specialty,  setSpecialty]  = useState<SpecialtyRow[]>([])
   const [inperson,   setInperson]   = useState(0)
   const [virtual,    setVirtual]    = useState(0)
@@ -172,6 +183,20 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
             ))}
           </View>
 
+          {/* Wait time / consultation time -- checked_in_at -> consult_started_at -> consult_ended_at,
+              same numbers that drive each doctor's live queue wait estimate. Was already coming back
+              on this same /api/appointments/stats response; only the KPI tiles read it before. */}
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+            <View style={[s.typeCard, { backgroundColor: t.infoSubtle, flex: 1 }]}>
+              <Text style={[s.typeCount, { color: t.info }]}>{fmtMinutes(stats.avgWaitMinutes)}</Text>
+              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Wait Time</Text>
+            </View>
+            <View style={[s.typeCard, { backgroundColor: t.accentBgMid, flex: 1 }]}>
+              <Text style={[s.typeCount, { color: t.accent }]}>{fmtMinutes(stats.avgConsultMinutes)}</Text>
+              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Consultation</Text>
+            </View>
+          </View>
+
           {/* Visit type split */}
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
             <Text style={[s.cardTitle, { color: t.textPrimary }]}>Visit Type Split</Text>
@@ -208,6 +233,32 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
                   </View>
                 ))}
               </View>
+            </View>
+          )}
+
+          {/* Wait & consultation time by doctor -- same source data as the two KPI tiles
+              above, broken out per doctor so an admin can see which doctors run long
+              consults or keep patients waiting, not just the aggregate. Web renders this
+              as a <table> with overflow-x scroll; four short columns read fine as stacked
+              rows at phone width, so no horizontal scroll needed here. */}
+          {!!stats.doctorStats.length && (
+            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
+              <Text style={[s.cardTitle, { color: t.textPrimary, marginBottom: 4 }]}>Wait &amp; Consultation Time by Doctor</Text>
+              <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 14 }}>Selected period · averaged per doctor</Text>
+              <View style={[s.doctorTableHead, { borderBottomColor: t.cardBorder }]}>
+                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1.4 }]}>DOCTOR</Text>
+                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1, textAlign: 'right' }]}>WAIT</Text>
+                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1, textAlign: 'right' }]}>CONSULT</Text>
+                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 0.7, textAlign: 'right' }]}>VISITS</Text>
+              </View>
+              {stats.doctorStats.map(d => (
+                <View key={d.doctorId} style={[s.doctorTableRow, { borderBottomColor: t.cardBorder }]}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.textPrimary, flex: 1.4 }} numberOfLines={1}>{d.doctorName}</Text>
+                  <Text style={{ fontSize: 12.5, color: t.textSecondary, flex: 1, textAlign: 'right' }}>{fmtMinutes(d.avgWaitMinutes)}</Text>
+                  <Text style={{ fontSize: 12.5, color: t.textSecondary, flex: 1, textAlign: 'right' }}>{fmtMinutes(d.avgConsultMinutes)}</Text>
+                  <Text style={{ fontSize: 12.5, color: t.textMuted, flex: 0.7, textAlign: 'right' }}>{d.sampleSize}</Text>
+                </View>
+              ))}
             </View>
           )}
 
@@ -262,4 +313,7 @@ const s = StyleSheet.create({
   specPct:     { width: 30, textAlign: 'right', fontSize: 12, fontWeight: '700' },
   barVal:      { fontSize: 9, fontWeight: '700' },
   barLabel:    { fontSize: 9 },
+  doctorTableHead: { flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, marginBottom: 4 },
+  doctorTableHeadText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  doctorTableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
 })
