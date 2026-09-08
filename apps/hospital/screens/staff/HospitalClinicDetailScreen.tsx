@@ -10,6 +10,7 @@ import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { DayHours, getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -22,6 +23,26 @@ interface ClinicDetail {
 }
 interface ClinicDoctor { id: string; full_name: string; specialty_name: string | null; is_active: boolean; is_active_here: boolean }
 interface UnassignedDoctor { id: string; full_name: string; title: string | null; specialty_name: string | null }
+interface ClinicStaffMember { id: string; user_id: string; full_name: string; email: string; role: string; is_active: boolean; created_at: string }
+interface ClinicAppt {
+  id: string; booking_ref: string; appointment_date: string; start_time: string; status: string
+  type: string; approval_status: string; patient_name: string; doctor_name: string; specialty_name: string | null
+}
+interface ClinicStats { total: number; completed: number; cancelled: number; pending: number; avgWaitMinutes: number | null; avgConsultMinutes: number | null }
+
+type RangeKey = 'today' | 'week' | 'month'
+
+function rangeBounds(key: RangeKey): { from: string; to: string } {
+  const now = new Date()
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  if (key === 'today') return { from: fmt(now), to: fmt(now) }
+  if (key === 'week') {
+    const start = new Date(now); start.setDate(now.getDate() - now.getDay())
+    return { from: fmt(start), to: fmt(now) }
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  return { from: fmt(start), to: fmt(now) }
+}
 
 interface Props { navigation: any; route: { params: { clinicId: string } } }
 
@@ -37,6 +58,17 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
   const [saving,   setSaving]   = useState(false)
   const [showAssign, setShowAssign] = useState(false)
   const [assignTab, setAssignTab] = useState<'assign' | 'new'>('assign')
+
+  // Staff / appointments / analytics -- all three come back from the same
+  // GET /api/clinics/[clinicId]?from=&to= call `load()` already makes (it
+  // bundles clinic/doctors/staff/appointments/stats/hours in one response),
+  // just never read past `clinic`/`doctors`/`clinicHours` before this.
+  const [staff,   setStaff]   = useState<ClinicStaffMember[]>([])
+  const [appts,   setAppts]   = useState<ClinicAppt[]>([])
+  const [stats,   setStats]   = useState<ClinicStats>({ total: 0, completed: 0, cancelled: 0, pending: 0, avgWaitMinutes: null, avgConsultMinutes: null })
+  const [rangeKey, setRangeKey] = useState<RangeKey>('today')
+  const [showAddStaff, setShowAddStaff] = useState(false)
+  const [managingStaff, setManagingStaff] = useState<ClinicStaffMember | null>(null)
 
   // Edit-form fields, seeded from `clinic` once loaded
   const [name,        setName]        = useState('')
@@ -57,12 +89,16 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     setLoading(true)
     try {
       const headers = await authHeaders()
-      const detailRes = await fetch(`${API_URL}/api/clinics/${clinicId}`, { headers })
+      const { from, to } = rangeBounds(rangeKey)
+      const detailRes = await fetch(`${API_URL}/api/clinics/${clinicId}?from=${from}&to=${to}`, { headers })
       const body = await detailRes.json()
       if (detailRes.ok) {
         setClinic(body.clinic)
         setDoctors(body.doctors ?? [])
         setHours(body.clinicHours?.hours ?? [])
+        setStaff(body.staff ?? [])
+        setAppts(body.appointments ?? [])
+        setStats(body.stats ?? { total: 0, completed: 0, cancelled: 0, pending: 0, avgWaitMinutes: null, avgConsultMinutes: null })
         setName(body.clinic?.name ?? '')
         setDescription(body.clinic?.description ?? '')
         setDailyLimit(body.clinic?.daily_booking_limit != null ? String(body.clinic.daily_booking_limit) : '')
@@ -73,7 +109,7 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [clinicId])
+  }, [clinicId, rangeKey])
 
   // Doctors linked to this hospital but not yet assigned to THIS clinic --
   // matches web's clinic-detail "Assign Existing" tab (GET
@@ -220,6 +256,44 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
     } finally { setSaving(false) }
   }
 
+  async function removeStaff(member: ClinicStaffMember) {
+    Alert.alert(`Remove ${member.full_name}?`, 'This deactivates their login and revokes their session immediately.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        setSaving(true)
+        try {
+          const headers = await authHeaders()
+          const res = await fetch(`${API_URL}/api/clinic-staff`, { method: 'DELETE', headers, body: JSON.stringify({ staffId: member.id }) })
+          if (!res.ok) throw new Error((await res.json())?.error ?? 'Failed to remove')
+          haptics.success()
+          setStaff(list => list.filter(s => s.id !== member.id))
+          setManagingStaff(null)
+        } catch (e) {
+          haptics.error(); Alert.alert(e instanceof Error ? e.message : 'Failed to remove')
+        } finally { setSaving(false) }
+      } },
+    ])
+  }
+
+  async function updateStaffProfile(memberId: string, fullName: string, email: string) {
+    const headers = await authHeaders()
+    const res = await fetch(`${API_URL}/api/clinic-staff`, {
+      method: 'PATCH', headers, body: JSON.stringify({ staffId: memberId, full_name: fullName, email }),
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(body?.error ?? 'Failed to save')
+    setStaff(list => list.map(s => s.id === memberId ? { ...s, full_name: fullName, email } : s))
+  }
+
+  async function resetStaffPassword(memberId: string, newPassword: string) {
+    const headers = await authHeaders()
+    const res = await fetch(`${API_URL}/api/clinic-staff/reset-password`, {
+      method: 'POST', headers, body: JSON.stringify({ staffId: memberId, newPassword }),
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(body?.error ?? 'Failed to reset password')
+  }
+
   if (loading) {
     return (
       <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
@@ -327,6 +401,146 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
             <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add Doctor</Text>
           </TouchableOpacity>
         </Section>
+
+        <Section theme={t} title={`Staff (${staff.length})`}>
+          <Text style={[s.label, { color: t.textMuted, marginBottom: 8 }]}>SUB-ADMIN · CLINIC MANAGEMENT ACCESS</Text>
+          {(() => {
+            const subAdmin = staff.find(m => m.role === 'clinic_admin')
+            return subAdmin ? (
+              <StaffRow theme={t} member={subAdmin} roleLabel="Sub-Admin" onManage={() => setManagingStaff(subAdmin)} />
+            ) : (
+              <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No sub-admin assigned to this clinic yet.</Text>
+            )
+          })()}
+
+          <Text style={[s.label, { color: t.textMuted, marginTop: 16, marginBottom: 8 }]}>FRONT DESK OFFICERS · QUEUE & CHECK-IN</Text>
+          {(() => {
+            const deskOfficers = staff.filter(m => m.role === 'front_desk' || m.role === 'desk_officer')
+            return deskOfficers.length === 0 ? (
+              <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No front desk officers yet.</Text>
+            ) : deskOfficers.map(m => (
+              <StaffRow key={m.id} theme={t} member={m} roleLabel="Desk" onManage={() => setManagingStaff(m)} />
+            ))
+          })()}
+
+          <TouchableOpacity onPress={() => setShowAddStaff(true)} style={[s.smallOutlineBtn, { borderColor: t.accent, marginTop: 10 }]}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add Staff Member</Text>
+          </TouchableOpacity>
+        </Section>
+
+        <Section theme={t} title="Appointments">
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            {(['today', 'week', 'month'] as const).map(k => (
+              <TouchableOpacity key={k} onPress={() => setRangeKey(k)}
+                style={[s.chip, { borderColor: rangeKey === k ? t.accent : t.cardBorder, backgroundColor: rangeKey === k ? `${t.accent}18` : 'transparent' }]}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: rangeKey === k ? t.accent : t.textMuted }}>
+                  {k === 'today' ? 'Today' : k === 'week' ? 'This week' : 'This month'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {(() => {
+            const pending = appts.filter(a => a.approval_status === 'pending_approval')
+            return pending.length > 0 ? (
+              <View style={[s.pendingBanner, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
+                <Ionicons name="hourglass-outline" size={14} color={t.statusBusy.text} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusBusy.text, flex: 1 }}>
+                  {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting review
+                </Text>
+              </View>
+            ) : null
+          })()}
+
+          {appts.length === 0 ? (
+            <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No appointments for this period.</Text>
+          ) : (
+            appts.map(a => {
+              const sc = statusBadgeColors(t)[a.status as keyof ReturnType<typeof statusBadgeColors>] ?? t.statusNeutral
+              return (
+                <View key={a.id} style={s.apptRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{a.patient_name}</Text>
+                    <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
+                      {a.appointment_date} · {a.start_time} · Dr. {a.doctor_name}
+                    </Text>
+                  </View>
+                  <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: sc.text }}>{a.status.replace(/_/g, ' ')}</Text>
+                  </View>
+                </View>
+              )
+            })
+          )}
+        </Section>
+
+        <Section theme={t} title="Analytics">
+          <View style={s.statGrid}>
+            <StatTile theme={t} label="Total" value={String(stats.total)} />
+            <StatTile theme={t} label="Completed" value={String(stats.completed)} />
+            <StatTile theme={t} label="Cancelled" value={String(stats.cancelled)} />
+            <StatTile theme={t} label="Pending" value={String(stats.pending)} />
+          </View>
+          {(stats.avgWaitMinutes != null || stats.avgConsultMinutes != null) && (
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 4 }}>
+              {stats.avgWaitMinutes != null && (
+                <Text style={{ fontSize: 11, color: t.textMuted, flex: 1 }}>Avg wait: <Text style={{ fontWeight: '700', color: t.textPrimary }}>{stats.avgWaitMinutes}m</Text></Text>
+              )}
+              {stats.avgConsultMinutes != null && (
+                <Text style={{ fontSize: 11, color: t.textMuted, flex: 1 }}>Avg consult: <Text style={{ fontWeight: '700', color: t.textPrimary }}>{stats.avgConsultMinutes}m</Text></Text>
+              )}
+            </View>
+          )}
+
+          {(() => {
+            const specCounts: Record<string, number> = {}
+            appts.forEach(a => { const n = a.specialty_name ?? 'General'; specCounts[n] = (specCounts[n] ?? 0) + 1 })
+            const specBreakdown = Object.entries(specCounts).sort((x, y) => y[1] - x[1]).slice(0, 5)
+              .map(([name, count]) => ({ name, count, pct: appts.length > 0 ? Math.round(count / appts.length * 100) : 0 }))
+            return specBreakdown.length > 0 ? (
+              <View style={{ marginTop: 16 }}>
+                <Text style={[s.label, { color: t.textMuted, marginBottom: 10 }]}>TOP SPECIALTIES</Text>
+                {specBreakdown.map((sp, i) => (
+                  <View key={sp.name} style={{ marginBottom: i < specBreakdown.length - 1 ? 12 : 0 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: t.textPrimary }}>{sp.name}</Text>
+                      <Text style={{ fontSize: 11, color: t.textMuted }}>{sp.count} · {sp.pct}%</Text>
+                    </View>
+                    <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', width: `${sp.pct}%`, backgroundColor: t.accent, borderRadius: 99 }} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null
+          })()}
+
+          {(() => {
+            const virtual = appts.filter(a => a.type === 'virtual').length
+            const inPerson = appts.length - virtual
+            if (appts.length === 0) return null
+            const virtPct = Math.round(virtual / appts.length * 100)
+            return (
+              <View style={{ marginTop: 16 }}>
+                <Text style={[s.label, { color: t.textMuted, marginBottom: 10 }]}>VISIT TYPE</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 12, color: t.textPrimary }}>In-person</Text>
+                  <Text style={{ fontSize: 11, color: t.textMuted }}>{inPerson} · {100 - virtPct}%</Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
+                  <View style={{ height: '100%', width: `${100 - virtPct}%`, backgroundColor: t.accent, borderRadius: 99 }} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 12, color: t.textPrimary }}>Virtual</Text>
+                  <Text style={{ fontSize: 11, color: t.textMuted }}>{virtual} · {virtPct}%</Text>
+                </View>
+                <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden' }}>
+                  <View style={{ height: '100%', width: `${virtPct}%`, backgroundColor: t.statusVirtual.text, borderRadius: 99 }} />
+                </View>
+              </View>
+            )
+          })()}
+        </Section>
       </ScrollView>
 
       {showAssign && (
@@ -376,6 +590,25 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
             )}
           </View>
         </View>
+      )}
+
+      {showAddStaff && (
+        <AddStaffModal
+          theme={t} clinicId={clinicId} hospitalId={clinic?.hospital_id ?? ''}
+          existingSubAdmin={staff.some(m => m.role === 'clinic_admin')}
+          onClose={() => setShowAddStaff(false)}
+          onDone={() => { setShowAddStaff(false); load() }}
+        />
+      )}
+
+      {managingStaff && (
+        <ManageStaffModal
+          theme={t} member={managingStaff}
+          onClose={() => setManagingStaff(null)}
+          onRemove={() => removeStaff(managingStaff)}
+          onSaveProfile={(name, email) => updateStaffProfile(managingStaff.id, name, email)}
+          onResetPassword={pw => resetStaffPassword(managingStaff.id, pw)}
+        />
       )}
     </SafeAreaView>
   )
@@ -536,6 +769,236 @@ function ToggleRow({ theme: t, label, sub, value, onToggle, last }: {
   )
 }
 
+function StaffRow({ theme: t, member, roleLabel, onManage }: {
+  theme: any; member: ClinicStaffMember; roleLabel: string; onManage: () => void
+}) {
+  return (
+    <View style={s.doctorRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{member.full_name}</Text>
+        <Text style={{ fontSize: 11, color: t.textMuted }} numberOfLines={1}>{member.email}</Text>
+      </View>
+      <View style={[s.chip, { borderColor: t.cardBorder, marginRight: 10 }]}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: t.textMuted }}>{roleLabel}</Text>
+      </View>
+      <TouchableOpacity onPress={onManage}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Manage</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+function StatTile({ theme: t, label, value }: { theme: any; label: string; value: string }) {
+  return (
+    <View style={[s.statTile, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
+      <Text style={{ fontSize: 10, fontWeight: '700', color: t.textMuted, letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
+      <Text style={{ fontSize: 20, fontWeight: '800', color: t.textPrimary, marginTop: 4 }}>{value}</Text>
+    </View>
+  )
+}
+
+// Random temp password shown once, selectable so the admin can long-press-copy
+// it without a Clipboard library -- expo-clipboard isn't a dependency of this
+// app (only apps/client has it), and adding one now is a native-module change
+// needing its own prebuild, not something to pull in for one field.
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let p = 'Queue@'
+  for (let i = 0; i < 6; i++) p += chars[Math.floor(Math.random() * chars.length)]
+  return p + '!'
+}
+
+function AddStaffModal({ theme: t, clinicId, hospitalId, existingSubAdmin, onClose, onDone }: {
+  theme: any; clinicId: string; hospitalId: string; existingSubAdmin: boolean
+  onClose: () => void; onDone: () => void
+}) {
+  const [role, setRole] = useState<'front_desk' | 'clinic_admin'>('front_desk')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password] = useState(generateTempPassword)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [created, setCreated] = useState(false)
+
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }
+  }
+
+  async function handleCreate() {
+    if (!name.trim() || !email.trim()) { setError('Name and email are required'); return }
+    setLoading(true); setError('')
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/clinic-staff`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ clinicId, hospitalId, staffName: name, staffEmail: email, tempPassword: password, role }),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(body?.error ?? 'Failed to create account')
+      haptics.success()
+      setCreated(true)
+    } catch (e) {
+      haptics.error()
+      setError(e instanceof Error ? e.message : 'Failed to create account')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const ROLES: { key: 'front_desk' | 'clinic_admin'; label: string; desc: string; disabled: boolean }[] = [
+    { key: 'front_desk',  label: 'Front Desk Officer', desc: 'Manages check-ins & queue',     disabled: false },
+    { key: 'clinic_admin', label: 'Sub-Admin',         desc: 'Full clinic management access', disabled: existingSubAdmin },
+  ]
+
+  if (created) {
+    return (
+      <View style={s.overlay}>
+        <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Text style={[s.sectionTitle, { color: t.textPrimary }]}>Account created</Text>
+          <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 14, lineHeight: 18 }}>
+            Share these credentials with {name} -- this password won't be shown again. Long-press to select and copy.
+          </Text>
+          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, marginBottom: 10 }]}>
+            <Text style={{ fontSize: 11, color: t.textMuted }}>EMAIL</Text>
+            <Text selectable style={{ fontSize: 14, color: t.textPrimary, fontWeight: '600', marginTop: 2 }}>{email}</Text>
+          </View>
+          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, marginBottom: 16 }]}>
+            <Text style={{ fontSize: 11, color: t.textMuted }}>TEMPORARY PASSWORD</Text>
+            <Text selectable style={{ fontSize: 16, color: t.textPrimary, fontWeight: '700', letterSpacing: 1, marginTop: 2 }}>{password}</Text>
+          </View>
+          <TouchableOpacity onPress={onDone} style={[s.saveBtn, { backgroundColor: t.accent }]}>
+            <Text style={s.saveBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
+  return (
+    <View style={s.overlay}>
+      <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={[s.sectionTitle, { color: t.textPrimary, marginBottom: 0 }]}>Add Staff Member</Text>
+          <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+        </View>
+        <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 14 }}>Create a login account for this clinic&apos;s staff.</Text>
+
+        <View style={{ gap: 8, marginBottom: 14 }}>
+          {ROLES.map(r => (
+            <TouchableOpacity key={r.key} onPress={() => !r.disabled && setRole(r.key)} disabled={r.disabled}
+              style={[s.roleOption, { borderColor: role === r.key ? t.accent : t.cardBorder, backgroundColor: role === r.key ? `${t.accent}18` : 'transparent', opacity: r.disabled ? 0.4 : 1 }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: role === r.key ? t.accent : t.textPrimary }}>{r.label}</Text>
+              <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{r.disabled ? 'This clinic already has a sub-admin' : r.desc}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Field theme={t} label="Full name" value={name} onChange={setName} />
+        <Field theme={t} label="Email" value={email} onChange={setEmail} />
+
+        {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+        <TouchableOpacity onPress={handleCreate} disabled={loading}
+          style={[s.saveBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 6 }]}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Create Account</Text>}
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+function ManageStaffModal({ theme: t, member, onClose, onRemove, onSaveProfile, onResetPassword }: {
+  theme: any; member: ClinicStaffMember; onClose: () => void; onRemove: () => void
+  onSaveProfile: (name: string, email: string) => Promise<void>
+  onResetPassword: (password: string) => Promise<void>
+}) {
+  const [tab, setTab] = useState<'edit' | 'password'>('edit')
+  const [name, setName] = useState(member.full_name)
+  const [email, setEmail] = useState(member.email)
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  async function saveProfile() {
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      await onSaveProfile(name, email)
+      setSuccess('Profile updated')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally { setSaving(false) }
+  }
+
+  async function savePassword() {
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      await onResetPassword(password)
+      setSuccess('Password updated')
+      setPassword('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reset password')
+    } finally { setSaving(false) }
+  }
+
+  const roleLabel = member.role === 'clinic_admin' ? 'Sub-Admin' : 'Front Desk'
+
+  return (
+    <View style={s.overlay}>
+      <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <View>
+            <Text style={[s.sectionTitle, { color: t.textPrimary, marginBottom: 4 }]}>{member.full_name}</Text>
+            <View style={[s.chip, { borderColor: t.accent, alignSelf: 'flex-start' }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: t.accent }}>{roleLabel}</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {(['edit', 'password'] as const).map(tb => (
+            <TouchableOpacity key={tb} onPress={() => { setTab(tb); setError(''); setSuccess('') }}
+              style={[s.tab, { borderColor: tab === tb ? t.accent : t.cardBorder, backgroundColor: tab === tb ? `${t.accent}18` : 'transparent' }]}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: tab === tb ? t.accent : t.textMuted }}>
+                {tb === 'edit' ? 'Edit Profile' : 'Reset Password'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {tab === 'edit' ? (
+          <>
+            <Field theme={t} label="Full name" value={name} onChange={setName} />
+            <Field theme={t} label="Email" value={email} onChange={setEmail} />
+            {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+            {success ? <Text style={{ fontSize: 12, color: t.accent, marginBottom: 8 }}>{success}</Text> : null}
+            <TouchableOpacity onPress={saveProfile} disabled={saving}
+              style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent }]}>
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Save Profile</Text>}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Field theme={t} label="New password (min 8 characters)" value={password} onChange={setPassword} />
+            {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+            {success ? <Text style={{ fontSize: 12, color: t.accent, marginBottom: 8 }}>{success}</Text> : null}
+            <TouchableOpacity onPress={savePassword} disabled={saving}
+              style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent }]}>
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Update Password</Text>}
+            </TouchableOpacity>
+          </>
+        )}
+
+        <TouchableOpacity onPress={onRemove} style={{ marginTop: 16, alignItems: 'center' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Remove from clinic</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
   safe:       { flex: 1 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
@@ -556,4 +1019,10 @@ const s = StyleSheet.create({
   smallOutlineBtn: { borderRadius: 10, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
   overlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modal:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 24, paddingBottom: 40 },
+  roleOption: { borderRadius: 12, borderWidth: 1, padding: 12 },
+  statGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statTile:   { flexBasis: '47%', flexGrow: 1, borderRadius: 12, borderWidth: 1, padding: 12 },
+  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 12 },
+  apptRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 8 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
 })
