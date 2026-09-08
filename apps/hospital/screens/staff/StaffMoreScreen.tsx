@@ -50,6 +50,14 @@ export function StaffMoreScreen({ navigation }: Props) {
     ...(isAdmin || isClinicAdmin ? [
       { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
     ] : []),
+    // Mirrors web's dashboard/ambulances/page.tsx role gate (admin/owner/front_desk) --
+    // front_desk had no management menu item at all before this; Ambulances is now the
+    // first one that role sees. Alerts/Coverage/Fleet are reached from inside that
+    // screen (same hub-and-spoke shape as the web page's own button row), not listed
+    // here separately.
+    ...(isAdmin || staffProfile?.role === 'front_desk' ? [
+      { icon: 'medical-outline', label: 'Ambulances', onPress: () => navigation.navigate('AmbulanceRequests') },
+    ] : []),
     ...(isAdmin ? [
       { icon: 'analytics-outline', label: 'Analytics', onPress: () => navigation.navigate('StaffAnalytics') },
       // Only hospitals onboarded with the multi-clinic model have clinics to manage --
