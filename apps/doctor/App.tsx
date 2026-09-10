@@ -29,6 +29,7 @@ import { DoctorAppointmentsScreen } from './screens/specialist/DoctorAppointment
 import { SpecialistProfileScreen }  from './screens/specialist/SpecialistProfileScreen'
 import { PatientConsultScreen }     from './screens/specialist/PatientConsultScreen'
 import { ReferPatientScreen }       from './screens/specialist/ReferPatientScreen'
+import { RequestAmbulanceScreen }   from './screens/specialist/RequestAmbulanceScreen'
 import { DoctorHospitalsScreen }    from './screens/specialist/DoctorHospitalsScreen'
 import { DoctorSettingsScreen }     from './screens/specialist/DoctorSettingsScreen'
 
@@ -116,6 +117,7 @@ function SpecialistStack() {
       <DocStack.Screen name="Settings"        component={DoctorSettingsScreen  as any} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
+      <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
     </DocStack.Navigator>
   )

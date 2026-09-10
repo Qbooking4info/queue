@@ -2,6 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+export async function OPTIONS() {
+  return corsOptions()
+}
+
+/**
+ * GET /api/ambulances/alerts
+ *
+ * Same query as the web dashboard's DispatcherAlertsPage. Alerts are scoped
+ * by the *destination hospital* of the underlying request (dispatcher_alerts
+ * has no notion of which ambulance provider was involved -- a "no unit
+ * available" alert means no provider was involved) -- a hospital-side
+ * concern, read here by the web dashboard only. Ambulance management
+ * (including a hospital-owned fleet's own admin account) lives entirely in
+ * the Ambulance app and has no hospitalId to scope this by at all now, so
+ * ambulance_admin was removed from the allowed roles.
+ */
+export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
+  if (auth instanceof NextResponse) return auth
+  const { caller } = auth
+  if (!caller.hospitalId) return NextResponse.json({ alerts: [] })
+
+  const db = createAdminClient()
+  const { data: rows } = await db
+    .from('dispatcher_alerts')
+    .select(`
+      id, severity, kind, message, created_at, acknowledged_at,
+      request:transport_requests!inner(
+        id, booking_ref, status, triage_level, symptom_description,
+        pickup_address, contact_phone, caller_patient_name, created_at,
+        destination_hospital_id, failure_reason
+      ),
+      ack:users!dispatcher_alerts_acknowledged_by_fkey(full_name)
+    `)
+    .eq('request.destination_hospital_id', caller.hospitalId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  return NextResponse.json({ alerts: rows ?? [] })
+}
 
 /**
  * PATCH /api/ambulances/alerts   { alertId }
@@ -18,6 +66,12 @@ import { Errors } from '@/lib/api-error'
  * and judged it handled" stop being indistinguishable after the fact.
  */
 export async function PATCH(req: NextRequest) {
+  const res = await handlePATCH(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth

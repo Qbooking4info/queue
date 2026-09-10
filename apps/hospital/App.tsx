@@ -36,6 +36,7 @@ import { HospitalClinicsScreen }       from './screens/staff/HospitalClinicsScre
 import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetailScreen'
 import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
+import { RequestAmbulanceScreen }      from './screens/staff/RequestAmbulanceScreen'
 
 const AuthStack   = createNativeStackNavigator()
 const StaffTab    = createBottomTabNavigator()
@@ -90,6 +91,7 @@ function StaffStack() {
       <StaffStackN.Screen name="HospitalClinicDetail"  component={HospitalClinicDetailScreen as any} />
       <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
       <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
+      <StaffStackN.Screen name="RequestAmbulance"      component={RequestAmbulanceScreen as any} />
       <StaffStackN.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </StaffStackN.Navigator>
   )

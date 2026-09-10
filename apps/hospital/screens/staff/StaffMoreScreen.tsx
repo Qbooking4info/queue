@@ -43,6 +43,10 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    // Front desk, clinic admins, and hospital admins can all arrange transport
+    // for a patient -- doctors get the same action from PatientConsultScreen
+    // instead, mid-consult, where it's actually needed.
+    { icon: 'medkit-outline', label: 'Request Ambulance', onPress: () => navigation.navigate('RequestAmbulance') },
     // Staff Management also holds doctor-linking (see StaffManagementScreen's
     // own role check for what a sub-admin can and can't do once inside it) --
     // a clinic's own sub-admin needs to reach it to add a doctor to their

@@ -21,7 +21,9 @@ export type AuthSurface = 'patient' | 'hospital' | 'doctor' | 'crew'
 const WRONG_APP: Record<AuthSurface, string> = {
   doctor:   'This is a doctor account. Please sign in from the Queue Doctor app.',
   hospital: 'This is a hospital staff account. Please sign in from the Queue Hospital app.',
-  crew:     'This is an ambulance crew account. Please sign in from the Queue Ambulance app.',
+  // Covers both today's crew accounts and an independent operator's admin/owner
+  // account -- both belong to Queue Ambulance, the one app that serves this surface.
+  crew:     'This is an ambulance account. Please sign in from the Queue Ambulance app.',
   patient:  'This is a patient account. Please sign in from the Queue app.',
 }
 
@@ -30,6 +32,12 @@ const WRONG_APP: Record<AuthSurface, string> = {
 // plain patient, since neither has their hospital_admins/doctors row yet.
 export const REGISTERED_VIA_HOSPITAL = 'hospital_onboarding'
 export const REGISTERED_VIA_DOCTOR   = 'doctor_signup'
+// Same idea for an independent (private or government) ambulance operator
+// self-registering through the Ambulance app -- they have no
+// ambulance_provider_admins row until POST /api/ambulances/register runs,
+// which would otherwise drop them on Queue Ambulance's "not ambulance crew"
+// screen the instant they finish signing up.
+export const REGISTERED_VIA_AMBULANCE_PROVIDER = 'ambulance_provider_signup'
 
 export interface LinkedHospital {
   doctorId:     string
@@ -64,12 +72,29 @@ export interface CrewProfile {
   crewTier:     string
 }
 
+export interface ProviderAdminProfile {
+  providerId:   string
+  role:         'owner' | 'admin'
+  providerName: string
+  providerType: 'hospital_fleet' | 'third_party'
+  // Set only when providerType is 'hospital_fleet' -- which hospital this
+  // ambulance service is part of. Independent and hospital-owned providers
+  // are managed identically otherwise; this is the one thing that still
+  // differs (e.g. the private-fleet setting only means anything here).
+  hospitalId:   string | null
+}
+
 interface AuthState {
   session:       Session       | null
   user:          User          | null
   doctorProfile: DoctorProfile | null
   staffProfile:  StaffProfile  | null
   crewProfile:   CrewProfile   | null
+  // An independent ambulance operator's admin/owner identity -- distinct from
+  // staffProfile (a hospital's own admin managing a hospital_fleet provider
+  // keeps resolving as staffProfile.role='hospital_admin'; this is only set
+  // for someone with no hospital at all, see get_my_ambulance_admin_profile).
+  providerAdminProfile: ProviderAdminProfile | null
   loading:       boolean
   staffMode:     boolean
   setStaffMode:  (v: boolean) => void
@@ -89,6 +114,10 @@ interface AuthState {
   // the instant they finish signing up.
   pendingDoctorOnboarding:      boolean
   setPendingDoctorOnboarding:   (v: boolean) => void
+  // Same idea again for an independent ambulance operator: they have no
+  // ambulance_provider_admins row until POST /api/ambulances/register runs.
+  pendingAmbulanceProviderOnboarding:    boolean
+  setPendingAmbulanceProviderOnboarding: (v: boolean) => void
   signIn:        (email: string, password: string, surface: AuthSurface) => Promise<string | null>
   signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string, registeredVia?: string) => Promise<string | null>
   signOut:       () => Promise<void>
@@ -110,10 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
   const [staffProfile,  setStaffProfile]  = useState<StaffProfile  | null>(null)
   const [crewProfile,   setCrewProfile]   = useState<CrewProfile   | null>(null)
+  const [providerAdminProfile, setProviderAdminProfile] = useState<ProviderAdminProfile | null>(null)
   const [loading,       setLoading]       = useState(true)
   const [staffMode,     setStaffMode]     = useState(false)
   const [pendingHospitalOnboarding, setPendingHospitalOnboarding] = useState(false)
   const [pendingDoctorOnboarding,   setPendingDoctorOnboarding]   = useState(false)
+  const [pendingAmbulanceProviderOnboarding, setPendingAmbulanceProviderOnboarding] = useState(false)
   const [switchedInto,  setSwitchedInto]  = useState<{ fullName: string } | null>(null)
 
   const initialLoadDone = useRef(false)
@@ -224,11 +255,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
-  // Return value (isDoctor / staffRole / isCrew) is used by signIn() to reject an
-  // account logging in through the wrong surface — resolved synchronously off this
-  // function's result rather than off React state, since the state setters above
-  // haven't necessarily flushed by the time signIn's caller needs an answer.
-  async function fetchProfile(authId: string): Promise<{ isDoctor: boolean; staffRole: StaffProfile['role'] | null; isCrew: boolean }> {
+  async function fetchProviderAdminProfile(seq: number): Promise<boolean> {
+    const current = () => seq === profileSeq.current
+    // Same SECURITY DEFINER pattern as fetchCrewProfile -- ambulance_provider_admins
+    // has no self-read RLS policy, so this must go through an RPC, not a direct query.
+    const { data, error } = await supabase.rpc('get_my_ambulance_admin_profile')
+
+    if (error || !data || data.length === 0) {
+      if (current()) setProviderAdminProfile(null)
+      return false
+    }
+
+    const row = data[0]
+    if (!current()) return true
+    setProviderAdminProfile({
+      providerId:   row.provider_id,
+      role:         row.role,
+      providerName: row.provider_name,
+      providerType: row.provider_type,
+      hospitalId:   row.hospital_id ?? null,
+    })
+    return true
+  }
+
+  // Return value (isDoctor / staffRole / isCrew / isProviderAdmin) is used by
+  // signIn() to reject an account logging in through the wrong surface —
+  // resolved synchronously off this function's result rather than off React
+  // state, since the state setters above haven't necessarily flushed by the
+  // time signIn's caller needs an answer.
+  async function fetchProfile(authId: string): Promise<{ isDoctor: boolean; staffRole: StaffProfile['role'] | null; isCrew: boolean; isProviderAdmin: boolean }> {
     const seq = ++profileSeq.current
     const current = () => seq === profileSeq.current
 
@@ -240,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('auth_id', authId)
       .maybeSingle()
 
-    if (!current()) return { isDoctor: false, staffRole: null, isCrew: false }
+    if (!current()) return { isDoctor: false, staffRole: null, isCrew: false, isProviderAdmin: false }
     setUser(data ?? null)
 
     // Always check doctor first — doctor accounts may not have a users row
@@ -249,15 +304,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const staffRole = await fetchStaffProfile(data?.full_name ?? '', seq)
       if (!staffRole) {
         const isCrew = await fetchCrewProfile(seq)
-        // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
-        if (isCrew && current()) setStaffMode(true)
-        return { isDoctor: false, staffRole: null, isCrew }
+        if (isCrew) {
+          if (current()) setProviderAdminProfile(null)
+          // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
+          if (current()) setStaffMode(true)
+          return { isDoctor: false, staffRole: null, isCrew: true, isProviderAdmin: false }
+        }
+        // Independent ambulance operator admin/owner -- checked last, since it's
+        // the narrowest identity: no hospital, no doctors row, no crew row, just
+        // an ambulance_provider_admins row from self-registration.
+        const isProviderAdmin = await fetchProviderAdminProfile(seq)
+        if (isProviderAdmin && current()) setStaffMode(true)
+        return { isDoctor: false, staffRole: null, isCrew: false, isProviderAdmin }
       } else {
         if (current()) {
           setCrewProfile(null)
+          setProviderAdminProfile(null)
           setStaffMode(true)
         }
-        return { isDoctor: false, staffRole, isCrew: false }
+        return { isDoctor: false, staffRole, isCrew: false, isProviderAdmin: false }
       }
     } else {
       if (current()) {
@@ -266,9 +331,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // left over from a previously signed-in staff account would survive.
         setStaffProfile(null)
         setCrewProfile(null)
+        setProviderAdminProfile(null)
         setStaffMode(true)
       }
-      return { isDoctor: true, staffRole: null, isCrew: false }
+      return { isDoctor: true, staffRole: null, isCrew: false, isProviderAdmin: false }
     }
   }
 
@@ -301,7 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'INITIAL_SESSION' && initialLoadDone.current) return
       setSession(session)
       if (session) fetchProfile(session.user.id)
-      else { setUser(null); setDoctorProfile(null); setStaffProfile(null); setCrewProfile(null) }
+      else { setUser(null); setDoctorProfile(null); setStaffProfile(null); setCrewProfile(null); setProviderAdminProfile(null) }
     })
 
     return () => subscription.unsubscribe()
@@ -320,8 +386,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const registeredVia = (data.user.user_metadata as Record<string, unknown> | undefined)?.registered_via
 
     // Crew arrive either as a dedicated crew row or as a hospital-fleet staff row whose
-    // role is 'ambulance_crew'; either way they belong in Queue Ambulance, not Hospital.
-    const isCrew  = profile.isCrew || profile.staffRole === 'ambulance_crew'
+    // role is 'ambulance_crew'; an independent OR hospital-owned provider's admin/owner
+    // is a third path into the same app -- both register and are managed identically
+    // now, so a hospital_admin account itself has no business here at all (ambulance
+    // management lives in its own account, never the hospital login).
+    const isCrew  = profile.isCrew || profile.staffRole === 'ambulance_crew' || profile.isProviderAdmin
     const isStaff = !!profile.staffRole && profile.staffRole !== 'ambulance_crew'
     const kind: AuthSurface = profile.isDoctor ? 'doctor' : isCrew ? 'crew' : isStaff ? 'hospital' : 'patient'
 
@@ -333,10 +402,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // patient app they'd otherwise still be entitled to.
     const resumingHospital = kind === 'patient' && registeredVia === REGISTERED_VIA_HOSPITAL
     const resumingDoctor   = kind === 'patient' && registeredVia === REGISTERED_VIA_DOCTOR
+    const resumingAmbulanceProvider = kind === 'patient' && registeredVia === REGISTERED_VIA_AMBULANCE_PROVIDER
 
     const allowed = kind === surface
       || (surface === 'hospital' && resumingHospital)
       || (surface === 'doctor'   && resumingDoctor)
+      || (surface === 'crew'     && resumingAmbulanceProvider)
 
     if (!allowed) {
       await signOut()
@@ -344,9 +415,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Resume the relevant onboarding rather than dropping them on a dashboard that has
-    // no hospital/doctor row behind it yet.
-    if (surface === 'hospital' && resumingHospital) setPendingHospitalOnboarding(true)
-    if (surface === 'doctor'   && resumingDoctor)   setPendingDoctorOnboarding(true)
+    // no hospital/doctor/provider row behind it yet.
+    if (surface === 'hospital' && resumingHospital)           setPendingHospitalOnboarding(true)
+    if (surface === 'doctor'   && resumingDoctor)             setPendingDoctorOnboarding(true)
+    if (surface === 'crew'     && resumingAmbulanceProvider)  setPendingAmbulanceProviderOnboarding(true)
     return null
   }
 
@@ -411,9 +483,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStaffMode(false)
     setPendingHospitalOnboarding(false)
     setPendingDoctorOnboarding(false)
+    setPendingAmbulanceProviderOnboarding(false)
     setDoctorProfile(null)
     setStaffProfile(null)
     setCrewProfile(null)
+    setProviderAdminProfile(null)
     setSwitchedInto(null)
     // An explicit, final logout should never leave an orphaned stashed session
     // behind for someone to accidentally switch back into later.
@@ -472,11 +546,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, doctorProfile, staffProfile, crewProfile, loading,
+      session, user, doctorProfile, staffProfile, crewProfile, providerAdminProfile, loading,
       staffMode, setStaffMode,
       switchHospital,
       pendingHospitalOnboarding, setPendingHospitalOnboarding,
       pendingDoctorOnboarding,   setPendingDoctorOnboarding,
+      pendingAmbulanceProviderOnboarding, setPendingAmbulanceProviderOnboarding,
       signIn, signUp, signOut, refreshProfile,
       switchedInto, switchToDependent, switchBackToCaretaker,
     }}>
