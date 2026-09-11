@@ -368,5 +368,5 @@ pg_cron jobs.
 
 ---
 
-*Queue · Product Requirements Document · v2.1 · August 2026*  
+*Queue · Product Requirements Document · v2.2 · September 2026*  
 *Confidential — Internal Use Only*
