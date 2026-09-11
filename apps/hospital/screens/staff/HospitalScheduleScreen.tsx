@@ -62,7 +62,13 @@ export function HospitalScheduleScreen({ navigation }: Props) {
       supabase.rpc('get_hospital_staff_roster', { p_hospital_id: hospitalId }),
     ])
     setClinicModel((hosp as any)?.clinic_model ?? null)
-    setDoctors((roster?.doctors ?? []).map((d: any) => ({ id: d.id, full_name: d.full_name })))
+    // Roster now returns deactivated doctors too (so StaffManagementScreen can
+    // offer an Activate button); a scheduling picker only wants active ones.
+    // `!== false` treats a missing flag as active, for the window between this
+    // app shipping and the roster migration landing.
+    setDoctors((roster?.doctors ?? [])
+      .filter((d: any) => d.is_active !== false)
+      .map((d: any) => ({ id: d.id, full_name: d.full_name })))
     if ((hosp as any)?.clinic_model === 'multi') {
       try {
         const headers = await authHeaders()
