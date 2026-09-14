@@ -33,6 +33,7 @@ interface Doctor {
   specialty_name: string | null
   display_status: DoctorDisplayStatus
   email: string | null
+  is_active: boolean
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -94,6 +95,7 @@ export function StaffManagementScreen({ navigation }: Props) {
       specialty_name: d.specialty_name,
       display_status: (d.display_status ?? 'inactive') as DoctorDisplayStatus,
       email: d.email,
+      is_active: d.is_active !== false,
     })))
 
     setLoading(false)
@@ -117,6 +119,42 @@ export function StaffManagementScreen({ navigation }: Props) {
 
   function initials(name: string) {
     return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  }
+
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  // The one lever staff have over a doctor's account at this hospital --
+  // activate/deactivate their link. A deactivated doctor stops appearing in
+  // bookings and queues here until reactivated; everything else about their
+  // profile is theirs alone to edit (independent, self-registered accounts).
+  // Mirrors /dashboard/doctors on web. The API (PATCH /api/doctors/[id])
+  // re-checks the caller's role and, for a clinic_admin, that the doctor is
+  // in their own clinic -- this is just the UI.
+  async function toggleDoctorActive(doc: Doctor) {
+    const run = async () => {
+      setTogglingId(doc.id)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(`${API_URL}/api/doctors/${doc.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ is_active: !doc.is_active }),
+        })
+        if (!res.ok) { const b = await res.json().catch(() => null); Alert.alert('Could not update doctor', b?.error ?? 'Try again.'); return }
+        haptics.success()
+        load(true)
+      } catch {
+        Alert.alert('Could not update doctor', 'Check your connection and try again.')
+      } finally { setTogglingId(null) }
+    }
+    if (doc.is_active) {
+      Alert.alert(`Deactivate ${doc.full_name}?`, "They'll stop appearing in bookings and queues at this hospital until reactivated.", [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Deactivate', style: 'destructive', onPress: run },
+      ])
+    } else {
+      run()
+    }
   }
 
   return (
@@ -207,20 +245,35 @@ export function StaffManagementScreen({ navigation }: Props) {
             ) : doctors.map(doc => {
               const dc = doctorStatusColors(t)
               const avail = dc[doc.display_status]
+              const busy = togglingId === doc.id
               return (
-                <View key={doc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <View style={[s.avatar, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
-                    <Text style={[s.avatarText, { color: t.info }]}>{initials(doc.full_name)}</Text>
+                <View key={doc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, flexDirection: 'column', alignItems: 'stretch', gap: 12, opacity: doc.is_active ? 1 : 0.55 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={[s.avatar, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
+                      <Text style={[s.avatarText, { color: t.info }]}>{initials(doc.full_name)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.memberName, { color: t.textPrimary }]}>{[doc.title, doc.full_name].filter(Boolean).join(' ')}</Text>
+                      {doc.specialty_name && <Text style={[s.memberMeta, { color: t.textMuted }]}>{doc.specialty_name}</Text>}
+                      {doc.email && <Text style={[s.memberEmail, { color: t.textMuted }]}>{doc.email}</Text>}
+                    </View>
+                    <View style={[s.availBadge, { backgroundColor: avail.bg }]}>
+                      <View style={[s.availDot, { backgroundColor: avail.text }]} />
+                      <Text style={[s.availText, { color: avail.text }]}>{DOCTOR_STATUS_LABEL[doc.display_status]}</Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.memberName, { color: t.textPrimary }]}>{[doc.title, doc.full_name].filter(Boolean).join(' ')}</Text>
-                    {doc.specialty_name && <Text style={[s.memberMeta, { color: t.textMuted }]}>{doc.specialty_name}</Text>}
-                    {doc.email && <Text style={[s.memberEmail, { color: t.textMuted }]}>{doc.email}</Text>}
-                  </View>
-                  <View style={[s.availBadge, { backgroundColor: avail.bg }]}>
-                    <View style={[s.availDot, { backgroundColor: avail.text }]} />
-                    <Text style={[s.availText, { color: avail.text }]}>{DOCTOR_STATUS_LABEL[doc.display_status]}</Text>
-                  </View>
+                  {canAddDoctor && (
+                    <TouchableOpacity
+                      onPress={() => toggleDoctorActive(doc)}
+                      disabled={busy}
+                      style={[s.docToggleBtn, { borderColor: doc.is_active ? t.cardBorder : t.accent, backgroundColor: doc.is_active ? 'transparent' : `${t.accent}18` }]}>
+                      {busy
+                        ? <ActivityIndicator size="small" color={t.textMuted} />
+                        : <Text style={{ fontSize: 12, fontWeight: '700', color: doc.is_active ? t.textMuted : t.accent }}>
+                            {doc.is_active ? 'Deactivate' : 'Activate'}
+                          </Text>}
+                    </TouchableOpacity>
+                  )}
                 </View>
               )
             })
@@ -494,6 +547,7 @@ const s = StyleSheet.create({
   roleBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   roleText:   { fontSize: 10, fontWeight: '700' },
   availBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99 },
+  docToggleBtn: { borderWidth: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
   availDot:   { width: 6, height: 6, borderRadius: 3 },
   availText:  { fontSize: 10, fontWeight: '700' },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 8 },

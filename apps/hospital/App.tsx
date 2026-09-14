@@ -37,6 +37,11 @@ import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetai
 import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
 import { RequestAmbulanceScreen }      from './screens/staff/RequestAmbulanceScreen'
+import { AmbulanceRequestsScreen }     from './screens/staff/AmbulanceRequestsScreen'
+import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScreen'
+import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
+import { AmbulanceFleetScreen }        from './screens/staff/AmbulanceFleetScreen'
+import { AmbulanceUnitScheduleScreen } from './screens/staff/AmbulanceUnitScheduleScreen'
 
 const AuthStack   = createNativeStackNavigator()
 const StaffTab    = createBottomTabNavigator()
@@ -92,6 +97,11 @@ function StaffStack() {
       <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
       <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
       <StaffStackN.Screen name="RequestAmbulance"      component={RequestAmbulanceScreen as any} />
+      <StaffStackN.Screen name="AmbulanceRequests"     component={AmbulanceRequestsScreen as any} />
+      <StaffStackN.Screen name="AmbulanceAlerts"       component={AmbulanceAlertsScreen as any} />
+      <StaffStackN.Screen name="AmbulanceCoverage"     component={AmbulanceCoverageScreen as any} />
+      <StaffStackN.Screen name="AmbulanceFleet"        component={AmbulanceFleetScreen as any} />
+      <StaffStackN.Screen name="AmbulanceUnitSchedule" component={AmbulanceUnitScheduleScreen as any} />
       <StaffStackN.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </StaffStackN.Navigator>
   )
