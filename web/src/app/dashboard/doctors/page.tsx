@@ -4,15 +4,10 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Star, Check, X } from 'lucide-react'
-import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
+import type { AdminDoctor } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
 import { LinkDoctorModal } from '@/components/dashboard/LinkDoctorModal'
-
-const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
-  on_duty:  { label: 'On Duty',   dot: '#22c55e', bg: 'rgba(34,197,94,0.12)',  text: '#16a34a' },
-  on_break: { label: 'On Break',  dot: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: '#d97706' },
-  off_duty: { label: 'Off Duty',  dot: '#94a3b8', bg: 'rgba(148,163,184,0.12)',text: '#64748b' },
-}
+import { DOCTOR_STATUS_META } from '@/lib/doctor-status'
 
 export default function DoctorsPage() {
   const { theme: C } = useTheme()
@@ -89,7 +84,7 @@ export default function DoctorsPage() {
       ) : (
         <div className="doctors-grid">
           {doctors.map(d => {
-            const avail = AVAIL[d.availability_status] ?? AVAIL.on_duty
+            const avail = DOCTOR_STATUS_META[d.display_status ?? 'inactive']
             return (
               <div key={d.id} style={{ background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 16, padding: 20, transition: 'background .3s' }}>

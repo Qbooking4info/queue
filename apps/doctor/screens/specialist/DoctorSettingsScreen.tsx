@@ -20,6 +20,7 @@ const DEFAULTS: DoctorProfileSettings = {
   title: null, specialty_id: null, level: null, bio: null, qualification: null, years_experience: null,
   virtual_fee: null, home_visit_fee: null,
   accepts_direct_virtual: false, accepts_direct_home_visit: false, show_phone_to_patients: false,
+  is_paused: false,
 }
 
 export function DoctorSettingsScreen({ navigation }: Props) {
@@ -51,6 +52,21 @@ export function DoctorSettingsScreen({ navigation }: Props) {
   function set<K extends keyof DoctorProfileSettings>(key: K, value: DoctorProfileSettings[K]) {
     setForm(f => ({ ...f, [key]: value }))
     setSaved(false)
+  }
+
+  const [togglingPause, setTogglingPause] = useState(false)
+
+  // Saves immediately rather than waiting on the form's own Save button --
+  // a doctor pausing their account to go on leave right now needs it to take
+  // effect right now, not whenever they next remember to tap Save.
+  async function togglePause(next: boolean) {
+    const prev = form.is_paused
+    set('is_paused', next)
+    setTogglingPause(true)
+    const err = await updateDoctorProfileSettings({ is_paused: next })
+    setTogglingPause(false)
+    if (err) { haptics.error(); set('is_paused', prev); return }
+    haptics.success()
   }
 
   async function save() {
@@ -112,19 +128,43 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           Your independent, hospital-agnostic profile — what patients see when booking you directly.
         </Text>
 
+        <View style={{
+          borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16,
+          backgroundColor: form.is_paused ? t.dangerSubtle : t.cardBg,
+          borderColor: form.is_paused ? t.danger : t.cardBorder,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: form.is_paused ? t.danger : t.textPrimary }}>
+                {form.is_paused ? 'Bookings paused' : 'Pause direct bookings'}
+              </Text>
+              <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2, lineHeight: 16 }}>
+                {form.is_paused
+                  ? 'Patients cannot book you for a virtual consult or home visit. Your virtual/home-visit preferences below are kept, not changed.'
+                  : 'Going on leave? Turn this on to stop new virtual/home-visit bookings without touching your settings below.'}
+              </Text>
+            </View>
+            {togglingPause
+              ? <ActivityIndicator color={t.danger} />
+              : <Switch value={form.is_paused} onValueChange={togglePause} trackColor={{ true: t.danger }} />}
+          </View>
+        </View>
+
         <Section theme={t} title="Direct bookings">
-          <ToggleRow theme={t} label="Accept virtual consults" sub="Patients can book a video call with you directly"
-            value={form.accepts_direct_virtual} onChange={v => set('accepts_direct_virtual', v)} />
-          {form.accepts_direct_virtual && (
-            <FeeRow theme={t} label="Virtual consultation fee (₦)" value={form.virtual_fee}
-              onChange={v => set('virtual_fee', v)} />
-          )}
-          <ToggleRow theme={t} label="Accept home visits" sub="Patients can request you visit their home"
-            value={form.accepts_direct_home_visit} onChange={v => set('accepts_direct_home_visit', v)} />
-          {form.accepts_direct_home_visit && (
-            <FeeRow theme={t} label="Home visit fee (₦)" value={form.home_visit_fee}
-              onChange={v => set('home_visit_fee', v)} />
-          )}
+          <View style={{ opacity: form.is_paused ? 0.5 : 1 }} pointerEvents={form.is_paused ? 'none' : 'auto'}>
+            <ToggleRow theme={t} label="Accept virtual consults" sub="Patients can book a video call with you directly"
+              value={form.accepts_direct_virtual} onChange={v => set('accepts_direct_virtual', v)} />
+            {form.accepts_direct_virtual && (
+              <FeeRow theme={t} label="Virtual consultation fee (₦)" value={form.virtual_fee}
+                onChange={v => set('virtual_fee', v)} />
+            )}
+            <ToggleRow theme={t} label="Accept home visits" sub="Patients can request you visit their home"
+              value={form.accepts_direct_home_visit} onChange={v => set('accepts_direct_home_visit', v)} />
+            {form.accepts_direct_home_visit && (
+              <FeeRow theme={t} label="Home visit fee (₦)" value={form.home_visit_fee}
+                onChange={v => set('home_visit_fee', v)} />
+            )}
+          </View>
           <ToggleRow theme={t} label="Show my phone number to patients" sub="Otherwise only visible after they've booked you"
             value={form.show_phone_to_patients} onChange={v => set('show_phone_to_patients', v)} last />
         </Section>
