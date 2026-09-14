@@ -18,7 +18,7 @@ interface Props { navigation: any }
 
 export function StaffMoreScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { staffProfile, setStaffMode, signOut } = useAuth()
+  const { staffProfile, signOut } = useAuth()
   const [hospitalName,   setHospitalName]   = useState<string | null>(null)
   const [clinicModel,    setClinicModel]    = useState<string | null>(null)
   const [signingOut,     setSigningOut]      = useState(false)
@@ -105,18 +105,8 @@ export function StaffMoreScreen({ navigation }: Props) {
           </>
         )}
 
-        {/* Switch to patient mode */}
         <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 16 }]}>ACCOUNT</Text>
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
-            style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
-            <View style={[s.menuIcon, { backgroundColor: t.infoSubtle }]}>
-              <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
-            </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
-          </TouchableOpacity>
-
           {/* Theme toggle */}
           <View style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>

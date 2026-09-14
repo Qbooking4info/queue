@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { MOCK_LOCATION, mockCoord } from '@queue/shared/lib/mock-location'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
 import { requestAmbulanceForPatient, triageForSymptom } from '@queue/shared/lib/ambulance-api'
@@ -43,6 +44,11 @@ export function RequestAmbulanceScreen({ navigation, route }: Props) {
   async function useCurrentLocation() {
     setLocating(true); setError('')
     try {
+      if (MOCK_LOCATION) {
+        const c = mockCoord(patientId)
+        setCoords({ lat: c.latitude, lng: c.longitude })
+        return
+      }
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
       if (status !== 'granted') { setError('Location permission denied.'); return }
       const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })

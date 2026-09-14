@@ -61,12 +61,18 @@ function membersOf(shift: ShiftRow): Array<{ userId: string | null; authId: stri
 }
 
 async function currentShifts(db: Db, ambulanceIds: string[]): Promise<ShiftRow[]> {
-  const now = new Date().toISOString()
+  // 'now()' is evaluated by Postgres, not this process. A shift is created with
+  // starts_at = now() on the DB server; judging the window against a local
+  // `new Date()` meant an API host whose clock ran a few seconds behind saw a
+  // just-started shift as "not started yet" and rejected the crew's first
+  // location pings with "not on the crew for this unit" (a unit then never
+  // became dispatchable). Same clock-skew failure 20260828000004 fixed for
+  // find_candidate_units by keeping the time comparison in SQL.
   const { data } = await db.from('ambulance_shifts')
     .select(CREW_SELECT)
     .in('ambulance_id', ambulanceIds)
-    .lte('starts_at', now)
-    .gte('ends_at', now)
+    .lte('starts_at', 'now()')
+    .gte('ends_at', 'now()')
   return (data ?? []) as unknown as ShiftRow[]
 }
 

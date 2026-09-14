@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { MOCK_LOCATION, mockCoord } from '@queue/shared/lib/mock-location'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
@@ -80,6 +81,11 @@ export function RequestAmbulanceScreen({ navigation }: Props) {
   async function useCurrentLocation() {
     setLocating(true); setError('')
     try {
+      if (MOCK_LOCATION) {
+        const c = mockCoord(foundPatient?.id ?? patientName.trim() ?? 'walkin')
+        setCoords({ lat: c.latitude, lng: c.longitude })
+        return
+      }
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
       if (status !== 'granted') { setError('Location permission denied.'); return }
       const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })

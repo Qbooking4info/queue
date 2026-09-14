@@ -14,6 +14,7 @@ import {
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
+import { MOCK_LOCATION, mockCoord, mockLivePoint } from '@queue/shared/lib/mock-location'
 import { JobPatientMap } from '@queue/shared/components/emergency/JobPatientMap'
 
 // Foreground pings. These are now a supplement, not the only source: while on
@@ -151,6 +152,11 @@ export function CrewHomeScreen() {
   // a job. Now the ping follows *duty*, so an on-duty idle rig is visible to
   // dispatch — which is the entire point of being on duty.
   const pingUnitId = activeJob?.assigned_unit_id ?? onDutyUnit?.ambulance_id ?? null
+  // Home base of whichever unit we're pinging for -- MOCK_LOCATION reports a
+  // point orbiting it instead of a real GPS fix.
+  const pingUnit = units.find(u => u.ambulance_id === pingUnitId) ?? null
+  const pingHomeLat = pingUnit?.home_lat
+  const pingHomeLng = pingUnit?.home_lng
 
   useEffect(() => {
     if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null }
@@ -161,23 +167,34 @@ export function CrewHomeScreen() {
     async function pingOnce() {
       if (stopped || !pingUnitId) return
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-        if (status !== 'granted') {
-          // Without location the unit is on duty but undispatchable. Surfaced in
-          // the duty card rather than failing silently.
-          setLocationDenied(true)
-          return
+        let lat: number, lng: number, heading: number | undefined, speedKmh: number | undefined, accuracyM: number | undefined, recordedAt: string
+        if (MOCK_LOCATION) {
+          const base = (pingHomeLat != null && pingHomeLng != null)
+            ? { latitude: pingHomeLat, longitude: pingHomeLng }
+            : mockCoord(pingUnitId)
+          const p = mockLivePoint(base)
+          lat = p.latitude; lng = p.longitude
+          heading = undefined; speedKmh = undefined; accuracyM = 8
+          recordedAt = new Date().toISOString()
+          setLocationDenied(false)
+        } else {
+          const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+          if (status !== 'granted') {
+            // Without location the unit is on duty but undispatchable. Surfaced in
+            // the duty card rather than failing silently.
+            setLocationDenied(true)
+            return
+          }
+          setLocationDenied(false)
+          const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+          lat = pos.coords.latitude
+          lng = pos.coords.longitude
+          heading = pos.coords.heading ?? undefined
+          speedKmh = pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined
+          accuracyM = pos.coords.accuracy ?? undefined
+          recordedAt = new Date(pos.timestamp).toISOString()
         }
-        setLocationDenied(false)
-        const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-        await sendLocationPing(pingUnitId, [{
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          heading: pos.coords.heading ?? undefined,
-          speedKmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined,
-          accuracyM: pos.coords.accuracy ?? undefined,
-          recordedAt: new Date(pos.timestamp).toISOString(),
-        }])
+        await sendLocationPing(pingUnitId, [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }])
       } catch (err) {
         console.warn('[crew] location ping failed', err)
       }
@@ -186,7 +203,7 @@ export function CrewHomeScreen() {
     pingOnce()
     pingTimer.current = setInterval(pingOnce, PING_INTERVAL_MS)
     return () => { stopped = true; if (pingTimer.current) clearInterval(pingTimer.current) }
-  }, [pingUnitId])
+  }, [pingUnitId, pingHomeLat, pingHomeLng])
 
   async function handleRespond(offerId: string, action: 'accept' | 'decline') {
     setRespondingId(offerId)

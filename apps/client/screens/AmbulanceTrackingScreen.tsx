@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as ExpoLocation from 'expo-location'
+import { MOCK_LOCATION, mockCoord, mockLivePoint } from '@queue/shared/lib/mock-location'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -122,6 +123,22 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
     let cancelled = false
     let sub: { remove: () => void } | null = null
+
+    // Testing switch: share a mock point orbiting a stable per-request spot
+    // instead of watching real GPS. Same 10s cadence as the real watcher.
+    if (MOCK_LOCATION) {
+      const base = mockCoord(requestId)
+      const tick = () => {
+        if (cancelled) return
+        const p = mockLivePoint(base)
+        sharePatientLocation(requestId, {
+          lat: p.latitude, lng: p.longitude, accuracyM: 8, recordedAt: new Date().toISOString(),
+        }).catch(() => {})
+      }
+      tick()
+      const iv = setInterval(tick, 10_000)
+      return () => { cancelled = true; clearInterval(iv) }
+    }
 
     ;(async () => {
       const { status: perm } = await ExpoLocation.getForegroundPermissionsAsync()
