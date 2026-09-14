@@ -488,6 +488,33 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </Section>
           )}
 
+          {/* Consultation Plan — the one place a virtual visit gets structured
+              documentation, shared by the doctor after the call. Never shown
+              for in-person/home-visit visits (those keep the plain doctor's-
+              notes/diagnosis fields only, surfaced elsewhere). */}
+          {isVirtual && appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).treatment_plan) && (
+            <Section title="Consultation Plan">
+              {(raw as any).diagnosis && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Diagnosis</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).diagnosis}</Text>
+                </View>
+              )}
+              {(raw as any).investigations && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Investigations</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).investigations}</Text>
+                </View>
+              )}
+              {(raw as any).treatment_plan && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Treatment</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).treatment_plan}</Text>
+                </View>
+              )}
+            </Section>
+          )}
+
           {/* Doctor info — only show if a doctor was assigned */}
           {appt.doctor ? (
             <Section title="Your doctor">
@@ -733,6 +760,9 @@ const st = StyleSheet.create({
   infoRow:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
   infoLabel:          { fontSize: 12, flexShrink: 0 },
   infoValue:          { fontSize: 12, fontWeight: '600', textAlign: 'right', flex: 1 },
+  planBlock:          { padding: 12, paddingHorizontal: 14, borderTopWidth: 1 },
+  planLabel:          { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  planValue:          { fontSize: 13, lineHeight: 19 },
   // No-doctor placeholder
   noDoctorRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
   noDoctorTitle:      { fontSize: 13, fontWeight: '700', marginBottom: 4 },

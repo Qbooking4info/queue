@@ -11,6 +11,8 @@ import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
 
 interface ApptRow {
   id:               string
@@ -60,6 +62,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [appts,       setAppts]       = useState<ApptRow[]>([])
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const load = useCallback(async (silent = false) => {
@@ -180,7 +183,8 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textMuted }]}>WAITING / ACTIVE</Text>
               {active.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'}
+                  onReschedule={['pending', 'confirmed'].includes(appt.status) ? () => setRescheduleId(appt.id) : undefined} />
               ))}
             </View>
           )}
@@ -196,11 +200,23 @@ export function SpecialistQueueScreen({ navigation }: Props) {
           )}
         </ScrollView>
       )}
+
+      {rescheduleId && (
+        <RescheduleModal
+          patientName={appts.find(a => a.id === rescheduleId)?.patient_name ?? undefined}
+          onClose={() => setRescheduleId(null)}
+          onConfirm={async payload => {
+            const err = await rescheduleHospitalAppointment(rescheduleId, payload)
+            if (!err) { setRescheduleId(null); load() }
+            return err
+          }}
+        />
+      )}
     </SafeAreaView>
   )
 }
 
-function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
+function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow; navigation: any; showDate: boolean; onReschedule?: () => void }) {
   const { theme: t } = useTheme()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -289,6 +305,13 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         {appt.queue_position != null && (
           <Text style={[st.queuePos, { color: t.textMuted }]}>#{appt.queue_position}</Text>
         )}
+        {onReschedule && (
+          <TouchableOpacity
+            onPress={() => { haptics.tap(); onReschedule() }}
+            style={[st.rescheduleBtn, { borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: t.textMuted }}>Reschedule</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   )
@@ -323,4 +346,5 @@ const st = StyleSheet.create({
   badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
   badgeText:   { fontSize: 10, fontWeight: '700' },
   queuePos:    { fontSize: 11, fontWeight: '600' },
+  rescheduleBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
 })

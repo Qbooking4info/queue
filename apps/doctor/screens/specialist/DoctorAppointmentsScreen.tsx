@@ -13,6 +13,7 @@ import { haptics } from '@queue/shared/lib/haptics'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
 
 interface Props { navigation: any }
 
@@ -62,6 +63,8 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
     load()
   }
 
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null)
+
   const filtered = appts.filter(a => {
     if (tab === 'pending') return a.status === 'pending'
     if (tab === 'upcoming') return ['confirmed', 'in_progress'].includes(a.status)
@@ -107,18 +110,33 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
                 onComplete={() => act(a.id, { action: 'complete' })}
                 onCancel={reason => act(a.id, { action: 'cancel', reason })}
                 onJoinCall={() => navigation.navigate('DoctorVideoCall', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
+                onReschedule={() => setRescheduleId(a.id)}
+                onViewSummary={() => navigation.navigate('ConsultationPlan', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
               />
             ))}
           </ScrollView>
+        )}
+
+        {rescheduleId && (
+          <RescheduleModal
+            patientName={appts.find(a => a.id === rescheduleId)?.patient?.full_name}
+            onClose={() => setRescheduleId(null)}
+            onConfirm={async payload => {
+              const err = await reviewDirectAppointment(rescheduleId, { action: 'reschedule', ...payload })
+              if (!err) { setRescheduleId(null); load() }
+              return err
+            }}
+          />
         )}
       </View>
   )
 }
 
-function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall }: {
+function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall, onReschedule, onViewSummary }: {
   appt: DirectAppt; theme: any; busy: boolean
   onApprove: () => void; onReject: (reason: string) => void; onStart: () => void
   onComplete: () => void; onCancel: (reason: string) => void; onJoinCall: () => void
+  onReschedule: () => void; onViewSummary: () => void
 }) {
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
@@ -195,6 +213,16 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
           )}
           {appt.status === 'in_progress' && appt.type === 'home_visit' && (
             <ActionBtn label="Mark Completed" theme={t} primary disabled={busy} onPress={onComplete} />
+          )}
+          {/* Reschedule is pre-check-in only -- pending/confirmed bookings can
+              still move; once a visit has started there's nothing left to move. */}
+          {['pending', 'confirmed'].includes(appt.status) && (
+            <ActionBtn label="Reschedule" theme={t} muted disabled={busy} onPress={onReschedule} />
+          )}
+          {/* The one place a doctor writes diagnosis/investigations/treatment
+              for a virtual visit and the patient gets to see it. */}
+          {appt.status === 'completed' && appt.type === 'virtual' && (
+            <ActionBtn label="Consultation Plan" theme={t} muted disabled={busy} onPress={onViewSummary} />
           )}
         </View>
       )}

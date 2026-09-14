@@ -25,6 +25,8 @@ interface ApptFull {
   symptom_description: string | null
   doctor_notes:     string | null
   diagnosis:        string | null
+  investigations?:  string | null
+  treatment_plan?:  string | null
   queue_position:   number | null
   patient_id:       string
   patient:          PatientRow | null
@@ -414,9 +416,21 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           )}
 
           {isDone && (
-            <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Ionicons name="checkmark-circle" size={20} color={t.accent} />
-              <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+            <View style={st.pad}>
+              <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginHorizontal: 0 }]}>
+                <Ionicons name="checkmark-circle" size={20} color={t.accent} />
+                <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+              </View>
+              {isVirtual && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ConsultationPlan', { appointmentId: appt.id, patientName: patient?.full_name ?? 'Patient' })}
+                  style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                  <Ionicons name="document-text-outline" size={15} color={t.textPrimary} />
+                  <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                    {(appt.diagnosis || appt.investigations || appt.treatment_plan) ? 'View/Edit Consultation Plan' : 'Share Consultation Plan'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 

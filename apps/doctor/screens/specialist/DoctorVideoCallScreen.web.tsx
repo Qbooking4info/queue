@@ -102,7 +102,10 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     } catch (err) {
       console.warn('[video] failed to end session on leave', err)
     }
-    navigation.goBack()
+    // replace, not goBack -- lands the doctor on the plan screen instead of
+    // back into the call, and "Save"/"Skip" from there both return cleanly to
+    // wherever the call was launched from (the queue, or the appointments list).
+    navigation.replace('ConsultationPlan', { appointmentId, patientName })
   }
 
   function handleEndSession() {

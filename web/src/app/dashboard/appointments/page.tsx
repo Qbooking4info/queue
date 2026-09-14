@@ -475,6 +475,86 @@ function RejectModal({
   )
 }
 
+// ── Reschedule Modal ─────────────────────────────────────────────────────────
+// Staff/doctor-initiated, pre-check-in only (a.status is guarded to
+// pending/confirmed everywhere this modal is opened from). Free-form
+// date/time entry -- not bound to a real time_slots row, same discretion
+// walk-in booking already gets.
+
+function RescheduleModal({
+  appointment, onClose, onDone,
+}: { appointment: AdminAppointment; onClose: () => void; onDone: () => void }) {
+  const { theme: C } = useTheme()
+  const [date, setDate] = useState(appointment.appointment_date)
+  const [time, setTime] = useState(appointment.start_time?.slice(0, 5) ?? '')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleConfirm() {
+    if (!date || !time) return
+    setSaving(true); setError('')
+    const res = await fetch(`/api/appointments/${appointment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reschedule', date, startTime: time, reason: reason.trim() || undefined }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setError(body?.error ?? 'Reschedule failed')
+      return
+    }
+    onDone()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+        border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
+          Reschedule Appointment
+        </div>
+        <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
+          <strong style={{ color: C.text }}>{appointment.patient_name}</strong> will be notified of the new time.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>New date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>New time</label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)}
+              style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <textarea
+          value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Reason (optional)…"
+          rows={2}
+          style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+            borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
+            outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+        {error && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleConfirm} loading={saving} disabled={!date || !time} style={{ flex: 1 }}>
+            Confirm New Time
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Appointment Detail Panel ──────────────────────────────────────────────────
 
 function DetailPanel({
@@ -579,6 +659,7 @@ export default function AppointmentsPage() {
   const [showWalkIn,     setShowWalkIn]     = useState(false)
   const [assignAppt,     setAssignAppt]     = useState<AdminAppointment | null>(null)
   const [rejectAppt,     setRejectAppt]     = useState<AdminAppointment | null>(null)
+  const [rescheduleAppt, setRescheduleAppt] = useState<AdminAppointment | null>(null)
   const [detailAppt,     setDetailAppt]     = useState<AdminAppointment | null>(null)
   const [vitalsAppt,     setVitalsAppt]     = useState<AdminAppointment | null>(null)
   const [actionError,    setActionError]    = useState('')
@@ -1040,6 +1121,13 @@ export default function AppointmentsPage() {
                             {isPending ? '…' : 'No-Show'}
                           </button>
                         )}
+                        {/* Reschedule -- pre-check-in only */}
+                        {['pending','confirmed'].includes(a.status) && (
+                          <button onClick={() => setRescheduleAppt(a)} disabled={isPending}
+                            style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                            Reschedule
+                          </button>
+                        )}
                       </div>
                       )
                     })()}
@@ -1182,6 +1270,12 @@ export default function AppointmentsPage() {
                     {isPending ? '…' : 'No-Show'}
                   </button>
                 )}
+                {['pending','confirmed'].includes(a.status) && (
+                  <button onClick={() => setRescheduleAppt(a)} disabled={isPending}
+                    style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                    Reschedule
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -1210,6 +1304,13 @@ export default function AppointmentsPage() {
           appointment={rejectAppt}
           onClose={() => setRejectAppt(null)}
           onDone={() => { load(); setRejectAppt(null) }}
+        />
+      )}
+      {rescheduleAppt && (
+        <RescheduleModal
+          appointment={rescheduleAppt}
+          onClose={() => setRescheduleAppt(null)}
+          onDone={() => { load(); setRescheduleAppt(null) }}
         />
       )}
       {detailAppt && (
