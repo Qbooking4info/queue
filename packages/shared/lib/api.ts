@@ -765,7 +765,7 @@ export interface ConsultVitals {
 export async function saveConsultVitalsAndNotes(
   appointmentId: string,
   vitals: ConsultVitals | null,
-  notes: { notes: string; diagnosis: string },
+  notes: { notes: string; diagnosis: string; investigations?: string; prescription?: string; treatmentPlan?: string },
 ): Promise<{ error: string | null }> {
   const headers = await doctorAuthHeader()
   if (!headers) return { error: 'Not authenticated' }

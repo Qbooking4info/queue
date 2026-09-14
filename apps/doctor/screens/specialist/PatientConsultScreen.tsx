@@ -26,6 +26,7 @@ interface ApptFull {
   doctor_notes:     string | null
   diagnosis:        string | null
   investigations?:  string | null
+  prescription?:    string | null
   treatment_plan?:  string | null
   queue_position:   number | null
   patient_id:       string
@@ -40,7 +41,107 @@ interface ApptFull {
 }
 
 const NOTES_MAX = 1000
-const DIAG_MAX  = 500
+const ITEM_MAX  = 200
+
+let itemSeq = 0
+function nextItemId() { return ++itemSeq }
+
+interface TextItem { id: number; text: string }
+interface InvItem  { id: number; text: string; isImaging: boolean; bodyPart: string }
+interface RxItem   { id: number; drug: string; dosage: string }
+
+const COMMON_DIAGNOSES = [
+  'Malaria', 'Hypertension', 'Type 2 Diabetes Mellitus', 'Upper Respiratory Tract Infection',
+  'Urinary Tract Infection', 'Typhoid Fever', 'Peptic Ulcer Disease', 'Gastroenteritis',
+  'Anaemia', 'Asthma', 'Pneumonia',
+]
+const COMMON_LABS = [
+  'Full Blood Count', 'Malaria RDT', 'Urinalysis', 'Random Blood Sugar', 'Widal Test',
+  'HIV Screening', 'Genotype', 'Stool Microscopy', 'Liver Function Test', 'Renal Function Test',
+]
+const COMMON_IMAGING = ['X-Ray', 'Ultrasound', 'CT Scan', 'MRI', 'Echocardiogram']
+const COMMON_PLANS = [
+  'Admit to Ward', 'Admit for Observation', 'Refer for Specialist Review',
+  'Discharge Home', 'Bed Rest Advised', 'Follow-up in 1 Week',
+]
+
+function parseTextItems(value: string | null | undefined): TextItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  return lines.length ? lines.map(text => ({ id: nextItemId(), text })) : [{ id: nextItemId(), text: '' }]
+}
+function serializeTextItems(items: TextItem[]): string {
+  return items.map(i => i.text.trim()).filter(Boolean).join('\n')
+}
+
+function parseInvItems(value: string | null | undefined): InvItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  if (!lines.length) return [{ id: nextItemId(), text: '', isImaging: false, bodyPart: '' }]
+  return lines.map(line => {
+    const sep = line.indexOf(' — ')
+    if (sep === -1) return { id: nextItemId(), text: line, isImaging: false, bodyPart: '' }
+    return { id: nextItemId(), text: line.slice(0, sep), isImaging: true, bodyPart: line.slice(sep + 3) }
+  })
+}
+function serializeInvItems(items: InvItem[]): string {
+  return items.map(i => {
+    const name = i.text.trim()
+    if (!name) return null
+    return i.isImaging && i.bodyPart.trim() ? `${name} — ${i.bodyPart.trim()}` : name
+  }).filter(Boolean).join('\n')
+}
+
+function parseRxItems(value: string | null | undefined): RxItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  if (!lines.length) return [{ id: nextItemId(), drug: '', dosage: '' }]
+  return lines.map(line => {
+    const sep = line.indexOf(' — ')
+    return sep === -1
+      ? { id: nextItemId(), drug: line, dosage: '' }
+      : { id: nextItemId(), drug: line.slice(0, sep), dosage: line.slice(sep + 3) }
+  })
+}
+function serializeRxItems(items: RxItem[]): string {
+  return items.map(i => {
+    const drug = i.drug.trim()
+    if (!drug) return null
+    return i.dosage.trim() ? `${drug} — ${i.dosage.trim()}` : drug
+  }).filter(Boolean).join('\n')
+}
+
+// Tapping a common-option chip fills the trailing blank row instead of always
+// appending, so picking one right after the screen loads (a single empty row)
+// doesn't leave a stray blank item above it.
+function appendOrFill<T extends { id: number; text: string }>(list: T[], item: T): T[] {
+  const lastIdx = list.length - 1
+  if (lastIdx >= 0 && !list[lastIdx].text.trim()) {
+    const copy = [...list]
+    copy[lastIdx] = { ...item, id: copy[lastIdx].id }
+    return copy
+  }
+  return [...list, item]
+}
+
+function ChipRow({ options, onPick, theme: t }: { options: string[]; onPick: (v: string) => void; theme: any }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+      {options.map(opt => (
+        <TouchableOpacity key={opt} onPress={() => onPick(opt)}
+          style={[st.chip, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: t.textPrimary }}>{opt}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  )
+}
+
+function AddItemButton({ label, onPress, theme: t }: { label: string; onPress: () => void; theme: any }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={[st.addBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
+      <Ionicons name="add" size={15} color={t.accent} />
+      <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
 
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
@@ -99,7 +200,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [bpDia,  setBpDia]    = useState('')
   const [bSugar, setBSugar]   = useState('')
   const [notes,  setNotes]    = useState('')
-  const [diag,   setDiag]     = useState('')
+  const [diagItems, setDiagItems] = useState<TextItem[]>(() => parseTextItems(''))
+  const [invItems,  setInvItems]  = useState<InvItem[]>(() => parseInvItems(''))
+  const [rxItems,   setRxItems]   = useState<RxItem[]>(() => parseRxItems(''))
+  const [planItems, setPlanItems] = useState<TextItem[]>(() => parseTextItems(''))
 
   const [saved,  setSaved]    = useState(false)
 
@@ -130,7 +234,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
     if (data) {
       setAppt(data as ApptFull)
       setNotes(data.doctor_notes ?? '')
-      setDiag(data.diagnosis ?? '')
+      setDiagItems(parseTextItems(data.diagnosis))
+      setInvItems(parseInvItems(data.investigations))
+      setRxItems(parseRxItems(data.prescription))
+      setPlanItems(parseTextItems(data.treatment_plan))
     }
     if (vitals) {
       setWeight(vitals.weight_kg    != null ? String(vitals.weight_kg)    : '')
@@ -158,7 +265,13 @@ export function PatientConsultScreen({ navigation, route }: Props) {
         bp_diastolic: parseInt(bpDia)    || null,
         blood_sugar:  parseFloat(bSugar) || null,
       } : null,
-      { notes, diagnosis: diag },
+      {
+        notes,
+        diagnosis: serializeTextItems(diagItems),
+        investigations: serializeInvItems(invItems),
+        prescription: serializeRxItems(rxItems),
+        treatmentPlan: serializeTextItems(planItems),
+      },
     )
 
     setSaving(false)
@@ -485,25 +598,127 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
             {/* Diagnosis */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
-                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
-                  DIAGNOSIS
-                </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
-                  {diag.length}/{DIAG_MAX}
-                </Text>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DIAGNOSIS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {diagItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.text}
+                      onChangeText={v => setDiagItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="e.g. Malaria, or an ICD-10 code…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {diagItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setDiagItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove diagnosis" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <ChipRow theme={t} options={COMMON_DIAGNOSES} onPick={text => setDiagItems(list => appendOrFill(list, { id: nextItemId(), text }))} />
+                <AddItemButton theme={t} label="Add diagnosis" onPress={() => setDiagItems(list => [...list, { id: nextItemId(), text: '' }])} />
               </View>
-              <TextInput
-                value={diag}
-                onChangeText={v => setDiag(v.slice(0, DIAG_MAX))}
-                placeholder="ICD-10 code or diagnosis description…"
-                placeholderTextColor={t.textMuted}
-                multiline
-                numberOfLines={3}
-                style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-                textAlignVertical="top"
-                maxLength={DIAG_MAX}
-              />
+            </View>
+
+            {/* Investigations */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>INVESTIGATIONS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {invItems.map(item => (
+                  <View key={item.id} style={{ gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TextInput
+                        value={item.text}
+                        onChangeText={v => setInvItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                        placeholder="Lab test or imaging study…"
+                        placeholderTextColor={t.textMuted}
+                        style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setInvItems(list => list.map(i => i.id === item.id ? { ...i, isImaging: !i.isImaging } : i))}
+                        style={[st.imagingToggle, { borderColor: item.isImaging ? t.accent : t.cardBorder, backgroundColor: item.isImaging ? `${t.accent}18` : 'transparent' }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: item.isImaging ? t.accent : t.textMuted }}>Imaging</Text>
+                      </TouchableOpacity>
+                      {invItems.length > 1 && (
+                        <TouchableOpacity onPress={() => setInvItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove investigation" hitSlop={8}>
+                          <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {item.isImaging && (
+                      <TextInput
+                        value={item.bodyPart}
+                        onChangeText={v => setInvItems(list => list.map(i => i.id === item.id ? { ...i, bodyPart: v.slice(0, ITEM_MAX) } : i))}
+                        placeholder="Part of body, e.g. Chest, Abdomen…"
+                        placeholderTextColor={t.textMuted}
+                        style={[st.itemInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder, marginLeft: 12 }]}
+                      />
+                    )}
+                  </View>
+                ))}
+                <Text style={[st.chipGroupLabel, { color: t.textMuted }]}>COMMON LABS</Text>
+                <ChipRow theme={t} options={COMMON_LABS} onPick={text => setInvItems(list => appendOrFill(list, { id: nextItemId(), text, isImaging: false, bodyPart: '' }))} />
+                <Text style={[st.chipGroupLabel, { color: t.textMuted }]}>COMMON IMAGING</Text>
+                <ChipRow theme={t} options={COMMON_IMAGING} onPick={text => setInvItems(list => appendOrFill(list, { id: nextItemId(), text, isImaging: true, bodyPart: '' }))} />
+                <AddItemButton theme={t} label="Add investigation" onPress={() => setInvItems(list => [...list, { id: nextItemId(), text: '', isImaging: false, bodyPart: '' }])} />
+              </View>
+            </View>
+
+            {/* Prescription */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>PRESCRIPTION</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {rxItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.drug}
+                      onChangeText={v => setRxItems(list => list.map(i => i.id === item.id ? { ...i, drug: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="Medication…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    <TextInput
+                      value={item.dosage}
+                      onChangeText={v => setRxItems(list => list.map(i => i.id === item.id ? { ...i, dosage: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="Dosage / duration…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {rxItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setRxItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove medication" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <AddItemButton theme={t} label="Add medication" onPress={() => setRxItems(list => [...list, { id: nextItemId(), drug: '', dosage: '' }])} />
+              </View>
+            </View>
+
+            {/* Other Plans */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>OTHER PLANS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {planItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.text}
+                      onChangeText={v => setPlanItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="e.g. Admit to Ward…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {planItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setPlanItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove plan item" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <ChipRow theme={t} options={COMMON_PLANS} onPick={text => setPlanItems(list => appendOrFill(list, { id: nextItemId(), text }))} />
+                <AddItemButton theme={t} label="Add plan item" onPress={() => setPlanItems(list => [...list, { id: nextItemId(), text: '' }])} />
+              </View>
             </View>
 
             {/* Save */}
@@ -582,6 +797,11 @@ const st = StyleSheet.create({
   vitalValue:    { fontSize: 18, fontWeight: '800' },
   vitalInput:    { fontSize: 18, fontWeight: '700', padding: 0 },
   notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
+  itemInput:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 },
+  imagingToggle: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  chipGroupLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.6, marginTop: 2 },
+  chip:          { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingVertical: 10, marginTop: 2 },
   saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
   saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
 })

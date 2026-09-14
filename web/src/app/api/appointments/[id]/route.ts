@@ -23,7 +23,7 @@ type Action =
   | { action: 'start_consultation' }
   | { action: 'end_consultation' }
   | { action: 'set_status'; status: string }
-  | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null }
+  | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null; investigations?: string | null; prescription?: string | null; treatmentPlan?: string | null }
   | { action: 'ring' }
   | { action: 'reschedule'; date: string; startTime: string; reason?: string }
 
@@ -381,6 +381,9 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
       if ('notes' in body) update.doctor_notes = body.notes?.trim() || null
       if ('diagnosis' in body) update.diagnosis = body.diagnosis?.trim() || null
+      if ('investigations' in body) update.investigations = body.investigations?.trim() || null
+      if ('prescription' in body) update.prescription = body.prescription?.trim() || null
+      if ('treatmentPlan' in body) update.treatment_plan = body.treatmentPlan?.trim() || null
       const { error } = await db.from('appointments').update(update as any).eq('id', id)
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
