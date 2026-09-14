@@ -797,6 +797,37 @@ export async function saveConsultVitalsAndNotes(
   return { error: failed?.error ?? 'Please try again' }
 }
 
+// The one place a doctor shares structured documentation with a patient:
+// diagnosis/investigations/treatment after a VIRTUAL consultation, hospital-
+// linked or booked directly -- both go through the same route. All three
+// fields are optional; a doctor can save with only one filled in, or "skip"
+// entirely from the UI by never calling this at all.
+export interface ConsultationPlan {
+  diagnosis?: string
+  investigations?: string
+  treatmentPlan?: string
+}
+
+export async function saveConsultationPlan(
+  appointmentId: string,
+  plan: ConsultationPlan,
+): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/plan`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(plan),
+    })
+    if (res.ok) return { error: null }
+    const body = await res.json().catch(() => ({}))
+    return { error: body?.error ?? 'Please try again' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
 // Calls the patient's phone with a push notification naming the doctor -- not
 // gated to being exactly "next". Front desk and the doctors app both call the
 // same PATCH action; doctorAuthHeader works for any authenticated caller
@@ -1231,6 +1262,7 @@ export interface DoctorProfileSettings {
   accepts_direct_virtual:     boolean
   accepts_direct_home_visit:  boolean
   show_phone_to_patients:     boolean
+  is_paused:                  boolean
 }
 
 async function authHeader(): Promise<Record<string, string> | null> {
@@ -1282,6 +1314,23 @@ export async function getMyDoctorStats(): Promise<DoctorStats | null> {
   return (await res.json()) as DoctorStats
 }
 
+export type DoctorAvailability = 'on_duty' | 'on_break' | 'off_duty'
+
+// The on/off-duty status hospital staff see next to a doctor's name -- entirely
+// separate from doctors.is_active (whether the account/link is enabled at all).
+// Self-service only: a doctor sets their own status, staff can only view it.
+export async function updateMyAvailability(status: DoctorAvailability): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/doctors/me`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ availability_status: status }),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Could not update status' }
+  return null
+}
+
 export interface DoctorClinicOption { clinicId: string; clinicName: string }
 
 // The caller's own assigned-clinics pool at their currently-active hospital,
@@ -1322,7 +1371,8 @@ export async function getQualificationDocuments(): Promise<QualificationDocument
 export async function reviewDirectAppointment(
   appointmentId: string,
   action: { action: 'approve' } | { action: 'reject'; reason: string } | { action: 'start' }
-    | { action: 'complete'; diagnosis?: string; doctorNotes?: string } | { action: 'cancel'; reason: string },
+    | { action: 'complete'; diagnosis?: string; doctorNotes?: string } | { action: 'cancel'; reason: string }
+    | { action: 'reschedule'; date: string; startTime: string; reason?: string },
 ): Promise<string | null> {
   const headers = await authHeader()
   if (!headers) return 'Not authenticated'
@@ -1332,6 +1382,26 @@ export async function reviewDirectAppointment(
     body: JSON.stringify(action),
   })
   if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Action failed' }
+  return null
+}
+
+// Staff (front desk/hospital admin/clinic admin) or the treating doctor moving
+// a hospital-linked appointment's date/time before the patient has checked
+// in. Called from 3 screens (StaffAppointmentsScreen, SpecialistQueueScreen's
+// Upcoming tab, and the web dashboard's appointments page) -- shared here so
+// all three hit the exact same contract.
+export async function rescheduleHospitalAppointment(
+  appointmentId: string,
+  payload: { date: string; startTime: string; reason?: string },
+): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reschedule', ...payload }),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Reschedule failed' }
   return null
 }
 

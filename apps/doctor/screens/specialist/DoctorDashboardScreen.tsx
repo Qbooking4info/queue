@@ -8,9 +8,15 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { ShellScroll } from '@queue/shared/components/AppShell'
-import { getMyDoctorStats } from '@queue/shared/lib/api'
+import { getMyDoctorStats, updateMyAvailability, type DoctorAvailability } from '@queue/shared/lib/api'
 
 interface Props { navigation: any }
+
+const AVAIL_OPTIONS: { key: DoctorAvailability; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'on_duty',  label: 'On Duty',  icon: 'radio-button-on' },
+  { key: 'on_break', label: 'On Break', icon: 'cafe-outline' },
+  { key: 'off_duty', label: 'Off Duty', icon: 'moon-outline' },
+]
 
 export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -20,6 +26,8 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [pendingDirect, setPendingDirect] = useState(0)
   const [monthCompleted, setMonthCompleted] = useState(0)
   const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
+  const [availability, setAvailability] = useState<DoctorAvailability | null>(null)
+  const [savingAvailability, setSavingAvailability] = useState(false)
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
@@ -41,15 +49,19 @@ export function DoctorDashboardScreen({ navigation }: Props) {
         )
       }
 
-      const [results, stats] = await Promise.all([
+      const [results, stats, availRow] = await Promise.all([
         Promise.all(queries),
         doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
+        doctorProfile
+          ? supabase.from('doctors').select('availability_status').eq('id', doctorProfile.doctorId).single()
+          : Promise.resolve({ data: null }),
       ])
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
       setMonthCompleted(results[1].count ?? 0)
       setTodayCount(doctorProfile ? (results[2]?.count ?? 0) : 0)
       setAvgConsultSecs(stats?.avgConsultSecs ?? null)
+      setAvailability(((availRow as any)?.data?.availability_status as DoctorAvailability) ?? null)
       setLoading(false)
     }
     load()
@@ -57,6 +69,17 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   }, [user?.id, doctorProfile]))
 
   const firstName = (doctorProfile?.fullName ?? user?.full_name ?? '').split(' ')[0] || 'there'
+
+  async function changeAvailability(status: DoctorAvailability) {
+    if (status === availability || savingAvailability) return
+    const prev = availability
+    setAvailability(status) // optimistic -- this is the same status hospital staff see live
+    setSavingAvailability(true)
+    haptics.tap()
+    const error = await updateMyAvailability(status)
+    setSavingAvailability(false)
+    if (error) { haptics.error(); setAvailability(prev) } else { haptics.success() }
+  }
 
   return (
       <ShellScroll>
@@ -71,6 +94,28 @@ export function DoctorDashboardScreen({ navigation }: Props) {
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
+            {doctorProfile && availability && (
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20 }}>
+                {AVAIL_OPTIONS.map(opt => {
+                  const active = availability === opt.key
+                  return (
+                    <TouchableOpacity key={opt.key} onPress={() => changeAvailability(opt.key)}
+                      disabled={savingAvailability}
+                      style={{
+                        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        paddingVertical: 9, borderRadius: 12, borderWidth: 1,
+                        backgroundColor: active ? t.accentBg : t.cardBg,
+                        borderColor: active ? t.accentBorder : t.cardBorder,
+                        opacity: savingAvailability && !active ? 0.5 : 1,
+                      }}>
+                      <Ionicons name={opt.icon} size={12} color={active ? t.accent : t.textMuted} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            )}
+
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
               <StatCard theme={t} icon="list-outline" label="Today's patients" value={todayCount}
                 onPress={() => navigation.navigate('Queue')} disabled={!doctorProfile} />
