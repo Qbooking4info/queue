@@ -828,6 +828,30 @@ export async function saveConsultationPlan(
   }
 }
 
+// Doctor books the patient's next visit at the same hospital/clinic --
+// date only, no time slot to pick. Doctor-only: the server re-checks the
+// caller is actually the treating doctor on `appointmentId`.
+export type FollowUpResult =
+  | { ok: true; id: string; bookingRef: string; date: string; startTime: string }
+  | { ok: false; error: string }
+
+export async function bookFollowUp(appointmentId: string, date: string): Promise<FollowUpResult> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/follow-up`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Please try again' }
+    return { ok: true, id: body.id, bookingRef: body.bookingRef, date: body.date, startTime: body.startTime }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
 // Calls the patient's phone with a push notification naming the doctor -- not
 // gated to being exactly "next". Front desk and the doctors app both call the
 // same PATCH action; doctorAuthHeader works for any authenticated caller

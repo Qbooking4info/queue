@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { setConsultStatus, saveConsultVitalsAndNotes } from '@queue/shared/lib/api'
+import { setConsultStatus, saveConsultVitalsAndNotes, bookFollowUp } from '@queue/shared/lib/api'
 import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
+import { FollowUpModal } from '@queue/shared/components/FollowUpModal'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -206,6 +207,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [planItems, setPlanItems] = useState<TextItem[]>(() => parseTextItems(''))
 
   const [saved,  setSaved]    = useState(false)
+  const [showFollowUp, setShowFollowUp] = useState(false)
 
   async function fetchAppt() {
     const [{ data }, { data: vitals }] = await Promise.all([
@@ -718,6 +720,13 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 ))}
                 <ChipRow theme={t} options={COMMON_PLANS} onPick={text => setPlanItems(list => appendOrFill(list, { id: nextItemId(), text }))} />
                 <AddItemButton theme={t} label="Add plan item" onPress={() => setPlanItems(list => [...list, { id: nextItemId(), text: '' }])} />
+
+                <View style={[st.divider, { backgroundColor: t.cardBorder }]} />
+                <TouchableOpacity onPress={() => setShowFollowUp(true)}
+                  style={[st.addBtn, { borderColor: t.infoBorder, backgroundColor: 'rgba(90,160,255,0.12)' }]}>
+                  <Ionicons name="calendar-outline" size={15} color={t.info} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.info }}>Book Follow-up Appointment</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -740,6 +749,17 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {showFollowUp && (
+        <FollowUpModal
+          patientName={patient?.full_name}
+          onClose={() => setShowFollowUp(false)}
+          onConfirm={async d => {
+            const res = await bookFollowUp(appt.id, d)
+            return res.ok ? null : res.error
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   )
 }
@@ -802,6 +822,7 @@ const st = StyleSheet.create({
   chipGroupLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.6, marginTop: 2 },
   chip:          { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   addBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingVertical: 10, marginTop: 2 },
+  divider:       { height: 1, marginVertical: 4 },
   saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
   saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
 })
