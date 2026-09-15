@@ -488,11 +488,12 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </Section>
           )}
 
-          {/* Consultation Plan — the one place a virtual visit gets structured
-              documentation, shared by the doctor after the call. Never shown
-              for in-person/home-visit visits (those keep the plain doctor's-
-              notes/diagnosis fields only, surfaced elsewhere). */}
-          {isVirtual && appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).treatment_plan) && (
+          {/* Consultation Plan — diagnosis/investigations/prescription/plan the
+              doctor recorded for this visit, in-person or virtual alike (see
+              PatientConsultScreen on the doctor app). Only once the visit is
+              completed -- a mid-visit or not-yet-seen appointment has nothing
+              finalized to show yet. */}
+          {appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).prescription || (raw as any).treatment_plan) && (
             <Section title="Consultation Plan">
               {(raw as any).diagnosis && (
                 <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
@@ -506,9 +507,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                   <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).investigations}</Text>
                 </View>
               )}
+              {(raw as any).prescription && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Prescription</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).prescription}</Text>
+                </View>
+              )}
               {(raw as any).treatment_plan && (
                 <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
-                  <Text style={[st.planLabel, { color: t.textMuted }]}>Treatment</Text>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Plan</Text>
                   <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).treatment_plan}</Text>
                 </View>
               )}
