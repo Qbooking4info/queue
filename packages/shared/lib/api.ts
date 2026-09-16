@@ -828,6 +828,36 @@ export async function saveConsultationPlan(
   }
 }
 
+// "Everything about myself" for the doctor's own Analytics screen -- unioned
+// across every hospital the doctor is linked to plus their direct/independent
+// bookings (see the route for why a single hospitalId/doctorId can't scope
+// this). `type` narrows to one visit type; omit for every type combined.
+export interface DoctorAnalyticsStats {
+  total: number; completed: number; cancelled: number; noShow: number; open: number
+  uniquePatients: number
+  byType: { inPerson: number; virtual: number; homeVisit: number }
+  avgWaitMinutes: number | null
+  avgConsultMinutes: number | null
+  rating: { avg: number | null; count: number }
+  monthly: { month: string; count: number }[]
+}
+
+export async function getMyDoctorAnalytics(
+  from: string, to: string, type?: 'in-person' | 'virtual' | 'home_visit'
+): Promise<{ ok: true; data: DoctorAnalyticsStats } | { ok: false; error: string }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const qs = new URLSearchParams({ from, to, ...(type ? { type } : {}) })
+    const res = await fetch(`${API_URL}/api/doctors/me/stats?${qs}`, { headers })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Please try again' }
+    return { ok: true, data: body as DoctorAnalyticsStats }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
 // Doctor books the patient's next visit at the same hospital/clinic --
 // date only, no time slot to pick. Doctor-only: the server re-checks the
 // caller is actually the treating doctor on `appointmentId`.
