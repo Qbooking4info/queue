@@ -63,6 +63,17 @@ export const themes = {
     rowAlt:       '#131A16',
     toggleTrack:  'rgba(0,232,122,0.20)',
     toggleThumb:  '#00E87A',
+    // MD3-style bold tonal "container" fills -- a saturated card background paired
+    // with an always-readable on-color, for surfaces that carry the color as their
+    // whole background (a stat tile, a hero banner) rather than a thin tint behind
+    // small text. Dark-mode container values: a deep, muted version of the hue with
+    // a bright on-color, the inverse pairing from light mode's pastel-fill/dark-text.
+    // Additive only -- nothing existing read these before, so nothing regresses.
+    accentContainer:   '#005230', onAccentContainer:   '#9EF5BC',
+    blueContainer:     '#1E3A5F', onBlueContainer:     '#93C5FD',
+    purpleContainer:   '#2D1B69', onPurpleContainer:   '#C4B5FD',
+    amberContainer:    '#452B00', onAmberContainer:    '#FBD06A',
+    sidebarActive:     '#005230', sidebarActiveText:   '#9EF5BC',
   },
   clinical: {
     id: 'clinical' as const,
@@ -105,6 +116,13 @@ export const themes = {
     rowAlt:       '#FAFCFB',
     toggleTrack:  'rgba(26,127,193,0.20)',
     toggleThumb:  '#1A7FC1',
+    // MD3-style bold tonal "container" fills -- see forest's own comment above for
+    // why these are additive. Light-mode pairing: a pastel fill with dark on-color.
+    accentContainer:   '#D5E3FF', onAccentContainer:   '#001B3D',
+    blueContainer:     '#DBEAFE', onBlueContainer:     '#1E3A5F',
+    purpleContainer:   '#EDE9FE', onPurpleContainer:   '#2D1B69',
+    amberContainer:    '#FEF3C7', onAmberContainer:    '#451A03',
+    sidebarActive:     '#D5E3FF', sidebarActiveText:   '#001B3D',
   },
 }
 

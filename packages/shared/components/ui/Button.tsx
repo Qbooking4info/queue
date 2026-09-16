@@ -41,7 +41,9 @@ export function Button({
   const onPrimary = t.id === 'forest' ? '#061208' : '#fff'
 
   const containerStyles: ViewStyle = {
-    borderRadius: size === 'lg' ? t.radius.lg : size === 'sm' ? t.radius.sm : t.radius.md,
+    // MD3 signature shape: fully pill-rounded buttons, matching the shared
+    // StatusBadge/chip rows already used everywhere else in this app.
+    borderRadius: t.radius.pill,
     paddingVertical: size === 'lg' ? t.spacing.lg : size === 'sm' ? t.spacing.sm : t.spacing.md,
     paddingHorizontal: size === 'lg' ? t.spacing.xxl : size === 'sm' ? t.spacing.md : t.spacing.xl,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: t.spacing.sm,

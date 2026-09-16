@@ -90,6 +90,13 @@ const forest = {
   inputBorder: 'rgba(255,255,255,0.09)',
   starColor:   '#EF9F27',
   splashBg:    '#061208',
+  // MD3-style bold tonal "container" -- a saturated fill paired with an always-
+  // readable on-color, for surfaces that carry the accent as their whole
+  // background (a stat tile, a hero banner) rather than a thin tint behind small
+  // text. Dark-mode pairing: a deep, muted accent with a bright on-color -- the
+  // inverse of light mode's pastel-fill/dark-text. Additive only.
+  accentContainer:   '#005230',
+  onAccentContainer: '#9EF5BC',
 }
 
 const clinical = {
@@ -156,6 +163,10 @@ const clinical = {
   inputBorder: '#C0D4E8',
   starColor:   '#C47F00',
   splashBg:    '#0C2A4A',
+  // MD3-style bold tonal "container" -- see forest's own comment above. Light-mode
+  // pairing: a pastel fill with dark on-color.
+  accentContainer:   '#D5E3FF',
+  onAccentContainer: '#001B3D',
 }
 
 export type Theme = typeof forest

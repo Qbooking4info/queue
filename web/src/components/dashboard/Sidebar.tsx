@@ -164,7 +164,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* Hospital context chip */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8,
+          <div style={{ width: 32, height: 32, borderRadius: '50%',
             background: (currentRole === 'super_admin' && !hospital) ? '#1A2A4A' : '#1A4A32',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 800,
@@ -203,16 +203,17 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           return (
             <Link key={item.href} href={item.href}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                background: isActive ? C.accentMid : 'none',
-                color: isActive ? C.accent : 'rgba(255,255,255,0.55)',
+                padding: '10px 14px', borderRadius: 99, cursor: 'pointer',
+                background: isActive ? C.sidebarActive : 'none',
+                color: isActive ? C.sidebarActiveText : 'rgba(255,255,255,0.55)',
                 fontSize: 13, fontWeight: isActive ? 700 : 500,
                 marginBottom: 2, transition: 'all .15s', textDecoration: 'none' }}>
               <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
               {item.label}
               {item.href === '/dashboard/appointments' && stats.todayTotal > 0 && (
                 <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-                  background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+                  background: isActive ? C.sidebarActiveText : C.accent,
+                  color: isActive ? C.sidebarActive : (C.id === 'forest' ? '#061208' : '#fff'),
                   padding: '1px 7px', borderRadius: 99 }}>
                   {stats.todayTotal}
                 </span>
@@ -232,7 +233,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* User chip + sign out */}
       <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentMid,
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.accentMid,
             border: `1px solid ${C.accentBorder}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 800, color: C.accent, flexShrink: 0 }}>
@@ -251,7 +252,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         </div>
         <button onClick={signOut}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+            gap: 8, padding: '9px 12px', borderRadius: 99, cursor: 'pointer',
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
             color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600,
             transition: 'all .15s', fontFamily: 'inherit' }}
