@@ -55,8 +55,8 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Avatar & info */}
         <View style={styles.profileCard}>
-          <View style={[styles.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[styles.avatarText, { color: t.accent }]}>{initials}</Text>
+          <View style={[styles.avatar, { backgroundColor: t.accent }]}>
+            <Text style={[styles.avatarText, { color: t.onAccent }]}>{initials}</Text>
           </View>
           <Text style={[styles.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
           <Text style={[styles.email, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
@@ -181,20 +181,20 @@ export function ProfileScreen({ navigation }: Props) {
         {/* Sign out */}
         {!confirmVisible ? (
           <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }}
-            style={[styles.signOutBtn, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-            <Text style={styles.signOutText}>Sign out</Text>
+            style={[styles.signOutBtn, { backgroundColor: t.dangerContainer, borderColor: 'transparent' }]}>
+            <Text style={[styles.signOutText, { color: t.onDangerContainer }]}>Sign out</Text>
           </TouchableOpacity>
         ) : (
-          <View style={[styles.confirmBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-            <Text style={styles.confirmText}>Sign out of your account?</Text>
+          <View style={[styles.confirmBox, { backgroundColor: t.dangerContainer, borderColor: 'transparent' }]}>
+            <Text style={[styles.confirmText, { color: t.onDangerContainer }]}>Sign out of your account?</Text>
             <View style={styles.confirmRow}>
               <TouchableOpacity onPress={() => setConfirmVisible(false)}
-                style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }]}>
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
+                style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.3)', borderColor: 'transparent' }]}>
+                <Text style={{ color: t.onDangerContainer, fontSize: 13, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { haptics.heavy(); handleSignOut() }} disabled={signingOut}
-                style={[styles.confirmBtn, { backgroundColor: '#7B2020', borderColor: '#A32D2D', opacity: signingOut ? 0.6 : 1 }]}>
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                style={[styles.confirmBtn, { backgroundColor: t.danger, borderColor: 'transparent', opacity: signingOut ? 0.6 : 1 }]}>
+                <Text style={{ color: t.onDanger, fontSize: 13, fontWeight: '700' }}>
                   {signingOut ? 'Signing out…' : 'Yes, sign out'}
                 </Text>
               </TouchableOpacity>
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   safe:        { flex: 1 },
   title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, paddingTop: 16, marginBottom: 16 },
   profileCard: { alignItems: 'center', marginBottom: 16 },
-  avatar:      { width: 70, height: 70, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, marginBottom: 10 },
+  avatar:      { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   avatarText:  { fontSize: 22, fontWeight: '800' },
   name:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
   email:       { fontSize: 12, marginTop: 3 },
@@ -236,10 +236,10 @@ const styles = StyleSheet.create({
   menuLabel:   { fontSize: 13, fontWeight: '600' },
   menuSub:     { fontSize: 11, marginTop: 1 },
   menuArrow:   { fontSize: 18 },
-  signOutBtn:  { borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4, borderWidth: 1 },
-  signOutText: { color: '#F87171', fontSize: 14, fontWeight: '700' },
-  confirmBox:  { borderRadius: 14, padding: 16, marginTop: 8, marginBottom: 4, borderWidth: 1 },
-  confirmText: { color: '#F87171', fontSize: 14, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
+  signOutBtn:  { borderRadius: 99, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4, borderWidth: 1 },
+  signOutText: { fontSize: 14, fontWeight: '700' },
+  confirmBox:  { borderRadius: 16, padding: 16, marginTop: 8, marginBottom: 4, borderWidth: 1 },
+  confirmText: { fontSize: 14, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
   confirmRow:  { flexDirection: 'row', gap: 8 },
   confirmBtn:  { flex: 1, padding: 11, borderRadius: 10, alignItems: 'center', borderWidth: 1 },
 })

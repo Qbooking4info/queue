@@ -215,8 +215,11 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                     s.card,
                     {
                       backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
-                      borderColor: isEmergency ? t.danger : isPending ? 'rgba(239,159,39,0.4)' : t.cardBorder,
-                      borderLeftWidth: isEmergency ? 4 : 1,
+                      borderColor: isEmergency ? t.danger : isPending ? t.statusBusy.border : t.cardBorder,
+                      // Left rail colored by status, matching the mockup's own
+                      // AppointmentsScreen card treatment.
+                      borderLeftWidth: 4,
+                      borderLeftColor: isEmergency ? t.danger : sc.color,
                     },
                   ]}>
 
@@ -272,7 +275,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 
                   {/* Pending approval banner */}
                   {isPending && (
-                    <View style={[s.approvalBanner, { backgroundColor: 'rgba(239,159,39,0.06)', borderTopColor: 'rgba(239,159,39,0.2)' }]}>
+                    <View style={[s.approvalBanner, { backgroundColor: t.statusBusy.bg, borderTopColor: t.statusBusy.border }]}>
                       <Text style={{ fontSize: 11, color: t.statusBusy.text }}>
                         ⏳ Awaiting hospital review — you'll be notified once approved.
                       </Text>
@@ -284,8 +287,8 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                     <View style={[s.cardFooter, { borderTopColor: t.cardBorder }]}>
                       <Text style={[s.footerHint, { color: t.textMuted }]}>Tap to view check-in pass</Text>
                       {isVirtual && (
-                        <View style={[s.virtualTag, { backgroundColor: 'rgba(55,138,221,0.1)', borderColor: 'rgba(55,138,221,0.25)' }]}>
-                          <Text style={s.virtualTagText}>Virtual</Text>
+                        <View style={[s.virtualTag, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}>
+                          <Text style={[s.virtualTagText, { color: t.statusVirtual.text }]}>Virtual</Text>
                         </View>
                       )}
                     </View>
@@ -315,11 +318,11 @@ const s = StyleSheet.create({
   safe:          { flex: 1 },
   titleRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
   title:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.8 },
-  pendingBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  pendingBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   // Filter row
   filterScroll:  { flexGrow: 0 },
   filterContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
-  filterPill:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8 },
+  filterPill:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8 },
   filterPillLast:{ marginRight: 0 },
   filterText:    { fontSize: 12, fontWeight: '600' },
   filterDot:     { width: 6, height: 6, borderRadius: 3, marginLeft: 5 },
@@ -336,7 +339,7 @@ const s = StyleSheet.create({
   refLeft:       { flexDirection: 'row', alignItems: 'center' },
   refIcon:       { fontSize: 14, marginRight: 7 },
   refText:       { fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
-  statusPill:    { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
+  statusPill:    { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99, borderWidth: 1 },
   statusText:    { fontSize: 10, fontWeight: '700' },
   cardBody:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12 },
   cardBodyLeft:  { flex: 1, paddingRight: 10 },
@@ -349,5 +352,5 @@ const s = StyleSheet.create({
   cardFooter:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1 },
   footerHint:    { fontSize: 10 },
   virtualTag:    { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  virtualTagText:{ fontSize: 9, color: '#85B7EB', fontWeight: '700' },
+  virtualTagText:{ fontSize: 9, fontWeight: '700' },
 })

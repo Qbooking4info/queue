@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   safe:        { flex: 1 },
   container:   { flex: 1 },
   title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
-  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
+  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 28, paddingHorizontal: 18, paddingVertical: 12, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
   input:       { flex: 1, fontSize: 13 },
   specialtyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
   specialtyBannerText: { fontSize: 13, fontWeight: '700' },
