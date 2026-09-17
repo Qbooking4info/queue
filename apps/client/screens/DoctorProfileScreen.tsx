@@ -125,8 +125,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
             <TouchableOpacity
               onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
               style={[st.bookBtn, { backgroundColor: t.accent }]}>
-              <Ionicons name="videocam-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-              <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
+              <Ionicons name="videocam-outline" size={15} color={t.onAccent} />
+              <Text style={[st.bookBtnText, { color: t.onAccent }]}>
                 Book Virtual{doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString()}` : ''}
               </Text>
             </TouchableOpacity>
@@ -147,8 +147,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
           <TouchableOpacity
             onPress={() => viewHospital(doctor.hospitals[0].id)}
             style={[st.bookBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="business-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-            <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
+            <Ionicons name="business-outline" size={15} color={t.onAccent} />
+            <Text style={[st.bookBtnText, { color: t.onAccent }]}>
               Book via {doctor.hospitals[0].name}
             </Text>
           </TouchableOpacity>

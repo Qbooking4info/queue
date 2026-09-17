@@ -33,12 +33,10 @@ export function Button({
   const { theme: t } = useTheme()
   const isDisabled = disabled || loading
 
-  // forest's accent (#00E87A) is bright enough that white text on it reads worse than
-  // near-black -- six screens had already independently discovered this and hand-wrote
-  // the same `t.id === 'forest' ? '#061208' : '#fff'` check. Centralizing it here so
-  // every future primary button gets it for free instead of rediscovering it a seventh
-  // time.
-  const onPrimary = t.id === 'forest' ? '#061208' : '#fff'
+  // The theme's own onAccent -- the exact MD3 on-color for this scheme's accent,
+  // not a dark/light guess (forest and clinical can each be light or dark now, so
+  // "forest -> near-black text" is only right for two of the four combinations).
+  const onPrimary = t.onAccent
 
   const containerStyles: ViewStyle = {
     // MD3 signature shape: fully pill-rounded buttons, matching the shared

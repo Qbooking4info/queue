@@ -449,7 +449,7 @@ export default function SettingsPage() {
             <button onClick={handleSave} disabled={saving}
               style={{ padding: '13px', borderRadius: 12,
                 background: saved ? C.accentLight : C.accent,
-                color: saved ? C.accent : C.id === 'forest' ? '#061208' : '#fff',
+                color: saved ? C.accent : C.onAccent,
                 border: saved ? `1px solid ${C.accentBorder}` : 'none',
                 fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.7 : 1 }}>

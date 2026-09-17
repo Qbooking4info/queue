@@ -27,12 +27,13 @@ interface TopBarProps {
 
 export function TopBar({ onMenuToggle }: TopBarProps) {
   const router = useRouter()
-  const { theme: C, themeId, toggleTheme } = useTheme()
+  const { theme: C, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { hospital } = useAdmin()
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [lastSeen, setLastSeen] = useState<string | null>(null)
   const isForest = themeId === 'forest'
+  const isDark = mode === 'dark'
 
   const lastSeenKey = hospital?.id ? `q-notif-last-seen-${hospital.id}` : null
 
@@ -76,16 +77,16 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
           <Menu size={20} />
         </button>
 
-        {/* Theme toggle */}
+        {/* Theme family toggle */}
         <button onClick={toggleTheme}
           className="q-topbar-theme-toggle"
           style={{ display: 'flex', alignItems: 'center', gap: 7,
             padding: '5px 12px', borderRadius: 99,
-            background: isForest ? 'rgba(0,232,122,0.10)' : 'rgba(26,127,193,0.10)',
-            border: `1px solid ${isForest ? 'rgba(0,232,122,0.25)' : 'rgba(26,127,193,0.25)'}`,
+            background: C.accentMid,
+            border: `1px solid ${C.accentBorder}`,
             cursor: 'pointer', transition: 'all .3s' }}>
           <div style={{ width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
-            background: isForest ? 'rgba(0,232,122,0.25)' : 'rgba(26,127,193,0.25)',
+            background: C.accentBorder,
             transition: 'background .3s' }}>
             <div style={{ position: 'absolute', top: 2, left: isForest ? 17 : 2,
               width: 14, height: 14, borderRadius: '50%', background: C.accent,
@@ -93,6 +94,27 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
           </div>
           <span className="q-topbar-theme-label" style={{ fontSize: 12, fontWeight: 600, color: C.accent, whiteSpace: 'nowrap' }}>
             {isForest ? 'Forest' : 'Clinical'}
+          </span>
+        </button>
+
+        {/* Mode toggle -- independent of theme family: either family can be
+            Light or Dark. */}
+        <button onClick={toggleMode}
+          className="q-topbar-theme-toggle"
+          style={{ display: 'flex', alignItems: 'center', gap: 7,
+            padding: '5px 12px', borderRadius: 99,
+            background: C.accentMid,
+            border: `1px solid ${C.accentBorder}`,
+            cursor: 'pointer', transition: 'all .3s' }}>
+          <div style={{ width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
+            background: C.accentBorder,
+            transition: 'background .3s' }}>
+            <div style={{ position: 'absolute', top: 2, left: isDark ? 17 : 2,
+              width: 14, height: 14, borderRadius: '50%', background: C.accent,
+              transition: 'left .25s cubic-bezier(.34,1.56,.64,1)' }} />
+          </div>
+          <span className="q-topbar-theme-label" style={{ fontSize: 12, fontWeight: 600, color: C.accent, whiteSpace: 'nowrap' }}>
+            {isDark ? 'Dark' : 'Light'}
           </span>
         </button>
 

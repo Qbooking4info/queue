@@ -9,7 +9,7 @@ import { haptics } from '@queue/shared/lib/haptics'
 interface Props { navigation?: any }
 
 export function ProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { user, signOut } = useAuth()
   const [signingOut, setSigningOut]         = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
@@ -123,6 +123,19 @@ export function ProfileScreen({ navigation }: Props) {
             <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch theme</Text>
           </View>
           <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
+            trackColor={{ false: t.accentBg, true: t.accentBg }}
+            thumbColor={t.accent} />
+        </View>
+
+        {/* Mode toggle -- independent of theme family: any of Forest/Clinical
+            can be Light or Dark. */}
+        <View style={[styles.themeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={18} color={t.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{mode === 'dark' ? 'Dark' : 'Light'} Mode</Text>
+            <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch mode</Text>
+          </View>
+          <Switch value={mode === 'dark'} onValueChange={toggleMode}
             trackColor={{ false: t.accentBg, true: t.accentBg }}
             thumbColor={t.accent} />
         </View>

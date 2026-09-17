@@ -55,7 +55,7 @@ function HospitalRow({ h, C, onManage, canManage }: { h: HospitalStat; C: any; o
       {canManage ? (
         <button onClick={onManage} style={{
           width: '100%', padding: '9px 16px', borderRadius: 10, border: 'none',
-          background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+          background: C.accent, color: C.onAccent,
           fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>

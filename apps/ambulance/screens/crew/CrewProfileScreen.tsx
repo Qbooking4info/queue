@@ -17,7 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 export function CrewProfileScreen() {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { crewProfile, staffProfile, user, signOut } = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut,     setSigningOut]     = useState(false)
@@ -70,11 +70,18 @@ export function CrewProfileScreen() {
 
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
+          <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
+            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
+              {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
+            </Text>
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
+              trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
           <View style={[s.row, { borderBottomWidth: 0 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+              {mode === 'dark' ? 'Dark' : 'Light'} mode
             </Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
+            <Switch value={mode === 'dark'} onValueChange={toggleMode}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </View>

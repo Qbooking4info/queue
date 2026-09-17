@@ -10,7 +10,7 @@ import { Button } from '@queue/shared/components/ui/Button'
 interface Props { navigation: any }
 
 export function AdminProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { providerAdminProfile, user, signOut } = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -52,11 +52,17 @@ export function AdminProfileScreen({ navigation }: Props) {
         </View>
 
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
+            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
+              {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
+            </Text>
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
           <View style={[s.row, { borderBottomWidth: 0 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+              {mode === 'dark' ? 'Dark' : 'Light'} mode
             </Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+            <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </View>
 

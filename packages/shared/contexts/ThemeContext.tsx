@@ -1,206 +1,309 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// Structural scale, not color -- identical across both palettes on purpose, and
+// Structural scale, not color -- identical across every scheme on purpose, and
 // mirrored (same numeric values) in web/src/contexts/ThemeContext.tsx's own `scale`
-// so a card or button reads as the same size on web and mobile even though the two
-// token systems aren't code-shared. Values were picked to match the modes actually
-// in use across screens today (fontSize clustered hardest at 11/12/13/14, borderRadius
-// at 10/14/20/99), not invented from scratch -- the goal is a named home for the
-// numbers already being reached for, not new numbers nobody was using.
+// so a card or button is the same size on web and mobile even though the two token
+// systems aren't code-shared. `font.display` is new: the MD3 mockups this palette
+// was redrawn from use a much bigger number for splash/hero branding (48) and stat
+// values (28-30) than anything this app reached for before (`hero` topped out at
+// 26) -- added rather than repurposing `hero`, so nothing that already reads `hero`
+// silently gets bigger.
 const scale = {
   spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
   radius:  { sm: 10, md: 14, lg: 20, pill: 99 },
-  font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 26 },
+  font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 30, display: 44 },
 }
 
-const forest = {
-  id: 'forest',
+// ── MD3 color science, redrawn from the four scheme mockups (queue-hospital-md /
+// queue-patient-md) exactly -- every primary/container/surface/outline value below
+// is the literal hex the mockups used for that scheme, not a re-tint. Two
+// independent dimensions, matching the mockups: a theme family (forest/clinical)
+// and a mode (light/dark), four total combinations, each reachable on its own
+// (see ThemeProvider below) rather than forest always meaning dark and clinical
+// always meaning light.
+//
+// This app's own token names (canvasBg, cardBg, textPrimary, ...) are kept --
+// every screen in the app already reads these by name, and renaming them would
+// mean touching every screen instead of just this file. Each name below is
+// mapped to the MD3 field with the matching semantic role:
+//   canvasBg -> surfaceContainer   (recessed page background, one step behind cards)
+//   cardBg   -> surface            (the card/content surface itself)
+//   textPrimary/Secondary/Muted -> onSurface / onSurfaceVariant / outline
+//     (MD3's own three-tier emphasis ladder for text on a surface)
+//   accent -> primary; danger -> error; info -> blue (MD3's dedicated "info" hue
+//     in these mockups, distinct from primary)
+//   statusOpen/Busy/Virtual/Cancelled/Approval/Progress/Neutral -> the container/
+//     on-container pair MD3 uses for an equivalent status chip in the mockups
+//     (confirmed->primary, waiting->amber, virtual->tertiary, cancelled->error,
+//     pending approval->purple, in-progress->secondary, neutral->surfaceVariant)
+// Tint tokens (accentBg, dangerSubtle, ...) that don't have a direct MD3 field are
+// computed as an rgba of the matching solid MD3 color at the opacity this app
+// already used for that role, so the *hue* is always the template's own color,
+// just applied at a "thin tint behind small text" strength instead of a "bold
+// fill" strength (that bold-fill role is exactly what the new *Container/
+// onAccentContainer pair -- and the newly-added on* pairs below it -- covers.)
+
+const forestLight = {
+  id: 'forest' as const, mode: 'light' as const,
   ...scale,
-  canvasBg:    '#0A0F0D',
-  cardBg:      '#111915',
-  cardBorder:  'rgba(255,255,255,0.07)',
-  accent:      '#00E87A',
-  accentDark:  '#00C265',
-  accentBg:    'rgba(0,232,122,0.12)',
-  accentBgMid: 'rgba(0,232,122,0.08)',
-  // Not the same RGB as accentBg above -- these are built from accentDark
-  // (0,194,101), which several screens' hand-rolled "Approve" buttons already
-  // tinted their bg/border from at exactly these opacities. Named `success`
-  // since that's the actual semantic (a positive/approve action), even though it
-  // happens to reuse the theme's own darker accent shade rather than a universal
-  // green -- in clinical below, accentDark is a blue, and successSubtle/Border
-  // follow it there too, preserving whatever that button already looked like
-  // rather than introducing a third, always-green hue no existing screen used.
-  successSubtle: 'rgba(0,194,101,0.12)',
-  successBorder: 'rgba(0,194,101,0.3)',
-  accentBorder:'rgba(0,232,122,0.28)',
-  textPrimary: '#E8F5EE',
-  textSecondary:'#7ABDA0',
-  // Lightened from #4A7060, which sat at 3.09:1 against inputBg -- below the WCAG AA
-  // 4.5:1 floor for body text, and this token carries timestamps, helper copy and
-  // empty-state text. #658B7B clears 4.5:1 on all three surfaces it renders on
-  // (canvasBg 5.09, cardBg 4.71, inputBg 4.52).
-  textMuted:   '#658B7B',
-  // Solid semantic colors for buttons/icons/banners -- distinct from the statusX
-  // trios below, which are specifically for queue-status badges (bg+text+border at
-  // one fixed opacity). danger/info were never named before this: every screen that
-  // needed an alert red or an info blue just retyped the same literal. forest's value
-  // here is the exact literal that was already the de facto standard (zero visual
-  // change); info is identical in both palettes because '#5B9EFF' was already proven
-  // to read fine on both a dark mobile screen and a white web dashboard card.
-  danger:      '#FF5C5C',
-  info:        '#5B9EFF',
-  // Tint/border variants at the opacities screens actually reach for, not an invented
-  // ramp. Real usage of rgba(255,92,92,*) alone spanned 14 distinct opacity values
-  // (0.06 through 0.8); these four are the ones with a real cluster behind them --
-  // dangerBg reuses the SAME 0.14 the statusX trios below already use for bg (exact
-  // match, not a new number), dangerSubtle/Border/Strong pick each cluster's dominant
-  // value (0.1, 0.3, 0.4). A handful of clear outliers (0.15/0.2/0.7/0.8, ~8 call
-  // sites, most likely full-screen backdrop dims, not brand-color tints) are
-  // deliberately left as their own literals rather than forced onto a nearby tier.
-  dangerBg:      'rgba(255,92,92,0.14)',
-  dangerSubtle:  'rgba(255,92,92,0.1)',
-  dangerBorder:  'rgba(255,92,92,0.3)',
-  dangerStrong:  'rgba(255,92,92,0.4)',
-  infoBg:        'rgba(91,158,255,0.14)',
-  infoSubtle:    'rgba(91,158,255,0.12)',
-  infoBorder:    'rgba(91,158,255,0.3)',
-  statusOpen:     { bg:'rgba(0,232,122,0.14)',  text:'#5DCAA5', border:'rgba(0,232,122,0.28)' },
-  statusBusy:     { bg:'rgba(239,159,39,0.14)', text:'#EF9F27', border:'rgba(239,159,39,0.28)' },
-  statusVirtual:  { bg:'rgba(55,138,221,0.14)', text:'#85B7EB', border:'rgba(55,138,221,0.28)' },
-  statusCancelled:{ bg:'rgba(226,75,74,0.14)',  text:'#F09595', border:'rgba(226,75,74,0.28)' },
-  // Added for statusBadgeColors() (lib/statusColors.ts) -- 5 screens each hand-rolled a
-  // STATUS_META table covering 6-8 appointment statuses from literals that never changed
-  // with the theme (clinical inherited forest's tuning and failed AA -- see the 6-status
-  // table measured directly on this app's own badges: every one was under 2.8:1 on white).
-  // Copy-paste also drifted: AdminDashboardScreen's in_progress was blue while its four
-  // siblings used orange. These three cover the buckets statusOpen/Busy/Virtual/Cancelled
-  // don't: pending_approval, in_progress (distinct from checked_in's blue and pending's
-  // amber), and a neutral tone for completed/no_show/off-duty. Text values are literals
-  // already in use elsewhere in the app (not invented): #A78BFA is the existing purple
-  // accent, #FF8C42 the existing in_progress orange, #93A9A0 an existing neutral gray
-  // (DoctorVideoCallScreen). All three measured against both cardBg and their own tint.
-  statusApproval: { bg:'rgba(167,139,250,0.14)', text:'#A78BFA', border:'rgba(167,139,250,0.28)' },
-  statusProgress: { bg:'rgba(255,140,66,0.14)',  text:'#FF8C42', border:'rgba(255,140,66,0.28)' },
-  statusNeutral:  { bg:'rgba(147,169,160,0.14)', text:'#93A9A0', border:'rgba(147,169,160,0.28)' },
-  bannerBg:    '#0A1A0F',
-  bannerBorder:'rgba(0,232,122,0.22)',
-  inputBg:     '#161D19',
-  inputBorder: 'rgba(255,255,255,0.09)',
-  starColor:   '#EF9F27',
-  splashBg:    '#061208',
-  // MD3-style bold tonal "container" -- a saturated fill paired with an always-
-  // readable on-color, for surfaces that carry the accent as their whole
-  // background (a stat tile, a hero banner) rather than a thin tint behind small
-  // text. Dark-mode pairing: a deep, muted accent with a bright on-color -- the
-  // inverse of light mode's pastel-fill/dark-text. Additive only.
+  canvasBg:    '#EAEEEA',
+  cardBg:      '#F6FBF4',
+  cardBorder:  '#BFC9BF',
+  accent:      '#006D3E',
+  // The color that reads on top of a solid `accent` fill (a primary button's own
+  // label, a filled chip's icon) -- MD3's onPrimary for this exact scheme, not a
+  // dark/light guess. Needed as its own token once forest could mean either mode:
+  // forest-light's accent is a deep, saturated green (wants white text) while
+  // forest-dark's is a pale mint (wants dark text) -- the two used to share one
+  // `t.id === 'forest' ? dark : white` heuristic across every call site because
+  // forest only ever meant dark before. That heuristic is wrong half the time now.
+  onAccent:    '#FFFFFF',
+  accentDark:  '#006D3E',
+  accentBg:    'rgba(0,109,62,0.12)',
+  accentBgMid: 'rgba(0,109,62,0.08)',
+  accentBorder:'rgba(0,109,62,0.28)',
+  successSubtle: 'rgba(0,109,62,0.12)',
+  successBorder: 'rgba(0,109,62,0.3)',
+  textPrimary:  '#181D19',
+  textSecondary:'#404943',
+  // MD3's own outline field is tuned for borders/icons (~3:1 against surface),
+  // not small text -- this app's textMuted carries timestamps and helper copy,
+  // genuinely small text that needs the 4.5:1 text floor. onSurfaceVariant
+  // (same value as textSecondary) is the field MD3 actually engineers for that,
+  // so textMuted reuses it rather than a lower-contrast tone with no such
+  // guarantee. The two collapse to one shade as a result -- a deliberate trade
+  // of hierarchy nuance for guaranteed legibility.
+  textMuted:    '#404943',
+  danger:      '#BA1A1A',
+  info:        '#1D4ED8',
+  dangerBg:      'rgba(186,26,26,0.14)',
+  dangerSubtle:  'rgba(186,26,26,0.1)',
+  dangerBorder:  'rgba(186,26,26,0.3)',
+  dangerStrong:  'rgba(186,26,26,0.4)',
+  infoBg:        'rgba(29,78,216,0.14)',
+  infoSubtle:    'rgba(29,78,216,0.12)',
+  infoBorder:    'rgba(29,78,216,0.3)',
+  statusOpen:     { bg:'#9EF5BC', text:'#002112', border:'rgba(0,109,62,0.28)' },
+  statusBusy:     { bg:'#FEF3C7', text:'#451A03', border:'rgba(180,83,9,0.28)' },
+  statusVirtual:  { bg:'#C2E8FD', text:'#001F2B', border:'rgba(62,99,116,0.28)' },
+  statusCancelled:{ bg:'#FFDAD6', text:'#410002', border:'rgba(186,26,26,0.28)' },
+  statusApproval: { bg:'#EDE9FE', text:'#2D1B69', border:'rgba(109,40,217,0.28)' },
+  statusProgress: { bg:'#CFF0DC', text:'#0A1F14', border:'rgba(77,99,86,0.28)' },
+  statusNeutral:  { bg:'#DCE5DB', text:'#404943', border:'#BFC9BF' },
+  bannerBg:    '#003D24',
+  bannerBorder:'rgba(0,109,62,0.28)',
+  inputBg:     '#E4E9E4',
+  inputBorder: '#707973',
+  starColor:   '#B45309',
+  splashBg:    '#003D24',
+  accentContainer:   '#9EF5BC',
+  onAccentContainer: '#002112',
+}
+
+const forestDark = {
+  id: 'forest' as const, mode: 'dark' as const,
+  ...scale,
+  canvasBg:    '#1A201A',
+  cardBg:      '#0F1410',
+  cardBorder:  '#404943',
+  accent:      '#7EDBA0',
+  onAccent:    '#00391F',
+  accentDark:  '#7EDBA0',
+  accentBg:    'rgba(126,219,160,0.14)',
+  accentBgMid: 'rgba(126,219,160,0.10)',
+  accentBorder:'rgba(126,219,160,0.28)',
+  successSubtle: 'rgba(126,219,160,0.14)',
+  successBorder: 'rgba(126,219,160,0.3)',
+  textPrimary:  '#DEE4DE',
+  textSecondary:'#BFC9BF',
+  // See forestLight's own comment on this same field.
+  textMuted:    '#BFC9BF',
+  danger:      '#FFB4AB',
+  info:        '#93C5FD',
+  dangerBg:      'rgba(255,180,171,0.16)',
+  dangerSubtle:  'rgba(255,180,171,0.12)',
+  dangerBorder:  'rgba(255,180,171,0.32)',
+  dangerStrong:  'rgba(255,180,171,0.42)',
+  infoBg:        'rgba(147,197,253,0.16)',
+  infoSubtle:    'rgba(147,197,253,0.12)',
+  infoBorder:    'rgba(147,197,253,0.32)',
+  statusOpen:     { bg:'#005230', text:'#9EF5BC', border:'rgba(126,219,160,0.28)' },
+  statusBusy:     { bg:'#452B00', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
+  statusVirtual:  { bg:'#244C5D', text:'#C2E8FD', border:'rgba(166,205,217,0.28)' },
+  statusCancelled:{ bg:'#93000A', text:'#FFDAD6', border:'rgba(255,180,171,0.28)' },
+  statusApproval: { bg:'#2D1B69', text:'#EDE9FE', border:'rgba(196,181,253,0.28)' },
+  statusProgress: { bg:'#354B3F', text:'#CFF0DC', border:'rgba(179,204,188,0.28)' },
+  statusNeutral:  { bg:'#404943', text:'#BFC9BF', border:'#404943' },
+  bannerBg:    '#002112',
+  bannerBorder:'rgba(126,219,160,0.28)',
+  inputBg:     '#1A201A',
+  inputBorder: '#404943',
+  starColor:   '#FBD06A',
+  splashBg:    '#002112',
   accentContainer:   '#005230',
   onAccentContainer: '#9EF5BC',
 }
 
-const clinical = {
-  id: 'clinical',
+const clinicalLight = {
+  id: 'clinical' as const, mode: 'light' as const,
   ...scale,
-  canvasBg:    '#F4F8FC',
-  cardBg:      '#FFFFFF',
-  cardBorder:  '#DDE8F5',
-  accent:      '#1A7FC1',
-  accentDark:  '#0E5A8A',
-  accentBg:    '#E6F1FB',
-  accentBgMid: 'rgba(26,127,193,0.12)',
-  accentBorder:'rgba(26,127,193,0.30)',
-  successSubtle: 'rgba(14,90,138,0.12)',
-  successBorder: 'rgba(14,90,138,0.3)',
-  // '#DC2626' isn't invented for this -- it's already the exact literal one mobile
-  // screen (AppointmentDetailScreen) and multiple web dashboard pages independently
-  // reached for as "the readable red on a light background", so it's a documented
-  // choice, not a guess.
-  // Both darkened for WCAG AA. These aren't only read on the card -- Button's `danger`
-  // and `info` variants paint them on their OWN tinted fill (dangerSubtle/infoSubtle
-  // composited over the card), which pulls the background toward the text hue and costs
-  // roughly half a point of contrast. Solved against that composite, not against white:
-  //   danger #CD1717 on #FCE9E9 = 4.53:1   (was #DC2626 at 4.13:1)
-  //   info   #2568C9 on #EBF3FF = 4.55:1   (was #5B9EFF at 2.42:1 -- the worst in the app)
-  danger:      '#CD1717',
-  info:        '#2568C9',
-  // Same opacities as forest, but built from clinical's OWN solid danger RGB
-  // (220,38,38, i.e. #DC2626) rather than forest's -- these never existed as literals
-  // in light mode before (every existing occurrence was a dark-mode-only literal), so
-  // rather than washing out forest's brighter red at low opacity against a white
-  // background, this follows the same forest/clinical relationship already
-  // established by danger's own solid value and by every statusX pair below.
-  dangerBg:      'rgba(220,38,38,0.14)',
-  dangerSubtle:  'rgba(220,38,38,0.1)',
-  dangerBorder:  'rgba(220,38,38,0.3)',
-  dangerStrong:  'rgba(220,38,38,0.4)',
-  infoBg:        'rgba(91,158,255,0.14)',
-  infoSubtle:    'rgba(91,158,255,0.12)',
-  infoBorder:    'rgba(91,158,255,0.3)',
-  textPrimary: '#0C2A4A',
-  textSecondary:'#2A5070',
-  // Darkened from #6A8FAA (3.21:1 on canvasBg). Had to clear AA against the *canvas*,
-  // not the card -- an obvious-looking #5A7A8A passes on white at 4.58:1 and quietly
-  // fails on canvasBg at 4.29:1. #4F748F clears both (4.97 / 4.66).
-  textMuted:   '#4F748F',
-  statusOpen:     { bg:'#E6F7EE', text:'#085041', border:'rgba(0,168,84,0.3)' },
-  statusBusy:     { bg:'#FEF8E7', text:'#633806', border:'rgba(196,127,0,0.3)' },
-  statusVirtual:  { bg:'#E6F1FB', text:'#0C447C', border:'rgba(26,95,165,0.3)' },
-  statusCancelled:{ bg:'#FCEBEB', text:'#791F1F', border:'rgba(163,45,45,0.3)' },
-  // Mirrors forest's three -- see that side for why these exist. statusApproval reuses
-  // this palette's own existing purple/purpleLight pair (already proven at 8.30:1 card,
-  // 7.29:1 tint) rather than inventing a new hue. statusProgress is a new burnt-orange,
-  // deliberately NOT statusBusy's brown-amber (#633806) -- pending and in_progress must
-  // stay visually distinct on a badge, not just contrast-legal. statusNeutral reuses
-  // textMuted for the text (a muted/gray semantic fits "completed" or "off duty") with
-  // a plain light-gray tint rather than bgAlt, so it doesn't read as "canvas" on a card.
-  statusApproval: { bg:'#F2EEFF', text:'#5C35A8', border:'rgba(92,53,168,0.3)' },
-  statusProgress: { bg:'#FDECE1', text:'#9A3412', border:'rgba(154,52,18,0.3)' },
-  statusNeutral:  { bg:'#EEF4FA', text:'#4C718C', border:'rgba(76,113,140,0.3)' },
-  bannerBg:    '#0C2A4A',
-  bannerBorder:'rgba(26,127,193,0.30)',
-  inputBg:     '#F4F8FC',
-  inputBorder: '#C0D4E8',
-  starColor:   '#C47F00',
-  splashBg:    '#0C2A4A',
-  // MD3-style bold tonal "container" -- see forest's own comment above. Light-mode
-  // pairing: a pastel fill with dark on-color.
+  canvasBg:    '#ECEEF4',
+  cardBg:      '#F8F9FF',
+  cardBorder:  '#C3C6CF',
+  accent:      '#005DB8',
+  onAccent:    '#FFFFFF',
+  accentDark:  '#005DB8',
+  accentBg:    'rgba(0,93,184,0.12)',
+  accentBgMid: 'rgba(0,93,184,0.08)',
+  accentBorder:'rgba(0,93,184,0.30)',
+  successSubtle: 'rgba(0,93,184,0.12)',
+  successBorder: 'rgba(0,93,184,0.3)',
+  textPrimary:  '#191C20',
+  textSecondary:'#43474E',
+  // See forestLight's own comment on this same field.
+  textMuted:    '#43474E',
+  danger:      '#BA1A1A',
+  info:        '#1D4ED8',
+  dangerBg:      'rgba(186,26,26,0.14)',
+  dangerSubtle:  'rgba(186,26,26,0.1)',
+  dangerBorder:  'rgba(186,26,26,0.3)',
+  dangerStrong:  'rgba(186,26,26,0.4)',
+  infoBg:        'rgba(29,78,216,0.14)',
+  infoSubtle:    'rgba(29,78,216,0.12)',
+  infoBorder:    'rgba(29,78,216,0.3)',
+  statusOpen:     { bg:'#D5E3FF', text:'#001B3D', border:'rgba(0,93,184,0.28)' },
+  statusBusy:     { bg:'#FEF3C7', text:'#451A03', border:'rgba(180,83,9,0.28)' },
+  statusVirtual:  { bg:'#F5D9FF', text:'#261430', border:'rgba(109,86,116,0.28)' },
+  statusCancelled:{ bg:'#FFDAD6', text:'#410002', border:'rgba(186,26,26,0.28)' },
+  statusApproval: { bg:'#EDE9FE', text:'#2D1B69', border:'rgba(109,40,217,0.28)' },
+  statusProgress: { bg:'#D8E3F8', text:'#111C2B', border:'rgba(84,95,113,0.28)' },
+  statusNeutral:  { bg:'#DFE2EB', text:'#43474E', border:'#C3C6CF' },
+  bannerBg:    '#001C42',
+  bannerBorder:'rgba(0,93,184,0.30)',
+  inputBg:     '#E6E8EE',
+  inputBorder: '#73777F',
+  starColor:   '#B45309',
+  splashBg:    '#001C42',
   accentContainer:   '#D5E3FF',
   onAccentContainer: '#001B3D',
 }
 
-export type Theme = typeof forest
-export const themes = { forest, clinical } as const
+const clinicalDark = {
+  id: 'clinical' as const, mode: 'dark' as const,
+  ...scale,
+  canvasBg:    '#1C1E24',
+  cardBg:      '#111318',
+  cardBorder:  '#43474E',
+  accent:      '#A8C8FF',
+  onAccent:    '#00306A',
+  accentDark:  '#A8C8FF',
+  accentBg:    'rgba(168,200,255,0.14)',
+  accentBgMid: 'rgba(168,200,255,0.10)',
+  accentBorder:'rgba(168,200,255,0.30)',
+  successSubtle: 'rgba(168,200,255,0.14)',
+  successBorder: 'rgba(168,200,255,0.3)',
+  textPrimary:  '#E2E2E9',
+  textSecondary:'#C3C6CF',
+  // See forestLight's own comment on this same field.
+  textMuted:    '#C3C6CF',
+  danger:      '#FFB4AB',
+  info:        '#93C5FD',
+  dangerBg:      'rgba(255,180,171,0.16)',
+  dangerSubtle:  'rgba(255,180,171,0.12)',
+  dangerBorder:  'rgba(255,180,171,0.32)',
+  dangerStrong:  'rgba(255,180,171,0.42)',
+  infoBg:        'rgba(147,197,253,0.16)',
+  infoSubtle:    'rgba(147,197,253,0.12)',
+  infoBorder:    'rgba(147,197,253,0.32)',
+  statusOpen:     { bg:'#00469A', text:'#D5E3FF', border:'rgba(168,200,255,0.28)' },
+  statusBusy:     { bg:'#452B00', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
+  statusVirtual:  { bg:'#553C5C', text:'#F5D9FF', border:'rgba(218,189,228,0.28)' },
+  statusCancelled:{ bg:'#93000A', text:'#FFDAD6', border:'rgba(255,180,171,0.28)' },
+  statusApproval: { bg:'#2D1B69', text:'#EDE9FE', border:'rgba(196,181,253,0.28)' },
+  statusProgress: { bg:'#3C4758', text:'#D8E3F8', border:'rgba(187,199,220,0.28)' },
+  statusNeutral:  { bg:'#43474E', text:'#C3C6CF', border:'#43474E' },
+  bannerBg:    '#001B3D',
+  bannerBorder:'rgba(168,200,255,0.28)',
+  inputBg:     '#1C1E24',
+  inputBorder: '#43474E',
+  starColor:   '#FBD06A',
+  splashBg:    '#001B3D',
+  accentContainer:   '#00469A',
+  onAccentContainer: '#D5E3FF',
+}
 
-const THEME_STORAGE_KEY = 'queue:theme'
+export type Theme = typeof forestLight | typeof forestDark | typeof clinicalLight | typeof clinicalDark
+export type ThemeFamily = 'forest' | 'clinical'
+export type ThemeMode = 'light' | 'dark'
 
-interface ThemeCtx { theme: Theme; themeId: string; toggleTheme: () => void }
+export const themes = {
+  'forest-light':   forestLight,
+  'forest-dark':    forestDark,
+  'clinical-light': clinicalLight,
+  'clinical-dark':  clinicalDark,
+} as const
 
-const Ctx = createContext<ThemeCtx>({ theme: forest, themeId: 'forest', toggleTheme: () => {} })
+const FAMILY_KEY = 'queue:theme'
+const MODE_KEY   = 'queue:theme-mode'
+
+interface ThemeCtx {
+  theme: Theme
+  themeId: ThemeFamily
+  mode: ThemeMode
+  toggleTheme: () => void
+  toggleMode: () => void
+  setMode: (mode: ThemeMode) => void
+}
+
+const Ctx = createContext<ThemeCtx>({
+  theme: forestLight, themeId: 'forest', mode: 'light',
+  toggleTheme: () => {}, toggleMode: () => {}, setMode: () => {},
+})
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeId] = useState<'forest' | 'clinical'>('forest')
+  const [themeId, setThemeId] = useState<ThemeFamily>('forest')
+  const [mode,    setModeState] = useState<ThemeMode>('dark')
 
-  // MM6: Load persisted theme preference on startup
+  // Load persisted theme + mode preference on startup. Forest previously always
+  // meant dark and clinical always meant light -- a saved 'forest'/'clinical' from
+  // before this change still resolves correctly since forest still defaults to
+  // dark and clinical to light when no separate mode was ever saved.
   useEffect(() => {
-    AsyncStorage.getItem(THEME_STORAGE_KEY).then(saved => {
-      if (saved === 'forest' || saved === 'clinical') {
-        setThemeId(saved)
+    Promise.all([
+      AsyncStorage.getItem(FAMILY_KEY),
+      AsyncStorage.getItem(MODE_KEY),
+    ]).then(([savedFamily, savedMode]) => {
+      if (savedFamily === 'forest' || savedFamily === 'clinical') setThemeId(savedFamily)
+      if (savedMode === 'light' || savedMode === 'dark') {
+        setModeState(savedMode)
+      } else if (savedFamily === 'clinical') {
+        setModeState('light')
       }
     }).catch(() => {/* ignore storage errors */})
   }, [])
 
   function toggleTheme() {
     setThemeId(prev => {
-      const next: 'forest' | 'clinical' = prev === 'forest' ? 'clinical' : 'forest'
-      // MM6: Persist new theme preference
-      AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(() => {/* ignore storage errors */})
+      const next: ThemeFamily = prev === 'forest' ? 'clinical' : 'forest'
+      AsyncStorage.setItem(FAMILY_KEY, next).catch(() => {/* ignore storage errors */})
       return next
     })
   }
 
+  function setMode(next: ThemeMode) {
+    setModeState(next)
+    AsyncStorage.setItem(MODE_KEY, next).catch(() => {/* ignore storage errors */})
+  }
+
+  function toggleMode() {
+    setMode(mode === 'light' ? 'dark' : 'light')
+  }
+
+  const theme = themes[`${themeId}-${mode}`]
+
   return (
-    <Ctx.Provider value={{ theme: themes[themeId], themeId, toggleTheme }}>
+    <Ctx.Provider value={{ theme, themeId, mode, toggleTheme, toggleMode, setMode }}>
       {children}
     </Ctx.Provider>
   )

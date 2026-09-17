@@ -128,7 +128,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
             />
 
             <TouchableOpacity onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-              <Text style={[styles.saveBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>{saving ? 'Saving…' : 'Save Insurance Details'}</Text>
+              <Text style={[styles.saveBtnText, { color: t.onAccent }]}>{saving ? 'Saving…' : 'Save Insurance Details'}</Text>
             </TouchableOpacity>
           </>
         )}

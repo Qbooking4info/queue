@@ -235,7 +235,7 @@ function ActionBtn({ label, theme: t, onPress, primary, danger, muted, disabled 
 }) {
   const bg = primary ? t.accent : danger ? t.dangerSubtle : t.inputBg
   const border = primary ? t.accent : danger ? t.dangerBorder : t.cardBorder
-  const color = primary ? (t.id === 'forest' ? '#061208' : '#fff') : danger ? t.danger : t.textSecondary
+  const color = primary ? t.onAccent : danger ? t.danger : t.textSecondary
   return (
     <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}
       style={{ flex: 1, minWidth: 100, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: bg, borderWidth: 1, borderColor: border, opacity: disabled ? 0.5 : 1 }}>

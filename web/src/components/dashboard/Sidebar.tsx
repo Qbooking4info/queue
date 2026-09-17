@@ -213,7 +213,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               {item.href === '/dashboard/appointments' && stats.todayTotal > 0 && (
                 <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700,
                   background: isActive ? C.sidebarActiveText : C.accent,
-                  color: isActive ? C.sidebarActive : (C.id === 'forest' ? '#061208' : '#fff'),
+                  color: isActive ? C.sidebarActive : C.onAccent,
                   padding: '1px 7px', borderRadius: 99 }}>
                   {stats.todayTotal}
                 </span>

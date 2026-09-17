@@ -24,7 +24,7 @@ const DEFAULTS: DoctorProfileSettings = {
 }
 
 export function DoctorSettingsScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { user, doctorProfile, signOut } = useAuth()
   const [form, setForm] = useState<DoctorProfileSettings>(DEFAULTS)
   const [loading, setLoading] = useState(true)
@@ -220,12 +220,19 @@ export function DoctorSettingsScreen({ navigation }: Props) {
         </Section>
 
         <Section theme={t} title="App">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
+              <Text style={{ fontSize: 13, color: t.textPrimary }}>{themeId === 'forest' ? 'Forest' : 'Clinical'} theme</Text>
+            </View>
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
-              <Text style={{ fontSize: 13, color: t.textPrimary }}>{themeId === 'forest' ? 'Dark theme' : 'Light theme'}</Text>
+              <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={{ fontSize: 13, color: t.textPrimary }}>{mode === 'dark' ? 'Dark' : 'Light'} mode</Text>
             </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+            <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </Section>
 

@@ -180,7 +180,7 @@ function WalkInModal({
               <div style={{ fontSize: 18, fontWeight: 800, color: C.accent, fontFamily: 'monospace' }}>{done}</div>
               <button onClick={onClose}
                 style={{ marginTop: 20, padding: '10px 32px', borderRadius: 10, background: C.accent,
-                  color: C.id === 'forest' ? '#061208' : '#fff', border: 'none',
+                  color: C.onAccent, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Done
               </button>
@@ -209,7 +209,7 @@ function WalkInModal({
                     <button onClick={searchByPatientNumber} disabled={!patientNumber.trim() || searching}
                       style={{ padding: '10px 16px', borderRadius: 10, border: 'none',
                         background: patientNumber.trim() ? C.accent : C.bgAlt,
-                        color: patientNumber.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+                        color: patientNumber.trim() ? C.onAccent : C.textMuted,
                         fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                       {searching ? '…' : 'Look up'}
                     </button>
@@ -845,7 +845,7 @@ export default function AppointmentsPage() {
             </button>
           )}
           <button onClick={load}
-            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+            style={{ background: C.accent, color: C.onAccent,
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
               transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}

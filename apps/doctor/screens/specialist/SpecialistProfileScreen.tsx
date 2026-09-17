@@ -33,7 +33,7 @@ interface Stats {
 }
 
 export function SpecialistProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { user, doctorProfile, signOut } = useAuth()
   const [doctor,       setDoctor]       = useState<DoctorDetails | null>(null)
   const [stats,        setStats]        = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
@@ -180,12 +180,21 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
               <Text style={[st.rowLabel, { color: t.textPrimary }]}>
-                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+                {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
               </Text>
             </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
+          <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={[st.rowLabel, { color: t.textPrimary }]}>
+                {mode === 'dark' ? 'Dark' : 'Light'} mode
+              </Text>
+            </View>
+            <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </View>
 
