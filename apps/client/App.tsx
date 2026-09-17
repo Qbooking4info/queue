@@ -14,8 +14,9 @@ import { SwitchedAccountBanner } from '@queue/shared/components/ui/SwitchedAccou
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator, Text, TextInput } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold } from '@expo-google-fonts/dm-sans'
 
 import { ThemeProvider, useTheme }     from '@queue/shared/contexts/ThemeContext'
 import { AlertProvider }               from '@queue/shared/contexts/AlertContext'
@@ -201,10 +202,35 @@ function RootAuthNavigator() {
 
 // ── Root navigator ────────────────────────────────────────────────────────────
 
+// Matches the mockup's own typeface exactly. Applied as a single global
+// default (Text.defaultProps) rather than per-screen, which is why every
+// existing screen picks it up with zero changes -- but that means only one
+// weight (Regular) is actually wired up as the default face. RN doesn't
+// auto-select a matching bold/heavy font file for a custom fontFamily the
+// way it does for system fonts, so a style that also sets fontWeight still
+// renders in Regular's own glyphs -- iOS synthesizes a reasonable faux-bold
+// from that (it does this for most custom fonts), Android's is a bit
+// flatter. The other four weights are still loaded so any specific screen
+// can opt into an exact weight later by naming it directly
+// (fontFamily: 'DMSans_800ExtraBold'), without needing to load anything new.
+let dmSansApplied = false
+function applyDMSansGlobally() {
+  if (dmSansApplied) return
+  dmSansApplied = true
+  for (const Comp of [Text, TextInput] as const) {
+    const existing = (Comp as any).defaultProps ?? {}
+    ;(Comp as any).defaultProps = { ...existing, style: [{ fontFamily: 'DMSans_400Regular' }, existing.style] }
+  }
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
   const { session, loading, user, switchedInto } = useAuth()
   const { theme: t } = useTheme()
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
+  })
+  if (fontsLoaded) applyDMSansGlobally()
   // Suspended while switched into a dependent's account -- otherwise this device's
   // push token would silently overwrite the dependent's own push_token every time a
   // caretaker switches in, breaking notification delivery to the dependent's own phone.
@@ -216,7 +242,7 @@ function AppNavigator() {
   // so it fires on any tab, not just Home.
   const { ringNotif, dismissRing } = useRingAlert(session ? user?.id : undefined)
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
