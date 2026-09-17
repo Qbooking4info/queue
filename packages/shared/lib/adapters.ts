@@ -9,7 +9,10 @@ import type { HospitalWithDoctors } from './api'
 // extended by two more distinct hues so more than 4 hospitals still visibly vary.
 const AVATAR_BG = ['#006D3E','#005DB8','#7B4100','#4B3694','#B45309','#0E7490']
 
-function bgFromName(name: string): string {
+// Exported so any avatar (a doctor row in the booking flow, not just a
+// hospital card) can get the same "different colors per tile" treatment
+// from just a name, instead of a single hardcoded color for every avatar.
+export function bgFromName(name: string): string {
   let h = 0
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
   return AVATAR_BG[Math.abs(h) % AVATAR_BG.length]

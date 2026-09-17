@@ -73,18 +73,18 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
               <StatusBadge type={hospital.tagType} />
               {hospital.virtual && <StatusBadge type="virtual" />}
               {isMultiClinic && (
-                <View style={[styles.multiChip, { backgroundColor: 'rgba(180,156,240,0.12)', borderColor: 'rgba(180,156,240,0.3)' }]}>
+                <View style={[styles.multiChip, { backgroundColor: t.statusApproval.bg, borderColor: t.statusApproval.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="business-outline" size={10} color="#B49CF0" />
-                    <Text style={[styles.multiChipText, { color: '#B49CF0' }]}>Multi-clinic</Text>
+                    <Ionicons name="business-outline" size={10} color={t.statusApproval.text} />
+                    <Text style={[styles.multiChipText, { color: t.statusApproval.text }]}>Multi-clinic</Text>
                   </View>
                 </View>
               )}
               {(hospital.emergencySlots ?? 0) > 0 && (
-                <View style={styles.emergBadge}>
+                <View style={[styles.emergBadge, { backgroundColor: t.dangerContainer, borderColor: 'transparent' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="alert-circle-outline" size={10} color="#791F1F" />
-                    <Text style={styles.emergBadgeText}>{hospital.emergencySlots} Emergency</Text>
+                    <Ionicons name="alert-circle-outline" size={10} color={t.onDangerContainer} />
+                    <Text style={[styles.emergBadgeText, { color: t.onDangerContainer }]}>{hospital.emergencySlots} Emergency</Text>
                   </View>
                 </View>
               )}
@@ -109,8 +109,8 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
         {/* Multi-clinic OPD note */}
         {isMultiClinic && (
-          <View style={[styles.opdNote, { backgroundColor: 'rgba(85,167,235,0.08)', borderColor: 'rgba(85,167,235,0.2)' }]}>
-            <Ionicons name="information-circle-outline" size={16} color="#55A7EB" style={{ marginTop: 1 }} />
+          <View style={[styles.opdNote, { backgroundColor: t.infoBg, borderColor: t.infoBorder }]}>
+            <Ionicons name="information-circle-outline" size={16} color={t.info} style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               Not sure which department to book?{' '}
               <Text style={{ fontWeight: '700' }}>Book an OPD (General) visit</Text> — the doctor
@@ -121,7 +121,7 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
 
         {/* Approval mode notice */}
         {hospital.approval_mode === 'manual' && (
-          <View style={[styles.opdNote, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.2)', marginTop: 8 }]}>
+          <View style={[styles.opdNote, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border, marginTop: 8 }]}>
             <Ionicons name="clipboard-outline" size={16} color={t.statusBusy.text} style={{ marginTop: 1 }} />
             <Text style={[styles.opdNoteText, { color: t.textSecondary }]}>
               This hospital <Text style={{ fontWeight: '700' }}>manually reviews</Text> booking
@@ -196,8 +196,8 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
                 <TouchableOpacity onPress={openDirections}
                   style={[styles.directionsBtn, { backgroundColor: t.accent }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="navigate-outline" size={15} color="inherit" />
-                  <Text style={styles.directionsBtnText}>Get Directions</Text>
+                  <Ionicons name="navigate-outline" size={15} color={t.onAccent} />
+                  <Text style={[styles.directionsBtnText, { color: t.onAccent }]}>Get Directions</Text>
                 </View>
                 </TouchableOpacity>
               </View>
@@ -255,8 +255,8 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
               style={[styles.ctaBtnPrimary, { backgroundColor: t.accent }]}
               onPress={bookVirtual}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="videocam-outline" size={16} color="#fff" />
-                <Text style={styles.ctaBtnPrimaryText}>Book Virtual</Text>
+                <Ionicons name="videocam-outline" size={16} color={t.onAccent} />
+                <Text style={[styles.ctaBtnPrimaryText, { color: t.onAccent }]}>Book Virtual</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
                 <Text style={[styles.ctaBtnFee, { color: 'rgba(255,255,255,0.75)', marginTop: 0 }]}>Choose a doctor</Text>
@@ -282,9 +282,8 @@ const styles = StyleSheet.create({
   hospitalSpecialty:   { fontSize: 12, marginTop: 2 },
   multiChip:           { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   multiChipText:       { fontSize: 10, fontWeight: '700' },
-  emergBadge:          { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99,
-                         backgroundColor: '#FCEBEB', borderWidth: 1, borderColor: 'rgba(163,45,45,0.3)' },
-  emergBadgeText:      { fontSize: 10, fontWeight: '700', color: '#791F1F', textTransform: 'uppercase' },
+  emergBadge:          { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
+  emergBadgeText:      { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   opdNote:             { flexDirection: 'row', alignItems: 'flex-start', gap: 8,
                          borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 10 },
   opdNoteIcon:         { fontSize: 14 },
@@ -317,10 +316,10 @@ const styles = StyleSheet.create({
   ctaBtnSecondary:     { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center', borderWidth: 1.5 },
   ctaBtnSecondaryText: { fontSize: 13, fontWeight: '700' },
   ctaBtnPrimary:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' },
-  ctaBtnPrimaryText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
+  ctaBtnPrimaryText:   { fontSize: 13, fontWeight: '700' },
   ctaBtnFee:           { fontSize: 10, marginTop: 2 },
   mapWrap:             { borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
   map:                 { height: 180 },
-  directionsBtn:       { padding: 13, alignItems: 'center', borderRadius: 12, marginTop: 8 },
-  directionsBtnText:   { fontSize: 13, fontWeight: '700', color: '#fff' },
+  directionsBtn:       { padding: 13, alignItems: 'center', borderRadius: 99, marginTop: 8 },
+  directionsBtnText:   { fontSize: 13, fontWeight: '700' },
 })

@@ -11,7 +11,7 @@ import { Stars } from '@queue/shared/components/ui/Stars'
 import { Button } from '@queue/shared/components/ui/Button'
 import { QueuePositionPicker } from '@queue/shared/components/QueuePositionPicker'
 import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
-import { toDisplayHospital } from '@queue/shared/lib/adapters'
+import { toDisplayHospital, bgFromName } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 
@@ -357,7 +357,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Doctor / placeholder */}
           <View style={st.doctorRow}>
             {appt.doctor ? (
-              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={52} />
+              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={52} />
             ) : (
               <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
@@ -526,7 +526,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {appt.doctor ? (
             <Section title="Your doctor">
               <View style={[st.doctorCard, { borderBottomColor: t.cardBorder }]}>
-                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={44} />
+                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={44} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.dcName, { color: t.textPrimary }]}>{appt.doctor}</Text>
                   <Text style={[st.dcSpec, { color: t.textMuted }]}>{appt.spec} · {appt.hospital}</Text>

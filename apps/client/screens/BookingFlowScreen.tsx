@@ -14,7 +14,7 @@ import {
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
   getAvailableSlots, getLinkedDependents,
 } from '@queue/shared/lib/api'
-import { toDisplayHospital } from '@queue/shared/lib/adapters'
+import { toDisplayHospital, bgFromName } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmt12 } from '@queue/shared/lib/format'
 import { payForAppointment } from '@queue/shared/lib/payments'
@@ -727,12 +727,12 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       <Text style={[s.hospSpec, { color: t.textMuted }]} numberOfLines={1}>{h.specialty}</Text>
                       <View style={{ flexDirection: 'row', gap: 5, marginTop: 3, flexWrap: 'wrap' }}>
                         {h.virtual && (
-                          <View style={[s.miniTag, { backgroundColor: 'rgba(55,138,221,0.1)', borderColor: 'rgba(55,138,221,0.2)' }]}>
+                          <View style={[s.miniTag, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="videocam-outline" size={9} color={t.statusVirtual.text} /><Text style={{ fontSize: 9, color: t.statusVirtual.text }}>Virtual</Text></View>
                           </View>
                         )}
                         {h.approval_mode === 'manual' && (
-                          <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.2)' }]}>
+                          <View style={[s.miniTag, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="clipboard-outline" size={9} color={t.statusBusy.text} /><Text style={{ fontSize: 9, color: t.statusBusy.text }}>Manual review</Text></View>
                           </View>
                         )}
@@ -799,7 +799,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               )}
 
               {isManual && (
-                <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                   <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
                     <Text style={{ fontWeight: '700' }}>Manual approval:</Text> This hospital reviews each booking. Please describe your symptoms clearly so they can assess your case.
                   </Text>
@@ -840,7 +840,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                         borderColor:     active ? activeColor : t.cardBorder,
                         backgroundColor: active ? activeColor : 'transparent',
                       }]}>
-                        {active && <Ionicons name="checkmark" size={10} color="#000" />}
+                        {active && <Ionicons name="checkmark" size={10} color={danger ? t.onDanger : t.onAccent} />}
                       </View>
                     </TouchableOpacity>
                   )
@@ -875,8 +875,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   </Text>
 
                   {!isEmergency && (
-                    <View style={[s.noticeBox, { backgroundColor: 'rgba(26,127,193,0.08)', borderColor: 'rgba(26,127,193,0.25)', marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: '#1A7FC1', lineHeight: 18 }}>
+                    <View style={[s.noticeBox, { backgroundColor: t.infoBg, borderColor: t.infoBorder, marginBottom: 12 }]}>
+                      <Text style={{ fontSize: 12, color: t.info, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
                       </Text>
                     </View>
@@ -916,7 +916,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: t.accent }}>Recommended</Text>
                                 </View>
                               ) : (
-                                <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.3)' }]}>
+                                <View style={[s.miniTag, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                                   <Text style={{ fontSize: 9, fontWeight: '700', color: t.statusBusy.text }}>Needs referral</Text>
                                 </View>
                               )}
@@ -946,7 +946,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                             borderColor:     active ? t.accent : t.cardBorder,
                             backgroundColor: active ? t.accent : 'transparent',
                           }]}>
-                            {active && <Ionicons name="checkmark" size={10} color="#000" />}
+                            {active && <Ionicons name="checkmark" size={10} color={t.onAccent} />}
                           </View>
                         </TouchableOpacity>
                       )
@@ -970,7 +970,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
                   {selectedClinic && !selectedClinic.is_opd && !isEmergency && !clinicRestrictionReason && (
                     <>
-                      <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginTop: 4 }]}>
+                      <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border, marginTop: 4 }]}>
                         <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
                           <Text style={{ fontWeight: '700' }}>Specialist clinic</Text>{' — the hospital will review your booking. A referral note helps them approve faster.'}
                         </Text>
@@ -1028,14 +1028,14 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     </Text>
                   )}
                   {dateFullMap[selectedDate] && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                    <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
 
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred arrival window</Text>
                   {opdSlots.length === 0 && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                    <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available slots for today. Please choose another date.</Text></View>
                     </View>
                   )}
@@ -1069,7 +1069,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               {bookingType === 'virtual' && (
                 <>
                   {/* How it works banner */}
-                  <View style={[s.infoBox, { backgroundColor: 'rgba(55,138,221,0.08)', borderColor: 'rgba(55,138,221,0.22)', marginBottom: 18 }]}>
+                  <View style={[s.infoBox, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border, marginBottom: 18 }]}>
                     <Text style={[s.infoText, { color: t.statusVirtual.text, lineHeight: 18 }]}>
                       <Text style={{ fontWeight: '700' }}>Virtual queue — how it works:</Text>{'\n'}
                       Join the queue for your chosen date and window. When it's your turn, the doctor will call you directly. You don't need to be at the hospital.
@@ -1101,7 +1101,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                           borderColor:     !preferredDoc ? t.accent : t.cardBorder,
                           backgroundColor: !preferredDoc ? t.accent : 'transparent',
                         }]}>
-                          {!preferredDoc && <Ionicons name="checkmark" size={10} color="#000" />}
+                          {!preferredDoc && <Ionicons name="checkmark" size={10} color={t.onAccent} />}
                         </View>
                       </TouchableOpacity>
 
@@ -1117,7 +1117,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                               borderColor:     active ? t.accent : t.cardBorder,
                               backgroundColor: active ? t.accentBg : t.cardBg,
                             }]}>
-                            <Avatar initials={initials} bg="#1A2A4A" size={40} />
+                            <Avatar initials={initials} bg={bgFromName(d.full_name)} size={40} />
                             <View style={{ flex: 1 }}>
                               <Text style={[s.docName, { color: active ? t.accent : t.textPrimary }]}>{d.full_name}</Text>
                               <Text style={[s.docSpec, { color: t.textMuted }]}>
@@ -1128,7 +1128,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                               borderColor:     active ? t.accent : t.cardBorder,
                               backgroundColor: active ? t.accent : 'transparent',
                             }]}>
-                              {active && <Ionicons name="checkmark" size={10} color="#000" />}
+                              {active && <Ionicons name="checkmark" size={10} color={t.onAccent} />}
                             </View>
                           </TouchableOpacity>
                         )
@@ -1168,7 +1168,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     </Text>
                   )}
                   {dateFullMap[selectedDate] && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                    <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
@@ -1176,7 +1176,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   {/* Arrival window */}
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred call window</Text>
                   {opdSlots.length === 0 && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
+                    <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available windows for today. Please choose another date.</Text></View>
                     </View>
                   )}
@@ -1213,7 +1213,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
             <View style={s.stepWrap}>
 
               {isManual && (
-                <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginBottom: 14 }]}>
+                <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border, marginBottom: 14 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color={t.statusBusy.text} /><Text style={{ fontSize: 13, fontWeight: '700', color: t.statusBusy.text }}>Pending hospital review</Text></View>
                   <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
                     Nothing is charged now — you pay at the hospital. If the hospital rejects the request, there is nothing to pay.
@@ -1297,7 +1297,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       borderColor:     active ? t.accent : t.cardBorder,
                       backgroundColor: active ? t.accent : 'transparent',
                     }]}>
-                      {active && <Ionicons name="checkmark" size={10} color="#000" />}
+                      {active && <Ionicons name="checkmark" size={10} color={t.onAccent} />}
                     </View>
                   </TouchableOpacity>
                 )
@@ -1310,7 +1310,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
         {/* Error */}
         {submitError.length > 0 && (
-          <Text style={{ color: '#F87171', fontSize: 12, textAlign: 'center', paddingBottom: 6, paddingHorizontal: 20 }}>
+          <Text style={{ color: t.danger, fontSize: 12, textAlign: 'center', paddingBottom: 6, paddingHorizontal: 20 }}>
             {submitError}
           </Text>
         )}
@@ -1328,7 +1328,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           {step !== STEP_TYPE && step < STEP_CONFIRM && (
             <TouchableOpacity onPress={() => { haptics.tap(); setStep(s => s + 1) }} disabled={!canAdvance()}
               style={[s.ctaBtn, { backgroundColor: canAdvance() ? t.accent : t.inputBg, flex: 1 }]}>
-              <Text style={[s.ctaBtnText, { color: canAdvance() ? '#fff' : t.textMuted }]}>
+              <Text style={[s.ctaBtnText, { color: canAdvance() ? t.onAccent : t.textMuted }]}>
                 Continue
               </Text>
             </TouchableOpacity>
