@@ -89,7 +89,7 @@ function SpecialtyGrid({
                   backgroundColor: active ? t.accentBg : t.inputBg,
                   borderColor:     active ? t.accent   : t.cardBorder,
                 }}>
-                <Ionicons name={sp.icon as any} size={20} color={active ? t.accent : sp.color} />
+                <Text style={{ fontSize: 20 }}>{sp.icon}</Text>
                 <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
                   numberOfLines={2}>{sp.label}</Text>
                 {active && (
@@ -283,18 +283,18 @@ export function HomeScreen({ navigation }: Props) {
             onOpenDetail={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: activeAppt }) }}
           />
         ) : nextAppt ? (
-          <View style={[s.banner, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
-            <Text style={[s.bannerLabel, { color: t.accent }]}>NEXT APPOINTMENT</Text>
+          <View style={[s.banner, { backgroundColor: t.accentContainer, borderColor: 'transparent' }]}>
+            <Text style={[s.bannerLabel, { color: t.onAccentContainer }]}>NEXT APPOINTMENT</Text>
             <View style={s.bannerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.bannerDoctor}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
-                <Text style={[s.bannerSub, { color: 'rgba(255,255,255,0.5)' }]}>
+                <Text style={[s.bannerDoctor, { color: t.onAccentContainer }]}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
+                <Text style={[s.bannerSub, { color: t.onAccentContainer, opacity: 0.75 }]}>
                   {nextAppt.hospital?.name ?? ''}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
                   {[nextAppt.appointment_date, nextAppt.start_time].map(l => (
-                    <View key={l} style={[s.bannerChip, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                      <Text style={[s.bannerChipText, { color: t.accent }]}>{l}</Text>
+                    <View key={l} style={[s.bannerChip, { backgroundColor: 'rgba(255,255,255,0.3)', borderColor: 'transparent' }]}>
+                      <Text style={[s.bannerChipText, { color: t.onAccentContainer }]}>{l}</Text>
                     </View>
                   ))}
                 </View>
@@ -363,17 +363,17 @@ export function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         {/* Emergency CTA */}
-        <View style={s.emergency}>
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
+        <View style={[s.emergency, { backgroundColor: t.dangerContainer, borderColor: 'transparent' }]}>
+          <Text style={{ fontSize: 22 }}>🚨</Text>
           <View style={{ flex: 1 }}>
-            <Text style={s.emergencyTitle}>Need urgent care?</Text>
-            <Text style={[s.emergencySub, { color: 'rgba(255,255,255,0.6)' }]}>
+            <Text style={[s.emergencyTitle, { color: t.onDangerContainer }]}>Need urgent care?</Text>
+            <Text style={[s.emergencySub, { color: t.onDangerContainer, opacity: 0.75 }]}>
               Emergency slots available · Premium fee applies
             </Text>
           </View>
-          <TouchableOpacity style={s.emergencyBtn}
+          <TouchableOpacity style={[s.emergencyBtn, { backgroundColor: t.danger }]}
             onPress={() => { haptics.heavy(); navigation.navigate('EmergencyBooking') }}>
-            <Text style={s.emergencyBtnText}>Book now</Text>
+            <Text style={[s.emergencyBtnText, { color: t.onDanger }]}>Book now</Text>
           </TouchableOpacity>
         </View>
 
@@ -391,7 +391,7 @@ export function HomeScreen({ navigation }: Props) {
                   borderColor:     active ? t.accent    : t.cardBorder,
                   borderWidth:     active ? 1.5 : 1,
                 }]}>
-                <Ionicons name={sp.icon as any} size={14} color={active ? t.accent : sp.color} />
+                <Text style={{ fontSize: 14 }}>{sp.icon}</Text>
                 <Text style={[s.chipLabel, { color: active ? t.accent : t.textMuted, fontWeight: active ? '700' : '500' }]}>
                   {sp.label}
                 </Text>
@@ -507,18 +507,18 @@ const s = StyleSheet.create({
   bannerSub:         { fontSize: 11, marginTop: 2 },
   bannerChip:        { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   bannerChipText:    { fontSize: 10, fontWeight: '700' },
-  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 14, borderWidth: 1 },
+  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 28, paddingHorizontal: 18, paddingVertical: 12, marginBottom: 14, borderWidth: 1 },
   bookRow:           { flexDirection: 'row', gap: 8, marginBottom: 16 },
   bookCard:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 12, borderWidth: 1 },
   bookIcon:          { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   bookCardLabel:     { fontSize: 12, fontWeight: '700' },
   bookCardSub:       { fontSize: 10, marginTop: 1 },
   searchPH:          { fontSize: 13 },
-  emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#7B1A1A', borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(163,45,45,0.5)' },
-  emergencyTitle:    { fontSize: 13, fontWeight: '700', color: '#fff' },
+  emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1 },
+  emergencyTitle:    { fontSize: 13, fontWeight: '700' },
   emergencySub:      { fontSize: 11, marginTop: 1 },
-  emergencyBtn:      { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  emergencyBtnText:  { fontSize: 11, fontWeight: '700', color: '#A32D2D' },
+  emergencyBtn:      { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
+  emergencyBtnText:  { fontSize: 11, fontWeight: '700' },
   sectionLabel:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 },
   sectionRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 10 },
   seeAll:            { fontSize: 12, fontWeight: '600' },

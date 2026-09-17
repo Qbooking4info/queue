@@ -99,6 +99,14 @@ const forestLight = {
   splashBg:    '#003D24',
   accentContainer:   '#9EF5BC',
   onAccentContainer: '#002112',
+  // MD3's errorContainer/onErrorContainer -- a bold tonal-fill pairing for a
+  // whole-surface emergency/alert banner, as distinct from dangerBg/Subtle/
+  // Border/Strong's "thin tint behind small text" role above.
+  dangerContainer:   '#FFDAD6',
+  onDangerContainer: '#410002',
+  // MD3's onError -- text/icon color on a SOLID danger fill (a filled "Book now"
+  // button), distinct from onDangerContainer's pastel-fill pairing above.
+  onDanger:          '#FFFFFF',
 }
 
 const forestDark = {
@@ -143,6 +151,9 @@ const forestDark = {
   splashBg:    '#002112',
   accentContainer:   '#005230',
   onAccentContainer: '#9EF5BC',
+  dangerContainer:   '#93000A',
+  onDangerContainer: '#FFDAD6',
+  onDanger:          '#690005',
 }
 
 const clinicalLight = {
@@ -187,6 +198,9 @@ const clinicalLight = {
   splashBg:    '#001C42',
   accentContainer:   '#D5E3FF',
   onAccentContainer: '#001B3D',
+  dangerContainer:   '#FFDAD6',
+  onDangerContainer: '#410002',
+  onDanger:          '#FFFFFF',
 }
 
 const clinicalDark = {
@@ -231,6 +245,9 @@ const clinicalDark = {
   splashBg:    '#001B3D',
   accentContainer:   '#00469A',
   onAccentContainer: '#D5E3FF',
+  dangerContainer:   '#93000A',
+  onDangerContainer: '#FFDAD6',
+  onDanger:          '#690005',
 }
 
 export type Theme = typeof forestLight | typeof forestDark | typeof clinicalLight | typeof clinicalDark
