@@ -102,8 +102,17 @@ const AuthNav    = createNativeStackNavigator()
 const PatientNav = createNativeStackNavigator()
 const HospitalNav = createNativeStackNavigator()
 
+// MD3 nav bar: an active tab gets a pill-shaped tonal capsule behind its icon
+// (accentContainer/onAccentContainer), matching the mockup's own NavBar --
+// not just a plain color swap on the bare icon the way this looked before.
 function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
-  return <Ionicons name={name} size={22} color={color} />
+  const { theme: t } = useTheme()
+  if (!focused) return <Ionicons name={name} size={22} color={color} />
+  return (
+    <View style={{ width: 52, height: 30, borderRadius: 16, backgroundColor: t.accentContainer, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={name} size={20} color={t.onAccentContainer} />
+    </View>
+  )
 }
 
 // ── Patient navigator ─────────────────────────────────────────────────────────
@@ -115,7 +124,11 @@ function MainTabs() {
     <Tab.Navigator screenOptions={{
       headerShown: false,
       tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      // Active label reads t.textPrimary (bold), not the accent -- the icon's
+      // own pill capsule (see TabIcon) already carries the accent color, so
+      // the label doesn't need to duplicate it, matching the mockup's own
+      // NavBar (label: onSurface when active, onSurfaceVariant otherwise).
+      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
       tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
     }}>
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />

@@ -44,6 +44,14 @@ export function ConfirmationScreen({ navigation, route }: Props) {
   }
 
   const accentColor = isPending ? t.statusBusy.text : t.accent
+  // Text/icon color for a SOLID fill of accentColor above -- this banner is
+  // always dark regardless of theme (matching the mockup's own gradBanner,
+  // used the same way), but accentColor itself isn't: in dark mode both
+  // t.accent and t.statusBusy.text are deliberately pale (meant to read as
+  // text on a dark tint), so white text on a solid fill of either would be
+  // nearly invisible. onAccentColor picks the correct contrasting color per
+  // case instead of assuming white always works.
+  const onAccentColor = isPending ? (t.mode === 'dark' ? '#2B1600' : '#FFFFFF') : t.onAccent
 
   return (
     <SafeAreaView style={[st.safe, { backgroundColor: t.splashBg }]}>
@@ -52,8 +60,8 @@ export function ConfirmationScreen({ navigation, route }: Props) {
         {/* Animated icon */}
         <Animated.View style={[st.checkWrap, { opacity, transform: [{ scale }] }]}>
           <View style={[st.checkCircle, {
-            backgroundColor: isPending ? 'rgba(239,159,39,0.14)' : t.accentBgMid,
-            borderColor:     isPending ? 'rgba(239,159,39,0.35)' : t.accentBorder,
+            backgroundColor: isPending ? t.statusBusy.bg : t.accentBgMid,
+            borderColor:     isPending ? t.statusBusy.border : t.accentBorder,
           }]}>
             <Ionicons name={isPending ? 'document-text-outline' : 'checkmark-circle'} size={38} color={accentColor} />
           </View>
@@ -69,10 +77,10 @@ export function ConfirmationScreen({ navigation, route }: Props) {
 
         {/* Pending approval notice */}
         {isPending && (
-          <Animated.View style={[st.pendingBanner, { opacity }]}>
+          <Animated.View style={[st.pendingBanner, { opacity, backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
               <Ionicons name="hourglass-outline" size={14} color={t.statusBusy.text} />
-              <Text style={[st.pendingTitle, { marginBottom: 0 }]}>
+              <Text style={[st.pendingTitle, { color: t.statusBusy.text, marginBottom: 0 }]}>
                 {directBooking ? "Awaiting the doctor's confirmation" : 'Awaiting hospital approval'}
               </Text>
             </View>
@@ -92,8 +100,8 @@ export function ConfirmationScreen({ navigation, route }: Props) {
               <Text style={[st.bookingId, { color: accentColor }]}>{bookingRef ?? '—'}</Text>
             </View>
             <View style={[st.statusPill, {
-              backgroundColor: isPending ? 'rgba(239,159,39,0.14)' : t.accentBgMid,
-              borderColor:     isPending ? 'rgba(239,159,39,0.35)' : t.accentBorder,
+              backgroundColor: isPending ? t.statusBusy.bg : t.accentBgMid,
+              borderColor:     isPending ? t.statusBusy.border : t.accentBorder,
             }]}>
               <Text style={[st.statusText, { color: accentColor }]}>
                 {isPending ? 'Pending Review' : 'Confirmed'}
@@ -184,7 +192,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
           </TouchableOpacity>
           <TouchableOpacity onPress={goHome}
             style={[st.primaryBtn, { backgroundColor: accentColor }]}>
-            <Text style={st.primaryBtnText}>Back to home</Text>
+            <Text style={[st.primaryBtnText, { color: onAccentColor }]}>Back to home</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -201,8 +209,8 @@ const st = StyleSheet.create({
   checkIcon:       { fontSize: 38 },
   headline:        { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.8, textAlign: 'center' },
   sub:             { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 6, textAlign: 'center', lineHeight: 19 },
-  pendingBanner:   { width: '100%', backgroundColor: 'rgba(239,159,39,0.1)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(239,159,39,0.3)', marginBottom: 14 },
-  pendingTitle:    { fontSize: 13, fontWeight: '700', color: '#EF9F27', marginBottom: 5 },
+  pendingBanner:   { width: '100%', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 14 },
+  pendingTitle:    { fontSize: 13, fontWeight: '700', marginBottom: 5 },
   pendingText:     { fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 },
   card:            { width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 12 },
   cardHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
