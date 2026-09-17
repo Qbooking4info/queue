@@ -179,7 +179,7 @@ export function RegisterScreen({ navigation }: Props) {
                   placeholder="e.g. K7M3QX" placeholderTextColor={t.textMuted}
                   autoCapitalize="characters" maxLength={6}
                   style={[s.input, { backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary,
-                    fontFamily: 'monospace', fontSize: 16, letterSpacing: 2, textAlign: 'center' }]}
+                    fontFamily: 'monospace', fontSize: 18, letterSpacing: 2, textAlign: 'center' }]}
                 />
                 <Text style={[s.label, { color: t.textMuted, marginTop: 12 }]}>Your relationship to them</Text>
                 <View style={s.pillRow}>
@@ -226,29 +226,29 @@ const s = StyleSheet.create({
   safe:      { flex: 1 },
   scroll:    { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24 },
   backBtn:   { marginBottom: 20 },
-  backText:  { fontSize: 14, fontWeight: '600' },
-  title:     { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  sub:       { fontSize: 13, marginTop: 4, marginBottom: 24 },
+  backText:  { fontSize: 16, fontWeight: '600' },
+  title:     { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  sub:       { fontSize: 15, marginTop: 4, marginBottom: 24 },
   card:      { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14, marginBottom: 20 },
   fieldWrap: { gap: 6 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  label:     { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 16 },
   errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
-  errText:   { color: '#F87171', fontSize: 12 },
+  errText:   { color: '#F87171', fontSize: 14 },
   footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  footerText:{ fontSize: 13 },
-  footerLink:{ fontSize: 13, fontWeight: '700' },
-  terms:     { fontSize: 11, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
+  footerText:{ fontSize: 15 },
+  footerLink:{ fontSize: 15, fontWeight: '700' },
+  terms:     { fontSize: 13, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
   recommendBanner:   { borderRadius: 12, borderWidth: 1, padding: 12 },
-  recommendText:     { fontSize: 12, lineHeight: 17 },
+  recommendText:     { fontSize: 14, lineHeight: 17 },
   caretakerToggle:   { paddingVertical: 4 },
-  caretakerToggleText: { fontSize: 13, fontWeight: '700' },
+  caretakerToggleText: { fontSize: 15, fontWeight: '700' },
   caretakerCard:     { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   caretakerHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  caretakerTitle:    { fontSize: 13, fontWeight: '800' },
-  caretakerRemove:   { fontSize: 12, fontWeight: '600' },
-  helpText:          { fontSize: 11, lineHeight: 16 },
+  caretakerTitle:    { fontSize: 15, fontWeight: '800' },
+  caretakerRemove:   { fontSize: 14, fontWeight: '600' },
+  helpText:          { fontSize: 13, lineHeight: 16 },
   pillRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   pill:              { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  pillText:          { fontSize: 12 },
+  pillText:          { fontSize: 14 },
 })

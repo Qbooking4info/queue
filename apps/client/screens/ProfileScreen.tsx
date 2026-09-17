@@ -190,11 +190,11 @@ export function ProfileScreen({ navigation }: Props) {
             <View style={styles.confirmRow}>
               <TouchableOpacity onPress={() => setConfirmVisible(false)}
                 style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.3)', borderColor: 'transparent' }]}>
-                <Text style={{ color: t.onDangerContainer, fontSize: 13, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: t.onDangerContainer, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { haptics.heavy(); handleSignOut() }} disabled={signingOut}
                 style={[styles.confirmBtn, { backgroundColor: t.danger, borderColor: 'transparent', opacity: signingOut ? 0.6 : 1 }]}>
-                <Text style={{ color: t.onDanger, fontSize: 13, fontWeight: '700' }}>
+                <Text style={{ color: t.onDanger, fontSize: 15, fontWeight: '700' }}>
                   {signingOut ? 'Signing out…' : 'Yes, sign out'}
                 </Text>
               </TouchableOpacity>
@@ -210,36 +210,36 @@ export function ProfileScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safe:        { flex: 1 },
-  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, paddingTop: 16, marginBottom: 16 },
+  title:       { fontSize: 23, fontWeight: '800', letterSpacing: -0.8, paddingTop: 16, marginBottom: 16 },
   profileCard: { alignItems: 'center', marginBottom: 16 },
   avatar:      { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  avatarText:  { fontSize: 22, fontWeight: '800' },
-  name:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  email:       { fontSize: 12, marginTop: 3 },
+  avatarText:  { fontSize: 25, fontWeight: '800' },
+  name:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  email:       { fontSize: 14, marginTop: 3 },
   patientIdRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
-  patientIdLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, opacity: 0.6 },
-  patientIdValue: { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-  patientIdCopy:  { fontSize: 10, fontWeight: '600', marginLeft: 4 },
-  patientIdHint:  { fontSize: 10, marginTop: 5, textAlign: 'center' },
+  patientIdLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, opacity: 0.6 },
+  patientIdValue: { fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+  patientIdCopy:  { fontSize: 12, fontWeight: '600', marginLeft: 4 },
+  patientIdHint:  { fontSize: 12, marginTop: 5, textAlign: 'center' },
   badges:         { flexDirection: 'row', gap: 6, marginTop: 8 },
   badge:       { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  badgeText:   { fontSize: 10, fontWeight: '700' },
+  badgeText:   { fontSize: 12, fontWeight: '700' },
   themeRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1 },
-  themeLabel:  { fontSize: 14, fontWeight: '600' },
-  themeSub:    { fontSize: 11, marginTop: 1 },
+  themeLabel:  { fontSize: 16, fontWeight: '600' },
+  themeSub:    { fontSize: 13, marginTop: 1 },
   section:     { borderRadius: 14, overflow: 'hidden', marginBottom: 14, borderWidth: 1 },
-  sectionTitle:{ padding: 10, paddingHorizontal: 14, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
+  sectionTitle:{ padding: 10, paddingHorizontal: 14, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
   infoRow:     { flexDirection: 'row', justifyContent: 'space-between', padding: 9, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  infoLabel:   { fontSize: 12, flexShrink: 0 },
-  infoValue:   { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
+  infoLabel:   { fontSize: 14, flexShrink: 0 },
+  infoValue:   { fontSize: 14, fontWeight: '500', textAlign: 'right', flex: 1 },
   menuItem:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12, paddingHorizontal: 14, marginBottom: 7, borderWidth: 1 },
-  menuLabel:   { fontSize: 13, fontWeight: '600' },
-  menuSub:     { fontSize: 11, marginTop: 1 },
-  menuArrow:   { fontSize: 18 },
+  menuLabel:   { fontSize: 15, fontWeight: '600' },
+  menuSub:     { fontSize: 13, marginTop: 1 },
+  menuArrow:   { fontSize: 21 },
   signOutBtn:  { borderRadius: 99, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4, borderWidth: 1 },
-  signOutText: { fontSize: 14, fontWeight: '700' },
+  signOutText: { fontSize: 16, fontWeight: '700' },
   confirmBox:  { borderRadius: 16, padding: 16, marginTop: 8, marginBottom: 4, borderWidth: 1 },
-  confirmText: { fontSize: 14, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
+  confirmText: { fontSize: 16, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
   confirmRow:  { flexDirection: 'row', gap: 8 },
   confirmBtn:  { flex: 1, padding: 11, borderRadius: 10, alignItems: 'center', borderWidth: 1 },
 })

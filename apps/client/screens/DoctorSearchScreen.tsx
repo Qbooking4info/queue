@@ -65,7 +65,7 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
         {([['all', 'All'], ['virtual', 'Virtual'], ['home_visit', 'Home Visit']] as [VisitFilter, string][]).map(([key, label]) => (
           <TouchableOpacity key={key} onPress={() => { haptics.tap(); setFilter(key) }}
             style={[st.chip, { backgroundColor: filter === key ? t.accentBg : t.cardBg, borderColor: filter === key ? t.accentBorder : t.cardBorder }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: filter === key ? t.accent : t.textMuted }}>{label}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: filter === key ? t.accent : t.textMuted }}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -93,12 +93,12 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
 const st = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  title:       { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
   inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12 },
-  input:       { flex: 1, fontSize: 13 },
+  input:       { flex: 1, fontSize: 15 },
   filterRow:   { flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 14 },
   chip:        { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 99, borderWidth: 1 },
   empty:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle:  { fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  emptySub:    { fontSize: 12, textAlign: 'center' },
+  emptyTitle:  { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  emptySub:    { fontSize: 14, textAlign: 'center' },
 })

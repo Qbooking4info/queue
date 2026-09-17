@@ -432,9 +432,9 @@ export function VideoCallScreen({ navigation, route }: Props) {
 const st = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#050d09' },
   waitingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  waitingIcon:      { fontSize: 52 },
-  waitingText:      { fontSize: 14, color: '#4A6058', textAlign: 'center', paddingHorizontal: 32 },
-  errorText:        { fontSize: 12, color: '#FF5C5C', marginTop: 8, textAlign: 'center' },
+  waitingIcon:      { fontSize: 60 },
+  waitingText:      { fontSize: 16, color: '#4A6058', textAlign: 'center', paddingHorizontal: 32 },
+  errorText:        { fontSize: 14, color: '#FF5C5C', marginTop: 8, textAlign: 'center' },
   localPip: {
     position: 'absolute', top: 68, right: 16,
     width: 90, height: 120, borderRadius: 10,
@@ -457,9 +457,9 @@ const st = StyleSheet.create({
     backgroundColor: '#12241B',
     borderWidth: 1, borderColor: 'rgba(74,222,128,0.35)',
   },
-  avatarInitials: { color: '#4ade80', fontSize: 34, fontWeight: '700', letterSpacing: 1 },
-  audioName:     { color: '#fff', fontSize: 19, fontWeight: '700', marginTop: 12 },
-  audioHint:     { color: '#7A9089', fontSize: 13 },
+  avatarInitials: { color: '#4ade80', fontSize: 39, fontWeight: '700', letterSpacing: 1 },
+  audioName:     { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 12 },
+  audioHint:     { color: '#7A9089', fontSize: 15 },
 
   pulseRing: {
     width: 78, height: 78, borderRadius: 39,
@@ -473,19 +473,19 @@ const st = StyleSheet.create({
   bars:         { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   bar:          { width: 3, borderRadius: 1.5 },
   barOff:       { backgroundColor: 'rgba(255,255,255,0.18)' },
-  signalLabel:  { fontSize: 11, fontWeight: '600' },
-  degradedHint: { color: '#fbbf24', fontSize: 11, marginTop: 8 },
+  signalLabel:  { fontSize: 13, fontWeight: '600' },
+  degradedHint: { color: '#fbbf24', fontSize: 13, marginTop: 8 },
 
   // ── controls ─────────────────────────────────────────────────────────────
   ctrlItem:     { alignItems: 'center', gap: 7 },
-  ctrlLabel:    { color: '#93A9A0', fontSize: 11, fontWeight: '500' },
+  ctrlLabel:    { color: '#93A9A0', fontSize: 13, fontWeight: '500' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
     paddingTop: 52, paddingHorizontal: 20, paddingBottom: 14,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  headerName:       { color: '#fff', fontSize: 16, fontWeight: '700' },
-  headerStatus:     { fontSize: 12, marginTop: 3 },
+  headerName:       { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerStatus:     { fontSize: 14, marginTop: 3 },
   controls: {
     position: 'absolute', bottom: 44, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 30,
@@ -507,5 +507,5 @@ const st = StyleSheet.create({
     shadowColor: '#dc2626', shadowOpacity: 0.4, shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 }, elevation: 6,
   },
-  ctrlIcon:         { fontSize: 22 },
+  ctrlIcon:         { fontSize: 25 },
 })

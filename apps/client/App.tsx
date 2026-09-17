@@ -130,7 +130,7 @@ function MainTabs() {
       // the label doesn't need to duplicate it, matching the mockup's own
       // NavBar (label: onSurface when active, onSurfaceVariant otherwise).
       tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
     }}>
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
       <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />

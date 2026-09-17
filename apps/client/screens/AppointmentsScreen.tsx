@@ -100,7 +100,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
           <Text style={[s.title, { color: t.textPrimary }]}>My Bookings</Text>
           {pendingCount > 0 && (
             <View style={[s.pendingBadge, { backgroundColor: t.statusApproval.bg, borderColor: t.statusApproval.border }]}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: t.statusApproval.text }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusApproval.text }}>
                 {pendingCount} awaiting review
               </Text>
             </View>
@@ -234,7 +234,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                       <Text style={[s.refText, { color: t.accent }]}>{bookingRef}</Text>
                       {a.patient && a.patient.id !== user?.id && (
                         <View style={{ backgroundColor: t.accentBg, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: t.accent }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: t.accent }}>
                             FOR {a.patient.full_name.split(' ')[0].toUpperCase()}
                           </Text>
                         </View>
@@ -243,7 +243,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                         <View style={{ backgroundColor: t.danger, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                             <Ionicons name="alert-circle-outline" size={9} color={t.onDanger} />
-                            <Text style={{ fontSize: 9, fontWeight: '800', color: t.onDanger }}>EMERGENCY</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: t.onDanger }}>EMERGENCY</Text>
                           </View>
                         </View>
                       )}
@@ -276,7 +276,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                   {/* Pending approval banner */}
                   {isPending && (
                     <View style={[s.approvalBanner, { backgroundColor: t.statusBusy.bg, borderTopColor: t.statusBusy.border }]}>
-                      <Text style={{ fontSize: 11, color: t.statusBusy.text }}>
+                      <Text style={{ fontSize: 13, color: t.statusBusy.text }}>
                         ⏳ Awaiting hospital review — you'll be notified once approved.
                       </Text>
                     </View>
@@ -317,40 +317,40 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
 const s = StyleSheet.create({
   safe:          { flex: 1 },
   titleRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  title:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.8 },
+  title:         { fontSize: 23, fontWeight: '800', letterSpacing: -0.8 },
   pendingBadge:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   // Filter row
   filterScroll:  { flexGrow: 0 },
   filterContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   filterPill:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8 },
   filterPillLast:{ marginRight: 0 },
-  filterText:    { fontSize: 12, fontWeight: '600' },
+  filterText:    { fontSize: 14, fontWeight: '600' },
   filterDot:     { width: 6, height: 6, borderRadius: 3, marginLeft: 5 },
   // List
   list:          { paddingHorizontal: 20 },
   // Empty state
   empty:         { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
-  emptyIcon:     { fontSize: 52, marginBottom: 12 },
-  emptyTitle:    { fontSize: 17, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+  emptyIcon:     { fontSize: 60, marginBottom: 12 },
+  emptyTitle:    { fontSize: 20, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
+  emptySubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
   // Card
   card:          { borderRadius: 16, marginBottom: 10, borderWidth: 1, overflow: 'hidden' },
   refRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
   refLeft:       { flexDirection: 'row', alignItems: 'center' },
-  refIcon:       { fontSize: 14, marginRight: 7 },
-  refText:       { fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  refIcon:       { fontSize: 16, marginRight: 7 },
+  refText:       { fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
   statusPill:    { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99, borderWidth: 1 },
-  statusText:    { fontSize: 10, fontWeight: '700' },
+  statusText:    { fontSize: 12, fontWeight: '700' },
   cardBody:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12 },
   cardBodyLeft:  { flex: 1, paddingRight: 10 },
   cardBodyRight: { alignItems: 'flex-end' },
-  hospitalName:  { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  doctorLine:    { fontSize: 11 },
-  dateText:      { fontSize: 12, fontWeight: '700', marginBottom: 2 },
-  timeText:      { fontSize: 11 },
+  hospitalName:  { fontSize: 16, fontWeight: '700', marginBottom: 3 },
+  doctorLine:    { fontSize: 13 },
+  dateText:      { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  timeText:      { fontSize: 13 },
   approvalBanner:{ paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 1 },
   cardFooter:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1 },
-  footerHint:    { fontSize: 10 },
+  footerHint:    { fontSize: 12 },
   virtualTag:    { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  virtualTagText:{ fontSize: 9, fontWeight: '700' },
+  virtualTagText:{ fontSize: 10, fontWeight: '700' },
 })

@@ -667,7 +667,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     <Text style={[s.typeLabel, { color: t.textPrimary }]}>{opt.label}</Text>
                     <Text style={[s.typeSub,   { color: t.textMuted   }]}>{opt.desc}</Text>
                   </View>
-                  <Text style={{ color: t.textMuted, fontSize: 20 }}>›</Text>
+                  <Text style={{ color: t.textMuted, fontSize: 23 }}>›</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -702,7 +702,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
               ) : hospitalList.length === 0 ? (
                 <View style={[s.emptyBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
                   <Ionicons name="business-outline" size={28} color={t.textMuted} style={{ marginBottom: 8, opacity: 0.4 }} />
-                  <Text style={[{ fontSize: 13, color: t.textMuted, textAlign: 'center' }]}>
+                  <Text style={[{ fontSize: 15, color: t.textMuted, textAlign: 'center' }]}>
                     {bookingType === 'virtual'
                       ? 'No hospitals with virtual consultations found.'
                       : 'No hospitals found. Try a different search.'}
@@ -728,22 +728,22 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       <View style={{ flexDirection: 'row', gap: 5, marginTop: 3, flexWrap: 'wrap' }}>
                         {h.virtual && (
                           <View style={[s.miniTag, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="videocam-outline" size={9} color={t.statusVirtual.text} /><Text style={{ fontSize: 9, color: t.statusVirtual.text }}>Virtual</Text></View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="videocam-outline" size={9} color={t.statusVirtual.text} /><Text style={{ fontSize: 10, color: t.statusVirtual.text }}>Virtual</Text></View>
                           </View>
                         )}
                         {h.approval_mode === 'manual' && (
                           <View style={[s.miniTag, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="clipboard-outline" size={9} color={t.statusBusy.text} /><Text style={{ fontSize: 9, color: t.statusBusy.text }}>Manual review</Text></View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="clipboard-outline" size={9} color={t.statusBusy.text} /><Text style={{ fontSize: 10, color: t.statusBusy.text }}>Manual review</Text></View>
                           </View>
                         )}
                         {h.opd_fee != null && h.opd_fee > 0 && bookingType === 'physical' && (
                           <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                            <Text style={{ fontSize: 9, color: t.accent }}>₦{Number(h.opd_fee).toLocaleString()} OPD</Text>
+                            <Text style={{ fontSize: 10, color: t.accent }}>₦{Number(h.opd_fee).toLocaleString()} OPD</Text>
                           </View>
                         )}
                       </View>
                     </View>
-                    <Text style={{ color: t.textMuted, fontSize: 20 }}>›</Text>
+                    <Text style={{ color: t.textMuted, fontSize: 23 }}>›</Text>
                   </TouchableOpacity>
                 ))
               )}
@@ -755,18 +755,18 @@ export function BookingFlowScreen({ navigation, route }: Props) {
             <View style={s.stepWrap}>
               {/* Context chip */}
               <View style={[s.contextChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                <Text style={{ fontSize: 16 }}>{bookingType === 'virtual' ? <Ionicons name="videocam-outline" size={16} color={t.textMuted} /> : <Ionicons name="walk-outline" size={16} color={t.accent} />}</Text>
+                <Text style={{ fontSize: 18 }}>{bookingType === 'virtual' ? <Ionicons name="videocam-outline" size={16} color={t.textMuted} /> : <Ionicons name="walk-outline" size={16} color={t.accent} />}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.contextName, { color: t.textPrimary }]} numberOfLines={1}>
                     {hospital?.name}
                   </Text>
-                  <Text style={[{ fontSize: 11, color: t.textMuted }]}>
+                  <Text style={[{ fontSize: 13, color: t.textMuted }]}>
                     {bookingType === 'virtual' ? 'Virtual consultation' : 'In-person visit'}
                   </Text>
                 </View>
                 {!presetHospital && (
                   <TouchableOpacity onPress={() => setStep(STEP_HOSPITAL)}>
-                    <Text style={{ fontSize: 11, color: t.accent }}>Change</Text>
+                    <Text style={{ fontSize: 13, color: t.accent }}>Change</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -781,7 +781,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                         borderColor:     !bookingForDependentId ? t.accent : t.cardBorder,
                         backgroundColor: !bookingForDependentId ? t.accentBg : t.cardBg,
                       }]}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: !bookingForDependentId ? t.accent : t.textMuted }}>Myself</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: !bookingForDependentId ? t.accent : t.textMuted }}>Myself</Text>
                     </TouchableOpacity>
                     {linkedDependents.map(d => (
                       <TouchableOpacity key={d.linkId} onPress={() => setBookingForDependentId(d.dependent.id)}
@@ -789,7 +789,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                           borderColor:     bookingForDependentId === d.dependent.id ? t.accent : t.cardBorder,
                           backgroundColor: bookingForDependentId === d.dependent.id ? t.accentBg : t.cardBg,
                         }]}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: bookingForDependentId === d.dependent.id ? t.accent : t.textMuted }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: bookingForDependentId === d.dependent.id ? t.accent : t.textMuted }}>
                           {d.dependent.full_name} ({d.relationship})
                         </Text>
                       </TouchableOpacity>
@@ -800,7 +800,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
               {isManual && (
                 <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                  <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
+                  <Text style={{ fontSize: 14, color: t.statusBusy.text, lineHeight: 18 }}>
                     <Text style={{ fontWeight: '700' }}>Manual approval:</Text> This hospital reviews each booking. Please describe your symptoms clearly so they can assess your case.
                   </Text>
                 </View>
@@ -854,12 +854,12 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   borderColor: t.dangerStrong,
                 }]}>
                   {hospitalOpenNow === false ? (
-                    <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                    <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                       <Text style={{ fontWeight: '800' }}>{hospital?.name} is closed right now.</Text> Emergency
                       bookings can only be for today, so please go back and choose a hospital that's currently open.
                     </Text>
                   ) : (
-                    <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                    <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                       Emergency bookings are for <Text style={{ fontWeight: '800' }}>today only</Text> — you won't
                       be able to pick a future date, and you'll be prioritized to the front of today's queue.
                     </Text>
@@ -876,7 +876,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
                   {!isEmergency && (
                     <View style={[s.noticeBox, { backgroundColor: t.infoBg, borderColor: t.infoBorder, marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: t.info, lineHeight: 18 }}>
+                      <Text style={{ fontSize: 14, color: t.info, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
                       </Text>
                     </View>
@@ -884,7 +884,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
                   {noEmergencyClinic && (
                     <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                      <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '800' }}>{hospital?.name} hasn't set up an Emergency Department.</Text> Please
                         go back and choose a different hospital for an emergency booking.
                       </Text>
@@ -909,15 +909,15 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                               <Text style={[s.urgLabel, { color: active ? t.accent : t.textPrimary }]}>{clinic.name}</Text>
                               {isEmergency ? (
                                 <View style={[s.miniTag, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Ionicons name="alert-circle-outline" size={9} color={t.danger} /><Text style={{ fontSize: 9, fontWeight: '700', color: t.danger }}>Emergency</Text></View>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Ionicons name="alert-circle-outline" size={9} color={t.danger} /><Text style={{ fontSize: 10, fontWeight: '700', color: t.danger }}>Emergency</Text></View>
                                 </View>
                               ) : clinic.is_opd ? (
                                 <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: t.accent }}>Recommended</Text>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.accent }}>Recommended</Text>
                                 </View>
                               ) : (
                                 <View style={[s.miniTag, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: t.statusBusy.text }}>Needs referral</Text>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.statusBusy.text }}>Needs referral</Text>
                                 </View>
                               )}
                             </View>
@@ -931,11 +931,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                                     backgroundColor: active ? t.accentBgMid : t.inputBg,
                                     borderColor: active ? t.accentBorder : t.cardBorder,
                                   }]}>
-                                    <Text style={{ fontSize: 9, color: active ? t.accent : t.textMuted }}>{tag}</Text>
+                                    <Text style={{ fontSize: 10, color: active ? t.accent : t.textMuted }}>{tag}</Text>
                                   </View>
                                 ))}
                                 {clinic.service_tags.length > 4 && (
-                                  <Text style={{ fontSize: 9, color: t.textMuted, alignSelf: 'center' }}>
+                                  <Text style={{ fontSize: 10, color: t.textMuted, alignSelf: 'center' }}>
                                     +{clinic.service_tags.length - 4}
                                   </Text>
                                 )}
@@ -955,12 +955,12 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
                   {clinicRestrictionReason && (
                     <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginTop: 4 }]}>
-                      <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                      <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                         <Text style={{ fontWeight: '800' }}>Can't book this clinic.</Text> {clinicRestrictionReason.reason}
                       </Text>
                       {clinicRestrictionReason.needsProfile && (
                         <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('MedicalHistory') }} style={{ marginTop: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger, textDecorationLine: 'underline' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger, textDecorationLine: 'underline' }}>
                             Complete your health profile →
                           </Text>
                         </TouchableOpacity>
@@ -971,7 +971,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   {selectedClinic && !selectedClinic.is_opd && !isEmergency && !clinicRestrictionReason && (
                     <>
                       <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border, marginTop: 4 }]}>
-                        <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
+                        <Text style={{ fontSize: 14, color: t.statusBusy.text, lineHeight: 18 }}>
                           <Text style={{ fontWeight: '700' }}>Specialist clinic</Text>{' — the hospital will review your booking. A referral note helps them approve faster.'}
                         </Text>
                       </View>
@@ -999,7 +999,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 <>
                   <Text style={[s.label, { color: t.textMuted }]}>Choose a date</Text>
                   {checkingLim && (
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
+                    <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
@@ -1017,26 +1017,26 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                           <Text style={[s.dateLabel, { color: full ? t.textMuted : active ? t.accent : t.textPrimary }]}>
                             {d.label}
                           </Text>
-                          {full && <Text style={{ fontSize: 9, color: t.textMuted }}>Full</Text>}
+                          {full && <Text style={{ fontSize: 10, color: t.textMuted }}>Full</Text>}
                         </TouchableOpacity>
                       )
                     })}
                   </ScrollView>
                   {isEmergency && (
-                    <Text style={{ fontSize: 11, color: t.danger, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, color: t.danger, marginBottom: 8 }}>
                       Emergency bookings are today only — no other dates available.
                     </Text>
                   )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 14, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
 
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred arrival window</Text>
                   {opdSlots.length === 0 && (
                     <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available slots for today. Please choose another date.</Text></View>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 14, color: t.statusBusy.text, flex: 1 }}>No available slots for today. Please choose another date.</Text></View>
                     </View>
                   )}
                   <View style={s.slotGrid}>
@@ -1080,7 +1080,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   {virtualDoctors.length > 0 && (
                     <>
                       <Text style={[s.label, { color: t.textMuted }]}>Preferred doctor (optional)</Text>
-                      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
+                      <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 10 }}>
                         Pick a doctor you'd like to consult, or skip — the hospital will assign one.
                       </Text>
 
@@ -1139,7 +1139,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   {/* Date */}
                   <Text style={[s.label, { color: t.textMuted, marginTop: 16 }]}>Choose a date</Text>
                   {checkingLim && (
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
+                    <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
@@ -1157,19 +1157,19 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                           <Text style={[s.dateLabel, { color: full ? t.textMuted : active ? t.accent : t.textPrimary }]}>
                             {d.label}
                           </Text>
-                          {full && <Text style={{ fontSize: 9, color: t.textMuted }}>Full</Text>}
+                          {full && <Text style={{ fontSize: 10, color: t.textMuted }}>Full</Text>}
                         </TouchableOpacity>
                       )
                     })}
                   </ScrollView>
                   {isEmergency && (
-                    <Text style={{ fontSize: 11, color: t.danger, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, color: t.danger, marginBottom: 8 }}>
                       Emergency bookings are today only — no other dates available.
                     </Text>
                   )}
                   {dateFullMap[selectedDate] && (
                     <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 14, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
                     </View>
                   )}
 
@@ -1177,7 +1177,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred call window</Text>
                   {opdSlots.length === 0 && (
                     <View style={[s.warnBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available windows for today. Please choose another date.</Text></View>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 14, color: t.statusBusy.text, flex: 1 }}>No available windows for today. Please choose another date.</Text></View>
                     </View>
                   )}
                   <View style={s.slotGrid}>
@@ -1214,8 +1214,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
               {isManual && (
                 <View style={[s.noticeBox, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border, marginBottom: 14 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color={t.statusBusy.text} /><Text style={{ fontSize: 13, fontWeight: '700', color: t.statusBusy.text }}>Pending hospital review</Text></View>
-                  <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color={t.statusBusy.text} /><Text style={{ fontSize: 15, fontWeight: '700', color: t.statusBusy.text }}>Pending hospital review</Text></View>
+                  <Text style={{ fontSize: 14, color: t.statusBusy.text, lineHeight: 18 }}>
                     Nothing is charged now — you pay at the hospital. If the hospital rejects the request, there is nothing to pay.
                   </Text>
                 </View>
@@ -1257,8 +1257,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   </View>
                 ))}
                 <View style={[s.cardRow, { borderBottomColor: 'transparent' }]}>
-                  <Text style={[s.cardLabel, { color: t.textPrimary, fontWeight: '700', fontSize: 14 }]}>Total</Text>
-                  <Text style={[s.cardValue, { color: t.accent, fontWeight: '800', fontSize: 15 }]}>₦{totalFee.toLocaleString()}</Text>
+                  <Text style={[s.cardLabel, { color: t.textPrimary, fontWeight: '700', fontSize: 16 }]}>Total</Text>
+                  <Text style={[s.cardValue, { color: t.accent, fontWeight: '800', fontSize: 17 }]}>₦{totalFee.toLocaleString()}</Text>
                 </View>
               </View>
 
@@ -1273,7 +1273,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                 ].map((p, i) => (
                   <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 7 }}>
                     <Ionicons name={p.icon} size={13} color={t.textSecondary} />
-                    <Text style={{ fontSize: 12, flex: 1, lineHeight: 17, color: t.textSecondary }}>{p.text}</Text>
+                    <Text style={{ fontSize: 14, flex: 1, lineHeight: 17, color: t.textSecondary }}>{p.text}</Text>
                   </View>
                 ))}
               </View>
@@ -1310,7 +1310,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
         {/* Error */}
         {submitError.length > 0 && (
-          <Text style={{ color: t.danger, fontSize: 12, textAlign: 'center', paddingBottom: 6, paddingHorizontal: 20 }}>
+          <Text style={{ color: t.danger, fontSize: 14, textAlign: 'center', paddingBottom: 6, paddingHorizontal: 20 }}>
             {submitError}
           </Text>
         )}
@@ -1354,66 +1354,66 @@ const s = StyleSheet.create({
   container:    { flex: 1, paddingHorizontal: 20 },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, marginBottom: 12 },
   backBtn:      { width: 32, height: 32, justifyContent: 'center' },
-  backArrow:    { fontSize: 22 },
-  title:        { fontSize: 15, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center', flex: 1 },
+  backArrow:    { fontSize: 25 },
+  title:        { fontSize: 17, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center', flex: 1 },
   progress:     { flexDirection: 'row', gap: 5, marginBottom: 16 },
   progressBar:  { height: 3, borderRadius: 99, marginBottom: 3 },
-  progressLabel:{ fontSize: 10 },
+  progressLabel:{ fontSize: 12 },
   stepWrap:     { paddingTop: 4, paddingBottom: 8 },
-  stepHeading:  { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
-  stepSub:      { fontSize: 13, lineHeight: 19 },
+  stepHeading:  { fontSize: 23, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
+  stepSub:      { fontSize: 15, lineHeight: 19 },
   // Type
   typeCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1.5 },
   typeIcon:     { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:    { fontSize: 15, fontWeight: '700', marginBottom: 3 },
-  typeSub:      { fontSize: 12, lineHeight: 17 },
+  typeLabel:    { fontSize: 17, fontWeight: '700', marginBottom: 3 },
+  typeSub:      { fontSize: 14, lineHeight: 17 },
   // Hospital
   searchRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 14, borderWidth: 1 },
-  searchInput:  { flex: 1, fontSize: 13 },
+  searchInput:  { flex: 1, fontSize: 15 },
   hospRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 13, marginBottom: 8, borderWidth: 1 },
-  hospName:     { fontSize: 13, fontWeight: '700' },
-  hospSpec:     { fontSize: 11, marginTop: 1 },
+  hospName:     { fontSize: 15, fontWeight: '700' },
+  hospSpec:     { fontSize: 13, marginTop: 1 },
   miniTag:      { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
   emptyBox:     { borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center', marginTop: 10 },
   // Details
   contextChip:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 14, borderWidth: 1 },
-  contextName:  { fontSize: 13, fontWeight: '700' },
+  contextName:  { fontSize: 15, fontWeight: '700' },
   forBtnSmall:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
   noticeBox:    { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  label:        { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
-  textarea:     { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
+  label:        { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  textarea:     { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
   urgRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 13, borderWidth: 1.5 },
-  urgLabel:     { fontSize: 13, fontWeight: '700' },
-  urgSub:       { fontSize: 11, marginTop: 1 },
+  urgLabel:     { fontSize: 15, fontWeight: '700' },
+  urgSub:       { fontSize: 13, marginTop: 1 },
   radio:        { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   // Schedule
   dateChip:     { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5, minWidth: 80, alignItems: 'center' },
-  dateLabel:    { fontSize: 12, fontWeight: '600' },
+  dateLabel:    { fontSize: 14, fontWeight: '600' },
   warnBox:      { borderRadius: 10, borderWidth: 1, padding: 11, marginBottom: 10 },
   slotGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
   slotBtn:      { width: '30%', paddingVertical: 11, borderRadius: 11, borderWidth: 1.5, alignItems: 'center' },
-  slotText:     { fontSize: 12 },
+  slotText:     { fontSize: 14 },
   infoBox:      { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8 },
-  infoText:     { fontSize: 12, lineHeight: 18 },
+  infoText:     { fontSize: 14, lineHeight: 18 },
   docRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1.5 },
   docAvatarBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  docName:      { fontSize: 13, fontWeight: '700' },
-  docSpec:      { fontSize: 11, marginTop: 1 },
+  docName:      { fontSize: 15, fontWeight: '700' },
+  docSpec:      { fontSize: 13, marginTop: 1 },
   // Confirm
   card:         { borderRadius: 14, overflow: 'hidden', marginBottom: 12, borderWidth: 1 },
-  cardTitle:    { padding: 10, paddingHorizontal: 14, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
+  cardTitle:    { padding: 10, paddingHorizontal: 14, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
   cardRow:      { flexDirection: 'row', justifyContent: 'space-between', padding: 9, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  cardLabel:    { fontSize: 12 },
-  cardValue:    { fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' },
+  cardLabel:    { fontSize: 14 },
+  cardValue:    { fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right' },
   policyCard:   { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
-  policyTitle:  { fontSize: 12, fontWeight: '700', marginBottom: 10 },
+  policyTitle:  { fontSize: 14, fontWeight: '700', marginBottom: 10 },
   payRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 13, marginBottom: 8, borderWidth: 1.5 },
-  payLabel:     { fontSize: 13, fontWeight: '600' },
-  paySub:       { fontSize: 11, marginTop: 1 },
+  payLabel:     { fontSize: 15, fontWeight: '600' },
+  paySub:       { fontSize: 13, marginTop: 1 },
   // CTA
   ctaWrap:      { flexDirection: 'row', gap: 8, paddingVertical: 12, borderTopWidth: 1 },
   backStepBtn:  { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  backStepText: { fontSize: 13, fontWeight: '600' },
+  backStepText: { fontSize: 15, fontWeight: '600' },
   ctaBtn:       { borderRadius: 14, padding: 15, alignItems: 'center' },
-  ctaBtnText:   { fontSize: 15, fontWeight: '700' },
+  ctaBtnText:   { fontSize: 17, fontWeight: '700' },
 })

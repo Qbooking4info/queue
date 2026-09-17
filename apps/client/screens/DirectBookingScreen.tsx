@@ -92,11 +92,11 @@ export function DirectBookingScreen({ navigation, route }: Props) {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={[st.doctorCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>
               {doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}
             </Text>
-            {doctor.specialty && <Text style={{ fontSize: 12, color: t.accent, marginTop: 2 }}>{doctor.specialty.name}</Text>}
-            {fee != null && <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>Fee: ₦{fee.toLocaleString()}</Text>}
+            {doctor.specialty && <Text style={{ fontSize: 14, color: t.accent, marginTop: 2 }}>{doctor.specialty.name}</Text>}
+            {fee != null && <Text style={{ fontSize: 14, color: t.textMuted, marginTop: 4 }}>Fee: ₦{fee.toLocaleString()}</Text>}
           </View>
 
           <Text style={[st.label, { color: t.textMuted }]}>PREFERRED DATE</Text>
@@ -104,7 +104,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
             {DATES.map(d => (
               <TouchableOpacity key={d.iso} onPress={() => { haptics.tap(); setDate(d.iso) }}
                 style={[st.dateChip, { backgroundColor: date === d.iso ? t.accentBg : t.cardBg, borderColor: date === d.iso ? t.accentBorder : t.cardBorder }]}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: date === d.iso ? t.accent : t.textPrimary }}>{d.label}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: date === d.iso ? t.accent : t.textPrimary }}>{d.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -114,7 +114,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
             {TIMES.map(tm => (
               <TouchableOpacity key={tm.value} onPress={() => { haptics.tap(); setTime(tm.value) }}
                 style={[st.timeChip, { backgroundColor: time === tm.value ? t.accentBg : t.cardBg, borderColor: time === tm.value ? t.accentBorder : t.cardBorder }]}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: time === tm.value ? t.accent : t.textPrimary }}>{tm.label}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: time === tm.value ? t.accent : t.textPrimary }}>{tm.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -137,12 +137,12 @@ export function DirectBookingScreen({ navigation, route }: Props) {
 
           {error ? (
             <View style={[st.errorBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-              <Text style={{ fontSize: 12, color: t.danger }}>{error}</Text>
+              <Text style={{ fontSize: 14, color: t.danger }}>{error}</Text>
             </View>
           ) : null}
 
           <Button label="Request Appointment" onPress={handleSubmit} loading={submitting} style={{ marginHorizontal: 20, marginTop: 20 }} />
-          <Text style={{ fontSize: 11, color: t.textMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }}>
+          <Text style={{ fontSize: 13, color: t.textMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }}>
             This is a request — the doctor will confirm your exact time or suggest an alternative.
           </Text>
         </ScrollView>
@@ -154,12 +154,12 @@ export function DirectBookingScreen({ navigation, route }: Props) {
 const st = StyleSheet.create({
   safe:         { flex: 1 },
   header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:        { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  title:        { fontSize: 21, fontWeight: '800', letterSpacing: -0.3 },
   doctorCard:   { marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  label:        { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginBottom: 8, paddingHorizontal: 20 },
+  label:        { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, marginBottom: 8, paddingHorizontal: 20 },
   dateChip:     { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
   timeGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20 },
   timeChip:     { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, minWidth: '22%', alignItems: 'center' },
-  textArea:     { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
+  textArea:     { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: 'top' },
   errorBox:     { marginHorizontal: 20, marginTop: 14, padding: 12, borderRadius: 10, borderWidth: 1 },
 })

@@ -283,8 +283,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Text style={[st.pendingTitle, { color: t.statusBusy.text }]}>Awaiting hospital approval</Text>
               {appt.clinic && !isOpdClinic && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 11, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
-                  <Text style={{ fontSize: 11, color: t.statusBusy.text, opacity: 0.85 }}>{appt.clinic}</Text>
+                  <Text style={{ fontSize: 13, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
+                  <Text style={{ fontSize: 13, color: t.statusBusy.text, opacity: 0.85 }}>{appt.clinic}</Text>
                 </View>
               )}
               <Text style={[st.pendingSub, { color: t.statusBusy.text, opacity: 0.75 }]}>
@@ -304,15 +304,15 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Text style={[st.pendingTitle, { color: t.danger, marginBottom: 6 }]}>Booking Rejected</Text>
               {(raw as any).approval_note ? (
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 3 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 3 }}>
                     Hospital's note:
                   </Text>
-                  <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                  <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                     {(raw as any).approval_note}
                   </Text>
                 </View>
               ) : null}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 6 }}>
                 What you can do:
               </Text>
               {[
@@ -322,7 +322,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               ].map(tip => (
                 <View key={tip.text} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
                   <Ionicons name={tip.icon} size={12} color={t.danger} style={{ marginTop: 3 }} />
-                  <Text style={{ fontSize: 11, color: t.danger, lineHeight: 18, flex: 1 }}>{tip.text}</Text>
+                  <Text style={{ fontSize: 13, color: t.danger, lineHeight: 18, flex: 1 }}>{tip.text}</Text>
                 </View>
               ))}
               {raw.hospital && (
@@ -332,7 +332,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                     bookingType: 'physical',
                   })}
                   style={[st.opdBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger }}>Book OPD Appointment</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.danger }}>Book OPD Appointment</Text>
                   <Ionicons name="arrow-forward" size={14} color={t.danger} />
                 </TouchableOpacity>
               )}
@@ -702,86 +702,86 @@ const st = StyleSheet.create({
   safe:               { flex: 1 },
   header:             { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:            { padding: 4 },
-  backArrow:          { fontSize: 22 },
-  headerTitle:        { flex: 1, fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  backArrow:          { fontSize: 25 },
+  headerTitle:        { flex: 1, fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
   statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  statusText:         { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  statusText:         { fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
   // Check-in pass
   passCard:           { marginHorizontal: 20, borderRadius: 20, borderWidth: 1.5, marginBottom: 12, overflow: 'hidden' },
   passHeader:         { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  passTitle:          { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  passTitle:          { fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
   passRefWrap:        { alignItems: 'center', paddingVertical: 18 },
-  passRef:            { fontSize: 32, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  passCopy:           { fontSize: 10, marginTop: 5, fontWeight: '600' },
+  passRef:            { fontSize: 37, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
+  passCopy:           { fontSize: 12, marginTop: 5, fontWeight: '600' },
   passDivider:        { height: 1, marginHorizontal: 16 },
   passRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6, gap: 12 },
-  passRowLabel:       { fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 },
-  passRowValue:       { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
+  passRowLabel:       { fontSize: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 },
+  passRowValue:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
   passFooter:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, paddingTop: 10 },
-  passFooterText:     { fontSize: 11, flex: 1, lineHeight: 16 },
+  passFooterText:     { fontSize: 13, flex: 1, lineHeight: 16 },
   // Pending notice
   pendingCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  pendingIcon:        { fontSize: 20 },
-  pendingTitle:       { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  pendingSub:         { fontSize: 11, lineHeight: 16 },
+  pendingIcon:        { fontSize: 23 },
+  pendingTitle:       { fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  pendingSub:         { fontSize: 13, lineHeight: 16 },
   // Hero
   heroCard:           { marginHorizontal: 20, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
   bookingIdRow:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  bookingIdLabel:     { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
-  bookingId:          { fontSize: 11, fontWeight: '700' },
+  bookingIdLabel:     { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
+  bookingId:          { fontSize: 13, fontWeight: '700' },
   doctorRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   doctorAvatarPlaceholder: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  doctorName:         { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  doctorSpec:         { fontSize: 12, marginTop: 1, marginBottom: 4 },
+  doctorName:         { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  doctorSpec:         { fontSize: 14, marginTop: 1, marginBottom: 4 },
   typePill:           { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  typePillText:       { fontSize: 10, fontWeight: '700' },
+  typePillText:       { fontSize: 12, fontWeight: '700' },
   chipsRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip:               { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1, maxWidth: '100%' },
-  chipIcon:           { fontSize: 12 },
-  chipText:           { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '500', flexShrink: 1 },
+  chipIcon:           { fontSize: 14 },
+  chipText:           { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500', flexShrink: 1 },
   // Virtual join
   joinBanner:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 12 },
-  joinTitle:          { fontSize: 13, fontWeight: '700' },
-  joinSub:            { fontSize: 11, marginTop: 2 },
+  joinTitle:          { fontSize: 15, fontWeight: '700' },
+  joinSub:            { fontSize: 13, marginTop: 2 },
   joinBtn:            { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  joinBtnText:        { fontSize: 12, fontWeight: '700' },
+  joinBtnText:        { fontSize: 14, fontWeight: '700' },
   // Queue
   queueCard:          { flexDirection: 'row', marginHorizontal: 20, borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   queueLeft:          { flex: 1, alignItems: 'center', padding: 14 },
   queueRight:         { flex: 1, alignItems: 'center', padding: 14 },
   queueDivider:       { width: 1 },
-  queueNum:           { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  queueLabel:         { fontSize: 10, marginTop: 2, textAlign: 'center' },
+  queueNum:           { fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },
+  queueLabel:         { fontSize: 12, marginTop: 2, textAlign: 'center' },
   // Pad
   pad:                { paddingHorizontal: 20 },
   // Section
   section:            { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionTitle:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionTitle:       { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   // Rows
   infoRow:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  infoLabel:          { fontSize: 12, flexShrink: 0 },
-  infoValue:          { fontSize: 12, fontWeight: '600', textAlign: 'right', flex: 1 },
+  infoLabel:          { fontSize: 14, flexShrink: 0 },
+  infoValue:          { fontSize: 14, fontWeight: '600', textAlign: 'right', flex: 1 },
   planBlock:          { padding: 12, paddingHorizontal: 14, borderTopWidth: 1 },
-  planLabel:          { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  planValue:          { fontSize: 13, lineHeight: 19 },
+  planLabel:          { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  planValue:          { fontSize: 15, lineHeight: 19 },
   // No-doctor placeholder
   noDoctorRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  noDoctorTitle:      { fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  noDoctorSub:        { fontSize: 11, lineHeight: 17 },
+  noDoctorTitle:      { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  noDoctorSub:        { fontSize: 13, lineHeight: 17 },
   // Doctor card
   doctorCard:         { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1 },
-  dcName:             { fontSize: 14, fontWeight: '700' },
-  dcSpec:             { fontSize: 11, marginTop: 1, marginBottom: 4 },
+  dcName:             { fontSize: 16, fontWeight: '700' },
+  dcSpec:             { fontSize: 13, marginTop: 1, marginBottom: 4 },
   // Tips
   tipRow:             { padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  tipText:            { fontSize: 12, lineHeight: 18 },
+  tipText:            { fontSize: 14, lineHeight: 18 },
   // Actions
   actions:            { flexDirection: 'row', gap: 10, marginBottom: 12 },
   rescheduleBtn:      { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
-  rescheduleTxt:      { fontSize: 13, fontWeight: '600' },
+  rescheduleTxt:      { fontSize: 15, fontWeight: '600' },
   // Refund
   refundNote:         { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 12 },
-  refundText:         { fontSize: 12, lineHeight: 18 },
+  refundText:         { fontSize: 14, lineHeight: 18 },
   // Rejection
   opdBtn:             { borderRadius: 10, borderWidth: 1, padding: 11, alignItems: 'center' },
 })
