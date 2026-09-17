@@ -652,7 +652,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   type: 'virtual' as const,
                   icon: 'videocam-outline' as const,
                   iconColor: t.statusVirtual.text,
-                  iconBg: 'rgba(55,138,221,0.12)',
+                  iconBg: t.statusVirtual.bg,
                   label: 'Virtual Consultation',
                   desc:  'Video or phone call with a doctor. You can choose a preferred doctor if available.',
                 },

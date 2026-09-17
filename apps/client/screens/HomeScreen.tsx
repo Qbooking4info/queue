@@ -94,7 +94,7 @@ function SpecialtyGrid({
                   numberOfLines={2}>{sp.label}</Text>
                 {active && (
                   <View style={{ position: 'absolute', top: 6, right: 6, width: 12, height: 12, borderRadius: 6, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="checkmark" size={8} color="#000" />
+                    <Ionicons name="checkmark" size={8} color={t.onAccent} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -252,23 +252,23 @@ export function HomeScreen({ navigation }: Props) {
 
         {/* Profile completion banner */}
         {showProfileBanner && (
-          <View style={[s.profileBanner, { backgroundColor: '#2A1800', borderColor: 'rgba(239,159,39,0.35)' }]}>
+          <View style={[s.profileBanner, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
             <Ionicons name="medical-outline" size={20} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
               <Text style={[s.profileBannerTitle, { color: t.statusBusy.text }]}>Complete your health profile</Text>
-              <Text style={[s.profileBannerSub, { color: 'rgba(239,159,39,0.65)' }]}>
+              <Text style={[s.profileBannerSub, { color: t.statusBusy.text, opacity: 0.8 }]}>
                 Missing info affects emergency triage. Takes 30 seconds.
               </Text>
             </View>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Profile') }}
               style={[s.profileBannerBtn, { backgroundColor: t.statusBusy.text, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete</Text>
-              <Ionicons name="arrow-forward" size={12} color="#000" />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: t.mode === 'dark' ? '#2B1600' : '#FFFFFF' }}>Complete</Text>
+              <Ionicons name="arrow-forward" size={12} color={t.mode === 'dark' ? '#2B1600' : '#FFFFFF'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { haptics.tap(); setBannerDismissed(true) }}
               accessibilityLabel="Dismiss"
               style={s.profileBannerDismiss}>
-              <Ionicons name="close" size={14} color="rgba(239,159,39,0.5)" />
+              <Ionicons name="close" size={14} color={t.statusBusy.text} style={{ opacity: 0.7 }} />
             </TouchableOpacity>
           </View>
         )}
@@ -338,8 +338,8 @@ export function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', { bookingType: 'virtual' }) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={[s.bookIcon, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
-              <Ionicons name="videocam-outline" size={20} color="#378ADD" />
+            <View style={[s.bookIcon, { backgroundColor: t.statusVirtual.bg }]}>
+              <Ionicons name="videocam-outline" size={20} color={t.statusVirtual.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Virtual Call</Text>
@@ -472,8 +472,8 @@ export function HomeScreen({ navigation }: Props) {
             </Text>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
               style={[s.clearBtn, { backgroundColor: t.accent, borderColor: t.accent, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Search hospitals</Text>
-              <Ionicons name="arrow-forward" size={14} color="#fff" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.onAccent }}>Search hospitals</Text>
+              <Ionicons name="arrow-forward" size={14} color={t.onAccent} />
             </TouchableOpacity>
           </View>
         )}
@@ -503,7 +503,7 @@ const s = StyleSheet.create({
   banner:            { borderRadius: 20, padding: 14, marginBottom: 18, borderWidth: 1 },
   bannerLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
   bannerRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  bannerDoctor:      { fontSize: 15, fontWeight: '700', color: '#fff' },
+  bannerDoctor:      { fontSize: 15, fontWeight: '700' },
   bannerSub:         { fontSize: 11, marginTop: 2 },
   bannerChip:        { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
   bannerChipText:    { fontSize: 10, fontWeight: '700' },

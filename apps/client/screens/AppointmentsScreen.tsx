@@ -242,8 +242,8 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
                       {isEmergency && (
                         <View style={{ backgroundColor: t.danger, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 6 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Ionicons name="alert-circle-outline" size={9} color="#fff" />
-                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>EMERGENCY</Text>
+                            <Ionicons name="alert-circle-outline" size={9} color={t.onDanger} />
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: t.onDanger }}>EMERGENCY</Text>
                           </View>
                         </View>
                       )}

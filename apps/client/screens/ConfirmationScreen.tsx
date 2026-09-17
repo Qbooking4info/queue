@@ -230,5 +230,5 @@ const st = StyleSheet.create({
   secondaryBtn:    { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   secondaryBtnText:{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
   primaryBtn:      { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' },
-  primaryBtnText:  { fontSize: 13, fontWeight: '700', color: '#fff' },
+  primaryBtnText:  { fontSize: 13, fontWeight: '700' },
 })

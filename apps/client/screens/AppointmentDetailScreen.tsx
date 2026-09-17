@@ -14,6 +14,7 @@ import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
 import { toDisplayHospital, bgFromName } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 interface Props { navigation: any; route: any }
 
@@ -140,15 +141,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const canReschedule = (isUpcoming || isMissed) && appt.rescheduleCount < 1
   const showPass    = isUpcoming && !cancelled && !isPendingReview && !isRejected
 
-  const statusColor = {
-    confirmed:   { bg: t.accentBg,  text: t.accent,    border: t.accentBorder },
-    pending:     { bg: '#FEF8E7',   text: '#633806',   border: 'rgba(196,127,0,0.3)' },
-    completed:   { bg: t.inputBg,   text: t.textMuted, border: t.cardBorder },
-    cancelled:   { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
-    checked_in:  { bg: '#E8F4FE',   text: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' },
-    in_progress: { bg: '#FEF0E6',   text: '#7A3A00',   border: 'rgba(122,58,0,0.3)' },
-    no_show:     { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
-  }[cancelled ? 'cancelled' : appt.status as string] ?? { bg: t.accentBg, text: t.accent, border: t.accentBorder }
+  const sc = statusBadgeColors(t)
+  const statusColor = sc[(cancelled ? 'cancelled' : appt.status) as keyof typeof sc] ?? sc.confirmed
 
   const displayStatus = isPendingReview ? 'Pending Review'
     : isRejected ? 'Rejected'
@@ -157,9 +151,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     : appt.status.charAt(0).toUpperCase() + appt.status.slice(1)
 
   const displayStatusColor = isPendingReview
-    ? { bg: 'rgba(239,159,39,0.12)', text: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
+    ? { bg: t.statusBusy.bg, text: t.statusBusy.text, border: t.statusBusy.border }
     : isRejected
-    ? { bg: '#FCEBEB', text: '#791F1F', border: 'rgba(163,45,45,0.3)' }
+    ? { bg: t.dangerContainer, text: t.onDangerContainer, border: 'transparent' }
     : statusColor
 
   function copyRef() {
@@ -283,17 +277,17 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
         {/* Pending review notice */}
         {isPendingReview && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(239,159,39,0.3)', backgroundColor: 'rgba(239,159,39,0.07)' }]}>
+          <View style={[st.pendingCard, { borderColor: t.statusBusy.border, backgroundColor: t.statusBusy.bg }]}>
             <Ionicons name="hourglass-outline" size={18} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
               <Text style={[st.pendingTitle, { color: t.statusBusy.text }]}>Awaiting hospital approval</Text>
               {appt.clinic && !isOpdClinic && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                   <Text style={{ fontSize: 11, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)' }}>{appt.clinic}</Text>
+                  <Text style={{ fontSize: 11, color: t.statusBusy.text, opacity: 0.85 }}>{appt.clinic}</Text>
                 </View>
               )}
-              <Text style={[st.pendingSub, { color: 'rgba(239,159,39,0.65)' }]}>
+              <Text style={[st.pendingSub, { color: t.statusBusy.text, opacity: 0.75 }]}>
                 {isOpdClinic
                   ? 'The hospital is reviewing your booking. Your check-in pass will appear here once approved.'
                   : 'A desk officer will verify your referral or reason and approve or decline your specialist booking. You\'ll be notified of the outcome.'}
@@ -304,21 +298,21 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
         {/* Rejection card */}
         {isRejected && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.06)' }]}>
-            <Ionicons name="close-circle" size={20} color="#DC2626" />
+          <View style={[st.pendingCard, { borderColor: t.dangerBorder, backgroundColor: t.dangerBg }]}>
+            <Ionicons name="close-circle" size={20} color={t.danger} />
             <View style={{ flex: 1 }}>
-              <Text style={[st.pendingTitle, { color: '#DC2626', marginBottom: 6 }]}>Booking Rejected</Text>
+              <Text style={[st.pendingTitle, { color: t.danger, marginBottom: 6 }]}>Booking Rejected</Text>
               {(raw as any).approval_note ? (
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 3 }}>
                     Hospital's note:
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#DC2626', lineHeight: 18 }}>
+                  <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
                     {(raw as any).approval_note}
                   </Text>
                 </View>
               ) : null}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 6 }}>
                 What you can do:
               </Text>
               {[
@@ -327,8 +321,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                 { icon: 'call-outline' as const,          text: 'Contact the hospital directly for more information' },
               ].map(tip => (
                 <View key={tip.text} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
-                  <Ionicons name={tip.icon} size={12} color="#DC2626" style={{ marginTop: 3 }} />
-                  <Text style={{ fontSize: 11, color: '#DC2626', lineHeight: 18, flex: 1 }}>{tip.text}</Text>
+                  <Ionicons name={tip.icon} size={12} color={t.danger} style={{ marginTop: 3 }} />
+                  <Text style={{ fontSize: 11, color: t.danger, lineHeight: 18, flex: 1 }}>{tip.text}</Text>
                 </View>
               ))}
               {raw.hospital && (
@@ -337,9 +331,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                     hospital:    toDisplayHospital(raw.hospital),
                     bookingType: 'physical',
                   })}
-                  style={[st.opdBtn, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.1)', marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Book OPD Appointment</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#DC2626" />
+                  style={[st.opdBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger }}>Book OPD Appointment</Text>
+                  <Ionicons name="arrow-forward" size={14} color={t.danger} />
                 </TouchableOpacity>
               )}
             </View>
@@ -422,7 +416,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         {/* Virtual join banner */}
         {canJoinVirtual && !cancelled && (
           <TouchableOpacity
-            style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: t.infoBorder }]}
+            style={[st.joinBanner, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}
             onPress={() => navigation.navigate('VideoCall', {
               appointmentId: raw.id,
               doctorName:    appt.doctor ?? 'your doctor',
@@ -431,10 +425,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <Ionicons name="videocam-outline" size={22} color={t.statusVirtual.text} />
             <View style={{ flex: 1 }}>
               <Text style={[st.joinTitle, { color: t.statusVirtual.text }]}>Virtual consultation</Text>
-              <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
+              <Text style={[st.joinSub, { color: t.statusVirtual.text, opacity: 0.7 }]}>Tap to join your video room</Text>
             </View>
-            <View style={[st.joinBtn, { backgroundColor: '#1A7FC1' }]}>
-              <Text style={st.joinBtnText}>Join</Text>
+            <View style={[st.joinBtn, { backgroundColor: t.accent }]}>
+              <Text style={[st.joinBtnText, { color: t.onAccent }]}>Join</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -750,7 +744,7 @@ const st = StyleSheet.create({
   joinTitle:          { fontSize: 13, fontWeight: '700' },
   joinSub:            { fontSize: 11, marginTop: 2 },
   joinBtn:            { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  joinBtnText:        { fontSize: 12, fontWeight: '700', color: '#fff' },
+  joinBtnText:        { fontSize: 12, fontWeight: '700' },
   // Queue
   queueCard:          { flexDirection: 'row', marginHorizontal: 20, borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   queueLeft:          { flex: 1, alignItems: 'center', padding: 14 },
