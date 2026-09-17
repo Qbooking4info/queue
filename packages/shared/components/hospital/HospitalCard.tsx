@@ -55,7 +55,13 @@ interface Props { hospital: DisplayHospital; onPress: () => void }
 export function HospitalCard({ hospital: h, onPress }: Props) {
   const { theme: t } = useTheme()
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.card, { backgroundColor: t.cardBg }]}>
+    // Shadow and corner-clipping deliberately split across two views -- a
+    // single view with both `overflow: 'hidden'` (needed to clip the header
+    // strip's tint to the rounded corners) and a shadow renders the shadow
+    // as a hard, near-black rectangle on Android/web instead of a soft drop
+    // shadow, which read as an unwanted dark border around every card.
+    <View style={[styles.shadowWrap, { backgroundColor: t.cardBg }]}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.clip}>
       {/* Tonal header strip */}
       <View style={[styles.headerStrip, { backgroundColor: h.avatarBg + '22', borderBottomColor: t.cardBorder }]}>
         <View style={styles.headerRow}>
@@ -106,20 +112,26 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
         </View>
       </View>
     </TouchableOpacity>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  card: {
+  shadowWrap: {
     borderRadius: 12,
     marginBottom: 12,
-    overflow: 'hidden',
     // Shadow-only elevation, no border -- see the file header comment.
+    // Deliberately soft: shadowOpacity/elevation this low reads as a gentle
+    // lift off the page, not a dark ring around the card.
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  clip: {
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   headerStrip:  { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1 },
   headerRow:    { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
