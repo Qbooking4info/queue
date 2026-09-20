@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   let query = db
     .from('doctors')
     .select(
-      'user_id, full_name, title, level, avatar_url, ' +
+      'user_id, full_name, title, level, avatar_url, avg_rating, review_count, ' +
       'hospital:hospitals!doctors_hospital_id_fkey(id, name), ' +
       'specialty:specialties!doctors_specialty_id_fkey(name, icon)',
     )
@@ -66,6 +66,8 @@ export async function GET(req: NextRequest) {
         avatarUrl: r.avatar_url,
         title: r.title,
         level: r.level,
+        avgRating: r.avg_rating,
+        reviewCount: r.review_count,
         specialty: r.specialty ?? null,
         hospitals: hospitalEntry ? [hospitalEntry] : [],
       })

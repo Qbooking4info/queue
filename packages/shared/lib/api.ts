@@ -533,6 +533,8 @@ export interface IndependentDoctor {
   avatarUrl: string | null
   title: string | null
   level: string | null
+  avgRating: number | null
+  reviewCount: number | null
   specialty: { name: string; icon: string | null } | null
   bio: string | null
   qualification: string | null
