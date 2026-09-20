@@ -122,9 +122,9 @@ export function DoctorSettingsScreen({ navigation }: Props) {
               <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Settings</Text>
+          <Text style={{ fontSize: 25, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Settings</Text>
         </View>
-        <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
+        <Text style={{ fontSize: 14, color: t.textMuted, marginBottom: 20 }}>
           Your independent, hospital-agnostic profile — what patients see when booking you directly.
         </Text>
 
@@ -135,10 +135,10 @@ export function DoctorSettingsScreen({ navigation }: Props) {
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: form.is_paused ? t.danger : t.textPrimary }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: form.is_paused ? t.danger : t.textPrimary }}>
                 {form.is_paused ? 'Bookings paused' : 'Pause direct bookings'}
               </Text>
-              <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2, lineHeight: 16 }}>
+              <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2, lineHeight: 16 }}>
                 {form.is_paused
                   ? 'Patients cannot book you for a virtual consult or home visit. Your virtual/home-visit preferences below are kept, not changed.'
                   : 'Going on leave? Turn this on to stop new virtual/home-visit bookings without touching your settings below.'}
@@ -173,9 +173,9 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           <FieldRow theme={t} label="Title" value={form.title ?? ''} onChange={v => set('title', v || null)} placeholder="e.g. Dr." />
           <TouchableOpacity onPress={() => { haptics.tap(); setPickerOpen(true) }}
             style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-            <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Medical Specialty</Text>
+            <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>Medical Specialty</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10 }}>
-              <Text style={{ fontSize: 13, color: form.specialty_id ? t.textPrimary : t.textMuted }}>
+              <Text style={{ fontSize: 15, color: form.specialty_id ? t.textPrimary : t.textMuted }}>
                 {specialties.find(s => s.id === form.specialty_id)?.name ?? 'Select specialty…'}
               </Text>
               <Ionicons name="chevron-down" size={14} color={t.textMuted} />
@@ -193,7 +193,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 
         <Section theme={t} title="Qualification documents">
           {docs.length === 0 ? (
-            <Text style={{ fontSize: 12, color: t.textMuted, padding: 14 }}>
+            <Text style={{ fontSize: 14, color: t.textMuted, padding: 14 }}>
               No documents uploaded yet. Upload certificates or licences so patients can verify your credentials.
             </Text>
           ) : docs.map(d => (
@@ -201,7 +201,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
               <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}
                 onPress={() => d.url && Linking.openURL(d.url)}>
                 <Ionicons name="document-text-outline" size={16} color={t.accent} />
-                <Text numberOfLines={1} style={{ fontSize: 12, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 14, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(d.id)} accessibilityLabel={`Delete ${d.title}`} style={{ padding: 4 }}>
                 <Ionicons name="trash-outline" size={15} color={t.danger} />
@@ -213,7 +213,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
             {uploading ? <ActivityIndicator size="small" color={t.accent} /> : (
               <>
                 <Ionicons name="cloud-upload-outline" size={15} color={t.accent} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Upload document (PDF, JPG, PNG — max 10MB)</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Upload document (PDF, JPG, PNG — max 10MB)</Text>
               </>
             )}
           </TouchableOpacity>
@@ -223,14 +223,14 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
-              <Text style={{ fontSize: 13, color: t.textPrimary }}>{themeId === 'forest' ? 'Forest' : 'Clinical'} theme</Text>
+              <Text style={{ fontSize: 15, color: t.textPrimary }}>{themeId === 'forest' ? 'Forest' : 'Clinical'} theme</Text>
             </View>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
-              <Text style={{ fontSize: 13, color: t.textPrimary }}>{mode === 'dark' ? 'Dark' : 'Light'} mode</Text>
+              <Text style={{ fontSize: 15, color: t.textPrimary }}>{mode === 'dark' ? 'Dark' : 'Light'} mode</Text>
             </View>
             <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
@@ -250,7 +250,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
         ) : (
           <TouchableOpacity onPress={() => setConfirmSignOut(true)}
             style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger }}>Sign out</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: t.danger }}>Sign out</Text>
           </TouchableOpacity>
         )}
       </ShellScroll>
@@ -259,7 +259,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: t.cardBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingTop: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: t.textPrimary }}>Select Specialty</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>Select Specialty</Text>
               <TouchableOpacity onPress={() => setPickerOpen(false)} accessibilityLabel="Close" hitSlop={8}>
                 <Ionicons name="close" size={20} color={t.textMuted} />
               </TouchableOpacity>
@@ -272,8 +272,8 @@ export function DoctorSettingsScreen({ navigation }: Props) {
                     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10,
                     backgroundColor: form.specialty_id === s.id ? t.accentBg : 'transparent',
                   }}>
-                  <Text style={{ fontSize: 18 }}>{s.icon ?? '🩺'}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: form.specialty_id === s.id ? t.accent : t.textPrimary, flex: 1 }}>{s.name}</Text>
+                  <Text style={{ fontSize: 21 }}>{s.icon ?? '🩺'}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: form.specialty_id === s.id ? t.accent : t.textPrimary, flex: 1 }}>{s.name}</Text>
                   {form.specialty_id === s.id && <Ionicons name="checkmark" size={16} color={t.accent} />}
                 </TouchableOpacity>
               ))}
@@ -288,7 +288,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 function Section({ theme: t, title, children }: { theme: any; title: string; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: 20 }}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{title}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{title}</Text>
       <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 14, overflow: 'hidden' }}>
         {children}
       </View>
@@ -302,8 +302,8 @@ function ToggleRow({ theme: t, label, sub, value, onChange, last }: {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder }}>
       <View style={{ flex: 1, paddingRight: 10 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
-        {sub && <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{sub}</Text>}
+        <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+        {sub && <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>{sub}</Text>}
       </View>
       <Switch value={value} onValueChange={v => { haptics.tap(); onChange(v) }} trackColor={{ true: t.accent, false: t.cardBorder }} />
     </View>
@@ -313,10 +313,10 @@ function ToggleRow({ theme: t, label, sub, value, onChange, last }: {
 function FeeRow({ theme: t, label, value, onChange }: { theme: any; label: string; value: number | null; onChange: (v: number | null) => void }) {
   return (
     <View style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
+      <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
       <TextInput value={value?.toString() ?? ''} onChangeText={v => onChange(v ? Number(v.replace(/\D/g, '')) : null)}
         keyboardType="number-pad" placeholder="e.g. 5000" placeholderTextColor={t.textMuted}
-        style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 13, color: t.textPrimary }} />
+        style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 15, color: t.textPrimary }} />
     </View>
   )
 }
@@ -327,12 +327,12 @@ function FieldRow({ theme: t, label, value, onChange, placeholder, multiline, ke
 }) {
   return (
     <View style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder }}>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
+      <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.textMuted}
         multiline={multiline} keyboardType={keyboardType ?? 'default'}
         style={{
           borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10,
-          padding: 10, fontSize: 13, color: t.textPrimary, minHeight: multiline ? 70 : undefined,
+          padding: 10, fontSize: 15, color: t.textPrimary, minHeight: multiline ? 70 : undefined,
           textAlignVertical: multiline ? 'top' : 'center',
         }} />
     </View>

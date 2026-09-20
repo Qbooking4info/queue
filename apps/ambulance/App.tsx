@@ -8,8 +8,9 @@ import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, ActivityIndicator, Text, TouchableOpacity, TextInput } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold } from '@expo-google-fonts/dm-sans'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
@@ -47,8 +48,14 @@ const CrewTab     = createBottomTabNavigator()
 const AdminTab    = createBottomTabNavigator()
 const AdminStackN = createNativeStackNavigator()
 
-function TabIcon({ name, color, size }: any) {
-  return <Ionicons name={name} color={color} size={size ?? 22} />
+function TabIcon({ name, focused, color }: any) {
+  const { theme: t } = useTheme()
+  if (!focused) return <Ionicons name={name} size={22} color={color} />
+  return (
+    <View style={{ width: 52, height: 30, borderRadius: 16, backgroundColor: t.accentContainer, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={name} size={20} color={t.onAccentContainer} />
+    </View>
+  )
 }
 
 // Two doors into the same app: a crew/dispatcher account (provisioned by
@@ -94,8 +101,8 @@ function CrewTabs() {
     <CrewTab.Navigator screenOptions={{
       headerShown: false,
       tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
     }}>
       <CrewTab.Screen name="CrewHome"    component={CrewHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'medkit' : 'medkit-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
       <CrewTab.Screen name="CrewProfile" component={CrewProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
@@ -116,8 +123,8 @@ function AdminTabs() {
     <AdminTab.Navigator screenOptions={{
       headerShown: false,
       tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
     }}>
       <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Home' }} />
       <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'car-sport' : 'car-sport-outline'} {...p} />, tabBarLabel: 'Fleet' }} />
@@ -136,6 +143,21 @@ function AdminStack() {
   )
 }
 
+// Matches the mockups' own typeface. Applied as a single global default
+// (Text/TextInput.defaultProps) so every existing screen picks it up with
+// no changes on its own end -- see the client app's own App.tsx for the
+// full reasoning (same helper, duplicated per-app since each app's entry
+// point is separate).
+let dmSansApplied = false
+function applyDMSansGlobally() {
+  if (dmSansApplied) return
+  dmSansApplied = true
+  for (const Comp of [Text, TextInput] as const) {
+    const existing = (Comp as any).defaultProps ?? {}
+    ;(Comp as any).defaultProps = { ...existing, style: [{ fontFamily: 'DMSans_400Regular' }, existing.style] }
+  }
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
   const {
@@ -144,8 +166,12 @@ function AppNavigator() {
   } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
+  })
+  if (fontsLoaded) applyDMSansGlobally()
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>

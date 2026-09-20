@@ -85,7 +85,7 @@ export function AmbulanceProviderRegisterScreen({ navigation }: Props) {
             {error ? (
               <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-                <Text style={s.errorText}>{error}</Text>
+                <Text style={[s.errorText, { color: t.danger }]}>{error}</Text>
               </View>
             ) : null}
 
@@ -133,10 +133,10 @@ const s = StyleSheet.create({
   safe:        { flex: 1 },
   back:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   content:     { flex: 1, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40 },
-  title:       { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
-  sub:         { fontSize: 13, lineHeight: 19, marginBottom: 20 },
+  title:       { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
+  sub:         { fontSize: 15, lineHeight: 19, marginBottom: 20 },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 13, color: '#FF5C5C', flex: 1 },
+  errorText:   { fontSize: 15, flex: 1 },
   input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
-  inputText:   { fontSize: 14, flex: 1 },
+  inputText:   { fontSize: 16, flex: 1 },
 })

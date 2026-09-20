@@ -127,7 +127,7 @@ export function AmbulanceProviderOnboardingScreen() {
           {error ? (
             <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
               <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-              <Text style={s.errorText}>{error}</Text>
+              <Text style={[s.errorText, { color: t.danger }]}>{error}</Text>
             </View>
           ) : null}
 
@@ -142,8 +142,8 @@ export function AmbulanceProviderOnboardingScreen() {
                   style={[s.typeCard, { backgroundColor: active ? t.accentBgMid : t.cardBg, borderColor: active ? t.accentBorder : t.cardBorder }]}
                 >
                   <Ionicons name={opt.icon} size={18} color={active ? t.accent : t.textMuted} />
-                  <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700', marginTop: 6 }}>{opt.label}</Text>
-                  <Text style={{ color: t.textMuted, fontSize: 10.5, marginTop: 2, lineHeight: 14 }}>{opt.sub}</Text>
+                  <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700', marginTop: 6 }}>{opt.label}</Text>
+                  <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 2, lineHeight: 14 }}>{opt.sub}</Text>
                 </TouchableOpacity>
               )
             })}
@@ -166,7 +166,7 @@ export function AmbulanceProviderOnboardingScreen() {
               {selectedHospital ? (
                 <View style={[s.selectedHospital, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
                   <Ionicons name="checkmark-circle" size={16} color={t.accent} />
-                  <Text style={{ color: t.accent, fontSize: 13, fontWeight: '700', flex: 1 }}>{selectedHospital.name}</Text>
+                  <Text style={{ color: t.accent, fontSize: 15, fontWeight: '700', flex: 1 }}>{selectedHospital.name}</Text>
                   <TouchableOpacity onPress={() => setSelectedHospital(null)}>
                     <Ionicons name="close" size={16} color={t.accent} />
                   </TouchableOpacity>
@@ -175,8 +175,8 @@ export function AmbulanceProviderOnboardingScreen() {
                 hospitalResults.map(h => (
                   <TouchableOpacity key={h.id} onPress={() => { setSelectedHospital(h); haptics.tap() }}
                     style={[s.hospitalRow, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-                    <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '600' }}>{h.name}</Text>
-                    {(h.city || h.state) && <Text style={{ color: t.textMuted, fontSize: 11.5, marginTop: 2 }}>{[h.city, h.state].filter(Boolean).join(', ')}</Text>}
+                    <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '600' }}>{h.name}</Text>
+                    {(h.city || h.state) && <Text style={{ color: t.textMuted, fontSize: 13, marginTop: 2 }}>{[h.city, h.state].filter(Boolean).join(', ')}</Text>}
                   </TouchableOpacity>
                 ))
               )}
@@ -194,7 +194,7 @@ export function AmbulanceProviderOnboardingScreen() {
                       style={[s.ownershipBtn, { backgroundColor: active ? t.accentBgMid : t.cardBg, borderColor: active ? t.accentBorder : t.cardBorder }]}
                     >
                       <Ionicons name={opt.icon} size={16} color={active ? t.accent : t.textMuted} />
-                      <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>{opt.label}</Text>
+                      <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>{opt.label}</Text>
                     </TouchableOpacity>
                   )
                 })}
@@ -231,19 +231,19 @@ function Field({ icon, placeholder, value, onChange, t, keyboard }: {
 
 const s = StyleSheet.create({
   safe:        { flex: 1 },
-  title:       { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
-  sub:         { fontSize: 13, lineHeight: 19, marginBottom: 20 },
+  title:       { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
+  sub:         { fontSize: 15, lineHeight: 19, marginBottom: 20 },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 13, color: '#FF5C5C', flex: 1 },
+  errorText:   { fontSize: 15, flex: 1 },
   input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
-  inputText:   { fontSize: 14, flex: 1 },
-  label:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  inputText:   { fontSize: 16, flex: 1 },
+  label:       { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   typeRow:     { flexDirection: 'row', gap: 10, marginBottom: 16 },
   typeCard:    { flex: 1, borderRadius: 14, borderWidth: 1, padding: 13, alignItems: 'flex-start' },
   ownershipRow:{ flexDirection: 'row', gap: 10, marginBottom: 16 },
   ownershipBtn:{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 13 },
   selectedHospital: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
   hospitalRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
-  doneTitle:   { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
-  doneSub:     { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  doneTitle:   { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
+  doneSub:     { fontSize: 15, lineHeight: 19, textAlign: 'center' },
 })

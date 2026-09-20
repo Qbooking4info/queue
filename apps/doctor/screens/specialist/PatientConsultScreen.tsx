@@ -10,6 +10,8 @@ import { haptics }  from '@queue/shared/lib/haptics'
 import { setConsultStatus, saveConsultVitalsAndNotes, bookFollowUp } from '@queue/shared/lib/api'
 import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
 import { FollowUpModal } from '@queue/shared/components/FollowUpModal'
+import { Avatar } from '@queue/shared/components/ui/Avatar'
+import { bgFromName } from '@queue/shared/lib/adapters'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -128,7 +130,7 @@ function ChipRow({ options, onPick, theme: t }: { options: string[]; onPick: (v:
       {options.map(opt => (
         <TouchableOpacity key={opt} onPress={() => onPick(opt)}
           style={[st.chip, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: t.textPrimary }}>{opt}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.textPrimary }}>{opt}</Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -139,7 +141,7 @@ function AddItemButton({ label, onPress, theme: t }: { label: string; onPress: (
   return (
     <TouchableOpacity onPress={onPress} style={[st.addBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
       <Ionicons name="add" size={15} color={t.accent} />
-      <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -164,7 +166,7 @@ function fmt12(time: string): string {
   return `${h % 12 || 12}:${mStr} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-function InProgressPulse() {
+function InProgressPulse({ color }: { color: string }) {
   const pulse = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
 
@@ -183,7 +185,7 @@ function InProgressPulse() {
   }, [reduceMotion])
 
   return (
-    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF8C42' }} />
+    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
   )
 }
 
@@ -357,9 +359,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               </View>
             )}
             {isInProgress ? (
-              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-                <InProgressPulse />
-                <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
+              <View style={[st.statusBadge, { backgroundColor: t.statusProgress.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                <InProgressPulse color={t.statusProgress.text} />
+                <Text style={[st.statusText, { color: t.statusProgress.text }]}>In Progress</Text>
               </View>
             ) : !isEmergency && (
               <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
@@ -378,11 +380,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
             borderColor: isEmergency ? t.danger : t.bannerBorder,
           }]}>
             <View style={st.patientRow}>
-              <View style={[st.avatarLg, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                <Text style={[st.avatarText, { color: t.accent }]}>
-                  {patient?.full_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() ?? '?'}
-                </Text>
-              </View>
+              <Avatar
+                initials={patient?.full_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() ?? '?'}
+                bg={bgFromName(patient?.full_name ?? '?')}
+                size={52}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={st.heroName}>{patient?.full_name ?? '—'}</Text>
                 <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.55)' }]}>
@@ -403,7 +405,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     {isVirtual ? 'Virtual' : 'In-person'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
                   {fmt12(appt.start_time)}
                 </Text>
               </View>
@@ -448,7 +450,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 })}
                 style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <Ionicons name="arrow-redo-outline" size={15} color={t.textPrimary} />
-                <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '700' }}>
                   {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
                 </Text>
               </TouchableOpacity>
@@ -463,7 +465,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 })}
                 style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginTop: 10 }]}>
                 <Ionicons name="medkit-outline" size={15} color={t.danger} />
-                <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>Request Ambulance</Text>
+                <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Request Ambulance</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -474,7 +476,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 {isVirtual ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: t.statusVirtual.bg, borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => {
                       haptics.heavy()
                       navigation.navigate('DoctorVideoCall', {
@@ -484,7 +486,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     }}
                   >
                     <Ionicons name="videocam-outline" size={16} color={t.statusVirtual.text} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
                   </TouchableOpacity>
                 ) : canStart ? (
                   <TouchableOpacity
@@ -493,11 +495,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     disabled={statusUpdating}
                   >
                     {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>…</Text>
                     ) : (
                       <>
                         <Ionicons name="play" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -517,11 +519,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     disabled={statusUpdating}
                   >
                     {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>…</Text>
                     ) : (
                       <>
                         <Ionicons name="checkmark" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Complete</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>Complete</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -541,7 +543,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   onPress={() => navigation.navigate('ConsultationPlan', { appointmentId: appt.id, patientName: patient?.full_name ?? 'Patient' })}
                   style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                   <Ionicons name="document-text-outline" size={15} color={t.textPrimary} />
-                  <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                  <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '700' }}>
                     {(appt.diagnosis || appt.investigations || appt.treatment_plan) ? 'View/Edit Consultation Plan' : 'Share Consultation Plan'}
                   </Text>
                 </TouchableOpacity>
@@ -565,11 +567,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   <VitalInput label="Blood Sugar (mg/dL)" value={bSugar} onChange={setBSugar} theme={t} keyboardType="decimal-pad" />
                   <View style={[st.vitalBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                     <Text style={[st.vitalLabel, { color: t.accent }]}>BMI</Text>
-                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 20 }]}>{bmi ?? '—'}</Text>
+                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 23 }]}>{bmi ?? '—'}</Text>
                   </View>
                 </View>
               ) : (
-                <Text style={{ fontSize: 12, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
+                <Text style={{ fontSize: 14, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
                   Vitals can be recorded once the patient is checked in.
                 </Text>
               )}
@@ -581,7 +583,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
                   CLINICAL NOTES
                 </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>
                   {notes.length}/{NOTES_MAX}
                 </Text>
               </View>
@@ -640,7 +642,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                       <TouchableOpacity
                         onPress={() => setInvItems(list => list.map(i => i.id === item.id ? { ...i, isImaging: !i.isImaging } : i))}
                         style={[st.imagingToggle, { borderColor: item.isImaging ? t.accent : t.cardBorder, backgroundColor: item.isImaging ? `${t.accent}18` : 'transparent' }]}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: item.isImaging ? t.accent : t.textMuted }}>Imaging</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: item.isImaging ? t.accent : t.textMuted }}>Imaging</Text>
                       </TouchableOpacity>
                       {invItems.length > 1 && (
                         <TouchableOpacity onPress={() => setInvItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove investigation" hitSlop={8}>
@@ -723,9 +725,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
                 <View style={[st.divider, { backgroundColor: t.cardBorder }]} />
                 <TouchableOpacity onPress={() => setShowFollowUp(true)}
-                  style={[st.addBtn, { borderColor: t.infoBorder, backgroundColor: 'rgba(90,160,255,0.12)' }]}>
+                  style={[st.addBtn, { borderColor: t.infoBorder, backgroundColor: t.infoBg }]}>
                   <Ionicons name="calendar-outline" size={15} color={t.info} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.info }}>Book Follow-up Appointment</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.info }}>Book Follow-up Appointment</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -737,13 +739,13 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               style={[st.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}
             >
               {saving
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color={t.onAccent} size="small" />
                 : saved
                   ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                      <Text style={st.saveTxt}>Saved</Text>
+                      <Ionicons name="checkmark" size={16} color={t.onAccent} />
+                      <Text style={[st.saveTxt, { color: t.onAccent }]}>Saved</Text>
                     </View>
-                  : <Text style={st.saveTxt}>Save Vitals & Notes</Text>
+                  : <Text style={[st.saveTxt, { color: t.onAccent }]}>Save Vitals & Notes</Text>
               }
             </TouchableOpacity>
           </View>
@@ -789,40 +791,38 @@ const st = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:       { padding: 4 },
-  backArrow:     { fontSize: 22 },
-  headerTitle:   { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  backArrow:     { fontSize: 25 },
+  headerTitle:   { flex: 1, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   statusBadge:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
-  statusText:    { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
+  statusText:    { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
   heroCard:      { marginHorizontal: 16, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
   patientRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatarLg:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:    { fontSize: 18, fontWeight: '800' },
-  heroName:      { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  heroSub:       { fontSize: 12, marginTop: 2, lineHeight: 17 },
-  typeChip:      { fontSize: 11, fontWeight: '700' },
+  heroName:      { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroSub:       { fontSize: 14, marginTop: 2, lineHeight: 17 },
+  typeChip:      { fontSize: 13, fontWeight: '700' },
   reasonBox:     { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  reasonLabel:   { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
-  reasonText:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
+  reasonLabel:   { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
+  reasonText:    { fontSize: 15, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
   pad:           { paddingHorizontal: 16, marginBottom: 0 },
   actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   referBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
-  doneTxt:       { fontSize: 14, fontWeight: '700' },
+  doneTxt:       { fontSize: 16, fontWeight: '700' },
   section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionTitle:  { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   vitalsGrid:    { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
   vitalBox:      { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },
-  vitalLabel:    { fontSize: 10, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
-  vitalValue:    { fontSize: 18, fontWeight: '800' },
-  vitalInput:    { fontSize: 18, fontWeight: '700', padding: 0 },
-  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
-  itemInput:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 },
+  vitalLabel:    { fontSize: 12, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
+  vitalValue:    { fontSize: 21, fontWeight: '800' },
+  vitalInput:    { fontSize: 21, fontWeight: '700', padding: 0 },
+  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 15, lineHeight: 20, minHeight: 90 },
+  itemInput:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   imagingToggle: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  chipGroupLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.6, marginTop: 2 },
+  chipGroupLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginTop: 2 },
   chip:          { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   addBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingVertical: 10, marginTop: 2 },
   divider:       { height: 1, marginVertical: 4 },
   saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
-  saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
+  saveTxt:       { fontSize: 17, fontWeight: '800' },
 })

@@ -10,6 +10,8 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { Button } from '@queue/shared/components/ui/Button'
+import { Avatar } from '@queue/shared/components/ui/Avatar'
+import { bgFromName } from '@queue/shared/lib/adapters'
 
 interface Props { navigation?: any }
 
@@ -97,8 +99,8 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
         {/* Doctor Card */}
         <View style={[st.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[st.avatarText, { color: t.accent }]}>{initials}</Text>
+          <View style={{ marginBottom: 12 }}>
+            <Avatar initials={initials ?? '?'} bg={bgFromName(doctor?.full_name ?? user?.full_name ?? '?')} size={72} />
           </View>
           <Text style={[st.docName, { color: t.textPrimary }]}>{doctor?.full_name ?? user?.full_name ?? '—'}</Text>
           {user?.doctor_code && (
@@ -230,28 +232,26 @@ function Row({ label, value, theme: t, accent }: { label: string; value: string;
 const st = StyleSheet.create({
   safe:            { flex: 1 },
   center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title:           { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
+  title:           { fontSize: 32, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
   profileCard:     { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:          { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:      { fontSize: 26, fontWeight: '800' },
-  docName:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  docName:         { fontSize: 23, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
   idPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 99, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
-  idPillText:      { fontSize: 12, fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1.5 },
-  specialty:       { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:            { fontSize: 12, marginTop: 3, textAlign: 'center' },
-  email:           { fontSize: 11, marginTop: 6 },
+  idPillText:      { fontSize: 14, fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1.5 },
+  specialty:       { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  qual:            { fontSize: 14, marginTop: 3, textAlign: 'center' },
+  email:           { fontSize: 13, marginTop: 6 },
   ratingRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingNum:       { fontSize: 12, marginLeft: 4 },
+  ratingNum:       { fontSize: 14, marginLeft: 4 },
   statsRow:        { flexDirection: 'row', gap: 8 },
   statBox:         { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  statNum:         { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  statLabel:       { fontSize: 10, fontWeight: '600', marginTop: 3 },
+  statNum:         { fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },
+  statLabel:       { fontSize: 12, fontWeight: '600', marginTop: 3 },
   scheduleBtn:     { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  scheduleBtnText: { fontSize: 14, fontWeight: '700' },
+  scheduleBtnText: { fontSize: 16, fontWeight: '700' },
   section:         { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   row:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  rowLabel:        { fontSize: 13 },
-  rowValue:        { fontSize: 13, fontWeight: '600' },
-  bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
+  rowLabel:        { fontSize: 15 },
+  rowValue:        { fontSize: 15, fontWeight: '600' },
+  bio:             { padding: 14, fontSize: 15, lineHeight: 20 },
 })

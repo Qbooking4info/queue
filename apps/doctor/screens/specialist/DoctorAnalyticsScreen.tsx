@@ -155,7 +155,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
         >
           {error ? (
             <View style={[s.card, { backgroundColor: t.dangerSubtle, borderColor: t.danger, marginBottom: 12 }]}>
-              <Text style={{ color: t.danger, fontSize: 12.5 }}>{error}</Text>
+              <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
             </View>
           ) : null}
 
@@ -198,7 +198,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
               <Text style={[s.cardTitle, { color: t.textPrimary, marginBottom: 2 }]}>
                 {stats.rating.avg != null ? stats.rating.avg.toFixed(1) : '—'} average rating
               </Text>
-              <Text style={{ fontSize: 12, color: t.textMuted }}>
+              <Text style={{ fontSize: 14, color: t.textMuted }}>
                 {stats.rating.count} review{stats.rating.count === 1 ? '' : 's'} in this period
               </Text>
             </View>
@@ -212,7 +212,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
                 {[
                   { label: 'Physical',   count: stats.byType.inPerson,  color: t.accent },
                   { label: 'Virtual',    count: stats.byType.virtual,   color: t.info },
-                  { label: 'Home Visit', count: stats.byType.homeVisit, color: '#FF8C42' },
+                  { label: 'Home Visit', count: stats.byType.homeVisit, color: t.statusApproval.text },
                 ].map(tp => (
                   <View key={tp.label} style={[s.typeCard, { backgroundColor: `${tp.color}12`, flex: 1 }]}>
                     <Text style={[s.typeCount, { color: tp.color }]}>{tp.count}</Text>
@@ -224,7 +224,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
               <View style={{ height: 8, borderRadius: 99, overflow: 'hidden', flexDirection: 'row' }}>
                 <View style={{ width: `${Math.round(stats.byType.inPerson / typeTotal * 100)}%`, backgroundColor: t.accent }} />
                 <View style={{ width: `${Math.round(stats.byType.virtual / typeTotal * 100)}%`, backgroundColor: t.info }} />
-                <View style={{ flex: 1, backgroundColor: '#FF8C42' }} />
+                <View style={{ flex: 1, backgroundColor: t.statusApproval.text }} />
               </View>
             </View>
           )}
@@ -261,15 +261,15 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
           <View style={s.overlay}>
             <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.title, { color: t.textPrimary, fontSize: 17, marginBottom: 14 }]}>Pick a Date</Text>
+              <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 14 }]}>Pick a Date</Text>
               <CalendarPicker value={pickedDate} onChange={setPickedDate} maxDate={todayLocalDate()} theme={t} />
               <View style={s.pickerBtnRow}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)} style={[s.pickerBtn, { borderColor: t.cardBorder }]}>
-                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 16 }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setPeriodMode('date'); setShowDatePicker(false) }}
                   style={[s.pickerBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 14 }}>Apply</Text>
+                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 16 }}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -281,7 +281,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowMonthPicker(false)}>
           <View style={s.overlay}>
             <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.title, { color: t.textPrimary, fontSize: 17, marginBottom: 16 }]}>Pick a Month</Text>
+              <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 16 }]}>Pick a Month</Text>
               <View style={s.monthStepper}>
                 <TouchableOpacity onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)) }} hitSlop={10}>
                   <Ionicons name="chevron-back" size={20} color={t.textPrimary} />
@@ -295,11 +295,11 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
               </View>
               <View style={s.pickerBtnRow}>
                 <TouchableOpacity onPress={() => setShowMonthPicker(false)} style={[s.pickerBtn, { borderColor: t.cardBorder }]}>
-                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 16 }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setPeriodMode('pickedMonth'); setShowMonthPicker(false) }}
                   style={[s.pickerBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 14 }}>Apply</Text>
+                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 16 }}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -313,27 +313,27 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
-  title:       { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  title:       { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
   chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  chipText:    { fontSize: 12, fontWeight: '700' },
+  chipText:    { fontSize: 14, fontWeight: '700' },
   typeChip:    { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   kpiCard:     { flexBasis: '31%', flexGrow: 1, borderRadius: 14, borderWidth: 1, padding: 12 },
-  kpiValue:    { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  kpiLabel:    { fontSize: 10.5, marginTop: 3 },
+  kpiValue:    { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
+  kpiLabel:    { fontSize: 12, marginTop: 3 },
   card:        { borderRadius: 16, borderWidth: 1, padding: 16 },
-  cardTitle:   { fontSize: 14, fontWeight: '700' },
+  cardTitle:   { fontSize: 16, fontWeight: '700' },
   typeCard:    { borderRadius: 12, padding: 14 },
-  typeCount:   { fontSize: 22, fontWeight: '800' },
-  typeLabel:   { fontSize: 10.5, marginTop: 2 },
-  typePct:     { fontSize: 11 },
+  typeCount:   { fontSize: 25, fontWeight: '800' },
+  typeLabel:   { fontSize: 12, marginTop: 2 },
+  typePct:     { fontSize: 13 },
   ratingBadge: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  barVal:      { fontSize: 9, fontWeight: '700' },
-  barLabel:    { fontSize: 9 },
+  barVal:      { fontSize: 10, fontWeight: '700' },
+  barLabel:    { fontSize: 10 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   pickerCard:  { width: '100%', maxWidth: 380, borderRadius: 18, borderWidth: 1, padding: 20 },
   pickerBtnRow:{ flexDirection: 'row', gap: 10, marginTop: 16 },
   pickerBtn:   { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: 'center' },
   monthStepper:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
-  monthStepperLabel: { fontSize: 15, fontWeight: '800' },
+  monthStepperLabel: { fontSize: 17, fontWeight: '800' },
 })

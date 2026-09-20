@@ -194,17 +194,17 @@ export function AdminFleetScreen() {
 
         {error ? (
           <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={{ color: t.danger, fontSize: 12 }}>{error}</Text>
+            <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
           </View>
         ) : null}
 
         {newCreds && (
           <View style={[s.credsBox, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={{ color: t.accent, fontWeight: '800', fontSize: 13, marginBottom: 6 }}>Crew account created — save these now</Text>
-            <Text style={{ color: t.textPrimary, fontSize: 13 }} selectable>Email: {newCreds.email}</Text>
-            <Text style={{ color: t.textPrimary, fontSize: 13 }} selectable>Password: {newCreds.password}</Text>
+            <Text style={{ color: t.accent, fontWeight: '800', fontSize: 15, marginBottom: 6 }}>Crew account created — save these now</Text>
+            <Text style={{ color: t.textPrimary, fontSize: 15 }} selectable>Email: {newCreds.email}</Text>
+            <Text style={{ color: t.textPrimary, fontSize: 15 }} selectable>Password: {newCreds.password}</Text>
             <TouchableOpacity onPress={() => setNewCreds(null)} style={{ marginTop: 8 }}>
-              <Text style={{ color: t.textMuted, fontSize: 12 }}>Dismiss</Text>
+              <Text style={{ color: t.textMuted, fontSize: 14 }}>Dismiss</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -219,24 +219,24 @@ export function AdminFleetScreen() {
           <>
             <TouchableOpacity onPress={() => setShowAddUnit(v => !v)} style={[s.addToggle, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
               <Ionicons name={showAddUnit ? 'remove' : 'add'} size={16} color={t.accent} />
-              <Text style={{ color: t.accent, fontWeight: '700', fontSize: 13 }}>Add an ambulance</Text>
+              <Text style={{ color: t.accent, fontWeight: '700', fontSize: 15 }}>Add an ambulance</Text>
             </TouchableOpacity>
 
             {showAddUnit && (
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 16 }]}>
                 <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
                   <TextInput value={plateNumber} onChangeText={setPlateNumber} placeholder="Plate number" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 14, flex: 1 }} />
+                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
                 </View>
                 <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
                   <TextInput value={callSign} onChangeText={setCallSign} placeholder="Call sign (optional)" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 14, flex: 1 }} />
+                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
                 </View>
                 <View style={s.chipRow}>
                   {VEHICLE_TIERS.map(tier => (
                     <TouchableOpacity key={tier} onPress={() => setVehicleTier(tier)}
                       style={[s.chip, { borderColor: vehicleTier === tier ? t.accentBorder : t.cardBorder, backgroundColor: vehicleTier === tier ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: vehicleTier === tier ? t.accent : t.textSecondary, fontSize: 12, fontWeight: '700' }}>{tier}</Text>
+                      <Text style={{ color: vehicleTier === tier ? t.accent : t.textSecondary, fontSize: 14, fontWeight: '700' }}>{tier}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -246,22 +246,22 @@ export function AdminFleetScreen() {
                     return (
                       <TouchableOpacity key={c} onPress={() => setCaps(cs => on ? cs.filter(x => x !== c) : [...cs, c])}
                         style={[s.chip, { borderColor: on ? t.accentBorder : t.cardBorder, backgroundColor: on ? t.accentBgMid : 'transparent' }]}>
-                        <Text style={{ color: on ? t.accent : t.textSecondary, fontSize: 12 }}>{c}</Text>
+                        <Text style={{ color: on ? t.accent : t.textSecondary, fontSize: 14 }}>{c}</Text>
                       </TouchableOpacity>
                     )
                   })}
                 </View>
                 <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
                   <TextInput value={address} onChangeText={t2 => { setAddress(t2); setCoords(null) }} placeholder="Home base address" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 14, flex: 1 }} />
+                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
                   <TouchableOpacity onPress={handleGeocode} disabled={geocoding || !address.trim()}>
-                    {geocoding ? <ActivityIndicator size="small" color={t.textMuted} /> : <Text style={{ color: t.accent, fontSize: 13, fontWeight: '700' }}>Find</Text>}
+                    {geocoding ? <ActivityIndicator size="small" color={t.textMuted} /> : <Text style={{ color: t.accent, fontSize: 15, fontWeight: '700' }}>Find</Text>}
                   </TouchableOpacity>
                 </View>
                 {coords && (
                   <View style={[s.foundRow]}>
                     <Ionicons name="checkmark-circle" size={14} color={t.accent} />
-                    <Text style={{ color: t.accent, fontSize: 12 }}>Location found: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</Text>
+                    <Text style={{ color: t.accent, fontSize: 14 }}>Location found: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</Text>
                   </View>
                 )}
                 <Button label="Add ambulance" onPress={handleAddUnit} loading={addingUnit} style={{ marginTop: 10 }} />
@@ -283,9 +283,9 @@ export function AdminFleetScreen() {
                         <Text style={[s.unitSub, { color: t.textMuted }]}>{u.plate_number} · {u.vehicle_tier} · {u.status}</Text>
                       </View>
                       <TouchableOpacity onPress={() => handleToggleDuty(u)} disabled={dutyBusy === u.id}
-                        style={[s.dutyBtn, { borderColor: u.on_duty ? '#FF5C5C55' : '#00C26555', backgroundColor: u.on_duty ? '#FF5C5C14' : '#00C26514' }]}>
+                        style={[s.dutyBtn, { borderColor: u.on_duty ? `${t.danger}55` : `${t.accentDark}55`, backgroundColor: u.on_duty ? `${t.danger}14` : `${t.accentDark}14` }]}>
                         {dutyBusy === u.id ? <ActivityIndicator size="small" color={t.textMuted} /> :
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: u.on_duty ? t.danger : t.accentDark }}>{u.on_duty ? 'Go off duty' : 'Go on duty'}</Text>}
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: u.on_duty ? t.danger : t.accentDark }}>{u.on_duty ? 'Go off duty' : 'Go on duty'}</Text>}
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => handleRemoveUnit(u)} style={{ padding: 6 }}>
                         <Ionicons name="trash-outline" size={16} color={t.danger} />
@@ -293,8 +293,8 @@ export function AdminFleetScreen() {
                     </View>
 
                     {u.on_duty && (
-                      <View style={[s.dispatchNote, { backgroundColor: u.visible_to_dispatch ? '#00A85410' : '#B4530910', borderColor: u.visible_to_dispatch ? '#00A85444' : '#B4530944' }]}>
-                        <Text style={{ color: u.visible_to_dispatch ? '#00A854' : '#B45309', fontSize: 11.5 }}>
+                      <View style={[s.dispatchNote, { backgroundColor: u.visible_to_dispatch ? `${t.accentDark}10` : `${t.statusBusy.text}10`, borderColor: u.visible_to_dispatch ? `${t.accentDark}44` : `${t.statusBusy.text}44` }]}>
+                        <Text style={{ color: u.visible_to_dispatch ? t.accentDark : t.statusBusy.text, fontSize: 13 }}>
                           {u.visible_to_dispatch
                             ? 'Visible to dispatch — can receive jobs.'
                             : u.seconds_since_ping == null
@@ -317,13 +317,13 @@ export function AdminFleetScreen() {
                         <Text style={[s.sectionLabel, { color: t.textMuted }]}>CREW ON THIS SHIFT</Text>
                         <View style={s.chipRow}>
                           {realCrew.length === 0 && (
-                            <Text style={{ color: t.textMuted, fontSize: 12 }}>No one assigned yet</Text>
+                            <Text style={{ color: t.textMuted, fontSize: 14 }}>No one assigned yet</Text>
                           )}
                           {realCrew.map(m => {
                             const cm = Array.isArray(m.ambulance_crew) ? m.ambulance_crew[0] : m.ambulance_crew
                             return (
                               <View key={m.id} style={[s.crewChip, { borderColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-                                <Text style={{ color: t.textPrimary, fontSize: 12 }}>{cm ? crewName(cm.users) : 'Crew'}</Text>
+                                <Text style={{ color: t.textPrimary, fontSize: 14 }}>{cm ? crewName(cm.users) : 'Crew'}</Text>
                                 {m.crew_member_id && (
                                   <TouchableOpacity onPress={() => handleUnassign(u, m.crew_member_id!)}>
                                     <Ionicons name="close" size={13} color={t.danger} />
@@ -338,7 +338,7 @@ export function AdminFleetScreen() {
                             {crewOptions.map(opt => (
                               <TouchableOpacity key={opt.id} disabled={assignBusy === u.id} onPress={() => handleAssign(u, opt)}
                                 style={[s.chip, { borderColor: t.cardBorder }]}>
-                                <Text style={{ color: t.textSecondary, fontSize: 12 }}>+ {crewName(opt.users)}</Text>
+                                <Text style={{ color: t.textSecondary, fontSize: 14 }}>+ {crewName(opt.users)}</Text>
                               </TouchableOpacity>
                             ))}
                           </View>
@@ -353,21 +353,21 @@ export function AdminFleetScreen() {
 
             <TouchableOpacity onPress={() => setShowAddCrew(v => !v)} style={[s.addToggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginTop: 8 }]}>
               <Ionicons name={showAddCrew ? 'remove' : 'person-add-outline'} size={16} color={t.textPrimary} />
-              <Text style={{ color: t.textPrimary, fontWeight: '700', fontSize: 13 }}>Add a crew member</Text>
+              <Text style={{ color: t.textPrimary, fontWeight: '700', fontSize: 15 }}>Add a crew member</Text>
             </TouchableOpacity>
 
             {showAddCrew && (
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
                   <TextInput value={crewName_} onChangeText={setCrewName_} placeholder="Full name" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 14, flex: 1 }} />
+                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
                 </View>
                 <Text style={[s.sectionLabel, { color: t.textMuted }]}>ROLE</Text>
                 <View style={s.chipRow}>
                   {CREW_ROLES.map(r => (
                     <TouchableOpacity key={r} onPress={() => setCrewRole(r)}
                       style={[s.chip, { borderColor: crewRole === r ? t.accentBorder : t.cardBorder, backgroundColor: crewRole === r ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: crewRole === r ? t.accent : t.textSecondary, fontSize: 12 }}>{r}</Text>
+                      <Text style={{ color: crewRole === r ? t.accent : t.textSecondary, fontSize: 14 }}>{r}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -376,7 +376,7 @@ export function AdminFleetScreen() {
                   {VEHICLE_TIERS.map(tier => (
                     <TouchableOpacity key={tier} onPress={() => setCrewTier(tier)}
                       style={[s.chip, { borderColor: crewTier === tier ? t.accentBorder : t.cardBorder, backgroundColor: crewTier === tier ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: crewTier === tier ? t.accent : t.textSecondary, fontSize: 12, fontWeight: '700' }}>{tier}</Text>
+                      <Text style={{ color: crewTier === tier ? t.accent : t.textSecondary, fontSize: 14, fontWeight: '700' }}>{tier}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -392,7 +392,7 @@ export function AdminFleetScreen() {
 
 const s = StyleSheet.create({
   safe:  { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
+  title: { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
   errorBanner: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 12 },
   credsBox:    { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
   card:  { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
@@ -402,12 +402,12 @@ const s = StyleSheet.create({
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
   foundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   unitHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  unitTitle: { fontSize: 15, fontWeight: '700' },
-  unitSub:   { fontSize: 12, marginTop: 2 },
+  unitTitle: { fontSize: 17, fontWeight: '700' },
+  unitSub:   { fontSize: 14, marginTop: 2 },
   dutyBtn:   { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   dispatchNote: { borderRadius: 10, borderWidth: 1, padding: 9, marginTop: 10 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   crewChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
   emptyBox: { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText: { fontSize: 13, textAlign: 'center' },
+  emptyText: { fontSize: 15, textAlign: 'center' },
 })

@@ -123,10 +123,10 @@ export function FleetMapScreen() {
               <Ionicons
                 name={isLive ? (unit.visible_to_dispatch ? 'radio-outline' : 'warning-outline') : unit.on_duty ? 'time-outline' : 'moon-outline'}
                 size={13}
-                color={isLive ? (unit.visible_to_dispatch ? t.accentDark : '#FFB547') : t.textMuted}
+                color={isLive ? (unit.visible_to_dispatch ? t.accentDark : t.statusBusy.text) : t.textMuted}
               />
-              <Text style={{ color: t.textPrimary, fontSize: 12, fontWeight: '600', flex: 1 }}>{unit.call_sign ?? unit.plate_number}</Text>
-              <Text style={{ color: t.textMuted, fontSize: 11 }}>
+              <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 }}>{unit.call_sign ?? unit.plate_number}</Text>
+              <Text style={{ color: t.textMuted, fontSize: 13 }}>
                 {isLive ? (unit.visible_to_dispatch ? 'Live' : 'Stale') : unit.on_duty ? 'On duty · home base' : 'Home base'}
               </Text>
             </View>
@@ -139,8 +139,8 @@ export function FleetMapScreen() {
 
 const s = StyleSheet.create({
   safe:   { flex: 1 },
-  title:  { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  sub:    { fontSize: 12.5, marginTop: 2 },
+  title:  { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
+  sub:    { fontSize: 14, marginTop: 2 },
   legend: { paddingHorizontal: 16, maxHeight: 150 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
 })

@@ -263,10 +263,10 @@ function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow;
           {isEmergency ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }}>
               <Ionicons name="alert-circle-outline" size={9} color={t.danger} />
-              <Text style={{ fontSize: 9, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
-            <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               {appt.urgency}
             </Text>
           )}
@@ -288,7 +288,7 @@ function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow;
         {appt.referred_by_doctor_name && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
             <Ionicons name="arrow-redo-outline" size={10} color={t.info} />
-            <Text style={{ fontSize: 10, fontWeight: '700', color: t.info }} numberOfLines={1}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.info }} numberOfLines={1}>
               {appt.referred_by_doctor_name}
               {appt.referring_clinic_name ? ` · ${appt.referring_clinic_name}` : ''}
               {appt.referring_hospital_name ? ` · ${appt.referring_hospital_name}` : ''}
@@ -309,7 +309,7 @@ function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow;
           <TouchableOpacity
             onPress={() => { haptics.tap(); onReschedule() }}
             style={[st.rescheduleBtn, { borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: t.textMuted }}>Reschedule</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Reschedule</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -320,31 +320,31 @@ function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow;
 const st = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
-  greeting:    { fontSize: 12, fontWeight: '500' },
-  name:        { fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 },
+  greeting:    { fontSize: 14, fontWeight: '500' },
+  name:        { fontSize: 25, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 },
   statBadge:   { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
-  statNum:     { fontSize: 22, fontWeight: '800', lineHeight: 26 },
-  statLabel:   { fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+  statNum:     { fontSize: 25, fontWeight: '800', lineHeight: 26 },
+  statLabel:   { fontSize: 12, fontWeight: '600', letterSpacing: 0.4 },
   statsBar:    { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1 },
-  statsBarText:{ fontSize: 12 },
+  statsBarText:{ fontSize: 14 },
   tabRow:      { flexDirection: 'row', borderBottomWidth: 1, marginHorizontal: 20 },
   tab:         { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0 },
-  tabText:     { fontSize: 13, fontWeight: '700' },
+  tabText:     { fontSize: 15, fontWeight: '700' },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
-  emptyTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
-  emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
+  emptyTitle:  { fontSize: 21, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
+  emptySub:    { fontSize: 15, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   group:       { paddingHorizontal: 16, marginBottom: 4 },
-  groupLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
+  groupLabel:  { fontSize: 12, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
   card:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 8 },
-  avatar:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:  { fontSize: 15, fontWeight: '800' },
-  patientName: { fontSize: 15, fontWeight: '700' },
+  avatar:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  avatarText:  { fontSize: 17, fontWeight: '800' },
+  patientName: { fontSize: 17, fontWeight: '700' },
   metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  metaText:    { fontSize: 11 },
-  typeDot:     { fontSize: 11, fontWeight: '500' },
-  reason:      { fontSize: 11, marginTop: 3 },
+  metaText:    { fontSize: 13 },
+  typeDot:     { fontSize: 13, fontWeight: '500' },
+  reason:      { fontSize: 13, marginTop: 3 },
   badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  badgeText:   { fontSize: 10, fontWeight: '700' },
-  queuePos:    { fontSize: 11, fontWeight: '600' },
+  badgeText:   { fontSize: 12, fontWeight: '700' },
+  queuePos:    { fontSize: 13, fontWeight: '600' },
   rescheduleBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
 })

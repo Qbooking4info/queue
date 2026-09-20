@@ -265,11 +265,11 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             <TouchableOpacity onPress={() => switchMode('same')}
               style={[st.modeBtn, { borderColor: mode === 'same' ? t.accent : t.cardBorder, backgroundColor: mode === 'same' ? t.accentBg : t.cardBg }]}>
-              <Text style={{ color: mode === 'same' ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>Same Hospital</Text>
+              <Text style={{ color: mode === 'same' ? t.accent : t.textPrimary, fontSize: 14, fontWeight: '700' }}>Same Hospital</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => switchMode('other')}
               style={[st.modeBtn, { borderColor: mode === 'other' ? t.accent : t.cardBorder, backgroundColor: mode === 'other' ? t.accentBg : t.cardBg }]}>
-              <Text style={{ color: mode === 'other' ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>Different Hospital</Text>
+              <Text style={{ color: mode === 'other' ? t.accent : t.textPrimary, fontSize: 14, fontWeight: '700' }}>Different Hospital</Text>
             </TouchableOpacity>
           </View>
 
@@ -301,7 +301,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
                   </TouchableOpacity>
                 ))}
                 {hospitals.length === 0 && (
-                  <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 8 }}>No hospitals found.</Text>
+                  <Text style={{ color: t.textMuted, fontSize: 14, marginTop: 8 }}>No hospitals found.</Text>
                 )}
               </>
             )
@@ -317,7 +317,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               </View>
               {mode === 'other' && (
                 <TouchableOpacity onPress={() => { setSelectedHospital(null); setSelectedDoctor(null); setClinics([]); setSelectedClinicId('') }}>
-                  <Text style={{ color: t.accent, fontSize: 12, fontWeight: '700' }}>Change</Text>
+                  <Text style={{ color: t.accent, fontSize: 14, fontWeight: '700' }}>Change</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -328,7 +328,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
             {(['routine', 'urgent', 'emergency'] as const).map(u => (
               <TouchableOpacity key={u} onPress={() => setUrgency(u)}
                 style={[st.chip, { flex: 1, alignItems: 'center', borderColor: urgency === u ? t.accent : t.cardBorder, backgroundColor: urgency === u ? t.accentBg : t.cardBg }]}>
-                <Text style={{ color: urgency === u ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{u}</Text>
+                <Text style={{ color: urgency === u ? t.accent : t.textPrimary, fontSize: 14, fontWeight: '700', textTransform: 'capitalize' }}>{u}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -340,12 +340,12 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               borderColor: t.dangerStrong,
             }]}>
               {emergencyMaybeClosed ? (
-                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                   <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} may be closed right now.</Text> Emergency
                   referrals are still sent immediately — confirm they can receive the patient before sending.
                 </Text>
               ) : (
-                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+                <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                   Emergency referrals are sent for <Text style={{ fontWeight: '800' }}>right now</Text> — no date or
                   time to pick, and this patient will be prioritized at the receiving side.
                 </Text>
@@ -360,21 +360,21 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               </Text>
               {isEmergency ? (
                 <View style={[st.docRow, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
-                  <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
+                  <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
                 </View>
               ) : (
                 <>
                   <TouchableOpacity
                     onPress={() => { setSelectedClinicId(''); setSelectedDoctor(null) }}
                     style={[st.docRow, { borderColor: !selectedClinicId ? t.accent : t.cardBorder, backgroundColor: !selectedClinicId ? t.accentBg : t.cardBg }]}>
-                    <Text style={{ color: !selectedClinicId ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>Any clinic</Text>
+                    <Text style={{ color: !selectedClinicId ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>Any clinic</Text>
                   </TouchableOpacity>
                   {clinics.map(c => {
                     const active = selectedClinicId === c.id
                     return (
                       <TouchableOpacity key={c.id} onPress={() => { setSelectedClinicId(active ? '' : c.id); setSelectedDoctor(null) }}
                         style={[st.docRow, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? t.accentBg : t.cardBg }]}>
-                        <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>{c.name}</Text>
+                        <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>{c.name}</Text>
                       </TouchableOpacity>
                     )
                   })}
@@ -387,7 +387,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
 
           {noEmergencyClinic && (
             <View style={[st.noticeBox, { marginTop: 8, backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
-              <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
+              <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                 <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} hasn't set up an Emergency Department.</Text> Choose
                 a different hospital for an emergency referral.
               </Text>
@@ -400,15 +400,15 @@ export function ReferPatientScreen({ navigation, route }: Props) {
               <TouchableOpacity
                 onPress={() => setSelectedDoctor(null)}
                 style={[st.docRow, { borderColor: !selectedDoctor ? t.accent : t.cardBorder, backgroundColor: !selectedDoctor ? t.accentBg : t.cardBg }]}>
-                <Text style={{ color: !selectedDoctor ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>No preference</Text>
-                <Text style={{ color: t.textMuted, fontSize: 11, marginTop: 1 }}>Hospital assigns a doctor</Text>
+                <Text style={{ color: !selectedDoctor ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>No preference</Text>
+                <Text style={{ color: t.textMuted, fontSize: 13, marginTop: 1 }}>Hospital assigns a doctor</Text>
               </TouchableOpacity>
               {filteredDoctors.map(d => {
                 const active = selectedDoctor?.id === d.id
                 return (
                   <TouchableOpacity key={d.id} onPress={() => setSelectedDoctor(active ? null : d)}
                     style={[st.docRow, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? t.accentBg : t.cardBg }]}>
-                    <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                    <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>
                       {[d.title, d.full_name].filter(Boolean).join(' ')}
                     </Text>
                   </TouchableOpacity>
@@ -425,12 +425,12 @@ export function ReferPatientScreen({ navigation, route }: Props) {
                   {openDates.map(d => (
                     <TouchableOpacity key={d.iso} onPress={() => setDate(d.iso)}
                       style={[st.chip, { borderColor: date === d.iso ? t.accent : t.cardBorder, backgroundColor: date === d.iso ? t.accentBg : t.cardBg }]}>
-                      <Text style={{ color: date === d.iso ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>{d.label}</Text>
+                      <Text style={{ color: date === d.iso ? t.accent : t.textPrimary, fontSize: 14, fontWeight: '700' }}>{d.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ color: t.textMuted, fontSize: 12 }}>No upcoming open day found.</Text>
+                <Text style={{ color: t.textMuted, fontSize: 14 }}>No upcoming open day found.</Text>
               )}
 
               <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Preferred time</Text>
@@ -439,12 +439,12 @@ export function ReferPatientScreen({ navigation, route }: Props) {
                   {timeOptions.map(time => (
                     <TouchableOpacity key={time} onPress={() => setStartTime(time)}
                       style={[st.chip, { borderColor: startTime === time ? t.accent : t.cardBorder, backgroundColor: startTime === time ? t.accentBg : t.cardBg }]}>
-                      <Text style={{ color: startTime === time ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>{fmt12(time)}</Text>
+                      <Text style={{ color: startTime === time ? t.accent : t.textPrimary, fontSize: 14, fontWeight: '700' }}>{fmt12(time)}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ color: t.textMuted, fontSize: 12 }}>Closed this day.</Text>
+                <Text style={{ color: t.textMuted, fontSize: 14 }}>Closed this day.</Text>
               )}
             </>
           )}
@@ -469,8 +469,8 @@ export function ReferPatientScreen({ navigation, route }: Props) {
           {isInProgress && (
             <View style={[st.completeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
               <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Also complete this consultation</Text>
-                <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Also complete this consultation</Text>
+                <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
                   Leave off to send more referrals from this same visit -- end it yourself from the Queue when you're done.
                 </Text>
               </View>
@@ -493,14 +493,14 @@ const st = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:     { padding: 4 },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  headerTitle: { flex: 1, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   modeBtn:     { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingVertical: 10 },
-  label:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  input:       { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
-  textarea:    { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, minHeight: 90, textAlignVertical: 'top' },
+  label:       { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  input:       { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  textarea:    { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, minHeight: 90, textAlignVertical: 'top' },
   card:        { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 8 },
-  cardTitle:   { fontSize: 14, fontWeight: '800' },
-  cardSub:     { fontSize: 11, marginTop: 2 },
+  cardTitle:   { fontSize: 16, fontWeight: '800' },
+  cardSub:     { fontSize: 13, marginTop: 2 },
   docRow:      { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
   chip:        { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   noticeBox:   { borderWidth: 1, borderRadius: 12, padding: 12 },

@@ -83,10 +83,10 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
   return (
       <ShellScroll>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>
+        <Text style={{ fontSize: 28, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>
           Welcome, Dr. {firstName}
         </Text>
-        <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 24 }}>
+        <Text style={{ fontSize: 15, color: t.textMuted, marginBottom: 24 }}>
           Here's what's happening across your practice.
         </Text>
 
@@ -109,7 +109,7 @@ export function DoctorDashboardScreen({ navigation }: Props) {
                         opacity: savingAvailability && !active ? 0.5 : 1,
                       }}>
                       <Ionicons name={opt.icon} size={12} color={active ? t.accent : t.textMuted} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{opt.label}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{opt.label}</Text>
                     </TouchableOpacity>
                   )
                 })}
@@ -132,13 +132,13 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
             {!doctorProfile && (
               <View style={{ backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent, marginBottom: 4 }}>Not linked to a hospital yet</Text>
-                <Text style={{ fontSize: 12, color: t.textSecondary, marginBottom: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.accent, marginBottom: 4 }}>Not linked to a hospital yet</Text>
+                <Text style={{ fontSize: 14, color: t.textSecondary, marginBottom: 10 }}>
                   You can still accept direct virtual consults and home visits from patients. Turn those on in Settings,
                   or share your Doctor ID with a hospital to also see their queue here.
                 </Text>
                 <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Hospitals') }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>View your Doctor ID →</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>View your Doctor ID →</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -167,8 +167,8 @@ function StatCard({ theme: t, icon, label, value, onPress, highlight, disabled }
         borderRadius: 16, padding: 16, opacity: disabled ? 0.5 : 1,
       }}>
       <Ionicons name={icon} size={18} color={highlight ? t.accent : t.textMuted} style={{ marginBottom: 10 }} />
-      <Text style={{ fontSize: 24, fontWeight: '800', color: highlight ? t.accent : t.textPrimary }}>{value}</Text>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{label}</Text>
+      <Text style={{ fontSize: 28, fontWeight: '800', color: highlight ? t.accent : t.textPrimary }}>{value}</Text>
+      <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -184,7 +184,7 @@ function QuickLink({ theme: t, icon, label, onPress }: {
         borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
       }}>
       <Ionicons name={icon} size={15} color={t.accent} />
-      <Text style={{ fontSize: 12, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
     </TouchableOpacity>
   )
 }

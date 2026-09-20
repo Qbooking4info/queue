@@ -75,7 +75,7 @@ export function ProviderSettingsScreen() {
 
         {error ? (
           <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={{ color: t.danger, fontSize: 12 }}>{error}</Text>
+            <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
           </View>
         ) : null}
 
@@ -114,7 +114,7 @@ export function ProviderSettingsScreen() {
         {saved && (
           <View style={[s.savedBanner, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
             <Ionicons name="checkmark-circle" size={14} color={t.accent} />
-            <Text style={{ color: t.accent, fontSize: 12, fontWeight: '600' }}>Saved</Text>
+            <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>Saved</Text>
           </View>
         )}
 
@@ -126,12 +126,12 @@ export function ProviderSettingsScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  subtitle: { fontSize: 13, marginTop: 2, marginBottom: 18 },
+  title: { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
+  subtitle: { fontSize: 15, marginTop: 2, marginBottom: 18 },
   errorBanner: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
-  rowLabel: { fontSize: 14, fontWeight: '700' },
-  rowSub: { fontSize: 11.5, marginTop: 2 },
-  radiusInput: { width: 64, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, textAlign: 'center', fontSize: 14 },
+  rowLabel: { fontSize: 16, fontWeight: '700' },
+  rowSub: { fontSize: 13, marginTop: 2 },
+  radiusInput: { width: 64, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, textAlign: 'center', fontSize: 16 },
   savedBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 6 },
 })

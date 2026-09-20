@@ -30,11 +30,11 @@ function isToday(iso: string): boolean {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
 }
 
-function triageColor(level: number | null): string {
-  if (level == null) return '#7A9089'
-  if (level <= 2) return '#FF5C5C'
-  if (level === 3) return '#FFB547'
-  return '#7A9089'
+function triageColor(level: number | null, t: any): string {
+  if (level == null) return t.textMuted
+  if (level <= 2) return t.danger
+  if (level === 3) return t.statusBusy.text
+  return t.textMuted
 }
 
 export function AdminHomeScreen() {
@@ -116,7 +116,7 @@ export function AdminHomeScreen() {
         <View style={[s.tabRow, { borderColor: t.cardBorder }]}>
           {(['active', 'history'] as const).map(k => (
             <TouchableOpacity key={k} onPress={() => setTab(k)} style={[s.tabBtn, tab === k && { backgroundColor: t.accentBgMid }]}>
-              <Text style={{ color: tab === k ? t.accent : t.textMuted, fontSize: 13, fontWeight: '700' }}>
+              <Text style={{ color: tab === k ? t.accent : t.textMuted, fontSize: 15, fontWeight: '700' }}>
                 {k === 'active' ? `Active (${active.length})` : `History (${history.length})`}
               </Text>
             </TouchableOpacity>
@@ -137,8 +137,8 @@ export function AdminHomeScreen() {
             return (
               <View key={r.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <View style={s.row}>
-                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(r.triage_level)}18`, borderColor: `${triageColor(r.triage_level)}40` }]}>
-                    <Text style={[s.triageBadgeText, { color: triageColor(r.triage_level) }]}>
+                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(r.triage_level, t)}18`, borderColor: `${triageColor(r.triage_level, t)}40` }]}>
+                    <Text style={[s.triageBadgeText, { color: triageColor(r.triage_level, t) }]}>
                       {r.triage_level ? `Triage ${r.triage_level}` : r.request_type === 'scheduled' ? 'Scheduled' : '—'}
                     </Text>
                   </View>
@@ -180,24 +180,24 @@ export function AdminHomeScreen() {
 
 const s = StyleSheet.create({
   safe:     { flex: 1 },
-  title:    { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  subtitle: { fontSize: 13, marginTop: 2, marginBottom: 16 },
+  title:    { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
+  subtitle: { fontSize: 15, marginTop: 2, marginBottom: 16 },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
   statCard: { flexGrow: 1, flexBasis: '46%', borderRadius: 16, borderWidth: 1, padding: 14 },
-  statValue:{ fontSize: 20, fontWeight: '800' },
-  statLabel:{ fontSize: 11, marginTop: 2 },
+  statValue:{ fontSize: 23, fontWeight: '800' },
+  statLabel:{ fontSize: 13, marginTop: 2 },
   tabRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3, marginBottom: 14, gap: 3 },
   tabBtn:   { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
   card:     { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
   row:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  triageBadgeText: { fontSize: 11, fontWeight: '800' },
-  bookingRef: { fontSize: 11 },
-  name:       { fontSize: 15, fontWeight: '700' },
-  statusLine: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2, marginBottom: 4 },
-  detailText: { fontSize: 12 },
+  triageBadgeText: { fontSize: 13, fontWeight: '800' },
+  bookingRef: { fontSize: 13 },
+  name:       { fontSize: 17, fontWeight: '700' },
+  statusLine: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2, marginBottom: 4 },
+  detailText: { fontSize: 14 },
   detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   emptyBox:   { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText:  { fontSize: 13 },
+  emptyText:  { fontSize: 15 },
 })
