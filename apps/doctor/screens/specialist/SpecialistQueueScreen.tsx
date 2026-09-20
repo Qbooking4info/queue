@@ -1,18 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
-import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
+import { rescheduleHospitalAppointment, ringPatient } from '@queue/shared/lib/api'
 
 interface ApptRow {
   id:               string
@@ -63,6 +64,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
   const [rescheduleId, setRescheduleId] = useState<string | null>(null)
+  const [ringingId, setRingingId] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const load = useCallback(async (silent = false) => {
@@ -87,6 +89,14 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     setRefreshing(true)
     await load(true)
     setRefreshing(false)
+  }
+
+  async function handleRing(appt: ApptRow) {
+    haptics.tap()
+    setRingingId(appt.id)
+    const { error } = await ringPatient(appt.id)
+    setRingingId(null)
+    if (error) { haptics.error(); Alert.alert('Could not ring patient', error) } else haptics.success()
   }
 
   useEffect(() => {
@@ -184,7 +194,9 @@ export function SpecialistQueueScreen({ navigation }: Props) {
               <Text style={[st.groupLabel, { color: t.textMuted }]}>WAITING / ACTIVE</Text>
               {active.map(appt => (
                 <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'}
-                  onReschedule={['pending', 'confirmed'].includes(appt.status) ? () => setRescheduleId(appt.id) : undefined} />
+                  onReschedule={['pending', 'confirmed'].includes(appt.status) ? () => setRescheduleId(appt.id) : undefined}
+                  onRing={['checked_in', 'in_progress'].includes(appt.status) ? () => handleRing(appt) : undefined}
+                  ringing={ringingId === appt.id} />
               ))}
             </View>
           )}
@@ -216,7 +228,10 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   )
 }
 
-function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow; navigation: any; showDate: boolean; onReschedule?: () => void }) {
+function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }: {
+  appt: ApptRow; navigation: any; showDate: boolean; onReschedule?: () => void
+  onRing?: () => void; ringing?: boolean
+}) {
   const { theme: t } = useTheme()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -305,6 +320,17 @@ function ApptCard({ appt, navigation, showDate, onReschedule }: { appt: ApptRow;
         {appt.queue_position != null && (
           <Text style={[st.queuePos, { color: t.textMuted }]}>#{appt.queue_position}</Text>
         )}
+        {onRing && (
+          <TouchableOpacity
+            onPress={onRing} disabled={ringing}
+            style={[st.ringBtn, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
+            {ringing ? <ActivityIndicator size="small" color={t.statusBusy.text} />
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="notifications-outline" size={12} color={t.statusBusy.text} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusBusy.text }}>Ring</Text>
+                </View>}
+          </TouchableOpacity>
+        )}
         {onReschedule && (
           <TouchableOpacity
             onPress={() => { haptics.tap(); onReschedule() }}
@@ -347,4 +373,5 @@ const st = StyleSheet.create({
   badgeText:   { fontSize: 12, fontWeight: '700' },
   queuePos:    { fontSize: 13, fontWeight: '600' },
   rescheduleBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
+  ringBtn:     { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
 })
