@@ -546,8 +546,10 @@ export function BookingFlowScreen({ navigation, route }: Props) {
         // not an exception worth interrupting the patient about.
       }
 
-      // Notify doctor/staff about new booking (best-effort)
-      if (result.id) {
+      // Notify doctor/staff about new booking (best-effort) -- skipped on a
+      // recovered duplicate submission (result.duplicate): staff were already
+      // notified from the original, successful attempt.
+      if (result.id && !result.duplicate) {
         const apiBase = process.env.EXPO_PUBLIC_API_URL ?? ''
         // Bearer token required: this endpoint is no longer open, and the
         // notification text is composed server-side from the appointment rather
@@ -565,17 +567,21 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
       const isPending = result.approvalStatus === 'pending_approval'
       const isReschedule = !!rescheduleCtx
-      await addNotification({
-        userId: user.id,
-        type:   isPending ? 'pending' : 'confirmed',
-        title:  isReschedule
-          ? (isPending ? 'Reschedule Submitted — Pending Review' : 'Appointment Rescheduled')
-          : (isPending ? 'Booking Submitted — Pending Review' : 'Booking Confirmed'),
-        body:   isPending
-          ? `${result.bookingRef} · ${hospital.name}\nUnder review — you'll be notified when approved.`
-          : `${result.bookingRef} · ${preferredDoc?.full_name ?? (bookingType === 'virtual' ? 'Virtual visit' : 'OPD visit')} · ${hospital.name}`,
-        data: { appointment_id: result.id, booking_ref: result.bookingRef },
-      })
+      // Same recovered-duplicate skip as above -- the patient's own receipt of
+      // this notification already happened on their original attempt.
+      if (!result.duplicate) {
+        await addNotification({
+          userId: user.id,
+          type:   isPending ? 'pending' : 'confirmed',
+          title:  isReschedule
+            ? (isPending ? 'Reschedule Submitted — Pending Review' : 'Appointment Rescheduled')
+            : (isPending ? 'Booking Submitted — Pending Review' : 'Booking Confirmed'),
+          body:   isPending
+            ? `${result.bookingRef} · ${hospital.name}\nUnder review — you'll be notified when approved.`
+            : `${result.bookingRef} · ${preferredDoc?.full_name ?? (bookingType === 'virtual' ? 'Virtual visit' : 'OPD visit')} · ${hospital.name}`,
+          data: { appointment_id: result.id, booking_ref: result.bookingRef },
+        })
+      }
       navigation.navigate('Confirmation', {
         hospital, doctor: preferredDoc ?? null, selectedDate,
         urgency, bookingType,

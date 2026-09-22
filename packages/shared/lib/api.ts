@@ -412,8 +412,29 @@ export async function getActiveQueueAppointment(
 // ── Create appointment (doctor-specific / virtual) ────────────────────────────
 
 export type BookingResult =
-  | { ok: true; id: string; bookingRef: string; approvalStatus: string; originalCompleted?: boolean }
+  | { ok: true; id: string; bookingRef: string; approvalStatus: string; originalCompleted?: boolean; duplicate?: boolean }
   | { ok: false; error: string }
+
+// A dropped-connection retry of the SAME emergency submission is blocked by
+// check_emergency_booking_resubmit() (20260923000001) rather than allowed to
+// insert a second, separately-billed booking. Shared by createAppointment and
+// createHospitalAppointment (both reachable with urgency: 'emergency', from
+// BookingFlowScreen's toggle and EmergencyBookingScreen respectively) to
+// recover that block as a success instead of surfacing a scary "booking
+// failed" to a patient mid-emergency: the trigger reports the existing
+// booking's id via the DETAIL clause (Postgrest surfaces it as error.details),
+// so fetch that row and hand it back exactly like a normal success -- the
+// patient lands on the same confirmation screen either way.
+async function recoverDuplicateEmergencyBooking(error: { code?: string; message: string; details?: string }): Promise<BookingResult | null> {
+  if (error.code !== '23505' || !error.message.includes('Duplicate emergency booking submission') || !error.details) return null
+  const { data: existing } = await supabase
+    .from('appointments')
+    .select('id, booking_ref, approval_status')
+    .eq('id', error.details)
+    .single()
+  if (!existing) return null
+  return { ok: true, id: existing.id, bookingRef: existing.booking_ref, approvalStatus: existing.approval_status, duplicate: true }
+}
 
 export async function createAppointment(payload: {
   patientId:           string
@@ -460,7 +481,12 @@ export async function createAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  if (error) {
+    console.warn('[createAppointment]', error.message, error.code)
+    const recovered = await recoverDuplicateEmergencyBooking(error)
+    if (recovered) return recovered
+    return { ok: false, error: error.message }
+  }
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
@@ -513,7 +539,12 @@ export async function createHospitalAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createHospitalAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  if (error) {
+    console.warn('[createHospitalAppointment]', error.message, error.code)
+    const recovered = await recoverDuplicateEmergencyBooking(error)
+    if (recovered) return recovered
+    return { ok: false, error: error.message }
+  }
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 

@@ -269,7 +269,10 @@ export function EmergencyBookingScreen({ navigation }: Props) {
       paymentMethod: paymentMethod,
     })
 
-    if (result.ok) {
+    // Skip on a recovered duplicate submission (result.duplicate) -- the patient
+    // already got this notification from their original, successful attempt;
+    // this is just a retry landing on the same booking, not a new one.
+    if (result.ok && !result.duplicate) {
       await addNotification({
         userId: user.id,
         type:   'confirmed',
