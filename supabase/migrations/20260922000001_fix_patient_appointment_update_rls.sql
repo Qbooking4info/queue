@@ -1,0 +1,26 @@
+-- ── Fix: patients could cancel/modify a checked_in or in_progress appointment ──
+--
+-- 20260827000001_dependent_account_linking.sql created TWO permissive UPDATE
+-- policies on `appointments` for patients:
+--   - "appointments_patient_update": USING (... AND status IN ('pending','confirmed'))
+--     -- the intended, status-restricted policy.
+--   - "patients_update_own": USING (patient_id IN current_patient_ids())
+--     -- no status restriction at all.
+--
+-- Postgres OR-combines multiple permissive policies for the same command, so
+-- "patients_update_own" silently subsumed the restrictive one: a patient could
+-- UPDATE their own appointment row in ANY status, including checked_in/
+-- in_progress. This is live end-to-end -- cancelAppointment() and the close-step
+-- inside rescheduleAppointment() (packages/shared/lib/api.ts) both write
+-- `status: 'cancelled'` via a raw client `.update()` with no server-side status
+-- check of their own, relying entirely on RLS to enforce "only before checked
+-- in". AppointmentDetailScreen.tsx's Cancel/Reschedule buttons rendered for
+-- checked_in/in_progress appointments (isUpcoming included both) and worked,
+-- because nothing actually stopped them.
+--
+-- Fix: drop the unrestricted policy. "appointments_patient_update" already
+-- covers every legitimate patient-initiated write (cancel, and reschedule's
+-- close-step -- both narrowed to pending/confirmed in this same change, see
+-- the app-side commit) -- there is no other direct client `.update()` on
+-- appointments from patient code, confirmed by reading every call site.
+DROP POLICY IF EXISTS "patients_update_own" ON appointments;

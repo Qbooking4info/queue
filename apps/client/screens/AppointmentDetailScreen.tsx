@@ -138,7 +138,14 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   // banner the instant the doctor starts the call.
   const canJoinVirtual = isVirtual && ['confirmed', 'checked_in', 'in_progress'].includes(appt.status)
   const isMissed    = appt.status === 'no_show'
-  const canReschedule = (isUpcoming || isMissed) && appt.rescheduleCount < 1
+  // Cancel/reschedule are pre-arrival actions only -- once checked in (or a virtual
+  // call is in progress), the patient has committed to being seen and the RLS policy
+  // backing cancelAppointment()/rescheduleAppointment() no longer permits the write
+  // (see 20260922000001_fix_patient_appointment_update_rls.sql). Separate from
+  // isUpcoming, which still covers checked_in/in_progress for display purposes
+  // (the check-in pass, the queue banner) -- those are read-only.
+  const canModify   = ['confirmed', 'pending'].includes(appt.status)
+  const canReschedule = (canModify || isMissed) && appt.rescheduleCount < 1
   const showPass    = isUpcoming && !cancelled && !isPendingReview && !isRejected
 
   const sc = statusBadgeColors(t)
@@ -574,8 +581,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {appt.paymentMethod && <InfoRow label="Payment method" value={appt.paymentMethod} />}
           </Section>
 
-          {/* Actions */}
-          {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
+          {/* Actions -- pre-arrival only, see canModify's comment above */}
+          {canModify && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
               {canReschedule && (
                 <Button

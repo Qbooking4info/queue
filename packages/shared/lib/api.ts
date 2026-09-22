@@ -1012,10 +1012,11 @@ export async function rescheduleAppointment(payload: {
 
   // Close out the original booking so the patient isn't left holding two active appointments
   // for the same visit — the new row links back to it via rescheduled_from. Scoped to
-  // non-terminal statuses only: a reschedule can now also happen from a 'no_show' original
-  // (the day-after prompt), and appointment_status_guard permanently blocks any change away
-  // from completed/cancelled/no_show — trying to flip no_show -> cancelled here would just
-  // throw. If the original is already terminal there's nothing to close; leave it as-is.
+  // pending/confirmed only, matching the "appointments_patient_update" RLS policy this
+  // write relies on (a patient can no longer modify an appointment once checked in — see
+  // 20260922000001_fix_patient_appointment_update_rls.sql) — a reschedule can still happen
+  // from a 'no_show' original (the day-after prompt), which is correctly excluded here
+  // since it's already terminal; there's nothing to close, so it's left as-is.
   const { error: closeErr } = await supabase
     .from('appointments')
     .update({
@@ -1024,7 +1025,7 @@ export async function rescheduleAppointment(payload: {
       cancelled_at: new Date().toISOString(),
     })
     .eq('id', payload.originalId)
-    .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
+    .in('status', ['pending', 'confirmed'])
   if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
 
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
