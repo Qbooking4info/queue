@@ -28,11 +28,15 @@ export function ValueChip({
       minWidth: 46, alignItems: 'center', flexShrink: 0,
     }, chipElevation, style]}>
       <Text style={{
-        fontSize: 17, fontWeight: '600', letterSpacing: -0.3,
+        fontSize: 18, fontWeight: '700', letterSpacing: -0.3,
         color: tone || t.textPrimary,
       }}>{value}</Text>
       {!!unit && (
-        <Text style={{ fontSize: 9, color: t.textFaint, marginTop: 2 }}>{unit}</Text>
+        // textSecondary, not textFaint: the decorative tone measured 1.84:1 on a
+        // dark chip and 3.93:1 on a light one, so the label under the number was
+        // the least readable text on the card. Bumped from 9px to 11px and given
+        // real weight, since at 9px it read as a smudge even where contrast was fine.
+        <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSecondary, marginTop: 3 }}>{unit}</Text>
       )}
     </View>
   )
