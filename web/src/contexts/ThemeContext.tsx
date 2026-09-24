@@ -372,6 +372,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--glass-border', t.glassBorder)
     root.style.setProperty('--glass-blur', t.blur)
     root.style.setProperty('--text', t.text)
+    // Consumed by globals.css for the scrollbar thumb and ::selection, both of
+    // which were fixed white/green for the old always-dark dashboard.
+    root.style.setProperty('--border-med', t.borderMed)
+    root.style.setProperty('--accent-muted', t.accentLight)
     root.style.setProperty('--orb-1', t.orbs[0])
     root.style.setProperty('--orb-2', t.orbs[1])
     root.style.setProperty('--orb-3', t.orbs[2])
