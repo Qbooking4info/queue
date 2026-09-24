@@ -273,7 +273,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
             <View style={st.passFooter}>
               <Ionicons name={isVirtual ? 'videocam-outline' : 'location-outline'} size={14} color="rgba(255,255,255,0.55)" />
-              <Text style={[st.passFooterText, { color: 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[st.passFooterText, { color: 'rgba(255,255,255,0.85)' }]}>
                 {isVirtual
                   ? 'Share this ID if asked by your doctor during the session'
                   : 'Show this ID at the hospital reception desk for check-in'}
@@ -360,7 +360,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {appt.doctor ? (
               <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={52} />
             ) : (
-              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
+              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
               </View>
             )}
@@ -368,20 +368,20 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Text style={st.doctorName}>
                 {appt.doctor ?? (isVirtual ? 'Doctor to be assigned' : 'Assigned at clinic')}
               </Text>
-              <Text style={[st.doctorSpec, { color: 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[st.doctorSpec, { color: 'rgba(255,255,255,0.85)' }]}>
                 {appt.spec ?? (isVirtual ? 'Virtual consultation' : 'In-person visit')}
               </Text>
               {appt.doctor && appt.rating > 0 && <Stars rating={appt.rating} />}
             </View>
             {isVirtual ? (
-              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="videocam-outline" size={11} color={t.onHero} />
                   <Text style={[st.typePillText, { color: t.onHero }]}>Virtual</Text>
                 </View>
               </View>
             ) : (
-              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="walk-outline" size={11} color={t.onHero} />
                   <Text style={[st.typePillText, { color: t.onHero }]}>In-person</Text>
@@ -397,7 +397,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               { icon: 'time-outline' as const,     val: fmt12(appt.time) },
               { icon: 'location-outline' as const, val: appt.hospital },
             ] as const).map(c => (
-              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
+              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <Ionicons name={c.icon} size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 3 }} />
                 <Text style={st.chipText} numberOfLines={1}>{c.val}</Text>
               </View>
@@ -722,7 +722,7 @@ const st = StyleSheet.create({
   passCopy:           { fontSize: 12, marginTop: 5, fontWeight: '600' },
   passDivider:        { height: 1, marginHorizontal: 16 },
   passRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6, gap: 12 },
-  passRowLabel:       { fontSize: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 },
+  passRowLabel:       { fontSize: 13, color: 'rgba(255,255,255,0.85)', flexShrink: 0 },
   passRowValue:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
   passFooter:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, paddingTop: 10 },
   passFooterText:     { fontSize: 13, flex: 1, lineHeight: 16 },

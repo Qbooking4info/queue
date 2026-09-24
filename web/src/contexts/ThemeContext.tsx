@@ -69,7 +69,7 @@ const tealLight = {
   accentBorder: 'rgba(11,127,134,0.28)',
   accentGlow:   'rgba(20,160,165,0.45)',
   btnGradient:  'linear-gradient(135deg, #08666C 0%, #0B7F86 100%)',
-  heroGradient: 'linear-gradient(125deg, #064B50 0%, #08666C 52%, #0B7F86 100%)',
+  heroGradient: 'linear-gradient(125deg, #043B40 0%, #065558 52%, #096B71 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#0E2A2E',
@@ -143,7 +143,7 @@ const tealDark = {
   accentBorder: 'rgba(127,224,220,0.28)',
   accentGlow:   'rgba(40,180,180,0.50)',
   btnGradient:  'linear-gradient(135deg, #8FE8E4 0%, #25AFB0 100%)',
-  heroGradient: 'linear-gradient(125deg, #053E43 0%, #075A60 55%, #0A7278 100%)',
+  heroGradient: 'linear-gradient(125deg, #03282C 0%, #054045 55%, #075A60 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#E2F1F1',
@@ -214,7 +214,7 @@ const clinicalLight = {
   accentBorder: 'rgba(47,91,234,0.30)',
   accentGlow:   'rgba(63,108,242,0.45)',
   btnGradient:  'linear-gradient(135deg, #2246B5 0%, #2F5BEA 100%)',
-  heroGradient: 'linear-gradient(120deg, #17307E 0%, #2246B5 46%, #2F5BEA 100%)',
+  heroGradient: 'linear-gradient(120deg, #16295E 0%, #1E3A94 46%, #2A4FC8 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#14213D',
@@ -285,7 +285,7 @@ const clinicalDark = {
   accentBorder: 'rgba(168,200,255,0.30)',
   accentGlow:   'rgba(91,124,250,0.50)',
   btnGradient:  'linear-gradient(135deg, #A8C1FF 0%, #5B7CFA 100%)',
-  heroGradient: 'linear-gradient(120deg, #122461 0%, #1B379C 55%, #2549C8 100%)',
+  heroGradient: 'linear-gradient(120deg, #0E1C4C 0%, #172F83 55%, #2243AE 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#E6ECFA',

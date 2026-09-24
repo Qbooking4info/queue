@@ -392,7 +392,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               />
               <View style={{ flex: 1 }}>
                 <Text style={st.heroName}>{patient?.full_name ?? '—'}</Text>
-                <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.55)' }]}>
+                <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.85)' }]}>
                   {[
                     patient?.gender ?? null,
                     age(patient?.date_of_birth ?? null),
@@ -400,7 +400,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   ].filter(Boolean).join(' · ')}
                 </Text>
                 {patient?.phone && (
-                  <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.4)', marginTop: 2 }]}>{patient.phone}</Text>
+                  <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>{patient.phone}</Text>
                 )}
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -410,26 +410,26 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     {isVirtual ? 'Virtual' : 'In-person'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
                   {fmt12(appt.start_time)}
                 </Text>
               </View>
             </View>
 
             {appt.reason && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>REASON FOR VISIT</Text>
                 <Text style={st.reasonText}>{appt.reason}</Text>
               </View>
             )}
             {appt.symptom_description && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>SYMPTOMS</Text>
                 <Text style={st.reasonText}>{appt.symptom_description}</Text>
               </View>
             )}
             {appt.referred_by && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>REFERRED BY</Text>
                 <Text style={st.reasonText}>
                   {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
@@ -584,7 +584,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
             {/* Clinical Notes */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
+              <View style={[st.sectionHeader, { borderBottomColor: t.cardBorder }]}>
                 <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
                   CLINICAL NOTES
                 </Text>
@@ -806,15 +806,15 @@ const st = StyleSheet.create({
   heroSub:       { fontSize: 14, marginTop: 2, lineHeight: 17 },
   typeChip:      { fontSize: 13, fontWeight: '700' },
   reasonBox:     { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  reasonLabel:   { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
-  reasonText:    { fontSize: 15, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
+  reasonLabel:   { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 1.5, marginBottom: 4 },
+  reasonText:    { fontSize: 15, color: '#FFFFFF', lineHeight: 19 },
   pad:           { paddingHorizontal: 16, marginBottom: 0 },
   actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   referBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
   doneTxt:       { fontSize: 16, fontWeight: '700' },
   section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.28)' },
   sectionTitle:  { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   vitalsGrid:    { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
   vitalBox:      { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },

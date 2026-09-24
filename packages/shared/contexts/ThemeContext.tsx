@@ -83,7 +83,7 @@ const tealLight = {
   // Every stop stays dark enough for white text: the old gradients ran out to
   // pale mint/periwinkle, where white measured 1.6-2.2:1 against a 4.5:1 floor,
   // so labels faded out toward the light end of every hero.
-  heroGradient:['#064B50', '#08666C', '#0B7F86'],
+  heroGradient:['#043B40', '#065558', '#096B71'],
   onHero:      '#FFFFFF',
 
   successSubtle: 'rgba(11,127,134,0.12)',
@@ -168,7 +168,7 @@ const tealDark = {
   accentGlow:  'rgba(40,180,180,0.50)',
   btnGradient: ['#8FE8E4', '#25AFB0'],
   onBtn:       '#00292B',
-  heroGradient:['#053E43', '#075A60', '#0A7278'],
+  heroGradient:['#03282C', '#054045', '#075A60'],
   onHero:      '#FFFFFF',
 
   successSubtle: 'rgba(127,224,220,0.14)',
@@ -247,7 +247,7 @@ const clinicalLight = {
   accentGlow:  'rgba(63,108,242,0.45)',
   btnGradient: ['#2246B5', '#2F5BEA'],
   onBtn:       '#FFFFFF',
-  heroGradient:['#17307E', '#2246B5', '#2F5BEA'],
+  heroGradient:['#16295E', '#1E3A94', '#2A4FC8'],
   onHero:      '#FFFFFF',
 
   successSubtle: 'rgba(47,91,234,0.11)',
@@ -326,7 +326,7 @@ const clinicalDark = {
   accentGlow:  'rgba(91,124,250,0.50)',
   btnGradient: ['#A8C1FF', '#5B7CFA'],
   onBtn:       '#0A1540',
-  heroGradient:['#122461', '#1B379C', '#2549C8'],
+  heroGradient:['#0E1C4C', '#172F83', '#2243AE'],
   onHero:      '#FFFFFF',
 
   successSubtle: 'rgba(168,200,255,0.14)',
