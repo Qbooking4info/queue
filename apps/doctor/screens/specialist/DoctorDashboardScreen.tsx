@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { ValueChip, IconOrb } from '@queue/shared/components/ui/ValueChip'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -161,14 +163,15 @@ function StatCard({ theme: t, icon, label, value, onPress, highlight, disabled }
 }) {
   return (
     <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}
-      style={{
-        flex: 1, minWidth: 140, backgroundColor: highlight ? t.accentBg : t.cardBg,
-        borderColor: highlight ? t.accentBorder : t.cardBorder, borderWidth: 1,
-        borderRadius: 16, padding: 16, opacity: disabled ? 0.5 : 1,
-      }}>
-      <Ionicons name={icon} size={18} color={highlight ? t.accent : t.textMuted} style={{ marginBottom: 10 }} />
-      <Text style={{ fontSize: 28, fontWeight: '800', color: highlight ? t.accent : t.textPrimary }}>{value}</Text>
-      <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>{label}</Text>
+      style={{ flex: 1, minWidth: 140, opacity: disabled ? 0.5 : 1 }}>
+      <Glass radius={20} pad={14} blur={false}
+        style={highlight ? { borderColor: t.accentBorder } : undefined}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <IconOrb name={icon} size={36} color={highlight ? t.accent : t.textSecondary} />
+          <ValueChip value={value} tone={highlight ? t.accent : undefined} tall={false} />
+        </View>
+        <Text style={{ fontSize: 13, color: t.textFaint, marginTop: 10 }}>{label}</Text>
+      </Glass>
     </TouchableOpacity>
   )
 }
@@ -177,14 +180,16 @@ function QuickLink({ theme: t, icon, label, onPress }: {
   theme: any; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void
 }) {
   return (
-    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1,
-        borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
-      }}>
-      <Ionicons name={icon} size={15} color={t.accent} />
-      <Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}>
+      <Glass radius={999} pad={0} blur={false}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingVertical: 10, paddingHorizontal: 16,
+        }}>
+          <Ionicons name={icon} size={15} color={t.accent} />
+          <Text style={{ fontSize: 14, fontWeight: '500', color: t.textPrimary }}>{label}</Text>
+        </View>
+      </Glass>
     </TouchableOpacity>
   )
 }
