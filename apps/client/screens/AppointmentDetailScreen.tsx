@@ -237,24 +237,24 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             borderColor: isVirtual ? t.infoBorder : t.accentBorder,
           }]}>
             <View style={[st.passHeader, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={isVirtual ? t.statusVirtual.text : t.accent} />
-              <Text style={[st.passTitle, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
+              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={t.onHero} />
+              <Text style={[st.passTitle, { color: t.onHero, opacity: 0.85 }]}>
                 {isVirtual ? 'VIRTUAL CONSULTATION PASS' : 'HOSPITAL CHECK-IN PASS'}
               </Text>
             </View>
 
             {/* Big booking ref */}
             <TouchableOpacity onPress={copyRef} style={st.passRefWrap} activeOpacity={0.7}>
-              <Text style={[st.passRef, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>{appt.id}</Text>
+              <Text style={[st.passRef, { color: t.onHero }]}>{appt.id}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                {copied && <Ionicons name="checkmark" size={10} color={t.accent} />}
-                <Text style={[st.passCopy, { color: copied ? t.accent : 'rgba(255,255,255,0.35)' }]}>
+                {copied && <Ionicons name="checkmark" size={10} color={t.onHero} />}
+                <Text style={[st.passCopy, { color: copied ? t.onHero : 'rgba(255,255,255,0.65)' }]}>
                   {copied ? 'Copied' : 'Tap to copy'}
                 </Text>
               </View>
             </TouchableOpacity>
 
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.22)' }]} />
 
             {/* Pass info */}
             {[
@@ -269,7 +269,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               </View>
             ))}
 
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)', marginTop: 10 }]} />
+            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.22)', marginTop: 10 }]} />
 
             <View style={st.passFooter}>
               <Ionicons name={isVirtual ? 'videocam-outline' : 'location-outline'} size={14} color="rgba(255,255,255,0.55)" />
@@ -351,8 +351,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         <View style={[st.heroCard, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
           {/* Booking ID */}
           <View style={st.bookingIdRow}>
-            <Text style={[st.bookingIdLabel, { color: t.accent }]}>BOOKING ID</Text>
-            <Text style={[st.bookingId, { color: t.accent }]}>{appt.id}</Text>
+            <Text style={[st.bookingIdLabel, { color: t.onHero, opacity: 0.8 }]}>BOOKING ID</Text>
+            <Text style={[st.bookingId, { color: t.onHero }]}>{appt.id}</Text>
           </View>
 
           {/* Doctor / placeholder */}
@@ -360,7 +360,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {appt.doctor ? (
               <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={52} />
             ) : (
-              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
+              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
               </View>
             )}
@@ -374,17 +374,17 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               {appt.doctor && appt.rating > 0 && <Stars rating={appt.rating} />}
             </View>
             {isVirtual ? (
-              <View style={[st.typePill, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: t.infoBorder }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="videocam-outline" size={11} color={t.statusVirtual.text} />
-                  <Text style={[st.typePillText, { color: t.statusVirtual.text }]}>Virtual</Text>
+                  <Ionicons name="videocam-outline" size={11} color={t.onHero} />
+                  <Text style={[st.typePillText, { color: t.onHero }]}>Virtual</Text>
                 </View>
               </View>
             ) : (
-              <View style={[st.typePill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="walk-outline" size={11} color={t.accent} />
-                  <Text style={[st.typePillText, { color: t.accent }]}>In-person</Text>
+                  <Ionicons name="walk-outline" size={11} color={t.onHero} />
+                  <Text style={[st.typePillText, { color: t.onHero }]}>In-person</Text>
                 </View>
               </View>
             )}
@@ -397,7 +397,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               { icon: 'time-outline' as const,     val: fmt12(appt.time) },
               { icon: 'location-outline' as const, val: appt.hospital },
             ] as const).map(c => (
-              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
+              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.35)' }]}>
                 <Ionicons name={c.icon} size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 3 }} />
                 <Text style={st.chipText} numberOfLines={1}>{c.val}</Text>
               </View>

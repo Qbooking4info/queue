@@ -375,9 +375,14 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}
+          {/* Always the banner fill, never the danger tint. Everything on this
+              card is white, and dangerSubtle is a near-white wash in the light
+              themes -- emergency patients would have had an invisible name.
+              Urgency is carried by the red border and the EMERGENCY badge. */}
           <View style={[st.heroCard, {
-            backgroundColor: isEmergency ? t.dangerSubtle : t.bannerBg,
+            backgroundColor: t.bannerBg,
             borderColor: isEmergency ? t.danger : t.bannerBorder,
+            borderWidth: isEmergency ? 2 : 1,
           }]}>
             <View style={st.patientRow}>
               <Avatar
