@@ -63,8 +63,11 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
   return (
     <>
       <style>{TOPBAR_STYLES}</style>
-      <div style={{ height: 'clamp(48px, 8vw, 60px)', borderBottom: `1px solid ${C.border}`, display: 'flex',
-        alignItems: 'center', padding: '0 clamp(10px, 3vw, 16px)', gap: 10, background: C.card,
+      {/* Sticky and frosted: content scrolls under it and blurs, which is the
+          whole point of the glass bar rather than an opaque strip. */}
+      <div style={{ height: 'clamp(48px, 8vw, 60px)', borderBottom: `1px solid ${C.glassBorder}`, display: 'flex',
+        alignItems: 'center', padding: '0 clamp(10px, 3vw, 16px)', gap: 10, background: C.glassStrong,
+        backdropFilter: C.blur, WebkitBackdropFilter: C.blur,
         position: 'sticky', top: 0, zIndex: 10, transition: 'background .3s, border-color .3s' }}>
 
         {/* Hamburger — mobile only */}

@@ -58,11 +58,41 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Frosted-glass page ground ─────────────────────────────────────────────
+   The wash and the soft coloured light that every frosted panel sits on.
+   Painted once here from CSS custom properties that ThemeProvider republishes
+   whenever the family or mode changes, so no route has to declare its own
+   background -- the same trick as the mobile apps' single GlassBackdrop.
+   --page-bg and the --orb-* values are set in ThemeContext.tsx. */
 body {
-  background: transparent;
-  color: var(--foreground);
+  background: var(--page-bg, #EFF2F8);
+  color: var(--text, var(--foreground));
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Three blurred colour blobs behind everything. Fixed rather than absolute so
+   they stay put while the dashboard scrolls, and inert to pointer events. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--orb-opacity, 0.7);
+  background:
+    radial-gradient(38rem 26rem at 88% -6%,  var(--orb-1, transparent) 0%, transparent 70%),
+    radial-gradient(32rem 24rem at -8% 38%,  var(--orb-2, transparent) 0%, transparent 70%),
+    radial-gradient(34rem 24rem at 104% 88%, var(--orb-3, transparent) 0%, transparent 70%);
+  filter: blur(40px);
+}
+
+/* Everything the app renders sits above the orbs. */
+body > * { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
 
 /* Scrollbar */

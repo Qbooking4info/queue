@@ -31,15 +31,20 @@ export function StatCard({ icon, label, value, sub, colorKey = 'accent', trend }
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="dash-stat-card"
+      // Frosted panel carrying a tint of its own colour, rather than a flat
+      // tonal fill: the page wash and light orbs read through it, and the
+      // bright 1px edge is what gives glass its lift.
       style={{
         background: bg,
-        border: 'none',
+        backdropFilter: C.blur,
+        WebkitBackdropFilter: C.blur,
+        border: `1px solid ${C.glassBorder}`,
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
         transition: 'box-shadow 0.2s, transform 0.2s, background 0.3s',
-        boxShadow: hovered ? '0 8px 24px rgba(0,0,0,0.18)' : '0 1px 3px rgba(0,0,0,0.08)',
-        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: hovered ? `0 18px 40px ${C.accentGlow}` : C.glassShadow,
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
         cursor: 'default',
       }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
