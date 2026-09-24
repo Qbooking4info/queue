@@ -160,7 +160,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#FFFFFF', letterSpacing: '-.03em' }}>Queue</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Queue</div>
             <div style={{ fontSize: 10, color: C.textFaint, letterSpacing: '.06em' }}>
               {currentRole === 'super_admin' ? 'PLATFORM ADMIN' : 'HOSPITAL PORTAL'}
             </div>
@@ -179,7 +179,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             {initials}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF',
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.text,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(currentRole === 'super_admin' && !hospital) ? 'All Hospitals' : (hospital?.name ?? 'Loading…')}
             </div>
@@ -212,7 +212,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 14px', borderRadius: 99, cursor: 'pointer',
                 background: isActive ? C.sidebarActive : 'none',
-                color: isActive ? C.sidebarActiveText : 'rgba(255,255,255,0.55)',
+                color: isActive ? C.sidebarActiveText : C.textSub,
                 fontSize: 13, fontWeight: isActive ? 700 : 500,
                 marginBottom: 2, transition: 'all .15s', textDecoration: 'none' }}>
               <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />

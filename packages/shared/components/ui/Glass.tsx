@@ -103,43 +103,15 @@ export function HeroChip({ children, style }: { children?: React.ReactNode; styl
   )
 }
 
-// ── Soft coloured light ──────────────────────────────────────────────────────
-// The blurred colour blobs the glass sits over. Absolutely positioned and
-// non-interactive; drop one behind a screen's content.
-export function LightOrbs({ scale = 1 }: { scale?: number }) {
-  const { theme: t } = useTheme()
-  const spots = [
-    { size: 280, top: -60, right: -90, c: t.orbs[0] },
-    { size: 230, top: 300, left: -110, c: t.orbs[1] },
-    { size: 240, bottom: 40, right: -100, c: t.orbs[2] },
-  ]
-  return (
-    <>
-      {spots.map((s, i) => (
-        <View
-          key={i}
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            width: s.size * scale,
-            height: s.size * scale,
-            borderRadius: (s.size * scale) / 2,
-            top: s.top != null ? s.top * scale : undefined,
-            bottom: s.bottom != null ? s.bottom * scale : undefined,
-            left: s.left != null ? s.left * scale : undefined,
-            right: s.right != null ? s.right * scale : undefined,
-            backgroundColor: s.c,
-            opacity: t.orbOpacity * 0.5,
-          }}
-        />
-      ))}
-    </>
-  )
-}
-
 // ── Screen background ────────────────────────────────────────────────────────
-// The soft vertical wash plus light orbs that every glass screen sits on.
-// Wrap a screen's content in this instead of a flat backgroundColor.
+//
+// An optional soft vertical wash for a screen that wants one. Most screens just
+// use the flat `t.canvasBg`, which is opaque on purpose: a navigator keeps every
+// visited screen mounted, so a transparent scene background renders all of them
+// on top of each other.
+//
+// There are deliberately no decorative background blobs here. An earlier pass
+// had them and they read as visual noise behind real content.
 export function GlassBackground({ children, style }: { children?: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const { theme: t } = useTheme()
   return (
@@ -149,34 +121,8 @@ export function GlassBackground({ children, style }: { children?: React.ReactNod
       end={{ x: 0.5, y: 1 }}
       style={[{ flex: 1 }, style]}
     >
-      <LightOrbs />
       {children}
     </LinearGradient>
-  )
-}
-
-// ── App-root backdrop ────────────────────────────────────────────────────────
-//
-// The same wash + orbs, but absolutely filling its parent and non-interactive,
-// so it can be dropped in as the FIRST child of an app's root View without
-// restructuring the tree around it.
-//
-// This is what makes the whole redesign work without editing 98 screen
-// backgrounds one by one: `t.canvasBg` is now 'transparent', so every screen
-// that already sets `backgroundColor: t.canvasBg` becomes see-through and this
-// one backdrop shows through all of them.
-export function GlassBackdrop() {
-  const { theme: t } = useTheme()
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <LinearGradient
-        colors={t.screenGradient as [string, string, ...string[]]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <LightOrbs scale={1.4} />
-    </View>
   )
 }
 

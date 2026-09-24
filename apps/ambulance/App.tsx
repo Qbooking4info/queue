@@ -6,7 +6,6 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { GlassDock } from '@queue/shared/components/ui/GlassDock'
-import { GlassBackdrop } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -254,7 +253,6 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
   }
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
-      <GlassBackdrop />
       <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
         {children}
       </NavigationContainer>

@@ -12,7 +12,7 @@ import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigat
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { SwitchedAccountBanner } from '@queue/shared/components/ui/SwitchedAccountBanner'
 import { GlassDock } from '@queue/shared/components/ui/GlassDock'
-import { GlassBackdrop, TRANSPARENT_NAV_THEME } from '@queue/shared/components/ui/Glass'
+import { TRANSPARENT_NAV_THEME } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -244,7 +244,6 @@ function AppNavigator() {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
-          <GlassBackdrop />
           <OfflineBanner />
           <SwitchedAccountBanner />
           <SafeAreaProvider style={{ flex: 1 }}>
@@ -270,7 +269,6 @@ function AppNavigator() {
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
-          <GlassBackdrop />
         <OfflineBanner />
         {/* Nested provider so the banner's height is subtracted from the insets
             the screens below see. Without it every screen would add the full top

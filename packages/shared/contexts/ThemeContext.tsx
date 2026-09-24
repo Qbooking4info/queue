@@ -50,16 +50,15 @@ const tealLight = {
   ...scale,
 
   // Surfaces
-  // Transparent so the root GlassBackdrop's gradient and light orbs show through
-  // every screen; canvasSolid is the real base colour for anything that needs an
-  // opaque fill (the app-root View, recessed list rows).
-  canvasBg:    'transparent',
+  // Opaque on purpose. A navigator keeps every visited screen mounted, so a
+  // transparent scene background lets all of them show through each other at once.
+  canvasBg:    '#EBF4F4',
   canvasSolid: '#EBF4F4',
   screenGradient: ['#F2F9F9', '#E4EFF0'],
-  cardBg:      'rgba(255,255,255,0.50)',
+  cardBg:      'rgba(255,255,255,0.82)',
   cardBorder:  'rgba(255,255,255,0.90)',
-  glass:       'rgba(255,255,255,0.50)',
-  glassStrong: 'rgba(255,255,255,0.72)',
+  glass:       'rgba(255,255,255,0.82)',
+  glassStrong: 'rgba(255,255,255,0.92)',
   glassBorder: 'rgba(255,255,255,0.90)',
   chip:        '#FFFFFF',
   chipBorder:  'rgba(255,255,255,1)',
@@ -138,15 +137,14 @@ const tealDark = {
   id: 'forest' as const, mode: 'dark' as const, label: 'Teal dark',
   ...scale,
 
-  // Transparent so the root GlassBackdrop's gradient and light orbs show through
-  // every screen; canvasSolid is the real base colour for anything that needs an
-  // opaque fill (the app-root View, recessed list rows).
-  canvasBg:    'transparent',
+  // Opaque on purpose. A navigator keeps every visited screen mounted, so a
+  // transparent scene background lets all of them show through each other at once.
+  canvasBg:    '#071416',
   canvasSolid: '#071416',
   screenGradient: ['#09181A', '#051012'],
-  cardBg:      'rgba(255,255,255,0.06)',
+  cardBg:      'rgba(255,255,255,0.08)',
   cardBorder:  'rgba(255,255,255,0.12)',
-  glass:       'rgba(255,255,255,0.06)',
+  glass:       'rgba(255,255,255,0.08)',
   glassStrong: 'rgba(18,42,46,0.62)',
   glassBorder: 'rgba(255,255,255,0.12)',
   chip:        'rgba(255,255,255,0.13)',
@@ -218,16 +216,15 @@ const clinicalLight = {
   id: 'clinical' as const, mode: 'light' as const, label: 'Clinical light',
   ...scale,
 
-  // Transparent so the root GlassBackdrop's gradient and light orbs show through
-  // every screen; canvasSolid is the real base colour for anything that needs an
-  // opaque fill (the app-root View, recessed list rows).
-  canvasBg:    'transparent',
+  // Opaque on purpose. A navigator keeps every visited screen mounted, so a
+  // transparent scene background lets all of them show through each other at once.
+  canvasBg:    '#EFF2F8',
   canvasSolid: '#EFF2F8',
   screenGradient: ['#F4F6FB', '#E8ECF5'],
-  cardBg:      'rgba(255,255,255,0.50)',
+  cardBg:      'rgba(255,255,255,0.82)',
   cardBorder:  'rgba(255,255,255,0.92)',
-  glass:       'rgba(255,255,255,0.50)',
-  glassStrong: 'rgba(255,255,255,0.74)',
+  glass:       'rgba(255,255,255,0.82)',
+  glassStrong: 'rgba(255,255,255,0.92)',
   glassBorder: 'rgba(255,255,255,0.92)',
   chip:        '#FFFFFF',
   chipBorder:  'rgba(255,255,255,1)',
@@ -298,15 +295,14 @@ const clinicalDark = {
   id: 'clinical' as const, mode: 'dark' as const, label: 'Clinical dark',
   ...scale,
 
-  // Transparent so the root GlassBackdrop's gradient and light orbs show through
-  // every screen; canvasSolid is the real base colour for anything that needs an
-  // opaque fill (the app-root View, recessed list rows).
-  canvasBg:    'transparent',
+  // Opaque on purpose. A navigator keeps every visited screen mounted, so a
+  // transparent scene background lets all of them show through each other at once.
+  canvasBg:    '#090E20',
   canvasSolid: '#090E20',
   screenGradient: ['#0B1126', '#070B19'],
-  cardBg:      'rgba(255,255,255,0.06)',
+  cardBg:      'rgba(255,255,255,0.08)',
   cardBorder:  'rgba(255,255,255,0.12)',
-  glass:       'rgba(255,255,255,0.06)',
+  glass:       'rgba(255,255,255,0.08)',
   glassStrong: 'rgba(22,30,64,0.62)',
   glassBorder: 'rgba(255,255,255,0.12)',
   chip:        'rgba(255,255,255,0.13)',
