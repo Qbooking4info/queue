@@ -68,8 +68,8 @@ const tealLight = {
   accentMid:    'rgba(11,127,134,0.08)',
   accentBorder: 'rgba(11,127,134,0.28)',
   accentGlow:   'rgba(20,160,165,0.45)',
-  btnGradient:  'linear-gradient(135deg, #0B7F86 0%, #1FA9AE 100%)',
-  heroGradient: 'linear-gradient(125deg, #0B7F86 0%, #1AA6AB 52%, #7FDCD8 100%)',
+  btnGradient:  'linear-gradient(135deg, #08666C 0%, #0B7F86 100%)',
+  heroGradient: 'linear-gradient(125deg, #064B50 0%, #08666C 52%, #0B7F86 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#0E2A2E',
@@ -143,7 +143,7 @@ const tealDark = {
   accentBorder: 'rgba(127,224,220,0.28)',
   accentGlow:   'rgba(40,180,180,0.50)',
   btnGradient:  'linear-gradient(135deg, #8FE8E4 0%, #25AFB0 100%)',
-  heroGradient: 'linear-gradient(125deg, #0A6468 0%, #179C9F 55%, #5FD8D4 100%)',
+  heroGradient: 'linear-gradient(125deg, #053E43 0%, #075A60 55%, #0A7278 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#E2F1F1',
@@ -213,8 +213,8 @@ const clinicalLight = {
   accentMid:    'rgba(47,91,234,0.08)',
   accentBorder: 'rgba(47,91,234,0.30)',
   accentGlow:   'rgba(63,108,242,0.45)',
-  btnGradient:  'linear-gradient(135deg, #2F5BEA 0%, #5E82F7 100%)',
-  heroGradient: 'linear-gradient(120deg, #3A68F0 0%, #5D81F7 46%, #A9BBFF 100%)',
+  btnGradient:  'linear-gradient(135deg, #2246B5 0%, #2F5BEA 100%)',
+  heroGradient: 'linear-gradient(120deg, #17307E 0%, #2246B5 46%, #2F5BEA 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#14213D',
@@ -285,7 +285,7 @@ const clinicalDark = {
   accentBorder: 'rgba(168,200,255,0.30)',
   accentGlow:   'rgba(91,124,250,0.50)',
   btnGradient:  'linear-gradient(135deg, #A8C1FF 0%, #5B7CFA 100%)',
-  heroGradient: 'linear-gradient(120deg, #2146C6 0%, #4D6DF0 55%, #93AAFF 100%)',
+  heroGradient: 'linear-gradient(120deg, #122461 0%, #1B379C 55%, #2549C8 100%)',
   onHero:       '#FFFFFF',
 
   text:         '#E6ECFA',
