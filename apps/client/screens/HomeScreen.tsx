@@ -11,6 +11,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation, distanceKm } from '@queue/shared/contexts/LocationContext'
 import { HospitalCard } from '@queue/shared/components/hospital/HospitalCard'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { Hero, HeroChip } from '@queue/shared/components/ui/Glass'
 import { specialties } from '../data'
 import { getHospitals, getNextAppointment, getActiveQueueAppointment } from '@queue/shared/lib/api'
 import { LiveQueueCard } from '@queue/shared/components/LiveQueueCard'
@@ -283,28 +284,31 @@ export function HomeScreen({ navigation }: Props) {
             onOpenDetail={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: activeAppt }) }}
           />
         ) : nextAppt ? (
-          <View style={[s.banner, { backgroundColor: t.accentContainer, borderColor: 'transparent' }]}>
-            <Text style={[s.bannerLabel, { color: t.onAccentContainer }]}>NEXT APPOINTMENT</Text>
+          // The one saturated moment on this screen: the next visit rides the
+          // hero gradient rather than a flat tonal fill, so everything else can
+          // stay quiet frosted glass.
+          <Hero style={{ marginHorizontal: 16, marginBottom: 12 }}>
+            <Text style={[s.bannerLabel, { color: t.onHero, opacity: 0.85 }]}>NEXT APPOINTMENT</Text>
             <View style={s.bannerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={[s.bannerDoctor, { color: t.onAccentContainer }]}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
-                <Text style={[s.bannerSub, { color: t.onAccentContainer, opacity: 0.75 }]}>
+                <Text style={[s.bannerDoctor, { color: t.onHero }]}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
+                <Text style={[s.bannerSub, { color: t.onHero, opacity: 0.8 }]}>
                   {nextAppt.hospital?.name ?? ''}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
                   {[nextAppt.appointment_date, nextAppt.start_time].map(l => (
-                    <View key={l} style={[s.bannerChip, { backgroundColor: 'rgba(255,255,255,0.3)', borderColor: 'transparent' }]}>
-                      <Text style={[s.bannerChipText, { color: t.onAccentContainer }]}>{l}</Text>
-                    </View>
+                    <HeroChip key={l}>
+                      <Text style={[s.bannerChipText, { color: t.onHero }]}>{l}</Text>
+                    </HeroChip>
                   ))}
                 </View>
               </View>
               <Button
-                label="View" size="sm"
+                label="View" size="sm" variant="outline"
                 onPress={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: nextAppt }) }}
               />
             </View>
-          </View>
+          </Hero>
         ) : !loading && (
           <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
             style={[s.banner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

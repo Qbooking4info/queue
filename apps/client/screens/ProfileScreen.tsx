@@ -119,7 +119,7 @@ export function ProfileScreen({ navigation }: Props) {
         <View style={[styles.themeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={18} color={t.textMuted} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Forest' : 'Clinical'} Theme</Text>
+            <Text style={[styles.themeLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Teal' : 'Clinical'} Theme</Text>
             <Text style={[styles.themeSub, { color: t.textMuted }]}>Tap to switch theme</Text>
           </View>
           <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}

@@ -223,7 +223,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
-              <Text style={{ fontSize: 15, color: t.textPrimary }}>{themeId === 'forest' ? 'Forest' : 'Clinical'} theme</Text>
+              <Text style={{ fontSize: 15, color: t.textPrimary }}>{themeId === 'forest' ? 'Teal' : 'Clinical'} theme</Text>
             </View>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>

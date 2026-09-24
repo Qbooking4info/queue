@@ -3,6 +3,8 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { Avatar } from '../ui/Avatar'
 import { Stars } from '../ui/Stars'
 import { StatusBadge } from '../ui/StatusBadge'
+import { Glass } from '../ui/Glass'
+import { ValueChip } from '../ui/ValueChip'
 import type { BedSpaceStatus } from '../../lib/api'
 
 export interface DisplayHospital {
@@ -44,109 +46,96 @@ export interface DisplayHospital {
 
 interface Props { hospital: DisplayHospital; onPress: () => void }
 
-// Matches the mockup's HospitalCard/Card exactly: no border at all -- the
-// mockup's Card relies purely on a shadow for separation from the page
-// behind it, not a 1px border like every other card in this app used to.
-// Also picks up the mockup's "tonal header strip" -- the avatar/name/rating
-// block sits on a tint of the hospital's OWN avatar color (not a flat
-// t.cardBg), visually tying the card to that hospital's color the same way
-// the mockup's varied avatarBg colors do -- and only the body below (wait/
-// distance/services) sits on the plain card surface.
+// Pulls the leading number out of "15 min" so the wait can sit in a ValueChip,
+// where the figure is the point. Anything non-numeric ("—", "Unknown") falls
+// back to rendering the string as-is rather than showing a blank chip.
+function splitWait(wait: string): { value: string; unit: string } {
+  const m = /^(\d+)\s*(.*)$/.exec(wait?.trim() ?? '')
+  if (!m) return { value: wait || '—', unit: 'wait' }
+  return { value: m[1], unit: `${m[2] || 'min'} wait` }
+}
+
+// Glass-language hospital tile: one frosted panel, the hospital's own avatar
+// colour as the only saturation, and the wait time raised into a solid chip so
+// it stays the most legible thing on the card.
+//
+// `blur={false}` on purpose -- these render in lists, and BlurView is expensive
+// on the low-end Android hardware this product targets. The translucent fill
+// still reads as glass against the backdrop; the real blur is spent on
+// singular panels (profile cards, heroes) where there is only ever one.
 export function HospitalCard({ hospital: h, onPress }: Props) {
   const { theme: t } = useTheme()
+  const wait = splitWait(h.wait)
+
   return (
-    // Shadow and corner-clipping deliberately split across two views -- a
-    // single view with both `overflow: 'hidden'` (needed to clip the header
-    // strip's tint to the rounded corners) and a shadow renders the shadow
-    // as a hard, near-black rectangle on Android/web instead of a soft drop
-    // shadow, which read as an unwanted dark border around every card.
-    <View style={[styles.shadowWrap, { backgroundColor: t.cardBg }]}>
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.clip}>
-      {/* Tonal header strip */}
-      <View style={[styles.headerStrip, { backgroundColor: h.avatarBg + '22', borderBottomColor: t.cardBorder }]}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ marginBottom: 10 }}>
+      <Glass radius={22} pad={14} blur={false}>
         <View style={styles.headerRow}>
-          <Avatar initials={h.avatar} bg={h.avatarBg} size={52} />
+          <Avatar initials={h.avatar} bg={h.avatarBg} size={46} />
+
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={styles.topRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
-                <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                {h.verified && (
-                  <View style={[styles.verifiedBadge, { backgroundColor: t.accent }]}>
-                    <Text style={[styles.verifiedText, { color: t.onAccent }]}>✓</Text>
-                  </View>
-                )}
-              </View>
-              <StatusBadge type={h.tagType} />
+              <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
+              {h.verified && (
+                <View style={[styles.verifiedBadge, { backgroundColor: t.accentSoft, borderColor: t.accentBorder }]}>
+                  <Text style={[styles.verifiedText, { color: t.accent }]}>✓</Text>
+                </View>
+              )}
             </View>
-            <Text style={[styles.specialty, { color: t.textSecondary }]}>{h.specialty}</Text>
+            <Text style={[styles.specialty, { color: t.textFaint }]} numberOfLines={1}>{h.specialty}</Text>
             <View style={styles.ratingRow}>
               <Stars rating={h.rating} />
-              <Text style={[styles.reviews, { color: t.textSecondary }]}>({h.reviews} reviews)</Text>
+              <Text style={[styles.reviews, { color: t.textFaint }]}>({h.reviews})</Text>
             </View>
           </View>
-        </View>
-      </View>
 
-      {/* Body */}
-      <View style={styles.body}>
-        <View style={styles.metaRow}>
-          <Text style={[styles.metaText, { color: t.textPrimary }]}>⏱ {h.wait} wait</Text>
-          <Text style={[styles.metaText, { color: t.textPrimary }]}>📍 {h.distance}</Text>
-          {h.virtual && <Text style={[styles.metaText, { color: t.accent, fontWeight: '700' }]}>💻 Virtual</Text>}
-          {(h.emergencySlots ?? 0) > 0 && <Text style={[styles.metaText, { color: t.danger, fontWeight: '700' }]}>🚨 Emergency</Text>}
+          <ValueChip value={wait.value} unit={wait.unit} tall={false} />
         </View>
+
         <View style={styles.tags}>
-          {h.services.slice(0, 3).map(s => (
-            <View key={s} style={[styles.tag, { backgroundColor: t.inputBg }]}>
-              <Text style={[styles.tagText, { color: t.textSecondary }]}>{s}</Text>
+          <StatusBadge type={h.tagType} />
+          {h.virtual && (
+            <View style={[styles.tag, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}>
+              <Text style={[styles.tagText, { color: t.statusVirtual.text }]}>Virtual visits</Text>
             </View>
-          ))}
-          {h.services.length > 3 && (
-            <Text style={[styles.moreText, { color: t.accent }]}>+{h.services.length - 3} more</Text>
+          )}
+          {(h.emergencySlots ?? 0) > 0 && (
+            <View style={[styles.tag, { backgroundColor: t.statusCancelled.bg, borderColor: t.statusCancelled.border }]}>
+              <Text style={[styles.tagText, { color: t.statusCancelled.text }]}>Emergency</Text>
+            </View>
           )}
           {h.is_24_hours && (
-            <View style={[styles.tag, { backgroundColor: t.accentContainer }]}>
-              <Text style={[styles.tagText, { color: t.onAccentContainer, fontWeight: '700' }]}>24/7</Text>
+            <View style={[styles.tag, { backgroundColor: t.accentSoft, borderColor: t.accentBorder }]}>
+              <Text style={[styles.tagText, { color: t.accent }]}>24/7</Text>
             </View>
           )}
+          <View style={[styles.tag, { backgroundColor: t.statusNeutral.bg, borderColor: t.statusNeutral.border }]}>
+            <Text style={[styles.tagText, { color: t.statusNeutral.text }]}>{h.distance}</Text>
+          </View>
         </View>
-      </View>
+
+        {h.services.length > 0 && (
+          <Text style={[styles.services, { color: t.textFaint }]} numberOfLines={1}>
+            {h.services.slice(0, 3).join(' · ')}
+            {h.services.length > 3 ? `  +${h.services.length - 3} more` : ''}
+          </Text>
+        )}
+      </Glass>
     </TouchableOpacity>
-    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  shadowWrap: {
-    borderRadius: 12,
-    marginBottom: 12,
-    // Shadow-only elevation, no border -- see the file header comment.
-    // Deliberately soft: shadowOpacity/elevation this low reads as a gentle
-    // lift off the page, not a dark ring around the card.
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  clip: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  headerStrip:  { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1 },
-  headerRow:    { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  topRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 3 },
-  name:         { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
-  verifiedBadge:{ borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
-  verifiedText: { fontSize: 10, fontWeight: '700' },
-  specialty:    { fontSize: 12, fontWeight: '500' },
-  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  reviews:      { fontSize: 12, fontWeight: '500' },
-  body:         { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
-  metaRow:      { flexDirection: 'row', gap: 16, marginBottom: 10, flexWrap: 'wrap' },
-  metaText:     { fontSize: 12, fontWeight: '600' },
-  tags:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
-  tag:          { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6 },
-  tagText:      { fontSize: 11, fontWeight: '600' },
-  moreText:     { fontSize: 11, fontWeight: '600' },
+  headerRow:    { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name:         { fontSize: 14.5, fontWeight: '600', letterSpacing: -0.2, flexShrink: 1 },
+  verifiedBadge:{ borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1 },
+  verifiedText: { fontSize: 9, fontWeight: '700' },
+  specialty:    { fontSize: 11.5, marginTop: 2 },
+  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  reviews:      { fontSize: 11.5 },
+  tags:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 12 },
+  tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  tagText:      { fontSize: 11, fontWeight: '500' },
+  services:     { fontSize: 11, marginTop: 10 },
 })

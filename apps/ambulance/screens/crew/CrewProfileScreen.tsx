@@ -74,7 +74,7 @@ export function CrewProfileScreen() {
           <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
+              {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
             </Text>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
               trackColor={{ true: t.accent, false: t.cardBorder }} />

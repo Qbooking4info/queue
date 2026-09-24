@@ -184,7 +184,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
               <Text style={[st.rowLabel, { color: t.textPrimary }]}>
-                {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
+                {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
               </Text>
             </View>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />

@@ -56,7 +56,7 @@ export function AdminProfileScreen({ navigation }: Props) {
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Forest' : 'Clinical'} theme
+              {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
             </Text>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>

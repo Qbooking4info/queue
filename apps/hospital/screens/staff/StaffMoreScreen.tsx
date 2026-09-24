@@ -121,7 +121,7 @@ export function StaffMoreScreen({ navigation }: Props) {
             <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>
               <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={18} color={t.accent} />
             </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Forest' : 'Clinical'} theme</Text>
+            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Teal' : 'Clinical'} theme</Text>
             <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
