@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ValueChip } from './ui/ValueChip'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -83,15 +84,15 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
           <Text style={[st.inProgressText, { color: t.accent }]}>The doctor is seeing you now</Text>
         </View>
       ) : (
+        // Both figures are server-computed and real (queue_position and the
+        // historically-derived estimated_wait), so they earn the raised chip
+        // treatment -- the number is the whole point of this card.
         <View style={st.statsRow}>
           <View style={st.statBox}>
-            <Text style={[st.statNum, { color: t.accent }]}>{position ?? '—'}</Text>
-            <Text style={[st.statLabel, { color: t.textMuted }]}>Position</Text>
+            <ValueChip value={position ?? '—'} unit="in line" tone={t.accent} />
           </View>
-          <View style={[st.statDivider, { backgroundColor: t.cardBorder }]} />
           <View style={st.statBox}>
-            <Text style={[st.statNum, { color: t.textPrimary }]}>{estimatedWait != null ? `~${estimatedWait}m` : '—'}</Text>
-            <Text style={[st.statLabel, { color: t.textMuted }]}>Est. wait</Text>
+            <ValueChip value={estimatedWait != null ? estimatedWait : '—'} unit="min wait" />
           </View>
         </View>
       )}
@@ -133,11 +134,8 @@ const st = StyleSheet.create({
   hospitalName:{ fontSize: 12, marginTop: 1 },
   inProgressBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
   inProgressText: { fontSize: 13, fontWeight: '700' },
-  statsRow:    { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
-  statBox:     { flex: 1, alignItems: 'center' },
-  statNum:     { fontSize: 24, fontWeight: '800' },
-  statLabel:   { fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, height: 32 },
+  statsRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  statBox:     { flex: 1, alignItems: 'stretch' },
   vitalsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
   vitalChip:   { fontSize: 11, fontWeight: '600' },
   changeBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingVertical: 10, marginTop: 14 },
