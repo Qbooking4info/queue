@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/react-native'
 import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
+import { GlassBackdrop } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -48,14 +50,10 @@ const CrewTab     = createBottomTabNavigator()
 const AdminTab    = createBottomTabNavigator()
 const AdminStackN = createNativeStackNavigator()
 
-function TabIcon({ name, focused, color }: any) {
-  const { theme: t } = useTheme()
-  if (!focused) return <Ionicons name={name} size={22} color={color} />
-  return (
-    <View style={{ width: 52, height: 30, borderRadius: 16, backgroundColor: t.accentContainer, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={name} size={20} color={t.onAccentContainer} />
-    </View>
-  )
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: any) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
 // Two doors into the same app: a crew/dispatcher account (provisioned by
@@ -95,15 +93,11 @@ function ProviderOnboardingStack() {
 }
 
 function CrewTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <CrewTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <CrewTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <CrewTab.Screen name="CrewHome"    component={CrewHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'medkit' : 'medkit-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
       <CrewTab.Screen name="CrewProfile" component={CrewProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
     </CrewTab.Navigator>
@@ -117,15 +111,11 @@ function CrewTabs() {
 // either kind of provider -- that stays a web-dashboard-only, hospital-side
 // concern.
 function AdminTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <AdminTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <AdminTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Home' }} />
       <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'car-sport' : 'car-sport-outline'} {...p} />, tabBarLabel: 'Fleet' }} />
       <AdminTab.Screen name="FleetMap"     component={FleetMapScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'map' : 'map-outline'} {...p} />, tabBarLabel: 'Map' }} />
@@ -174,7 +164,7 @@ function AppNavigator() {
   if (loading || !fontsLoaded) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} size="large" />
         </View>
       </SafeAreaProvider>
@@ -207,7 +197,7 @@ function AppNavigator() {
       content = <AdminStack />
     } else {
       content = (
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
           <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
           <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
             This account is not ambulance crew
@@ -263,9 +253,12 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
     },
   }
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
-      {children}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+      <GlassBackdrop />
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+        {children}
+      </NavigationContainer>
+    </View>
   )
 }
 

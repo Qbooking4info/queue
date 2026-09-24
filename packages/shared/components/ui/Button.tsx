@@ -1,5 +1,6 @@
 import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../../contexts/ThemeContext'
 
 interface Props {
@@ -12,77 +13,105 @@ interface Props {
   style?: ViewStyle
   // An Ionicons name, not a rendered icon -- Button owns sizing/color so the icon
   // always matches the label's, which every hand-rolled version had to duplicate
-  // itself. Most of the icon-having buttons this component's adoption sweep had to
-  // skip were this exact shape: one icon, one label, nothing fancier.
+  // itself.
   icon?: keyof typeof Ionicons.glyphMap
   iconPosition?: 'left' | 'right'
 }
 
-// Had zero consumers when this was found -- it imported a hardcoded `dark` palette
-// from lib/theme.ts, an earlier, orphaned token file with its own dark/light objects
-// that nothing else in the app ever switches into, and referenced keys (`borderMed`,
-// `textSub`) that don't exist on the real theme every screen actually uses. That made
-// it permanently dark and disconnected from the app's real forest/clinical toggle --
-// exactly the "reads fine in the one theme nobody checked" bug this session kept
-// finding elsewhere. Fixed to use the live ThemeContext instead, and since nothing
-// referenced this component's exact pixel values yet, its radius/font now come
-// straight from the theme's own scale rather than a second, competing set of numbers.
+// Glass-language button. The public API is unchanged from the MD3 version --
+// same variants, sizes, props -- only the rendering differs:
+//
+//   primary  a real gradient fill with a coloured glow, the one saturated
+//            control per screen
+//   outline  a frosted pane rather than a hairline box
+//   danger / success / info  keep their tinted-fill shape, restyled onto the
+//            glass border tokens
+//
+// `primary` needs an extra nested View because LinearGradient can't also be the
+// touch target without swallowing the shadow -- the shadow lives on the
+// TouchableOpacity, the gradient clips inside it.
 export function Button({
   label, onPress, variant = 'primary', size = 'md', loading, disabled, style, icon, iconPosition = 'left',
 }: Props) {
-  const { theme: t } = useTheme()
+  const { theme: t, shadow } = useTheme()
   const isDisabled = disabled || loading
 
-  // The theme's own onAccent -- the exact MD3 on-color for this scheme's accent,
-  // not a dark/light guess (forest and clinical can each be light or dark now, so
-  // "forest -> near-black text" is only right for two of the four combinations).
-  const onPrimary = t.onAccent
-
-  const containerStyles: ViewStyle = {
-    // MD3 signature shape: fully pill-rounded buttons, matching the shared
-    // StatusBadge/chip rows already used everywhere else in this app.
-    borderRadius: t.radius.pill,
-    paddingVertical: size === 'lg' ? t.spacing.lg : size === 'sm' ? t.spacing.sm : t.spacing.md,
-    paddingHorizontal: size === 'lg' ? t.spacing.xxl : size === 'sm' ? t.spacing.md : t.spacing.xl,
-    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: t.spacing.sm,
-    opacity: isDisabled ? 0.5 : 1,
-    ...(variant === 'primary' && { backgroundColor: t.accent }),
-    ...(variant === 'outline' && { backgroundColor: 'transparent', borderWidth: 1, borderColor: t.cardBorder }),
-    ...(variant === 'ghost'   && { backgroundColor: 'transparent' }),
-    // Matches the bordered/tinted destructive button several screens (sign out, delete
-    // account) had already hand-rolled from dangerSubtle/dangerStrong -- not a new look.
-    ...(variant === 'danger'  && { backgroundColor: t.dangerSubtle, borderWidth: 1, borderColor: t.dangerStrong }),
-    // Matches the "Approve"/positive-action buttons several queue screens had
-    // already hand-rolled from accentDark at these same opacities.
-    ...(variant === 'success' && { backgroundColor: t.successSubtle, borderWidth: 1, borderColor: t.successBorder }),
-    // Same shape again for neutral/forward-progress actions ("Check In", "Vitals") --
-    // matches what FrontDeskQueueScreen already hand-rolled from infoSubtle/infoBorder.
-    ...(variant === 'info'    && { backgroundColor: t.infoSubtle, borderWidth: 1, borderColor: t.infoBorder }),
-  }
+  const padV = size === 'lg' ? t.spacing.lg : size === 'sm' ? t.spacing.sm : t.spacing.md
+  const padH = size === 'lg' ? t.spacing.xxl : size === 'sm' ? t.spacing.md : t.spacing.xl
 
   const textStyle: TextStyle = {
     fontSize: size === 'lg' ? t.font.lg : size === 'sm' ? t.font.sm : t.font.md,
-    fontWeight: '700',
-    color: variant === 'primary' ? onPrimary
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    color: variant === 'primary' ? t.onBtn
       : variant === 'danger'  ? t.danger
       : variant === 'success' ? t.accentDark
       : variant === 'info'    ? t.info
-      : t.textSecondary,
+      : t.textPrimary,
   }
   const iconSize = size === 'lg' ? 18 : size === 'sm' ? 13 : 15
 
-  // Loading already has its own signal (the spinner) -- showing the icon alongside it
-  // too is just clutter, so it drops out while loading rather than stacking with it.
+  // Loading already has its own signal (the spinner) -- showing the icon alongside
+  // it too is just clutter, so it drops out while loading rather than stacking.
   const iconEl = icon && !loading
-    ? <Ionicons name={icon} size={iconSize} color={textStyle.color} />
+    ? <Ionicons name={icon} size={iconSize} color={textStyle.color as string} />
     : null
 
-  return (
-    <TouchableOpacity onPress={onPress} disabled={isDisabled} style={[containerStyles, style]} activeOpacity={0.75}>
-      {loading && <ActivityIndicator size="small" color={textStyle.color} />}
+  const inner = (
+    <>
+      {loading && <ActivityIndicator size="small" color={textStyle.color as string} />}
       {iconPosition === 'left' && iconEl}
       <Text style={textStyle}>{label}</Text>
       {iconPosition === 'right' && iconEl}
+    </>
+  )
+
+  const rowStyle: ViewStyle = {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: t.spacing.sm, paddingVertical: padV, paddingHorizontal: padH,
+  }
+
+  if (variant === 'primary') {
+    return (
+      <TouchableOpacity
+        onPress={onPress} disabled={isDisabled} activeOpacity={0.85}
+        style={[{
+          borderRadius: t.radius.pill,
+          opacity: isDisabled ? 0.5 : 1,
+          shadowColor: t.accent,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.45,
+          shadowRadius: 18,
+          elevation: 6,
+        }, style]}
+      >
+        <LinearGradient
+          colors={t.btnGradient as [string, string, ...string[]]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[rowStyle, { borderRadius: t.radius.pill, overflow: 'hidden' }]}
+        >
+          {inner}
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
+
+  const variantFill: ViewStyle =
+      variant === 'outline' ? { backgroundColor: t.glassStrong, borderWidth: 1, borderColor: t.glassBorder, ...shadow }
+    : variant === 'ghost'   ? { backgroundColor: 'transparent' }
+    : variant === 'danger'  ? { backgroundColor: t.dangerSubtle, borderWidth: 1, borderColor: t.dangerBorder }
+    : variant === 'success' ? { backgroundColor: t.successSubtle, borderWidth: 1, borderColor: t.successBorder }
+    : /* info */              { backgroundColor: t.infoSubtle, borderWidth: 1, borderColor: t.infoBorder }
+
+  return (
+    <TouchableOpacity
+      onPress={onPress} disabled={isDisabled} activeOpacity={0.75}
+      style={[rowStyle, {
+        borderRadius: t.radius.pill,
+        opacity: isDisabled ? 0.5 : 1,
+      }, variantFill, style]}
+    >
+      {inner}
     </TouchableOpacity>
   )
 }

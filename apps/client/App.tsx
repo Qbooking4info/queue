@@ -11,6 +11,8 @@ import { NavigationContainer } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { SwitchedAccountBanner } from '@queue/shared/components/ui/SwitchedAccountBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
+import { GlassBackdrop, TRANSPARENT_NAV_THEME } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -103,35 +105,20 @@ const AuthNav    = createNativeStackNavigator()
 const PatientNav = createNativeStackNavigator()
 const HospitalNav = createNativeStackNavigator()
 
-// MD3 nav bar: an active tab gets a pill-shaped tonal capsule behind its icon
-// (accentContainer/onAccentContainer), matching the mockup's own NavBar --
-// not just a plain color swap on the bare icon the way this looked before.
-function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
-  const { theme: t } = useTheme()
-  if (!focused) return <Ionicons name={name} size={22} color={color} />
-  return (
-    <View style={{ width: 52, height: 30, borderRadius: 16, backgroundColor: t.accentContainer, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={name} size={20} color={t.onAccentContainer} />
-    </View>
-  )
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
 // ── Patient navigator ─────────────────────────────────────────────────────────
 
 function MainTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <Tab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      // Active label reads t.textPrimary (bold), not the accent -- the icon's
-      // own pill capsule (see TabIcon) already carries the accent color, so
-      // the label doesn't need to duplicate it, matching the mockup's own
-      // NavBar (label: onSurface when active, onSurfaceVariant otherwise).
-      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <Tab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
       <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Bookings' }} />
@@ -256,11 +243,12 @@ function AppNavigator() {
     const content: React.ReactElement = <AppStack />
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+          <GlassBackdrop />
           <OfflineBanner />
           <SwitchedAccountBanner />
           <SafeAreaProvider style={{ flex: 1 }}>
-            <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+            <NavigationContainer theme={TRANSPARENT_NAV_THEME as any} ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
           </SafeAreaProvider>
           {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
         </View>
@@ -281,13 +269,14 @@ function AppNavigator() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+          <GlassBackdrop />
         <OfflineBanner />
         {/* Nested provider so the banner's height is subtracted from the insets
             the screens below see. Without it every screen would add the full top
             inset again and sit in a gap under the banner. */}
         <SafeAreaProvider style={{ flex: 1 }}>
-          <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
+          <NavigationContainer theme={TRANSPARENT_NAV_THEME as any} ref={navigationRef} onReady={flushPendingNavigation}>
             <RootAuthNavigator />
           </NavigationContainer>
         </SafeAreaProvider>

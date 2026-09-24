@@ -4,259 +4,404 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // Structural scale, not color -- identical across every scheme on purpose, and
 // mirrored (same numeric values) in web/src/contexts/ThemeContext.tsx's own `scale`
 // so a card or button is the same size on web and mobile even though the two token
-// systems aren't code-shared. `font.display` is new: the MD3 mockups this palette
-// was redrawn from use a much bigger number for splash/hero branding (48) and stat
-// values (28-30) than anything this app reached for before (`hero` topped out at
-// 26) -- added rather than repurposing `hero`, so nothing that already reads `hero`
-// silently gets bigger.
+// systems aren't code-shared.
+//
+// Radii are deliberately larger than the previous MD3 pass: the glass language
+// leans on soft, fully-rounded geometry (pill controls, 22-26px panels) rather
+// than MD3's tighter corners. Anything reading radius.md/lg picks this up for free.
 const scale = {
   spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 },
-  radius:  { sm: 10, md: 14, lg: 20, pill: 99 },
+  radius:  { sm: 14, md: 18, lg: 24, pill: 999 },
   font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 30, display: 44 },
 }
 
-// ── MD3 color science, redrawn from the four scheme mockups (queue-hospital-md /
-// queue-patient-md) exactly -- every primary/container/surface/outline value below
-// is the literal hex the mockups used for that scheme, not a re-tint. Two
-// independent dimensions, matching the mockups: a theme family (forest/clinical)
-// and a mode (light/dark), four total combinations, each reachable on its own
-// (see ThemeProvider below) rather than forest always meaning dark and clinical
-// always meaning light.
+// ── Frosted-glass design language ────────────────────────────────────────────
 //
-// This app's own token names (canvasBg, cardBg, textPrimary, ...) are kept --
-// every screen in the app already reads these by name, and renaming them would
-// mean touching every screen instead of just this file. Each name below is
-// mapped to the MD3 field with the matching semantic role:
-//   canvasBg -> surfaceContainer   (recessed page background, one step behind cards)
-//   cardBg   -> surface            (the card/content surface itself)
-//   textPrimary/Secondary/Muted -> onSurface / onSurfaceVariant / outline
-//     (MD3's own three-tier emphasis ladder for text on a surface)
-//   accent -> primary; danger -> error; info -> blue (MD3's dedicated "info" hue
-//     in these mockups, distinct from primary)
-//   statusOpen/Busy/Virtual/Cancelled/Approval/Progress/Neutral -> the container/
-//     on-container pair MD3 uses for an equivalent status chip in the mockups
-//     (confirmed->primary, waiting->amber, virtual->tertiary, cancelled->error,
-//     pending approval->purple, in-progress->secondary, neutral->surfaceVariant)
-// Tint tokens (accentBg, dangerSubtle, ...) that don't have a direct MD3 field are
-// computed as an rgba of the matching solid MD3 color at the opacity this app
-// already used for that role, so the *hue* is always the template's own color,
-// just applied at a "thin tint behind small text" strength instead of a "bold
-// fill" strength (that bold-fill role is exactly what the new *Container/
-// onAccentContainer pair -- and the newly-added on* pairs below it -- covers.)
+// Translucent blurred panels over soft coloured light, raised near-opaque
+// "chips" carrying key numbers, gradient hero cards, and pill-shaped controls.
+// Two families -- Teal and Clinical -- each in light and dark.
+//
+// EVERY token name from the previous palette is kept and remapped, so screens
+// that already read `t.cardBg`/`t.accent`/`t.statusBusy` pick up the new look
+// with no edits. The genuinely new glass tokens (glass, chip, heroGradient,
+// glassShadow, ...) are additive.
+//
+// Mapping of the old names into the new language:
+//   canvasBg   -> the solid base the blurred panels sit on (screenGradient's midpoint)
+//   cardBg     -> `glass`: a translucent fill. Over a BlurView this reads as real
+//                 frosted glass; on its own it still reads as soft translucency,
+//                 so a screen that hasn't been migrated to <Glass> yet degrades
+//                 gracefully instead of looking broken.
+//   cardBorder -> `glassBorder`: the bright 1px edge that gives glass its lift
+//   bannerBg   -> the deepest stop of heroGradient, so existing "dark banner"
+//                 surfaces stay intentional until they move to <Hero>
+//
+// Note on `id`: the family ids stay 'forest'/'clinical' even though the forest
+// family now renders teal. Six screens branch on `themeId === 'forest'` for
+// their toggle labels; renaming the id would silently break all of them. Each
+// scheme carries a `label` for anything that wants to show the real name.
 
-const forestLight = {
-  id: 'forest' as const, mode: 'light' as const,
+// React Native has no backdrop-filter, so translucency alone is not frosted
+// glass -- <Glass> pairs these fills with expo-blur's BlurView. `blurTint` and
+// `blurIntensity` are the per-scheme inputs for that.
+
+const tealLight = {
+  id: 'forest' as const, mode: 'light' as const, label: 'Teal light',
   ...scale,
-  canvasBg:    '#EAEEEA',
-  cardBg:      '#F6FBF4',
-  cardBorder:  '#BFC9BF',
-  accent:      '#006D3E',
-  // The color that reads on top of a solid `accent` fill (a primary button's own
-  // label, a filled chip's icon) -- MD3's onPrimary for this exact scheme, not a
-  // dark/light guess. Needed as its own token once forest could mean either mode:
-  // forest-light's accent is a deep, saturated green (wants white text) while
-  // forest-dark's is a pale mint (wants dark text) -- the two used to share one
-  // `t.id === 'forest' ? dark : white` heuristic across every call site because
-  // forest only ever meant dark before. That heuristic is wrong half the time now.
+
+  // Surfaces
+  // Transparent so the root GlassBackdrop's gradient and light orbs show through
+  // every screen; canvasSolid is the real base colour for anything that needs an
+  // opaque fill (the app-root View, recessed list rows).
+  canvasBg:    'transparent',
+  canvasSolid: '#EBF4F4',
+  screenGradient: ['#F2F9F9', '#E4EFF0'],
+  cardBg:      'rgba(255,255,255,0.50)',
+  cardBorder:  'rgba(255,255,255,0.90)',
+  glass:       'rgba(255,255,255,0.50)',
+  glassStrong: 'rgba(255,255,255,0.72)',
+  glassBorder: 'rgba(255,255,255,0.90)',
+  chip:        '#FFFFFF',
+  chipBorder:  'rgba(255,255,255,1)',
+  blurTint:    'light' as const,
+  blurIntensity: 40,
+
+  // Soft coloured light behind the glass
+  orbs: ['#8FE3E0', '#9CD4EC', '#B8F0DC'],
+  orbOpacity: 0.7,
+
+  // Accent
+  accent:      '#0B7F86',
   onAccent:    '#FFFFFF',
-  accentDark:  '#006D3E',
-  accentBg:    'rgba(0,109,62,0.12)',
-  accentBgMid: 'rgba(0,109,62,0.08)',
-  accentBorder:'rgba(0,109,62,0.28)',
-  successSubtle: 'rgba(0,109,62,0.12)',
-  successBorder: 'rgba(0,109,62,0.3)',
-  textPrimary:  '#181D19',
-  textSecondary:'#404943',
-  // MD3's own outline field is tuned for borders/icons (~3:1 against surface),
-  // not small text -- this app's textMuted carries timestamps and helper copy,
-  // genuinely small text that needs the 4.5:1 text floor. onSurfaceVariant
-  // (same value as textSecondary) is the field MD3 actually engineers for that,
-  // so textMuted reuses it rather than a lower-contrast tone with no such
-  // guarantee. The two collapse to one shade as a result -- a deliberate trade
-  // of hierarchy nuance for guaranteed legibility.
-  textMuted:    '#404943',
-  danger:      '#BA1A1A',
-  info:        '#1D4ED8',
-  dangerBg:      'rgba(186,26,26,0.14)',
-  dangerSubtle:  'rgba(186,26,26,0.1)',
-  dangerBorder:  'rgba(186,26,26,0.3)',
-  dangerStrong:  'rgba(186,26,26,0.4)',
-  infoBg:        'rgba(29,78,216,0.14)',
-  infoSubtle:    'rgba(29,78,216,0.12)',
-  infoBorder:    'rgba(29,78,216,0.3)',
-  statusOpen:     { bg:'#9EF5BC', text:'#002112', border:'rgba(0,109,62,0.28)' },
-  statusBusy:     { bg:'#FEF3C7', text:'#451A03', border:'rgba(180,83,9,0.28)' },
-  statusVirtual:  { bg:'#C2E8FD', text:'#001F2B', border:'rgba(62,99,116,0.28)' },
-  statusCancelled:{ bg:'#FFDAD6', text:'#410002', border:'rgba(186,26,26,0.28)' },
-  statusApproval: { bg:'#EDE9FE', text:'#2D1B69', border:'rgba(109,40,217,0.28)' },
-  statusProgress: { bg:'#CFF0DC', text:'#0A1F14', border:'rgba(77,99,86,0.28)' },
-  statusNeutral:  { bg:'#DCE5DB', text:'#404943', border:'#BFC9BF' },
-  bannerBg:    '#003D24',
-  bannerBorder:'rgba(0,109,62,0.28)',
-  inputBg:     '#E4E9E4',
-  inputBorder: '#707973',
-  starColor:   '#B45309',
-  splashBg:    '#003D24',
-  accentContainer:   '#9EF5BC',
-  onAccentContainer: '#002112',
-  // MD3's errorContainer/onErrorContainer -- a bold tonal-fill pairing for a
-  // whole-surface emergency/alert banner, as distinct from dangerBg/Subtle/
-  // Border/Strong's "thin tint behind small text" role above.
-  dangerContainer:   '#FFDAD6',
-  onDangerContainer: '#410002',
-  // MD3's onError -- text/icon color on a SOLID danger fill (a filled "Book now"
-  // button), distinct from onDangerContainer's pastel-fill pairing above.
+  accentDark:  '#0B7F86',
+  accentBg:    'rgba(11,127,134,0.12)',
+  accentBgMid: 'rgba(11,127,134,0.08)',
+  accentBorder:'rgba(11,127,134,0.28)',
+  accentSoft:  'rgba(11,127,134,0.12)',
+  accentGlow:  'rgba(20,160,165,0.45)',
+  btnGradient: ['#0B7F86', '#1FA9AE'],
+  onBtn:       '#FFFFFF',
+  heroGradient:['#0B7F86', '#1AA6AB', '#7FDCD8'],
+  onHero:      '#FFFFFF',
+
+  successSubtle: 'rgba(11,127,134,0.12)',
+  successBorder: 'rgba(11,127,134,0.30)',
+
+  // Text. `ink` is the high-contrast hue used for chart strokes, not body copy.
+  textPrimary:  '#0E2A2E',
+  textSecondary:'#3C5558',
+  // textMuted deliberately reuses textSecondary rather than the lighter
+  // decorative grey: it carries timestamps and helper copy, genuinely small
+  // text that needs the 4.5:1 floor, and the lighter tone measures ~3.7:1 on
+  // this canvas. `textFaint` is that lighter tone, for decoration only.
+  textMuted:    '#3C5558',
+  textFaint:    '#6C8588',
+  ink:          '#0D3A40',
+  tick:         'rgba(13,58,64,0.16)',
+  line:         'rgba(13,58,64,0.08)',
+
+  // Semantic
+  danger:      '#D2293A',
+  info:        '#1D5FB8',
+  dangerBg:      'rgba(210,41,58,0.14)',
+  dangerSubtle:  'rgba(210,41,58,0.09)',
+  dangerBorder:  'rgba(210,41,58,0.30)',
+  dangerStrong:  'rgba(210,41,58,0.42)',
+  dangerGlow:    'rgba(210,41,58,0.45)',
+  infoBg:        'rgba(29,95,184,0.12)',
+  infoSubtle:    'rgba(29,95,184,0.10)',
+  infoBorder:    'rgba(29,95,184,0.28)',
+
+  statusOpen:     { bg:'rgba(11,127,134,0.12)',  text:'#0B7F86', border:'rgba(11,127,134,0.22)' },
+  statusBusy:     { bg:'rgba(196,120,10,0.13)',  text:'#935600', border:'rgba(196,120,10,0.26)' },
+  statusVirtual:  { bg:'rgba(29,95,184,0.10)',   text:'#1D5FB8', border:'rgba(29,95,184,0.22)' },
+  statusCancelled:{ bg:'rgba(210,41,58,0.10)',   text:'#BE2230', border:'rgba(210,41,58,0.24)' },
+  statusApproval: { bg:'rgba(109,40,217,0.10)',  text:'#5B2BC0', border:'rgba(109,40,217,0.22)' },
+  statusProgress: { bg:'rgba(42,106,110,0.12)',  text:'#2A6A6E', border:'rgba(42,106,110,0.22)' },
+  statusNeutral:  { bg:'rgba(13,58,64,0.06)',    text:'#4C6366', border:'rgba(13,58,64,0.12)' },
+
+  bannerBg:    '#0B7F86',
+  bannerBorder:'rgba(255,255,255,0.35)',
+  inputBg:     'rgba(255,255,255,0.55)',
+  inputBorder: 'rgba(255,255,255,0.90)',
+  starColor:   '#E09B1B',
+  splashBg:    '#0B7F86',
+
+  accentContainer:   '#CFF0EF',
+  onAccentContainer: '#04383C',
+  dangerContainer:   '#FBDDDF',
+  onDangerContainer: '#5B0710',
   onDanger:          '#FFFFFF',
 }
 
-const forestDark = {
-  id: 'forest' as const, mode: 'dark' as const,
+const tealDark = {
+  id: 'forest' as const, mode: 'dark' as const, label: 'Teal dark',
   ...scale,
-  canvasBg:    '#1A201A',
-  cardBg:      '#0F1410',
-  cardBorder:  '#404943',
-  accent:      '#7EDBA0',
-  onAccent:    '#00391F',
-  accentDark:  '#7EDBA0',
-  accentBg:    'rgba(126,219,160,0.14)',
-  accentBgMid: 'rgba(126,219,160,0.10)',
-  accentBorder:'rgba(126,219,160,0.28)',
-  successSubtle: 'rgba(126,219,160,0.14)',
-  successBorder: 'rgba(126,219,160,0.3)',
-  textPrimary:  '#DEE4DE',
-  textSecondary:'#BFC9BF',
-  // See forestLight's own comment on this same field.
-  textMuted:    '#BFC9BF',
-  danger:      '#FFB4AB',
-  info:        '#93C5FD',
-  dangerBg:      'rgba(255,180,171,0.16)',
-  dangerSubtle:  'rgba(255,180,171,0.12)',
-  dangerBorder:  'rgba(255,180,171,0.32)',
-  dangerStrong:  'rgba(255,180,171,0.42)',
-  infoBg:        'rgba(147,197,253,0.16)',
-  infoSubtle:    'rgba(147,197,253,0.12)',
-  infoBorder:    'rgba(147,197,253,0.32)',
-  statusOpen:     { bg:'#005230', text:'#9EF5BC', border:'rgba(126,219,160,0.28)' },
-  statusBusy:     { bg:'#452B00', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
-  statusVirtual:  { bg:'#244C5D', text:'#C2E8FD', border:'rgba(166,205,217,0.28)' },
-  statusCancelled:{ bg:'#93000A', text:'#FFDAD6', border:'rgba(255,180,171,0.28)' },
-  statusApproval: { bg:'#2D1B69', text:'#EDE9FE', border:'rgba(196,181,253,0.28)' },
-  statusProgress: { bg:'#354B3F', text:'#CFF0DC', border:'rgba(179,204,188,0.28)' },
-  statusNeutral:  { bg:'#404943', text:'#BFC9BF', border:'#404943' },
-  bannerBg:    '#002112',
-  bannerBorder:'rgba(126,219,160,0.28)',
-  inputBg:     '#1A201A',
-  inputBorder: '#404943',
+
+  // Transparent so the root GlassBackdrop's gradient and light orbs show through
+  // every screen; canvasSolid is the real base colour for anything that needs an
+  // opaque fill (the app-root View, recessed list rows).
+  canvasBg:    'transparent',
+  canvasSolid: '#071416',
+  screenGradient: ['#09181A', '#051012'],
+  cardBg:      'rgba(255,255,255,0.06)',
+  cardBorder:  'rgba(255,255,255,0.12)',
+  glass:       'rgba(255,255,255,0.06)',
+  glassStrong: 'rgba(18,42,46,0.62)',
+  glassBorder: 'rgba(255,255,255,0.12)',
+  chip:        'rgba(255,255,255,0.13)',
+  chipBorder:  'rgba(255,255,255,0.22)',
+  blurTint:    'dark' as const,
+  blurIntensity: 45,
+
+  orbs: ['#0E7D82', '#1A6F9A', '#1F8A78'],
+  orbOpacity: 0.55,
+
+  accent:      '#7FE0DC',
+  onAccent:    '#00292B',
+  accentDark:  '#7FE0DC',
+  accentBg:    'rgba(127,224,220,0.14)',
+  accentBgMid: 'rgba(127,224,220,0.10)',
+  accentBorder:'rgba(127,224,220,0.28)',
+  accentSoft:  'rgba(127,224,220,0.14)',
+  accentGlow:  'rgba(40,180,180,0.50)',
+  btnGradient: ['#8FE8E4', '#25AFB0'],
+  onBtn:       '#00292B',
+  heroGradient:['#0A6468', '#179C9F', '#5FD8D4'],
+  onHero:      '#FFFFFF',
+
+  successSubtle: 'rgba(127,224,220,0.14)',
+  successBorder: 'rgba(127,224,220,0.30)',
+
+  textPrimary:  '#E2F1F1',
+  textSecondary:'#AEC6C7',
+  textMuted:    '#AEC6C7',
+  textFaint:    '#7C9698',
+  ink:          '#8FEDEA',
+  tick:         'rgba(222,240,240,0.16)',
+  line:         'rgba(255,255,255,0.08)',
+
+  danger:      '#FF8A8A',
+  info:        '#C2DDFD',
+  dangerBg:      'rgba(255,138,138,0.16)',
+  dangerSubtle:  'rgba(255,110,110,0.12)',
+  dangerBorder:  'rgba(255,138,138,0.32)',
+  dangerStrong:  'rgba(255,138,138,0.42)',
+  dangerGlow:    'rgba(255,90,90,0.40)',
+  infoBg:        'rgba(166,190,230,0.16)',
+  infoSubtle:    'rgba(166,190,230,0.12)',
+  infoBorder:    'rgba(166,190,230,0.32)',
+
+  statusOpen:     { bg:'rgba(127,224,220,0.14)', text:'#A6F2EE', border:'rgba(127,224,220,0.28)' },
+  statusBusy:     { bg:'rgba(251,208,106,0.13)', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
+  statusVirtual:  { bg:'rgba(166,190,230,0.13)', text:'#C2DDFD', border:'rgba(166,190,230,0.28)' },
+  statusCancelled:{ bg:'rgba(255,138,138,0.13)', text:'#FFB4AB', border:'rgba(255,138,138,0.30)' },
+  statusApproval: { bg:'rgba(196,181,253,0.13)', text:'#DDD3FF', border:'rgba(196,181,253,0.28)' },
+  statusProgress: { bg:'rgba(179,214,212,0.13)', text:'#CDEDEC', border:'rgba(179,214,212,0.26)' },
+  statusNeutral:  { bg:'rgba(255,255,255,0.07)', text:'#BFCBCB', border:'rgba(255,255,255,0.14)' },
+
+  bannerBg:    '#0A6468',
+  bannerBorder:'rgba(255,255,255,0.20)',
+  inputBg:     'rgba(255,255,255,0.07)',
+  inputBorder: 'rgba(255,255,255,0.16)',
   starColor:   '#FBD06A',
-  splashBg:    '#002112',
-  accentContainer:   '#005230',
-  onAccentContainer: '#9EF5BC',
-  dangerContainer:   '#93000A',
-  onDangerContainer: '#FFDAD6',
-  onDanger:          '#690005',
+  splashBg:    '#06282B',
+
+  accentContainer:   '#12474A',
+  onAccentContainer: '#A6F2EE',
+  dangerContainer:   '#5A1418',
+  onDangerContainer: '#FFD9D9',
+  onDanger:          '#3B0006',
 }
 
 const clinicalLight = {
-  id: 'clinical' as const, mode: 'light' as const,
+  id: 'clinical' as const, mode: 'light' as const, label: 'Clinical light',
   ...scale,
-  canvasBg:    '#ECEEF4',
-  cardBg:      '#F8F9FF',
-  cardBorder:  '#C3C6CF',
-  accent:      '#005DB8',
+
+  // Transparent so the root GlassBackdrop's gradient and light orbs show through
+  // every screen; canvasSolid is the real base colour for anything that needs an
+  // opaque fill (the app-root View, recessed list rows).
+  canvasBg:    'transparent',
+  canvasSolid: '#EFF2F8',
+  screenGradient: ['#F4F6FB', '#E8ECF5'],
+  cardBg:      'rgba(255,255,255,0.50)',
+  cardBorder:  'rgba(255,255,255,0.92)',
+  glass:       'rgba(255,255,255,0.50)',
+  glassStrong: 'rgba(255,255,255,0.74)',
+  glassBorder: 'rgba(255,255,255,0.92)',
+  chip:        '#FFFFFF',
+  chipBorder:  'rgba(255,255,255,1)',
+  blurTint:    'light' as const,
+  blurIntensity: 40,
+
+  orbs: ['#A9C1FF', '#CBD8FF', '#9FD8FF'],
+  orbOpacity: 0.75,
+
+  accent:      '#2F5BEA',
   onAccent:    '#FFFFFF',
-  accentDark:  '#005DB8',
-  accentBg:    'rgba(0,93,184,0.12)',
-  accentBgMid: 'rgba(0,93,184,0.08)',
-  accentBorder:'rgba(0,93,184,0.30)',
-  successSubtle: 'rgba(0,93,184,0.12)',
-  successBorder: 'rgba(0,93,184,0.3)',
-  textPrimary:  '#191C20',
-  textSecondary:'#43474E',
-  // See forestLight's own comment on this same field.
-  textMuted:    '#43474E',
-  danger:      '#BA1A1A',
-  info:        '#1D4ED8',
-  dangerBg:      'rgba(186,26,26,0.14)',
-  dangerSubtle:  'rgba(186,26,26,0.1)',
-  dangerBorder:  'rgba(186,26,26,0.3)',
-  dangerStrong:  'rgba(186,26,26,0.4)',
-  infoBg:        'rgba(29,78,216,0.14)',
-  infoSubtle:    'rgba(29,78,216,0.12)',
-  infoBorder:    'rgba(29,78,216,0.3)',
-  statusOpen:     { bg:'#D5E3FF', text:'#001B3D', border:'rgba(0,93,184,0.28)' },
-  statusBusy:     { bg:'#FEF3C7', text:'#451A03', border:'rgba(180,83,9,0.28)' },
-  statusVirtual:  { bg:'#F5D9FF', text:'#261430', border:'rgba(109,86,116,0.28)' },
-  statusCancelled:{ bg:'#FFDAD6', text:'#410002', border:'rgba(186,26,26,0.28)' },
-  statusApproval: { bg:'#EDE9FE', text:'#2D1B69', border:'rgba(109,40,217,0.28)' },
-  statusProgress: { bg:'#D8E3F8', text:'#111C2B', border:'rgba(84,95,113,0.28)' },
-  statusNeutral:  { bg:'#DFE2EB', text:'#43474E', border:'#C3C6CF' },
-  bannerBg:    '#001C42',
-  bannerBorder:'rgba(0,93,184,0.30)',
-  inputBg:     '#E6E8EE',
-  inputBorder: '#73777F',
-  starColor:   '#B45309',
-  splashBg:    '#001C42',
-  accentContainer:   '#D5E3FF',
-  onAccentContainer: '#001B3D',
-  dangerContainer:   '#FFDAD6',
-  onDangerContainer: '#410002',
+  accentDark:  '#2F5BEA',
+  accentBg:    'rgba(47,91,234,0.11)',
+  accentBgMid: 'rgba(47,91,234,0.08)',
+  accentBorder:'rgba(47,91,234,0.30)',
+  accentSoft:  'rgba(47,91,234,0.11)',
+  accentGlow:  'rgba(63,108,242,0.45)',
+  btnGradient: ['#2F5BEA', '#5E82F7'],
+  onBtn:       '#FFFFFF',
+  heroGradient:['#3A68F0', '#5D81F7', '#A9BBFF'],
+  onHero:      '#FFFFFF',
+
+  successSubtle: 'rgba(47,91,234,0.11)',
+  successBorder: 'rgba(47,91,234,0.30)',
+
+  textPrimary:  '#14213D',
+  textSecondary:'#44506B',
+  textMuted:    '#44506B',
+  textFaint:    '#7A859C',
+  ink:          '#16244A',
+  tick:         'rgba(22,36,74,0.15)',
+  line:         'rgba(22,36,74,0.08)',
+
+  danger:      '#E0263B',
+  info:        '#1D5FB8',
+  dangerBg:      'rgba(224,38,59,0.13)',
+  dangerSubtle:  'rgba(224,38,59,0.08)',
+  dangerBorder:  'rgba(224,38,59,0.30)',
+  dangerStrong:  'rgba(224,38,59,0.42)',
+  dangerGlow:    'rgba(224,38,59,0.45)',
+  infoBg:        'rgba(29,95,184,0.12)',
+  infoSubtle:    'rgba(29,95,184,0.10)',
+  infoBorder:    'rgba(29,95,184,0.28)',
+
+  statusOpen:     { bg:'rgba(47,91,234,0.10)',   text:'#2449C8', border:'rgba(47,91,234,0.22)' },
+  statusBusy:     { bg:'rgba(196,120,10,0.12)',  text:'#935600', border:'rgba(196,120,10,0.26)' },
+  statusVirtual:  { bg:'rgba(130,70,170,0.10)',  text:'#7A3AA6', border:'rgba(130,70,170,0.22)' },
+  statusCancelled:{ bg:'rgba(224,38,59,0.09)',   text:'#C21F31', border:'rgba(224,38,59,0.24)' },
+  statusApproval: { bg:'rgba(109,40,217,0.10)',  text:'#5B2BC0', border:'rgba(109,40,217,0.22)' },
+  statusProgress: { bg:'rgba(60,90,140,0.10)',   text:'#35507E', border:'rgba(60,90,140,0.20)' },
+  statusNeutral:  { bg:'rgba(22,36,74,0.06)',    text:'#4A5572', border:'rgba(22,36,74,0.12)' },
+
+  bannerBg:    '#3A68F0',
+  bannerBorder:'rgba(255,255,255,0.35)',
+  inputBg:     'rgba(255,255,255,0.55)',
+  inputBorder: 'rgba(255,255,255,0.92)',
+  starColor:   '#E09B1B',
+  splashBg:    '#2F5BEA',
+
+  accentContainer:   '#D9E2FF',
+  onAccentContainer: '#001A42',
+  dangerContainer:   '#FBDDDF',
+  onDangerContainer: '#5B0710',
   onDanger:          '#FFFFFF',
 }
 
 const clinicalDark = {
-  id: 'clinical' as const, mode: 'dark' as const,
+  id: 'clinical' as const, mode: 'dark' as const, label: 'Clinical dark',
   ...scale,
-  canvasBg:    '#1C1E24',
-  cardBg:      '#111318',
-  cardBorder:  '#43474E',
+
+  // Transparent so the root GlassBackdrop's gradient and light orbs show through
+  // every screen; canvasSolid is the real base colour for anything that needs an
+  // opaque fill (the app-root View, recessed list rows).
+  canvasBg:    'transparent',
+  canvasSolid: '#090E20',
+  screenGradient: ['#0B1126', '#070B19'],
+  cardBg:      'rgba(255,255,255,0.06)',
+  cardBorder:  'rgba(255,255,255,0.12)',
+  glass:       'rgba(255,255,255,0.06)',
+  glassStrong: 'rgba(22,30,64,0.62)',
+  glassBorder: 'rgba(255,255,255,0.12)',
+  chip:        'rgba(255,255,255,0.13)',
+  chipBorder:  'rgba(255,255,255,0.22)',
+  blurTint:    'dark' as const,
+  blurIntensity: 45,
+
+  orbs: ['#2448D0', '#51308C', '#1C6FB5'],
+  orbOpacity: 0.55,
+
   accent:      '#A8C8FF',
-  onAccent:    '#00306A',
+  onAccent:    '#0A1540',
   accentDark:  '#A8C8FF',
   accentBg:    'rgba(168,200,255,0.14)',
   accentBgMid: 'rgba(168,200,255,0.10)',
   accentBorder:'rgba(168,200,255,0.30)',
+  accentSoft:  'rgba(168,200,255,0.14)',
+  accentGlow:  'rgba(91,124,250,0.50)',
+  btnGradient: ['#A8C1FF', '#5B7CFA'],
+  onBtn:       '#0A1540',
+  heroGradient:['#2146C6', '#4D6DF0', '#93AAFF'],
+  onHero:      '#FFFFFF',
+
   successSubtle: 'rgba(168,200,255,0.14)',
-  successBorder: 'rgba(168,200,255,0.3)',
-  textPrimary:  '#E2E2E9',
-  textSecondary:'#C3C6CF',
-  // See forestLight's own comment on this same field.
-  textMuted:    '#C3C6CF',
-  danger:      '#FFB4AB',
-  info:        '#93C5FD',
-  dangerBg:      'rgba(255,180,171,0.16)',
-  dangerSubtle:  'rgba(255,180,171,0.12)',
-  dangerBorder:  'rgba(255,180,171,0.32)',
-  dangerStrong:  'rgba(255,180,171,0.42)',
-  infoBg:        'rgba(147,197,253,0.16)',
-  infoSubtle:    'rgba(147,197,253,0.12)',
-  infoBorder:    'rgba(147,197,253,0.32)',
-  statusOpen:     { bg:'#00469A', text:'#D5E3FF', border:'rgba(168,200,255,0.28)' },
-  statusBusy:     { bg:'#452B00', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
-  statusVirtual:  { bg:'#553C5C', text:'#F5D9FF', border:'rgba(218,189,228,0.28)' },
-  statusCancelled:{ bg:'#93000A', text:'#FFDAD6', border:'rgba(255,180,171,0.28)' },
-  statusApproval: { bg:'#2D1B69', text:'#EDE9FE', border:'rgba(196,181,253,0.28)' },
-  statusProgress: { bg:'#3C4758', text:'#D8E3F8', border:'rgba(187,199,220,0.28)' },
-  statusNeutral:  { bg:'#43474E', text:'#C3C6CF', border:'#43474E' },
-  bannerBg:    '#001B3D',
-  bannerBorder:'rgba(168,200,255,0.28)',
-  inputBg:     '#1C1E24',
-  inputBorder: '#43474E',
+  successBorder: 'rgba(168,200,255,0.30)',
+
+  textPrimary:  '#E6ECFA',
+  textSecondary:'#B3BED6',
+  textMuted:    '#B3BED6',
+  textFaint:    '#8290AD',
+  ink:          '#B7CCFF',
+  tick:         'rgba(226,232,250,0.16)',
+  line:         'rgba(255,255,255,0.08)',
+
+  danger:      '#FF8A8A',
+  info:        '#C2DDFD',
+  dangerBg:      'rgba(255,138,138,0.16)',
+  dangerSubtle:  'rgba(255,110,110,0.12)',
+  dangerBorder:  'rgba(255,138,138,0.32)',
+  dangerStrong:  'rgba(255,138,138,0.42)',
+  dangerGlow:    'rgba(255,90,90,0.40)',
+  infoBg:        'rgba(194,221,253,0.16)',
+  infoSubtle:    'rgba(194,221,253,0.12)',
+  infoBorder:    'rgba(194,221,253,0.32)',
+
+  statusOpen:     { bg:'rgba(168,200,255,0.14)', text:'#D5E3FF', border:'rgba(168,200,255,0.28)' },
+  statusBusy:     { bg:'rgba(251,208,106,0.13)', text:'#FBD06A', border:'rgba(251,208,106,0.28)' },
+  statusVirtual:  { bg:'rgba(218,189,228,0.13)', text:'#F5D9FF', border:'rgba(218,189,228,0.28)' },
+  statusCancelled:{ bg:'rgba(255,138,138,0.13)', text:'#FFB4AB', border:'rgba(255,138,138,0.30)' },
+  statusApproval: { bg:'rgba(196,181,253,0.13)', text:'#DDD3FF', border:'rgba(196,181,253,0.28)' },
+  statusProgress: { bg:'rgba(187,199,220,0.13)', text:'#D8E3F8', border:'rgba(187,199,220,0.26)' },
+  statusNeutral:  { bg:'rgba(255,255,255,0.07)', text:'#C3C6CF', border:'rgba(255,255,255,0.14)' },
+
+  bannerBg:    '#2146C6',
+  bannerBorder:'rgba(255,255,255,0.20)',
+  inputBg:     'rgba(255,255,255,0.07)',
+  inputBorder: 'rgba(255,255,255,0.16)',
   starColor:   '#FBD06A',
-  splashBg:    '#001B3D',
-  accentContainer:   '#00469A',
+  splashBg:    '#0B1740',
+
+  accentContainer:   '#1B2A5C',
   onAccentContainer: '#D5E3FF',
-  dangerContainer:   '#93000A',
-  onDangerContainer: '#FFDAD6',
-  onDanger:          '#690005',
+  dangerContainer:   '#5A1418',
+  onDangerContainer: '#FFD9D9',
+  onDanger:          '#3B0006',
 }
 
-export type Theme = typeof forestLight | typeof forestDark | typeof clinicalLight | typeof clinicalDark
+// Elevation presets. React Native can't express the layered CSS box-shadows the
+// glass language uses, so these are the closest single-shadow equivalents,
+// exported as spreadable style objects rather than strings.
+export interface ShadowStyle {
+  shadowColor: string
+  shadowOffset: { width: number; height: number }
+  shadowOpacity: number
+  shadowRadius: number
+  elevation: number
+}
+
+export const glassShadow: Record<ThemeMode, ShadowStyle> = {
+  light: { shadowColor: '#0C464E', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.10, shadowRadius: 20, elevation: 4 },
+  dark:  { shadowColor: '#000000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.38, shadowRadius: 20, elevation: 6 },
+}
+
+export const chipShadow: Record<ThemeMode, ShadowStyle> = {
+  light: { shadowColor: '#0C464E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.13, shadowRadius: 12, elevation: 3 },
+  dark:  { shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5 },
+}
+
+export type Theme = typeof tealLight | typeof tealDark | typeof clinicalLight | typeof clinicalDark
 export type ThemeFamily = 'forest' | 'clinical'
 export type ThemeMode = 'light' | 'dark'
 
 export const themes = {
-  'forest-light':   forestLight,
-  'forest-dark':    forestDark,
+  'forest-light':   tealLight,
+  'forest-dark':    tealDark,
   'clinical-light': clinicalLight,
   'clinical-dark':  clinicalDark,
 } as const
@@ -271,32 +416,29 @@ interface ThemeCtx {
   toggleTheme: () => void
   toggleMode: () => void
   setMode: (mode: ThemeMode) => void
+  /** Spreadable shadow for glass panels, already matched to the active mode. */
+  shadow: ShadowStyle
+  /** Spreadable shadow for raised value chips, matched to the active mode. */
+  chipElevation: ShadowStyle
 }
 
 const Ctx = createContext<ThemeCtx>({
-  theme: forestLight, themeId: 'forest', mode: 'light',
+  theme: tealLight, themeId: 'forest', mode: 'light',
   toggleTheme: () => {}, toggleMode: () => {}, setMode: () => {},
+  shadow: glassShadow.light, chipElevation: chipShadow.light,
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeId] = useState<ThemeFamily>('forest')
-  const [mode,    setModeState] = useState<ThemeMode>('dark')
+  const [themeId, setThemeId] = useState<ThemeFamily>('clinical')
+  const [mode,    setModeState] = useState<ThemeMode>('light')
 
-  // Load persisted theme + mode preference on startup. Forest previously always
-  // meant dark and clinical always meant light -- a saved 'forest'/'clinical' from
-  // before this change still resolves correctly since forest still defaults to
-  // dark and clinical to light when no separate mode was ever saved.
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(FAMILY_KEY),
       AsyncStorage.getItem(MODE_KEY),
     ]).then(([savedFamily, savedMode]) => {
       if (savedFamily === 'forest' || savedFamily === 'clinical') setThemeId(savedFamily)
-      if (savedMode === 'light' || savedMode === 'dark') {
-        setModeState(savedMode)
-      } else if (savedFamily === 'clinical') {
-        setModeState('light')
-      }
+      if (savedMode === 'light' || savedMode === 'dark') setModeState(savedMode)
     }).catch(() => {/* ignore storage errors */})
   }, [])
 
@@ -320,7 +462,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = themes[`${themeId}-${mode}`]
 
   return (
-    <Ctx.Provider value={{ theme, themeId, mode, toggleTheme, toggleMode, setMode }}>
+    <Ctx.Provider value={{
+      theme, themeId, mode, toggleTheme, toggleMode, setMode,
+      shadow: glassShadow[mode],
+      chipElevation: chipShadow[mode],
+    }}>
       {children}
     </Ctx.Provider>
   )

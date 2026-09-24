@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/react-native'
 import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
+import { GlassBackdrop } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -55,14 +57,10 @@ const DocTab      = createBottomTabNavigator()
 const DocStack    = createNativeStackNavigator()
 const OnboardStk  = createNativeStackNavigator()
 
-function TabIcon({ name, focused, color }: any) {
-  const { theme: t } = useTheme()
-  if (!focused) return <Ionicons name={name} size={22} color={color} />
-  return (
-    <View style={{ width: 52, height: 30, borderRadius: 16, backgroundColor: t.accentContainer, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={name} size={20} color={t.onAccentContainer} />
-    </View>
-  )
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: any) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
 // LoginScreen is shared with the other three apps, so the doctor-specific bits (which
@@ -101,15 +99,11 @@ function DoctorOnboardingStack() {
 }
 
 function SpecialistTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <DocTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.textPrimary, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <DocTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
       <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
@@ -166,7 +160,7 @@ function AppNavigator() {
   if (loading || !fontsLoaded) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} size="large" />
         </View>
       </SafeAreaProvider>
@@ -187,7 +181,7 @@ function AppNavigator() {
     // This app is only ever the doctor's. A staff or crew account signing in here has
     // no stack to land on, so say which app they want rather than showing an empty one.
     const content = doctorProfile ? <SpecialistStack /> : needsDoctorOnboarding ? <DoctorOnboardingStack /> : (
-      <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
         <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
         <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
           This account is not a doctor
@@ -242,9 +236,12 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
     },
   }
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
-      {children}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+      <GlassBackdrop />
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+        {children}
+      </NavigationContainer>
+    </View>
   )
 }
 
