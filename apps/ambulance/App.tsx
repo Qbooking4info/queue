@@ -155,12 +155,16 @@ function AppNavigator() {
   } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
   })
   if (fontsLoaded) applyDMSansGlobally()
 
-  if (loading || !fontsLoaded) {
+  // Fonts are cosmetic, so they must never be able to brick the app. useFonts
+  // reports failure through its second value; without checking it, a blocked or
+  // stalled webfont request leaves fontsLoaded false forever and the whole app
+  // sits on this spinner with no way out -- a real risk on poor connectivity.
+  if (loading || (!fontsLoaded && !fontError)) {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>

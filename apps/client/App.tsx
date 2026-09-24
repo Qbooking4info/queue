@@ -214,7 +214,7 @@ function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
   const { session, loading, user, switchedInto } = useAuth()
   const { theme: t } = useTheme()
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
   })
   if (fontsLoaded) applyDMSansGlobally()
