@@ -321,7 +321,7 @@ function ScheduleContent() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setSelected(null) }}>
           <div style={{ width: '100%', maxWidth: 480, maxHeight: '80vh', overflowY: 'auto',
-            background: C.card, border: `1px solid ${C.border}`, borderRadius: 20,
+            background: C.popover, border: `1px solid ${C.border}`, borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>

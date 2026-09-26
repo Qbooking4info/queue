@@ -71,7 +71,7 @@ function ServiceModal({
       backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 500, background: C.card,
+      <div style={{ width: '100%', maxWidth: 500, background: C.popover,
         border: `1px solid ${C.border}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '28px 32px' }}>
 
@@ -198,7 +198,7 @@ function AddSpecialtyModal({
       backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 440, background: C.card,
+      <div style={{ width: '100%', maxWidth: 440, background: C.popover,
         border: `1px solid ${C.border}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '28px 28px 16px' }}>
 
@@ -544,7 +544,7 @@ export default function ServicesPage() {
           backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
           justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setRemoveSpecConfirm(null) }}>
-          <div style={{ width: '100%', maxWidth: 380, background: C.card,
+          <div style={{ width: '100%', maxWidth: 380, background: C.popover,
             border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '28px 28px' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 8 }}>
@@ -580,7 +580,7 @@ export default function ServicesPage() {
           backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
           justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setDeleteConfirm(null) }}>
-          <div style={{ width: '100%', maxWidth: 380, background: C.card,
+          <div style={{ width: '100%', maxWidth: 380, background: C.popover,
             border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '28px 28px' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 8 }}>

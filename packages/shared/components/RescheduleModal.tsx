@@ -57,7 +57,7 @@ export function RescheduleModal({ patientName, onClose, onConfirm }: Props) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={st.overlay}>
-        <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={[st.card, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
           <Text style={[st.title, { color: t.textPrimary }]}>Reschedule Appointment</Text>
           {patientName && <Text style={[st.sub, { color: t.textMuted }]}>{patientName}</Text>}
 

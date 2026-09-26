@@ -257,7 +257,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: t.cardBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingTop: 8 }}>
+          <View style={{ backgroundColor: t.popover, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingTop: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
               <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>Select Specialty</Text>
               <TouchableOpacity onPress={() => setPickerOpen(false)} accessibilityLabel="Close" hitSlop={8}>

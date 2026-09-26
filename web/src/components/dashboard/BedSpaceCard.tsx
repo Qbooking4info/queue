@@ -85,7 +85,7 @@ export function BedSpaceCard({ hospitalId, status, updatedAt }: {
             backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={e => e.target === e.currentTarget && setOpen(false)}
         >
-          <div style={{ width: '100%', maxWidth: 460, background: C.card, border: `1px solid ${C.border}`,
+          <div style={{ width: '100%', maxWidth: 460, background: C.popover, border: `1px solid ${C.border}`,
             borderRadius: 20, boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Update Bed Space</div>

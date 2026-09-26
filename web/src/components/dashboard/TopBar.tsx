@@ -152,7 +152,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
               <div onClick={() => setNotifOpen(false)}
                 style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
               <div className="q-notif-panel" style={{ position: 'absolute', right: 0, top: 46, width: 320,
-                background: C.card, border: `1px solid ${C.border}`,
+                background: C.popover, border: `1px solid ${C.border}`,
                 borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                 zIndex: 100, overflow: 'hidden', transition: 'background .3s' }}>
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`,

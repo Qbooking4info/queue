@@ -62,6 +62,12 @@ const tealLight = {
   glassBorder: 'rgba(255,255,255,0.90)',
   chip:        '#FFFFFF',
   chipBorder:  'rgba(255,255,255,1)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#FFFFFF',
+  popoverBorder: 'rgba(14,42,46,0.10)',
   blurTint:    'light' as const,
   blurIntensity: 40,
 
@@ -152,6 +158,12 @@ const tealDark = {
   glassBorder: 'rgba(255,255,255,0.12)',
   chip:        'rgba(0,0,0,0.30)',
   chipBorder:  'rgba(255,255,255,0.22)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#122A2E',
+  popoverBorder: 'rgba(255,255,255,0.14)',
   blurTint:    'dark' as const,
   blurIntensity: 45,
 
@@ -231,6 +243,12 @@ const clinicalLight = {
   glassBorder: 'rgba(255,255,255,0.92)',
   chip:        '#FFFFFF',
   chipBorder:  'rgba(255,255,255,1)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#FFFFFF',
+  popoverBorder: 'rgba(20,33,61,0.10)',
   blurTint:    'light' as const,
   blurIntensity: 40,
 
@@ -310,6 +328,12 @@ const clinicalDark = {
   glassBorder: 'rgba(255,255,255,0.12)',
   chip:        'rgba(0,0,0,0.30)',
   chipBorder:  'rgba(255,255,255,0.22)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#19203A',
+  popoverBorder: 'rgba(255,255,255,0.14)',
   blurTint:    'dark' as const,
   blurIntensity: 45,
 

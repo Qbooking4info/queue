@@ -62,7 +62,7 @@ export function QueuePositionPicker({ appointmentId, onClose, onMoved }: Props) 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={st.overlay}>
-        <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={[st.card, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
           <Text style={[st.title, { color: t.textPrimary }]}>Change Queue Position</Text>
 
           {loading ? (

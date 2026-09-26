@@ -197,7 +197,7 @@ export function HomeScreen({ navigation }: Props) {
       <Modal visible={showAll} animationType="slide" transparent
         onRequestClose={() => setShowAll(false)}>
         <Pressable style={s.overlay} onPress={() => setShowAll(false)} />
-        <View style={[s.sheet, { backgroundColor: t.cardBg, maxHeight: SCREEN_H * 0.82 }]}>
+        <View style={[s.sheet, { backgroundColor: t.popover, maxHeight: SCREEN_H * 0.82 }]}>
           <View style={[s.handle, { backgroundColor: t.inputBorder }]} />
           <View style={s.sheetHeader}>
             <Text style={[s.sheetTitle, { color: t.textPrimary }]}>All Specialties</Text>

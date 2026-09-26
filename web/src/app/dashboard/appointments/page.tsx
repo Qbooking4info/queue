@@ -150,13 +150,15 @@ function WalkInModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 480, background: C.card,
+      <div style={{ width: '100%', maxWidth: 480, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          position: 'sticky', top: 0, background: C.card, zIndex: 1 }}>
+          // Opaque: this header is sticky over a scrolling modal body, so a translucent
+          // fill let the rows underneath slide visibly through it.
+          position: 'sticky', top: 0, background: C.popover, zIndex: 1 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Walk-in Booking</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
@@ -385,7 +387,7 @@ function AssignDoctorModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
@@ -482,7 +484,7 @@ function RejectModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
         border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
@@ -547,7 +549,7 @@ function RescheduleModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
@@ -601,7 +603,7 @@ function DetailPanel({
       background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 440, background: C.card,
+      <div style={{ width: '100%', maxWidth: 440, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,

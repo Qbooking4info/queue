@@ -45,6 +45,12 @@ const tealLight = {
   glassBorder:  'rgba(255,255,255,0.90)',
   chip:         '#FFFFFF',
   chipBorder:   'rgba(255,255,255,1)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#FFFFFF',
+  popoverBorder: 'rgba(14,42,46,0.10)',
   blur:         'blur(22px) saturate(165%)',
   glassShadow:  '0 12px 32px rgba(12,70,78,0.10), 0 1px 0 rgba(12,70,78,0.04), inset 0 1px 0 rgba(255,255,255,0.95)',
   chipShadow:   '0 8px 18px rgba(12,70,78,0.13)',
@@ -120,6 +126,12 @@ const tealDark = {
   glassBorder:  'rgba(255,255,255,0.12)',
   chip:         'rgba(255,255,255,0.13)',
   chipBorder:   'rgba(255,255,255,0.22)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#122A2E',
+  popoverBorder: 'rgba(255,255,255,0.14)',
   blur:         'blur(22px) saturate(165%)',
   glassShadow:  '0 12px 32px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.09)',
   chipShadow:   '0 8px 18px rgba(0,0,0,0.35)',
@@ -191,6 +203,12 @@ const clinicalLight = {
   glassBorder:  'rgba(255,255,255,0.92)',
   chip:         '#FFFFFF',
   chipBorder:   'rgba(255,255,255,1)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#FFFFFF',
+  popoverBorder: 'rgba(20,33,61,0.10)',
   blur:         'blur(22px) saturate(165%)',
   glassShadow:  '0 12px 32px rgba(30,52,110,0.10), 0 1px 0 rgba(30,52,110,0.04), inset 0 1px 0 rgba(255,255,255,0.95)',
   chipShadow:   '0 8px 18px rgba(30,52,110,0.13)',
@@ -262,6 +280,12 @@ const clinicalDark = {
   glassBorder:  'rgba(255,255,255,0.12)',
   chip:         'rgba(255,255,255,0.13)',
   chipBorder:   'rgba(255,255,255,0.22)',
+  // Opaque, for anything floating ABOVE the page -- modals, dropdowns, sheets,
+  // menus. The glass fills are translucent by design, which is right for a panel
+  // resting ON the canvas and wrong for one covering it: at 0.08 alpha a dark-mode
+  // modal showed the page straight through and read as having no background.
+  popover:       '#19203A',
+  popoverBorder: 'rgba(255,255,255,0.14)',
   blur:         'blur(22px) saturate(165%)',
   glassShadow:  '0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.09)',
   chipShadow:   '0 8px 18px rgba(0,0,0,0.35)',

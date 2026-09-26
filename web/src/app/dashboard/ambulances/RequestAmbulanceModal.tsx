@@ -125,7 +125,7 @@ export function RequestAmbulanceModal({ C, hospitalId, onClose }: { C: any; hosp
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: 28 }}>
+      <div style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', background: C.popover, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Request Ambulance</div>
           <button onClick={() => onClose()} aria-label="Close" style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>

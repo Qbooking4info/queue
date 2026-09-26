@@ -260,7 +260,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
       {showDatePicker && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
           <View style={s.overlay}>
-            <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <View style={[s.pickerCard, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
               <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 14 }]}>Pick a Date</Text>
               <CalendarPicker value={pickedDate} onChange={setPickedDate} maxDate={todayLocalDate()} theme={t} />
               <View style={s.pickerBtnRow}>
@@ -280,7 +280,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
       {showMonthPicker && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowMonthPicker(false)}>
           <View style={s.overlay}>
-            <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <View style={[s.pickerCard, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
               <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 16 }]}>Pick a Month</Text>
               <View style={s.monthStepper}>
                 <TouchableOpacity onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)) }} hitSlop={10}>

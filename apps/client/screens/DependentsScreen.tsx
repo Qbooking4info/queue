@@ -153,7 +153,7 @@ export function DependentsScreen({ navigation }: Props) {
       {/* Link-by-ID Modal */}
       <Modal visible={linkOpen} animationType="slide" transparent onRequestClose={() => setLinkOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setLinkOpen(false)} />
-        <View style={[s.sheet, { backgroundColor: t.cardBg }]}>
+        <View style={[s.sheet, { backgroundColor: t.popover }]}>
           <View style={[s.sheetHandle, { backgroundColor: t.inputBorder }]} />
           <Text style={[s.sheetTitle, { color: t.textPrimary }]}>
             {linkMode === 'dependent' ? 'Add a caretaker' : "Link a dependent's account"}
