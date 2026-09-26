@@ -89,20 +89,28 @@ async function handleGET(req: NextRequest, { params }: { params: Promise<{ id: s
   // move_appointment_in_queue()'s own clamp exactly.
   const isEmergency = appt.urgency === 'emergency'
   const doctorFilter = `doctor_id.eq.${doctorId},assigned_doctor_id.eq.${doctorId}`
+  // Pulled out of `appt` so the narrowing from the guards above survives into the
+  // closure below -- TS re-widens a property read inside a callback.
+  const hospitalId = appt.hospital_id
+  const checkInDate = appt.check_in_date
 
-  const { count: emergencyCount } = await db.from('appointments')
+  const inThisQueue = () => db.from('appointments')
     .select('id', { count: 'exact', head: true })
-    .eq('hospital_id', appt.hospital_id).eq('check_in_date', appt.check_in_date)
+    .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
     .in('status', ['checked_in', 'in_progress'])
     .or(doctorFilter)
-    .eq('urgency', 'emergency')
-  let tierSizeQuery = db.from('appointments')
-    .select('id', { count: 'exact', head: true })
-    .eq('hospital_id', appt.hospital_id).eq('check_in_date', appt.check_in_date)
-    .in('status', ['checked_in', 'in_progress'])
-    .or(doctorFilter)
-  tierSizeQuery = isEmergency ? tierSizeQuery.eq('urgency', 'emergency') : tierSizeQuery.neq('urgency', 'emergency')
-  const { count: tierSize } = await tierSizeQuery
+
+  const tierSizeQuery = isEmergency
+    ? inThisQueue().eq('urgency', 'emergency')
+    : inThisQueue().neq('urgency', 'emergency')
+
+  // Run in parallel: every checked-in patient polls this route every 15s, so three
+  // sequential round-trips here were three times the latency for no reason.
+  const [{ count: emergencyCount }, { count: tierSize }, { count: queueTotal }] = await Promise.all([
+    inThisQueue().eq('urgency', 'emergency'),
+    tierSizeQuery,
+    inThisQueue(),
+  ])
 
   const tierOffset = isEmergency ? 0 : (emergencyCount ?? 0)
   const minPosition = tierOffset + 1
@@ -110,6 +118,11 @@ async function handleGET(req: NextRequest, { params }: { params: Promise<{ id: s
 
   return NextResponse.json({
     currentPosition: appt.queue_position, minPosition, maxPosition,
+    // queueTotal is everyone waiting on THIS doctor today, both urgency tiers, so the
+    // patient can read "3 of 24". Deliberately not maxPosition: that's the bound of the
+    // caller's own tier, which for an emergency patient counts only the emergency tier
+    // and would under-report the queue as a total.
+    queueTotal: queueTotal ?? null,
     estimatedWait: appt.estimated_wait, status: appt.status,
   })
 }

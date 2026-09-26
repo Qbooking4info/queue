@@ -318,9 +318,39 @@ function WalkInModal({
 
 // ── Assign Doctor Modal ───────────────────────────────────────────────────────
 
+/** doctorId -> today's seen/assigned tally, from GET /api/appointments. */
+export type DoctorDayLoad = Record<string, { completed: number; assigned: number }>
+
+// "5/13" — patients this doctor has seen today (the one in the room included) over the
+// total on their list. tabular-nums so the ratios line up down the picker instead of
+// jittering with digit width.
+function DayLoadBadge({ load }: { load?: { completed: number; assigned: number } }) {
+  const { theme: C } = useTheme()
+  const assigned = load?.assigned ?? 0
+  const completed = load?.completed ?? 0
+  const allDone = assigned > 0 && completed >= assigned
+  return (
+    <div style={{ textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+        color: assigned === 0 ? C.textMuted : allDone ? C.textSub : C.text }}>
+        {assigned === 0 ? '—' : `${completed}/${assigned}`}
+      </div>
+      <div style={{ fontSize: 10, color: C.textMuted }}>
+        {assigned === 0 ? 'none today' : 'seen today'}
+      </div>
+    </div>
+  )
+}
+
 function AssignDoctorModal({
-  appointment, doctors, onClose, onDone,
-}: { appointment: AdminAppointment; doctors: AdminDoctor[]; onClose: () => void; onDone: (doctorId: string) => void }) {
+  appointment, doctors, dayLoad, onClose, onDone,
+}: {
+  appointment: AdminAppointment
+  doctors: AdminDoctor[]
+  dayLoad: DoctorDayLoad
+  onClose: () => void
+  onDone: (doctorId: string) => void
+}) {
   const { theme: C } = useTheme()
   const currentDoctorId = appointment.assigned_doctor_id ?? appointment.doctor_id ?? ''
   const isReassign = !!currentDoctorId
@@ -397,6 +427,10 @@ function AssignDoctorModal({
                 </div>
                 <div style={{ fontSize: 11, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
               </div>
+              {/* Today's workload, so whoever is assigning can spread the load instead of
+                  piling onto whoever happens to be first in the list. Reads "5/13" —
+                  seen (including the one in the room) over total on their list today. */}
+              <DayLoadBadge load={dayLoad[d.id]} />
               {selected === d.id && <CheckCircle2 size={15} color={C.accent} />}
             </button>
           ))}
@@ -652,6 +686,8 @@ export default function AppointmentsPage() {
   const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('today'))
   const [appts,   setAppts]   = useState<AdminAppointment[]>([])
   const [doctors, setDoctors] = useState<AdminDoctor[]>([])
+  // Today's completed/assigned per doctor, always for today regardless of `range`.
+  const [dayLoad, setDayLoad] = useState<DoctorDayLoad>({})
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState('all')
   const [search,  setSearch]  = useState('')
@@ -670,9 +706,10 @@ export default function AppointmentsPage() {
     setLoading(true)
     const res = await fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`)
     if (res.ok) {
-      const { appointments, doctors: doctorList } = await res.json()
+      const { appointments, doctors: doctorList, doctorDayLoad: dayLoad } = await res.json()
       setAppts(appointments)
       setDoctors(doctorList)
+      setDayLoad(dayLoad ?? {})
     }
     setLoading(false)
   }, [hospital?.id, bounds])
@@ -1295,6 +1332,7 @@ export default function AppointmentsPage() {
         <AssignDoctorModal
           appointment={assignAppt}
           doctors={doctors}
+          dayLoad={dayLoad}
           onClose={() => setAssignAppt(null)}
           onDone={() => { load(); setAssignAppt(null) }}
         />

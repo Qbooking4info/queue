@@ -960,7 +960,7 @@ export async function moveAppointmentQueuePosition(appointmentId: string, newPos
 // A patient's own queue-position bounds -- current position and how far later
 // they're allowed to move themselves within their own urgency tier.
 export async function getQueuePositionBounds(appointmentId: string): Promise<
-  { ok: true; currentPosition: number | null; minPosition: number; maxPosition: number; estimatedWait: number | null; status: string }
+  { ok: true; currentPosition: number | null; minPosition: number; maxPosition: number; queueTotal: number | null; estimatedWait: number | null; status: string }
   | { ok: false; error: string }
 > {
   const headers = await doctorAuthHeader()
@@ -971,7 +971,7 @@ export async function getQueuePositionBounds(appointmentId: string): Promise<
     if (!res.ok) return { ok: false, error: body?.error ?? 'Failed to load queue position' }
     return {
       ok: true, currentPosition: body.currentPosition, minPosition: body.minPosition, maxPosition: body.maxPosition,
-      estimatedWait: body.estimatedWait, status: body.status,
+      queueTotal: body.queueTotal ?? null, estimatedWait: body.estimatedWait, status: body.status,
     }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Network error' }

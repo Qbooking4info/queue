@@ -34,6 +34,7 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
   const { theme: t } = useTheme()
   const [status, setStatus] = useState(appointment.status)
   const [position, setPosition] = useState<number | null>(appointment.queue_position ?? null)
+  const [queueTotal, setQueueTotal] = useState<number | null>(null)
   const [estimatedWait, setEstimatedWait] = useState<number | null>(appointment.estimated_wait ?? null)
   const [vitals, setVitals] = useState<VitalsRow | null>(null)
   const [showPicker, setShowPicker] = useState(false)
@@ -42,6 +43,7 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
     const bounds = await getQueuePositionBounds(appointment.id)
     if (bounds.ok) {
       setPosition(bounds.currentPosition)
+      setQueueTotal(bounds.queueTotal)
       setEstimatedWait(bounds.estimatedWait)
       setStatus(bounds.status)
     }
@@ -62,6 +64,13 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
   }, [refresh])
 
   const isInProgress = status === 'in_progress'
+
+  // Top three: close enough that the patient should stop queueing for food, take the
+  // headphones off, and be findable when they're called. Gated on checked_in as well as
+  // the position, so the chip isn't still flashing "get ready" at someone already in
+  // with the doctor (that branch renders the in-progress box instead, but position can
+  // legitimately still be 1 while in_progress, so the guard is not redundant).
+  const isNearlyUp = !isInProgress && position != null && position <= 3
 
   return (
     // Being in the queue right now is the most live thing on the home screen, so
@@ -94,7 +103,16 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
         // treatment -- the number is the whole point of this card.
         <View style={st.statsRow}>
           <View style={st.statBox}>
-            <ValueChip value={position ?? '—'} unit="in line" />
+            {/* Position stays the big numeral and the total rides in the unit slot, so
+                the chip reads "3 / of 24 in line" without demoting the one figure the
+                patient actually looks for. The total is this doctor's whole queue for
+                today, so "of 24" means 24 people waiting on the same doctor -- not the
+                hospital, which would be a much larger and far less useful number. */}
+            <ValueChip
+              value={position ?? '—'}
+              unit={queueTotal != null && position != null ? `of ${queueTotal} in line` : 'in line'}
+              pulse={isNearlyUp}
+            />
           </View>
           <View style={st.statBox}>
             <ValueChip value={estimatedWait != null ? estimatedWait : '—'} unit="min wait" />
