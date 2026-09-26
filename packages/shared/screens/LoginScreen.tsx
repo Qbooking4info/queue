@@ -55,9 +55,17 @@ export function LoginScreen({ navigation, route }: Props) {
   async function handleLogin() {
     if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
     setBusy(true); setError('')
-    const err = await signIn(email.trim().toLowerCase(), pass, surface)
-    setBusy(false)
-    if (err) setError(err)
+    // try/finally, not a bare await: if signIn throws, an unhandled rejection used to
+    // leave busy stuck true, so the button spun forever and the user was never told
+    // anything went wrong -- indistinguishable from a hung network call.
+    try {
+      const err = await signIn(email.trim().toLowerCase(), pass, surface)
+      if (err) setError(err)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not sign in. Please try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

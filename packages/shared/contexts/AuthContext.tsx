@@ -158,6 +158,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // sign-out cleared them. Every setter below is gated on still being current.
   const profileSeq = useRef(0)
 
+  // True for the duration of signIn(). signIn() runs its own fetchProfile() and needs
+  // that call's return value to decide whether this account may enter this app, but
+  // supabase-js also emits SIGNED_IN mid-signIn, and the listener's fetchProfile()
+  // would bump profileSeq and invalidate signIn's -- making it return an all-false
+  // profile, so a doctor/staff/crew account resolved as a plain patient and got
+  // rejected from its own app. The listener stands down while signIn owns the fetch.
+  const signInInFlight = useRef(false)
+
   // MH1: matches on user_id OR auth_user_id (portal-created vs self-registered doctors).
   // One person can now have MULTIPLE doctors rows -- one per hospital they've linked
   // their independent account to (see the doctors/ app) -- so this can return more than
@@ -366,7 +374,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION' && initialLoadDone.current) return
       setSession(session)
-      if (session) fetchProfile(session.user.id)
+      if (session) { if (!signInInFlight.current) fetchProfile(session.user.id) }
       else { setUser(null); setDoctorProfile(null); setStaffProfile(null); setCrewProfile(null); setProviderAdminProfile(null) }
     })
 
@@ -378,6 +386,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // its resolved role happens to match (or, worse, let in and stranded on the target
   // app's "no access" screen). Each of the four apps passes its own surface.
   async function signIn(email: string, password: string, surface: AuthSurface): Promise<string | null> {
+    signInInFlight.current = true
+    try {
+      return await doSignIn(email, password, surface)
+    } finally {
+      signInInFlight.current = false
+    }
+  }
+
+  async function doSignIn(email: string, password: string, surface: AuthSurface): Promise<string | null> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return error.message
     if (!data.user) return null
