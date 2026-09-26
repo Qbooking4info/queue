@@ -50,3 +50,11 @@ apks/
 # Local build outputs — must never enter the eas project archive
 *.tar.gz
 queue-*.apk
+
+# Pre-monorepo native husks, superseded by apps/client and apps/doctor. They hold
+# no source — just android/ build output, node_modules and .expo — but each carries
+# a real .env.local, and they were untracked *and* unignored, so a `git add -A` from
+# the repo root would have staged those secrets. Same failure mode as PROJECT_SOURCE.md
+# above. Kept on disk deliberately; ignored so they can never be committed.
+/mobile/
+/doctors/
