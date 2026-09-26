@@ -412,8 +412,29 @@ export async function getActiveQueueAppointment(
 // ── Create appointment (doctor-specific / virtual) ────────────────────────────
 
 export type BookingResult =
-  | { ok: true; id: string; bookingRef: string; approvalStatus: string; originalCompleted?: boolean }
+  | { ok: true; id: string; bookingRef: string; approvalStatus: string; originalCompleted?: boolean; duplicate?: boolean }
   | { ok: false; error: string }
+
+// A dropped-connection retry of the SAME emergency submission is blocked by
+// check_emergency_booking_resubmit() (20260923000001) rather than allowed to
+// insert a second, separately-billed booking. Shared by createAppointment and
+// createHospitalAppointment (both reachable with urgency: 'emergency', from
+// BookingFlowScreen's toggle and EmergencyBookingScreen respectively) to
+// recover that block as a success instead of surfacing a scary "booking
+// failed" to a patient mid-emergency: the trigger reports the existing
+// booking's id via the DETAIL clause (Postgrest surfaces it as error.details),
+// so fetch that row and hand it back exactly like a normal success -- the
+// patient lands on the same confirmation screen either way.
+async function recoverDuplicateEmergencyBooking(error: { code?: string; message: string; details?: string }): Promise<BookingResult | null> {
+  if (error.code !== '23505' || !error.message.includes('Duplicate emergency booking submission') || !error.details) return null
+  const { data: existing } = await supabase
+    .from('appointments')
+    .select('id, booking_ref, approval_status')
+    .eq('id', error.details)
+    .single()
+  if (!existing) return null
+  return { ok: true, id: existing.id, bookingRef: existing.booking_ref, approvalStatus: existing.approval_status, duplicate: true }
+}
 
 export async function createAppointment(payload: {
   patientId:           string
@@ -460,7 +481,12 @@ export async function createAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  if (error) {
+    console.warn('[createAppointment]', error.message, error.code)
+    const recovered = await recoverDuplicateEmergencyBooking(error)
+    if (recovered) return recovered
+    return { ok: false, error: error.message }
+  }
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
@@ -513,7 +539,12 @@ export async function createHospitalAppointment(payload: {
     .select('id, booking_ref')
     .single()
 
-  if (error) { console.warn('[createHospitalAppointment]', error.message, error.code); return { ok: false, error: error.message } }
+  if (error) {
+    console.warn('[createHospitalAppointment]', error.message, error.code)
+    const recovered = await recoverDuplicateEmergencyBooking(error)
+    if (recovered) return recovered
+    return { ok: false, error: error.message }
+  }
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
 }
 
@@ -533,6 +564,8 @@ export interface IndependentDoctor {
   avatarUrl: string | null
   title: string | null
   level: string | null
+  avgRating: number | null
+  reviewCount: number | null
   specialty: { name: string; icon: string | null } | null
   bio: string | null
   qualification: string | null
@@ -765,7 +798,7 @@ export interface ConsultVitals {
 export async function saveConsultVitalsAndNotes(
   appointmentId: string,
   vitals: ConsultVitals | null,
-  notes: { notes: string; diagnosis: string },
+  notes: { notes: string; diagnosis: string; investigations?: string; prescription?: string; treatmentPlan?: string },
 ): Promise<{ error: string | null }> {
   const headers = await doctorAuthHeader()
   if (!headers) return { error: 'Not authenticated' }
@@ -795,6 +828,91 @@ export async function saveConsultVitalsAndNotes(
   if (vitalsRes.ok && notesRes.ok) return { error: null }
   const failed = await (vitalsRes.ok ? notesRes : vitalsRes).json().catch(() => ({}))
   return { error: failed?.error ?? 'Please try again' }
+}
+
+// The one place a doctor shares structured documentation with a patient:
+// diagnosis/investigations/treatment after a VIRTUAL consultation, hospital-
+// linked or booked directly -- both go through the same route. All three
+// fields are optional; a doctor can save with only one filled in, or "skip"
+// entirely from the UI by never calling this at all.
+export interface ConsultationPlan {
+  diagnosis?: string
+  investigations?: string
+  treatmentPlan?: string
+}
+
+export async function saveConsultationPlan(
+  appointmentId: string,
+  plan: ConsultationPlan,
+): Promise<{ error: string | null }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/plan`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(plan),
+    })
+    if (res.ok) return { error: null }
+    const body = await res.json().catch(() => ({}))
+    return { error: body?.error ?? 'Please try again' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+// "Everything about myself" for the doctor's own Analytics screen -- unioned
+// across every hospital the doctor is linked to plus their direct/independent
+// bookings (see the route for why a single hospitalId/doctorId can't scope
+// this). `type` narrows to one visit type; omit for every type combined.
+export interface DoctorAnalyticsStats {
+  total: number; completed: number; cancelled: number; noShow: number; open: number
+  uniquePatients: number
+  byType: { inPerson: number; virtual: number; homeVisit: number }
+  avgWaitMinutes: number | null
+  avgConsultMinutes: number | null
+  rating: { avg: number | null; count: number }
+  monthly: { month: string; count: number }[]
+}
+
+export async function getMyDoctorAnalytics(
+  from: string, to: string, type?: 'in-person' | 'virtual' | 'home_visit'
+): Promise<{ ok: true; data: DoctorAnalyticsStats } | { ok: false; error: string }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const qs = new URLSearchParams({ from, to, ...(type ? { type } : {}) })
+    const res = await fetch(`${API_URL}/api/doctors/me/stats?${qs}`, { headers })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Please try again' }
+    return { ok: true, data: body as DoctorAnalyticsStats }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+// Doctor books the patient's next visit at the same hospital/clinic --
+// date only, no time slot to pick. Doctor-only: the server re-checks the
+// caller is actually the treating doctor on `appointmentId`.
+export type FollowUpResult =
+  | { ok: true; id: string; bookingRef: string; date: string; startTime: string }
+  | { ok: false; error: string }
+
+export async function bookFollowUp(appointmentId: string, date: string): Promise<FollowUpResult> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/follow-up`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Please try again' }
+    return { ok: true, id: body.id, bookingRef: body.bookingRef, date: body.date, startTime: body.startTime }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
 }
 
 // Calls the patient's phone with a push notification naming the doctor -- not
@@ -925,10 +1043,11 @@ export async function rescheduleAppointment(payload: {
 
   // Close out the original booking so the patient isn't left holding two active appointments
   // for the same visit — the new row links back to it via rescheduled_from. Scoped to
-  // non-terminal statuses only: a reschedule can now also happen from a 'no_show' original
-  // (the day-after prompt), and appointment_status_guard permanently blocks any change away
-  // from completed/cancelled/no_show — trying to flip no_show -> cancelled here would just
-  // throw. If the original is already terminal there's nothing to close; leave it as-is.
+  // pending/confirmed only, matching the "appointments_patient_update" RLS policy this
+  // write relies on (a patient can no longer modify an appointment once checked in — see
+  // 20260922000001_fix_patient_appointment_update_rls.sql) — a reschedule can still happen
+  // from a 'no_show' original (the day-after prompt), which is correctly excluded here
+  // since it's already terminal; there's nothing to close, so it's left as-is.
   const { error: closeErr } = await supabase
     .from('appointments')
     .update({
@@ -937,7 +1056,7 @@ export async function rescheduleAppointment(payload: {
       cancelled_at: new Date().toISOString(),
     })
     .eq('id', payload.originalId)
-    .in('status', ['pending', 'confirmed', 'checked_in', 'in_progress'])
+    .in('status', ['pending', 'confirmed'])
   if (closeErr) console.warn('[rescheduleAppointment] failed to close original booking:', closeErr.message)
 
   return { ok: true, id: data.id, bookingRef: data.booking_ref, approvalStatus }
@@ -1231,6 +1350,7 @@ export interface DoctorProfileSettings {
   accepts_direct_virtual:     boolean
   accepts_direct_home_visit:  boolean
   show_phone_to_patients:     boolean
+  is_paused:                  boolean
 }
 
 async function authHeader(): Promise<Record<string, string> | null> {
@@ -1282,6 +1402,23 @@ export async function getMyDoctorStats(): Promise<DoctorStats | null> {
   return (await res.json()) as DoctorStats
 }
 
+export type DoctorAvailability = 'on_duty' | 'on_break' | 'off_duty'
+
+// The on/off-duty status hospital staff see next to a doctor's name -- entirely
+// separate from doctors.is_active (whether the account/link is enabled at all).
+// Self-service only: a doctor sets their own status, staff can only view it.
+export async function updateMyAvailability(status: DoctorAvailability): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/doctors/me`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ availability_status: status }),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Could not update status' }
+  return null
+}
+
 export interface DoctorClinicOption { clinicId: string; clinicName: string }
 
 // The caller's own assigned-clinics pool at their currently-active hospital,
@@ -1322,7 +1459,8 @@ export async function getQualificationDocuments(): Promise<QualificationDocument
 export async function reviewDirectAppointment(
   appointmentId: string,
   action: { action: 'approve' } | { action: 'reject'; reason: string } | { action: 'start' }
-    | { action: 'complete'; diagnosis?: string; doctorNotes?: string } | { action: 'cancel'; reason: string },
+    | { action: 'complete'; diagnosis?: string; doctorNotes?: string } | { action: 'cancel'; reason: string }
+    | { action: 'reschedule'; date: string; startTime: string; reason?: string },
 ): Promise<string | null> {
   const headers = await authHeader()
   if (!headers) return 'Not authenticated'
@@ -1332,6 +1470,26 @@ export async function reviewDirectAppointment(
     body: JSON.stringify(action),
   })
   if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Action failed' }
+  return null
+}
+
+// Staff (front desk/hospital admin/clinic admin) or the treating doctor moving
+// a hospital-linked appointment's date/time before the patient has checked
+// in. Called from 3 screens (StaffAppointmentsScreen, SpecialistQueueScreen's
+// Upcoming tab, and the web dashboard's appointments page) -- shared here so
+// all three hit the exact same contract.
+export async function rescheduleHospitalAppointment(
+  appointmentId: string,
+  payload: { date: string; startTime: string; reason?: string },
+): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reschedule', ...payload }),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Reschedule failed' }
   return null
 }
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, TextInput, Switch,
+  ActivityIndicator, TextInput,
   KeyboardAvoidingView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -235,6 +235,11 @@ const WEEKDAY_OPTIONS = [
 ]
 const DURATIONS = [10, 15, 20, 30, 45, 60]
 const DAYS_AHEAD_PRESETS = [7, 14, 30, 60, 90]
+const SLOT_MODES: { key: 'physical' | 'virtual' | 'both'; label: string }[] = [
+  { key: 'physical', label: 'Physical only' },
+  { key: 'virtual',  label: 'Virtual only' },
+  { key: 'both',     label: 'Both' },
+]
 
 function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
   theme: any; doctors: DoctorLite[]; onClose: () => void; onDone: () => void
@@ -245,7 +250,7 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
   const [endTime, setEndTime] = useState('17:00')
   const [slotDuration, setSlotDuration] = useState(30)
   const [daysAhead, setDaysAhead] = useState(30)
-  const [acceptsVirtual, setAcceptsVirtual] = useState(false)
+  const [slotMode, setSlotMode] = useState<'physical' | 'virtual' | 'both'>('physical')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ inserted: number; skippedForHours: number } | null>(null)
@@ -269,7 +274,7 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
       const headers = await authHeaders()
       const res = await fetch(`${API_URL}/api/doctors/schedule`, {
         method: 'POST', headers,
-        body: JSON.stringify({ doctor_id: doctorId, working_days: workingDays, start_time: startTime, end_time: endTime, slot_duration: slotDuration, days_ahead: daysAhead, accepts_virtual: acceptsVirtual }),
+        body: JSON.stringify({ doctor_id: doctorId, working_days: workingDays, start_time: startTime, end_time: endTime, slot_duration: slotDuration, days_ahead: daysAhead, slot_mode: slotMode }),
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body?.error ?? 'Failed to generate schedule')
@@ -379,10 +384,22 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
                   ))}
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Accept virtual consults</Text>
-                  <Switch value={acceptsVirtual} onValueChange={setAcceptsVirtual} trackColor={{ true: t.accent }} />
+                <Text style={[s.modalLabel, { color: t.textMuted }]}>VIRTUAL OR PHYSICAL</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                  {SLOT_MODES.map(m => (
+                    <TouchableOpacity key={m.key} onPress={() => setSlotMode(m.key)}
+                      style={[s.tagChip, { borderColor: slotMode === m.key ? t.accent : t.cardBorder, backgroundColor: slotMode === m.key ? `${t.accent}18` : 'transparent' }]}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: slotMode === m.key ? t.accent : t.textMuted }}>{m.label}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
+                <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 14, lineHeight: 16 }}>
+                  {slotMode === 'both'
+                    ? 'Every slot in this range offers both — patients of either type share one queue by check-in time.'
+                    : slotMode === 'virtual'
+                      ? 'This range becomes a dedicated virtual-only block — no physical slots are created for it.'
+                      : 'No virtual slots for this range. Run this again with a different range to add a virtual block.'}
+                </Text>
 
                 {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
 

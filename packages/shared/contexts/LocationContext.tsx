@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import * as ExpoLocation from 'expo-location'
+import { MOCK_LOCATION, mockCoord } from '../lib/mock-location'
+import { useAuth } from './AuthContext'
 
 interface Coords { latitude: number; longitude: number }
 
@@ -13,11 +15,24 @@ interface LocationCtx {
 const Ctx = createContext<LocationCtx>({ coords: null, granted: false, loading: true, request: async () => {} })
 
 export function LocationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [coords,  setCoords]  = useState<Coords | null>(null)
   const [granted, setGranted] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Testing switch: no permission prompt, a stable made-up coordinate per user
+  // (see lib/mock-location.ts). Set EXPO_PUBLIC_MOCK_LOCATION=false to restore
+  // the real expo-location paths below.
+  const mockActive = MOCK_LOCATION
+  const mockSeed = user?.id ?? 'anon'
+
   async function request() {
+    if (mockActive) {
+      setGranted(true)
+      setCoords(mockCoord(mockSeed))
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
@@ -33,6 +48,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (mockActive) {
+      setGranted(true)
+      setCoords(mockCoord(mockSeed))
+      setLoading(false)
+      return
+    }
     ExpoLocation.getForegroundPermissionsAsync().then(async ({ status }) => {
       if (status === 'granted') {
         setGranted(true)
@@ -45,7 +66,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockActive, mockSeed])
 
   return <Ctx.Provider value={{ coords, granted, loading, request }}>{children}</Ctx.Provider>
 }

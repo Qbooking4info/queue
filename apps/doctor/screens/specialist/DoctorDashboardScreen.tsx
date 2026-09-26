@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { ValueChip, IconOrb } from '@queue/shared/components/ui/ValueChip'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -8,9 +10,15 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { ShellScroll } from '@queue/shared/components/AppShell'
-import { getMyDoctorStats } from '@queue/shared/lib/api'
+import { getMyDoctorStats, updateMyAvailability, type DoctorAvailability } from '@queue/shared/lib/api'
 
 interface Props { navigation: any }
+
+const AVAIL_OPTIONS: { key: DoctorAvailability; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'on_duty',  label: 'On Duty',  icon: 'radio-button-on' },
+  { key: 'on_break', label: 'On Break', icon: 'cafe-outline' },
+  { key: 'off_duty', label: 'Off Duty', icon: 'moon-outline' },
+]
 
 export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -20,6 +28,8 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [pendingDirect, setPendingDirect] = useState(0)
   const [monthCompleted, setMonthCompleted] = useState(0)
   const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
+  const [availability, setAvailability] = useState<DoctorAvailability | null>(null)
+  const [savingAvailability, setSavingAvailability] = useState(false)
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
@@ -41,15 +51,19 @@ export function DoctorDashboardScreen({ navigation }: Props) {
         )
       }
 
-      const [results, stats] = await Promise.all([
+      const [results, stats, availRow] = await Promise.all([
         Promise.all(queries),
         doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
+        doctorProfile
+          ? supabase.from('doctors').select('availability_status').eq('id', doctorProfile.doctorId).single()
+          : Promise.resolve({ data: null }),
       ])
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
       setMonthCompleted(results[1].count ?? 0)
       setTodayCount(doctorProfile ? (results[2]?.count ?? 0) : 0)
       setAvgConsultSecs(stats?.avgConsultSecs ?? null)
+      setAvailability(((availRow as any)?.data?.availability_status as DoctorAvailability) ?? null)
       setLoading(false)
     }
     load()
@@ -58,12 +72,23 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
   const firstName = (doctorProfile?.fullName ?? user?.full_name ?? '').split(' ')[0] || 'there'
 
+  async function changeAvailability(status: DoctorAvailability) {
+    if (status === availability || savingAvailability) return
+    const prev = availability
+    setAvailability(status) // optimistic -- this is the same status hospital staff see live
+    setSavingAvailability(true)
+    haptics.tap()
+    const error = await updateMyAvailability(status)
+    setSavingAvailability(false)
+    if (error) { haptics.error(); setAvailability(prev) } else { haptics.success() }
+  }
+
   return (
       <ShellScroll>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>
+        <Text style={{ fontSize: 28, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>
           Welcome, Dr. {firstName}
         </Text>
-        <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 24 }}>
+        <Text style={{ fontSize: 15, color: t.textMuted, marginBottom: 24 }}>
           Here's what's happening across your practice.
         </Text>
 
@@ -71,6 +96,28 @@ export function DoctorDashboardScreen({ navigation }: Props) {
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
+            {doctorProfile && availability && (
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20 }}>
+                {AVAIL_OPTIONS.map(opt => {
+                  const active = availability === opt.key
+                  return (
+                    <TouchableOpacity key={opt.key} onPress={() => changeAvailability(opt.key)}
+                      disabled={savingAvailability}
+                      style={{
+                        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        paddingVertical: 9, borderRadius: 12, borderWidth: 1,
+                        backgroundColor: active ? t.accentBg : t.cardBg,
+                        borderColor: active ? t.accentBorder : t.cardBorder,
+                        opacity: savingAvailability && !active ? 0.5 : 1,
+                      }}>
+                      <Ionicons name={opt.icon} size={12} color={active ? t.accent : t.textMuted} />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            )}
+
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
               <StatCard theme={t} icon="list-outline" label="Today's patients" value={todayCount}
                 onPress={() => navigation.navigate('Queue')} disabled={!doctorProfile} />
@@ -87,19 +134,20 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
             {!doctorProfile && (
               <View style={{ backgroundColor: t.accentBg, borderColor: t.accentBorder, borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent, marginBottom: 4 }}>Not linked to a hospital yet</Text>
-                <Text style={{ fontSize: 12, color: t.textSecondary, marginBottom: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.accent, marginBottom: 4 }}>Not linked to a hospital yet</Text>
+                <Text style={{ fontSize: 14, color: t.textSecondary, marginBottom: 10 }}>
                   You can still accept direct virtual consults and home visits from patients. Turn those on in Settings,
                   or share your Doctor ID with a hospital to also see their queue here.
                 </Text>
                 <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Hospitals') }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>View your Doctor ID →</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>View your Doctor ID →</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
               <QuickLink theme={t} icon="calendar-outline" label="Review appointments" onPress={() => navigation.navigate('Appointments')} />
+              <QuickLink theme={t} icon="bar-chart-outline" label="My Analytics" onPress={() => navigation.navigate('DoctorAnalytics')} />
               <QuickLink theme={t} icon="settings-outline" label="Edit settings & fees" onPress={() => navigation.navigate('Settings')} />
               <QuickLink theme={t} icon="business-outline" label="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} />
             </View>
@@ -115,14 +163,15 @@ function StatCard({ theme: t, icon, label, value, onPress, highlight, disabled }
 }) {
   return (
     <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}
-      style={{
-        flex: 1, minWidth: 140, backgroundColor: highlight ? t.accentBg : t.cardBg,
-        borderColor: highlight ? t.accentBorder : t.cardBorder, borderWidth: 1,
-        borderRadius: 16, padding: 16, opacity: disabled ? 0.5 : 1,
-      }}>
-      <Ionicons name={icon} size={18} color={highlight ? t.accent : t.textMuted} style={{ marginBottom: 10 }} />
-      <Text style={{ fontSize: 24, fontWeight: '800', color: highlight ? t.accent : t.textPrimary }}>{value}</Text>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{label}</Text>
+      style={{ flex: 1, minWidth: 140, opacity: disabled ? 0.5 : 1 }}>
+      <Glass radius={20} pad={14} blur={false}
+        style={highlight ? { borderColor: t.accentBorder } : undefined}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <IconOrb name={icon} size={36} color={highlight ? t.accent : t.textSecondary} />
+          <ValueChip value={value} tone={highlight ? t.accent : undefined} tall={false} />
+        </View>
+        <Text style={{ fontSize: 13, color: t.textFaint, marginTop: 10 }}>{label}</Text>
+      </Glass>
     </TouchableOpacity>
   )
 }
@@ -131,14 +180,16 @@ function QuickLink({ theme: t, icon, label, onPress }: {
   theme: any; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void
 }) {
   return (
-    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1,
-        borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
-      }}>
-      <Ionicons name={icon} size={15} color={t.accent} />
-      <Text style={{ fontSize: 12, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}>
+      <Glass radius={999} pad={0} blur={false}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingVertical: 10, paddingHorizontal: 16,
+        }}>
+          <Ionicons name={icon} size={15} color={t.accent} />
+          <Text style={{ fontSize: 14, fontWeight: '500', color: t.textPrimary }}>{label}</Text>
+        </View>
+      </Glass>
     </TouchableOpacity>
   )
 }

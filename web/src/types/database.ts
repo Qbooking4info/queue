@@ -197,6 +197,55 @@ export type Database = {
           },
         ]
       }
+      ambulance_provider_admins: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          provider_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ambulance_provider_admins_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_provider_admins_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_provider_admins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ambulance_providers: {
         Row: {
           commission_rate: number
@@ -208,9 +257,13 @@ export type Database = {
           is_active: boolean
           is_verified: boolean
           name: string
+          ownership_category: string | null
+          private_fleet: boolean
           provider_type: string
           reliability_score: number
           service_area: unknown
+          service_hours_247: boolean
+          service_radius_m: number | null
           updated_at: string | null
         }
         Insert: {
@@ -223,9 +276,13 @@ export type Database = {
           is_active?: boolean
           is_verified?: boolean
           name: string
+          ownership_category?: string | null
+          private_fleet?: boolean
           provider_type: string
           reliability_score?: number
           service_area?: unknown
+          service_hours_247?: boolean
+          service_radius_m?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -238,9 +295,13 @@ export type Database = {
           is_active?: boolean
           is_verified?: boolean
           name?: string
+          ownership_category?: string | null
+          private_fleet?: boolean
           provider_type?: string
           reliability_score?: number
           service_area?: unknown
+          service_hours_247?: boolean
+          service_radius_m?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -258,18 +319,21 @@ export type Database = {
           crew_member_id: string | null
           hospital_admin_id: string | null
           id: string
+          provider_admin_id: string | null
           shift_id: string
         }
         Insert: {
           crew_member_id?: string | null
           hospital_admin_id?: string | null
           id?: string
+          provider_admin_id?: string | null
           shift_id: string
         }
         Update: {
           crew_member_id?: string | null
           hospital_admin_id?: string | null
           id?: string
+          provider_admin_id?: string | null
           shift_id?: string
         }
         Relationships: [
@@ -285,6 +349,13 @@ export type Database = {
             columns: ["hospital_admin_id"]
             isOneToOne: false
             referencedRelation: "hospital_admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_shift_crew_provider_admin_id_fkey"
+            columns: ["provider_admin_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_provider_admins"
             referencedColumns: ["id"]
           },
           {

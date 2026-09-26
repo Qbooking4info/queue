@@ -66,12 +66,12 @@ export function SpecialtyBrowseScreen({ navigation }: Props) {
 const st = StyleSheet.create({
   safe:      { flex: 1 },
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  title:     { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  sub:       { fontSize: 12, paddingHorizontal: 20, marginBottom: 14 },
+  title:     { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
+  sub:       { fontSize: 14, paddingHorizontal: 20, marginBottom: 14 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 16 },
-  input:     { flex: 1, fontSize: 13 },
+  input:     { flex: 1, fontSize: 15 },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 20 },
   tile:      { width: '30%', aspectRatio: 1, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 6 },
-  icon:      { fontSize: 26 },
-  label:     { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  icon:      { fontSize: 30 },
+  label:     { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 })

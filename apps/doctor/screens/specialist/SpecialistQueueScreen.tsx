@@ -1,16 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { rescheduleHospitalAppointment, ringPatient } from '@queue/shared/lib/api'
 
 interface ApptRow {
   id:               string
@@ -60,6 +63,8 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const [appts,       setAppts]       = useState<ApptRow[]>([])
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null)
+  const [ringingId, setRingingId] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const load = useCallback(async (silent = false) => {
@@ -84,6 +89,14 @@ export function SpecialistQueueScreen({ navigation }: Props) {
     setRefreshing(true)
     await load(true)
     setRefreshing(false)
+  }
+
+  async function handleRing(appt: ApptRow) {
+    haptics.tap()
+    setRingingId(appt.id)
+    const { error } = await ringPatient(appt.id)
+    setRingingId(null)
+    if (error) { haptics.error(); Alert.alert('Could not ring patient', error) } else haptics.success()
   }
 
   useEffect(() => {
@@ -180,7 +193,10 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textMuted }]}>WAITING / ACTIVE</Text>
               {active.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'}
+                  onReschedule={['pending', 'confirmed'].includes(appt.status) ? () => setRescheduleId(appt.id) : undefined}
+                  onRing={['checked_in', 'in_progress'].includes(appt.status) ? () => handleRing(appt) : undefined}
+                  ringing={ringingId === appt.id} />
               ))}
             </View>
           )}
@@ -196,11 +212,26 @@ export function SpecialistQueueScreen({ navigation }: Props) {
           )}
         </ScrollView>
       )}
+
+      {rescheduleId && (
+        <RescheduleModal
+          patientName={appts.find(a => a.id === rescheduleId)?.patient_name ?? undefined}
+          onClose={() => setRescheduleId(null)}
+          onConfirm={async payload => {
+            const err = await rescheduleHospitalAppointment(rescheduleId, payload)
+            if (!err) { setRescheduleId(null); load() }
+            return err
+          }}
+        />
+      )}
     </SafeAreaView>
   )
 }
 
-function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
+function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }: {
+  appt: ApptRow; navigation: any; showDate: boolean; onReschedule?: () => void
+  onRing?: () => void; ringing?: boolean
+}) {
   const { theme: t } = useTheme()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -247,10 +278,10 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
           {isEmergency ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }}>
               <Ionicons name="alert-circle-outline" size={9} color={t.danger} />
-              <Text style={{ fontSize: 9, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
             </View>
           ) : urgencyColor && (
-            <Text style={{ fontSize: 9, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               {appt.urgency}
             </Text>
           )}
@@ -272,7 +303,7 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         {appt.referred_by_doctor_name && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
             <Ionicons name="arrow-redo-outline" size={10} color={t.info} />
-            <Text style={{ fontSize: 10, fontWeight: '700', color: t.info }} numberOfLines={1}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.info }} numberOfLines={1}>
               {appt.referred_by_doctor_name}
               {appt.referring_clinic_name ? ` · ${appt.referring_clinic_name}` : ''}
               {appt.referring_hospital_name ? ` · ${appt.referring_hospital_name}` : ''}
@@ -289,6 +320,24 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         {appt.queue_position != null && (
           <Text style={[st.queuePos, { color: t.textMuted }]}>#{appt.queue_position}</Text>
         )}
+        {onRing && (
+          <TouchableOpacity
+            onPress={onRing} disabled={ringing}
+            style={[st.ringBtn, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
+            {ringing ? <ActivityIndicator size="small" color={t.statusBusy.text} />
+              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="notifications-outline" size={12} color={t.statusBusy.text} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusBusy.text }}>Ring</Text>
+                </View>}
+          </TouchableOpacity>
+        )}
+        {onReschedule && (
+          <TouchableOpacity
+            onPress={() => { haptics.tap(); onReschedule() }}
+            style={[st.rescheduleBtn, { borderColor: t.cardBorder }]}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Reschedule</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   )
@@ -297,30 +346,32 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
 const st = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
-  greeting:    { fontSize: 12, fontWeight: '500' },
-  name:        { fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 },
+  greeting:    { fontSize: 14, fontWeight: '500' },
+  name:        { fontSize: 25, fontWeight: '800', letterSpacing: -0.5, marginTop: 2 },
   statBadge:   { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
-  statNum:     { fontSize: 22, fontWeight: '800', lineHeight: 26 },
-  statLabel:   { fontSize: 10, fontWeight: '600', letterSpacing: 0.4 },
+  statNum:     { fontSize: 25, fontWeight: '800', lineHeight: 26 },
+  statLabel:   { fontSize: 12, fontWeight: '600', letterSpacing: 0.4 },
   statsBar:    { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1 },
-  statsBarText:{ fontSize: 12 },
+  statsBarText:{ fontSize: 14 },
   tabRow:      { flexDirection: 'row', borderBottomWidth: 1, marginHorizontal: 20 },
   tab:         { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0 },
-  tabText:     { fontSize: 13, fontWeight: '700' },
+  tabText:     { fontSize: 15, fontWeight: '700' },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
-  emptyTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
-  emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
+  emptyTitle:  { fontSize: 21, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
+  emptySub:    { fontSize: 15, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   group:       { paddingHorizontal: 16, marginBottom: 4 },
-  groupLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
+  groupLabel:  { fontSize: 12, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
   card:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 8 },
-  avatar:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:  { fontSize: 15, fontWeight: '800' },
-  patientName: { fontSize: 15, fontWeight: '700' },
+  avatar:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  avatarText:  { fontSize: 17, fontWeight: '800' },
+  patientName: { fontSize: 17, fontWeight: '700' },
   metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  metaText:    { fontSize: 11 },
-  typeDot:     { fontSize: 11, fontWeight: '500' },
-  reason:      { fontSize: 11, marginTop: 3 },
+  metaText:    { fontSize: 13 },
+  typeDot:     { fontSize: 13, fontWeight: '500' },
+  reason:      { fontSize: 13, marginTop: 3 },
   badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  badgeText:   { fontSize: 10, fontWeight: '700' },
-  queuePos:    { fontSize: 11, fontWeight: '600' },
+  badgeText:   { fontSize: 12, fontWeight: '700' },
+  queuePos:    { fontSize: 13, fontWeight: '600' },
+  rescheduleBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
+  ringBtn:     { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginTop: 2 },
 })

@@ -8,6 +8,7 @@ import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { MOCK_LOCATION, mockCoord } from '@queue/shared/lib/mock-location'
 import * as Location from 'expo-location'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -142,6 +143,13 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   async function captureLocation() {
     setLocating(true)
     try {
+      if (MOCK_LOCATION) {
+        const c = mockCoord(user?.id ?? name ?? 'hospital')
+        setLatitude(c.latitude)
+        setLongitude(c.longitude)
+        haptics.success()
+        return
+      }
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Location access is required to pin your hospital on the map. You can also skip this and set it later from the web portal.')

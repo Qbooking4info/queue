@@ -7,8 +7,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { setConsultStatus, saveConsultVitalsAndNotes } from '@queue/shared/lib/api'
+import { setConsultStatus, saveConsultVitalsAndNotes, bookFollowUp } from '@queue/shared/lib/api'
 import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
+import { FollowUpModal } from '@queue/shared/components/FollowUpModal'
+import { Avatar } from '@queue/shared/components/ui/Avatar'
+import { bgFromName } from '@queue/shared/lib/adapters'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -25,6 +28,9 @@ interface ApptFull {
   symptom_description: string | null
   doctor_notes:     string | null
   diagnosis:        string | null
+  investigations?:  string | null
+  prescription?:    string | null
+  treatment_plan?:  string | null
   queue_position:   number | null
   patient_id:       string
   patient:          PatientRow | null
@@ -38,7 +44,107 @@ interface ApptFull {
 }
 
 const NOTES_MAX = 1000
-const DIAG_MAX  = 500
+const ITEM_MAX  = 200
+
+let itemSeq = 0
+function nextItemId() { return ++itemSeq }
+
+interface TextItem { id: number; text: string }
+interface InvItem  { id: number; text: string; isImaging: boolean; bodyPart: string }
+interface RxItem   { id: number; drug: string; dosage: string }
+
+const COMMON_DIAGNOSES = [
+  'Malaria', 'Hypertension', 'Type 2 Diabetes Mellitus', 'Upper Respiratory Tract Infection',
+  'Urinary Tract Infection', 'Typhoid Fever', 'Peptic Ulcer Disease', 'Gastroenteritis',
+  'Anaemia', 'Asthma', 'Pneumonia',
+]
+const COMMON_LABS = [
+  'Full Blood Count', 'Malaria RDT', 'Urinalysis', 'Random Blood Sugar', 'Widal Test',
+  'HIV Screening', 'Genotype', 'Stool Microscopy', 'Liver Function Test', 'Renal Function Test',
+]
+const COMMON_IMAGING = ['X-Ray', 'Ultrasound', 'CT Scan', 'MRI', 'Echocardiogram']
+const COMMON_PLANS = [
+  'Admit to Ward', 'Admit for Observation', 'Refer for Specialist Review',
+  'Discharge Home', 'Bed Rest Advised', 'Follow-up in 1 Week',
+]
+
+function parseTextItems(value: string | null | undefined): TextItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  return lines.length ? lines.map(text => ({ id: nextItemId(), text })) : [{ id: nextItemId(), text: '' }]
+}
+function serializeTextItems(items: TextItem[]): string {
+  return items.map(i => i.text.trim()).filter(Boolean).join('\n')
+}
+
+function parseInvItems(value: string | null | undefined): InvItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  if (!lines.length) return [{ id: nextItemId(), text: '', isImaging: false, bodyPart: '' }]
+  return lines.map(line => {
+    const sep = line.indexOf(' — ')
+    if (sep === -1) return { id: nextItemId(), text: line, isImaging: false, bodyPart: '' }
+    return { id: nextItemId(), text: line.slice(0, sep), isImaging: true, bodyPart: line.slice(sep + 3) }
+  })
+}
+function serializeInvItems(items: InvItem[]): string {
+  return items.map(i => {
+    const name = i.text.trim()
+    if (!name) return null
+    return i.isImaging && i.bodyPart.trim() ? `${name} — ${i.bodyPart.trim()}` : name
+  }).filter(Boolean).join('\n')
+}
+
+function parseRxItems(value: string | null | undefined): RxItem[] {
+  const lines = (value ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+  if (!lines.length) return [{ id: nextItemId(), drug: '', dosage: '' }]
+  return lines.map(line => {
+    const sep = line.indexOf(' — ')
+    return sep === -1
+      ? { id: nextItemId(), drug: line, dosage: '' }
+      : { id: nextItemId(), drug: line.slice(0, sep), dosage: line.slice(sep + 3) }
+  })
+}
+function serializeRxItems(items: RxItem[]): string {
+  return items.map(i => {
+    const drug = i.drug.trim()
+    if (!drug) return null
+    return i.dosage.trim() ? `${drug} — ${i.dosage.trim()}` : drug
+  }).filter(Boolean).join('\n')
+}
+
+// Tapping a common-option chip fills the trailing blank row instead of always
+// appending, so picking one right after the screen loads (a single empty row)
+// doesn't leave a stray blank item above it.
+function appendOrFill<T extends { id: number; text: string }>(list: T[], item: T): T[] {
+  const lastIdx = list.length - 1
+  if (lastIdx >= 0 && !list[lastIdx].text.trim()) {
+    const copy = [...list]
+    copy[lastIdx] = { ...item, id: copy[lastIdx].id }
+    return copy
+  }
+  return [...list, item]
+}
+
+function ChipRow({ options, onPick, theme: t }: { options: string[]; onPick: (v: string) => void; theme: any }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+      {options.map(opt => (
+        <TouchableOpacity key={opt} onPress={() => onPick(opt)}
+          style={[st.chip, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.textPrimary }}>{opt}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  )
+}
+
+function AddItemButton({ label, onPress, theme: t }: { label: string; onPress: () => void; theme: any }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={[st.addBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
+      <Ionicons name="add" size={15} color={t.accent} />
+      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
 
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
@@ -60,7 +166,7 @@ function fmt12(time: string): string {
   return `${h % 12 || 12}:${mStr} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-function InProgressPulse() {
+function InProgressPulse({ color }: { color: string }) {
   const pulse = useRef(new Animated.Value(1)).current
   const reduceMotion = useReducedMotion()
 
@@ -79,7 +185,7 @@ function InProgressPulse() {
   }, [reduceMotion])
 
   return (
-    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF8C42' }} />
+    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
   )
 }
 
@@ -97,9 +203,13 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [bpDia,  setBpDia]    = useState('')
   const [bSugar, setBSugar]   = useState('')
   const [notes,  setNotes]    = useState('')
-  const [diag,   setDiag]     = useState('')
+  const [diagItems, setDiagItems] = useState<TextItem[]>(() => parseTextItems(''))
+  const [invItems,  setInvItems]  = useState<InvItem[]>(() => parseInvItems(''))
+  const [rxItems,   setRxItems]   = useState<RxItem[]>(() => parseRxItems(''))
+  const [planItems, setPlanItems] = useState<TextItem[]>(() => parseTextItems(''))
 
   const [saved,  setSaved]    = useState(false)
+  const [showFollowUp, setShowFollowUp] = useState(false)
 
   async function fetchAppt() {
     const [{ data }, { data: vitals }] = await Promise.all([
@@ -128,7 +238,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
     if (data) {
       setAppt(data as ApptFull)
       setNotes(data.doctor_notes ?? '')
-      setDiag(data.diagnosis ?? '')
+      setDiagItems(parseTextItems(data.diagnosis))
+      setInvItems(parseInvItems(data.investigations))
+      setRxItems(parseRxItems(data.prescription))
+      setPlanItems(parseTextItems(data.treatment_plan))
     }
     if (vitals) {
       setWeight(vitals.weight_kg    != null ? String(vitals.weight_kg)    : '')
@@ -156,7 +269,13 @@ export function PatientConsultScreen({ navigation, route }: Props) {
         bp_diastolic: parseInt(bpDia)    || null,
         blood_sugar:  parseFloat(bSugar) || null,
       } : null,
-      { notes, diagnosis: diag },
+      {
+        notes,
+        diagnosis: serializeTextItems(diagItems),
+        investigations: serializeInvItems(invItems),
+        prescription: serializeRxItems(rxItems),
+        treatmentPlan: serializeTextItems(planItems),
+      },
     )
 
     setSaving(false)
@@ -240,9 +359,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               </View>
             )}
             {isInProgress ? (
-              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-                <InProgressPulse />
-                <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
+              <View style={[st.statusBadge, { backgroundColor: t.statusProgress.bg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                <InProgressPulse color={t.statusProgress.text} />
+                <Text style={[st.statusText, { color: t.statusProgress.text }]}>In Progress</Text>
               </View>
             ) : !isEmergency && (
               <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
@@ -256,19 +375,24 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}
+          {/* Always the banner fill, never the danger tint. Everything on this
+              card is white, and dangerSubtle is a near-white wash in the light
+              themes -- emergency patients would have had an invisible name.
+              Urgency is carried by the red border and the EMERGENCY badge. */}
           <View style={[st.heroCard, {
-            backgroundColor: isEmergency ? t.dangerSubtle : t.bannerBg,
+            backgroundColor: t.bannerBg,
             borderColor: isEmergency ? t.danger : t.bannerBorder,
+            borderWidth: isEmergency ? 2 : 1,
           }]}>
             <View style={st.patientRow}>
-              <View style={[st.avatarLg, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                <Text style={[st.avatarText, { color: t.accent }]}>
-                  {patient?.full_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() ?? '?'}
-                </Text>
-              </View>
+              <Avatar
+                initials={patient?.full_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() ?? '?'}
+                bg={bgFromName(patient?.full_name ?? '?')}
+                size={52}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={st.heroName}>{patient?.full_name ?? '—'}</Text>
-                <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.55)' }]}>
+                <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.85)' }]}>
                   {[
                     patient?.gender ?? null,
                     age(patient?.date_of_birth ?? null),
@@ -276,7 +400,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   ].filter(Boolean).join(' · ')}
                 </Text>
                 {patient?.phone && (
-                  <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.4)', marginTop: 2 }]}>{patient.phone}</Text>
+                  <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>{patient.phone}</Text>
                 )}
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -286,26 +410,26 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     {isVirtual ? 'Virtual' : 'In-person'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
                   {fmt12(appt.start_time)}
                 </Text>
               </View>
             </View>
 
             {appt.reason && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>REASON FOR VISIT</Text>
                 <Text style={st.reasonText}>{appt.reason}</Text>
               </View>
             )}
             {appt.symptom_description && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>SYMPTOMS</Text>
                 <Text style={st.reasonText}>{appt.symptom_description}</Text>
               </View>
             )}
             {appt.referred_by && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
                 <Text style={st.reasonLabel}>REFERRED BY</Text>
                 <Text style={st.reasonText}>
                   {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
@@ -331,9 +455,22 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 })}
                 style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <Ionicons name="arrow-redo-outline" size={15} color={t.textPrimary} />
-                <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
+                <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '700' }}>
                   {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
                 </Text>
+              </TouchableOpacity>
+
+              {/* Emergency transfer -- a doctor mid-consult realizing a patient needs
+                  moving somewhere with more capability than a referral note implies. */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RequestAmbulance', {
+                  patientId: appt.patient_id,
+                  patientName: patient?.full_name ?? 'Patient',
+                  patientPhone: patient?.phone ?? null,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginTop: 10 }]}>
+                <Ionicons name="medkit-outline" size={15} color={t.danger} />
+                <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Request Ambulance</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -344,7 +481,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
                 {isVirtual ? (
                   <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: t.statusVirtual.bg, borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
                     onPress={() => {
                       haptics.heavy()
                       navigation.navigate('DoctorVideoCall', {
@@ -354,7 +491,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     }}
                   >
                     <Ionicons name="videocam-outline" size={16} color={t.statusVirtual.text} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
                   </TouchableOpacity>
                 ) : canStart ? (
                   <TouchableOpacity
@@ -363,11 +500,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     disabled={statusUpdating}
                   >
                     {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>…</Text>
                     ) : (
                       <>
                         <Ionicons name="play" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -387,11 +524,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                     disabled={statusUpdating}
                   >
                     {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>…</Text>
                     ) : (
                       <>
                         <Ionicons name="checkmark" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Complete</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: t.accent }}>Complete</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -401,9 +538,21 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           )}
 
           {isDone && (
-            <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Ionicons name="checkmark-circle" size={20} color={t.accent} />
-              <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+            <View style={st.pad}>
+              <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder, marginHorizontal: 0 }]}>
+                <Ionicons name="checkmark-circle" size={20} color={t.accent} />
+                <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+              </View>
+              {isVirtual && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ConsultationPlan', { appointmentId: appt.id, patientName: patient?.full_name ?? 'Patient' })}
+                  style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                  <Ionicons name="document-text-outline" size={15} color={t.textPrimary} />
+                  <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '700' }}>
+                    {(appt.diagnosis || appt.investigations || appt.treatment_plan) ? 'View/Edit Consultation Plan' : 'Share Consultation Plan'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -423,11 +572,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   <VitalInput label="Blood Sugar (mg/dL)" value={bSugar} onChange={setBSugar} theme={t} keyboardType="decimal-pad" />
                   <View style={[st.vitalBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
                     <Text style={[st.vitalLabel, { color: t.accent }]}>BMI</Text>
-                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 20 }]}>{bmi ?? '—'}</Text>
+                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 23 }]}>{bmi ?? '—'}</Text>
                   </View>
                 </View>
               ) : (
-                <Text style={{ fontSize: 12, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
+                <Text style={{ fontSize: 14, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
                   Vitals can be recorded once the patient is checked in.
                 </Text>
               )}
@@ -435,11 +584,11 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
             {/* Clinical Notes */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
+              <View style={[st.sectionHeader, { borderBottomColor: t.cardBorder }]}>
                 <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
                   CLINICAL NOTES
                 </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>
                   {notes.length}/{NOTES_MAX}
                 </Text>
               </View>
@@ -458,25 +607,134 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
             {/* Diagnosis */}
             <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
-                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
-                  DIAGNOSIS
-                </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
-                  {diag.length}/{DIAG_MAX}
-                </Text>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DIAGNOSIS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {diagItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.text}
+                      onChangeText={v => setDiagItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="e.g. Malaria, or an ICD-10 code…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {diagItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setDiagItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove diagnosis" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <ChipRow theme={t} options={COMMON_DIAGNOSES} onPick={text => setDiagItems(list => appendOrFill(list, { id: nextItemId(), text }))} />
+                <AddItemButton theme={t} label="Add diagnosis" onPress={() => setDiagItems(list => [...list, { id: nextItemId(), text: '' }])} />
               </View>
-              <TextInput
-                value={diag}
-                onChangeText={v => setDiag(v.slice(0, DIAG_MAX))}
-                placeholder="ICD-10 code or diagnosis description…"
-                placeholderTextColor={t.textMuted}
-                multiline
-                numberOfLines={3}
-                style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-                textAlignVertical="top"
-                maxLength={DIAG_MAX}
-              />
+            </View>
+
+            {/* Investigations */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>INVESTIGATIONS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {invItems.map(item => (
+                  <View key={item.id} style={{ gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <TextInput
+                        value={item.text}
+                        onChangeText={v => setInvItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                        placeholder="Lab test or imaging study…"
+                        placeholderTextColor={t.textMuted}
+                        style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setInvItems(list => list.map(i => i.id === item.id ? { ...i, isImaging: !i.isImaging } : i))}
+                        style={[st.imagingToggle, { borderColor: item.isImaging ? t.accent : t.cardBorder, backgroundColor: item.isImaging ? `${t.accent}18` : 'transparent' }]}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: item.isImaging ? t.accent : t.textMuted }}>Imaging</Text>
+                      </TouchableOpacity>
+                      {invItems.length > 1 && (
+                        <TouchableOpacity onPress={() => setInvItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove investigation" hitSlop={8}>
+                          <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {item.isImaging && (
+                      <TextInput
+                        value={item.bodyPart}
+                        onChangeText={v => setInvItems(list => list.map(i => i.id === item.id ? { ...i, bodyPart: v.slice(0, ITEM_MAX) } : i))}
+                        placeholder="Part of body, e.g. Chest, Abdomen…"
+                        placeholderTextColor={t.textMuted}
+                        style={[st.itemInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder, marginLeft: 12 }]}
+                      />
+                    )}
+                  </View>
+                ))}
+                <Text style={[st.chipGroupLabel, { color: t.textMuted }]}>COMMON LABS</Text>
+                <ChipRow theme={t} options={COMMON_LABS} onPick={text => setInvItems(list => appendOrFill(list, { id: nextItemId(), text, isImaging: false, bodyPart: '' }))} />
+                <Text style={[st.chipGroupLabel, { color: t.textMuted }]}>COMMON IMAGING</Text>
+                <ChipRow theme={t} options={COMMON_IMAGING} onPick={text => setInvItems(list => appendOrFill(list, { id: nextItemId(), text, isImaging: true, bodyPart: '' }))} />
+                <AddItemButton theme={t} label="Add investigation" onPress={() => setInvItems(list => [...list, { id: nextItemId(), text: '', isImaging: false, bodyPart: '' }])} />
+              </View>
+            </View>
+
+            {/* Prescription */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>PRESCRIPTION</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {rxItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.drug}
+                      onChangeText={v => setRxItems(list => list.map(i => i.id === item.id ? { ...i, drug: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="Medication…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    <TextInput
+                      value={item.dosage}
+                      onChangeText={v => setRxItems(list => list.map(i => i.id === item.id ? { ...i, dosage: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="Dosage / duration…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {rxItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setRxItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove medication" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <AddItemButton theme={t} label="Add medication" onPress={() => setRxItems(list => [...list, { id: nextItemId(), drug: '', dosage: '' }])} />
+              </View>
+            </View>
+
+            {/* Other Plans */}
+            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>OTHER PLANS</Text>
+              <View style={{ padding: 12, gap: 8 }}>
+                {planItems.map(item => (
+                  <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={item.text}
+                      onChangeText={v => setPlanItems(list => list.map(i => i.id === item.id ? { ...i, text: v.slice(0, ITEM_MAX) } : i))}
+                      placeholder="e.g. Admit to Ward…"
+                      placeholderTextColor={t.textMuted}
+                      style={[st.itemInput, { flex: 1, color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
+                    />
+                    {planItems.length > 1 && (
+                      <TouchableOpacity onPress={() => setPlanItems(list => list.filter(i => i.id !== item.id))} accessibilityLabel="Remove plan item" hitSlop={8}>
+                        <Ionicons name="close-circle" size={20} color={t.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <ChipRow theme={t} options={COMMON_PLANS} onPick={text => setPlanItems(list => appendOrFill(list, { id: nextItemId(), text }))} />
+                <AddItemButton theme={t} label="Add plan item" onPress={() => setPlanItems(list => [...list, { id: nextItemId(), text: '' }])} />
+
+                <View style={[st.divider, { backgroundColor: t.cardBorder }]} />
+                <TouchableOpacity onPress={() => setShowFollowUp(true)}
+                  style={[st.addBtn, { borderColor: t.infoBorder, backgroundColor: t.infoBg }]}>
+                  <Ionicons name="calendar-outline" size={15} color={t.info} />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.info }}>Book Follow-up Appointment</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Save */}
@@ -486,18 +744,29 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               style={[st.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}
             >
               {saving
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color={t.onAccent} size="small" />
                 : saved
                   ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                      <Text style={st.saveTxt}>Saved</Text>
+                      <Ionicons name="checkmark" size={16} color={t.onAccent} />
+                      <Text style={[st.saveTxt, { color: t.onAccent }]}>Saved</Text>
                     </View>
-                  : <Text style={st.saveTxt}>Save Vitals & Notes</Text>
+                  : <Text style={[st.saveTxt, { color: t.onAccent }]}>Save Vitals & Notes</Text>
               }
             </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {showFollowUp && (
+        <FollowUpModal
+          patientName={patient?.full_name}
+          onClose={() => setShowFollowUp(false)}
+          onConfirm={async d => {
+            const res = await bookFollowUp(appt.id, d)
+            return res.ok ? null : res.error
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   )
 }
@@ -527,34 +796,38 @@ const st = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:       { padding: 4 },
-  backArrow:     { fontSize: 22 },
-  headerTitle:   { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  backArrow:     { fontSize: 25 },
+  headerTitle:   { flex: 1, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   statusBadge:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
-  statusText:    { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
+  statusText:    { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
   heroCard:      { marginHorizontal: 16, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
   patientRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatarLg:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:    { fontSize: 18, fontWeight: '800' },
-  heroName:      { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  heroSub:       { fontSize: 12, marginTop: 2, lineHeight: 17 },
-  typeChip:      { fontSize: 11, fontWeight: '700' },
+  heroName:      { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroSub:       { fontSize: 14, marginTop: 2, lineHeight: 17 },
+  typeChip:      { fontSize: 13, fontWeight: '700' },
   reasonBox:     { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  reasonLabel:   { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
-  reasonText:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
+  reasonLabel:   { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 1.5, marginBottom: 4 },
+  reasonText:    { fontSize: 15, color: '#FFFFFF', lineHeight: 19 },
   pad:           { paddingHorizontal: 16, marginBottom: 0 },
   actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   referBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
-  doneTxt:       { fontSize: 14, fontWeight: '700' },
+  doneTxt:       { fontSize: 16, fontWeight: '700' },
   section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.28)' },
+  sectionTitle:  { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   vitalsGrid:    { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
   vitalBox:      { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },
-  vitalLabel:    { fontSize: 10, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
-  vitalValue:    { fontSize: 18, fontWeight: '800' },
-  vitalInput:    { fontSize: 18, fontWeight: '700', padding: 0 },
-  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
+  vitalLabel:    { fontSize: 12, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
+  vitalValue:    { fontSize: 21, fontWeight: '800' },
+  vitalInput:    { fontSize: 21, fontWeight: '700', padding: 0 },
+  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 15, lineHeight: 20, minHeight: 90 },
+  itemInput:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  imagingToggle: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  chipGroupLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginTop: 2 },
+  chip:          { borderRadius: 99, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingVertical: 10, marginTop: 2 },
+  divider:       { height: 1, marginVertical: 4 },
   saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
-  saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
+  saveTxt:       { fontSize: 17, fontWeight: '800' },
 })

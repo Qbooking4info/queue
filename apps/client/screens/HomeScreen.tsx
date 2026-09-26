@@ -11,6 +11,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation, distanceKm } from '@queue/shared/contexts/LocationContext'
 import { HospitalCard } from '@queue/shared/components/hospital/HospitalCard'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { Hero, HeroChip } from '@queue/shared/components/ui/Glass'
 import { specialties } from '../data'
 import { getHospitals, getNextAppointment, getActiveQueueAppointment } from '@queue/shared/lib/api'
 import { LiveQueueCard } from '@queue/shared/components/LiveQueueCard'
@@ -89,12 +90,12 @@ function SpecialtyGrid({
                   backgroundColor: active ? t.accentBg : t.inputBg,
                   borderColor:     active ? t.accent   : t.cardBorder,
                 }}>
-                <Ionicons name={sp.icon as any} size={20} color={active ? t.accent : sp.color} />
-                <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
+                <Text style={{ fontSize: 23 }}>{sp.icon}</Text>
+                <Text style={{ fontSize: 12, fontWeight: active ? '700' : '500', textAlign: 'center', color: active ? t.accent : t.textSecondary }}
                   numberOfLines={2}>{sp.label}</Text>
                 {active && (
                   <View style={{ position: 'absolute', top: 6, right: 6, width: 12, height: 12, borderRadius: 6, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="checkmark" size={8} color="#000" />
+                    <Ionicons name="checkmark" size={8} color={t.onAccent} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -252,23 +253,23 @@ export function HomeScreen({ navigation }: Props) {
 
         {/* Profile completion banner */}
         {showProfileBanner && (
-          <View style={[s.profileBanner, { backgroundColor: '#2A1800', borderColor: 'rgba(239,159,39,0.35)' }]}>
+          <View style={[s.profileBanner, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
             <Ionicons name="medical-outline" size={20} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
               <Text style={[s.profileBannerTitle, { color: t.statusBusy.text }]}>Complete your health profile</Text>
-              <Text style={[s.profileBannerSub, { color: 'rgba(239,159,39,0.65)' }]}>
+              <Text style={[s.profileBannerSub, { color: t.statusBusy.text, opacity: 0.8 }]}>
                 Missing info affects emergency triage. Takes 30 seconds.
               </Text>
             </View>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Profile') }}
               style={[s.profileBannerBtn, { backgroundColor: t.statusBusy.text, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#000' }}>Complete</Text>
-              <Ionicons name="arrow-forward" size={12} color="#000" />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: t.mode === 'dark' ? '#2B1600' : '#FFFFFF' }}>Complete</Text>
+              <Ionicons name="arrow-forward" size={12} color={t.mode === 'dark' ? '#2B1600' : '#FFFFFF'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { haptics.tap(); setBannerDismissed(true) }}
               accessibilityLabel="Dismiss"
               style={s.profileBannerDismiss}>
-              <Ionicons name="close" size={14} color="rgba(239,159,39,0.5)" />
+              <Ionicons name="close" size={14} color={t.statusBusy.text} style={{ opacity: 0.7 }} />
             </TouchableOpacity>
           </View>
         )}
@@ -283,28 +284,31 @@ export function HomeScreen({ navigation }: Props) {
             onOpenDetail={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: activeAppt }) }}
           />
         ) : nextAppt ? (
-          <View style={[s.banner, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
-            <Text style={[s.bannerLabel, { color: t.accent }]}>NEXT APPOINTMENT</Text>
+          // The one saturated moment on this screen: the next visit rides the
+          // hero gradient rather than a flat tonal fill, so everything else can
+          // stay quiet frosted glass.
+          <Hero style={{ marginHorizontal: 16, marginBottom: 12 }}>
+            <Text style={[s.bannerLabel, { color: t.onHero, opacity: 0.85 }]}>NEXT APPOINTMENT</Text>
             <View style={s.bannerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.bannerDoctor}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
-                <Text style={[s.bannerSub, { color: 'rgba(255,255,255,0.5)' }]}>
+                <Text style={[s.bannerDoctor, { color: t.onHero }]}>{nextAppt.doctor?.full_name ?? 'Doctor'}</Text>
+                <Text style={[s.bannerSub, { color: t.onHero, opacity: 0.8 }]}>
                   {nextAppt.hospital?.name ?? ''}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
                   {[nextAppt.appointment_date, nextAppt.start_time].map(l => (
-                    <View key={l} style={[s.bannerChip, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                      <Text style={[s.bannerChipText, { color: t.accent }]}>{l}</Text>
-                    </View>
+                    <HeroChip key={l}>
+                      <Text style={[s.bannerChipText, { color: t.onHero }]}>{l}</Text>
+                    </HeroChip>
                   ))}
                 </View>
               </View>
               <Button
-                label="View" size="sm"
+                label="View" size="sm" variant="outline"
                 onPress={() => { haptics.tap(); navigation.navigate('AppointmentDetail', { appointment: nextAppt }) }}
               />
             </View>
-          </View>
+          </Hero>
         ) : !loading && (
           <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
             style={[s.banner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
@@ -333,19 +337,19 @@ export function HomeScreen({ navigation }: Props) {
               <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Physical Visit</Text>
               <Text style={[s.bookCardSub, { color: t.textMuted }]}>Doctor assigned on arrival</Text>
             </View>
-            <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+            <Text style={{ color: t.accent, fontSize: 18 }}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', { bookingType: 'virtual' }) }}
             style={[s.bookCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={[s.bookIcon, { backgroundColor: 'rgba(55,138,221,0.12)' }]}>
-              <Ionicons name="videocam-outline" size={20} color="#378ADD" />
+            <View style={[s.bookIcon, { backgroundColor: t.statusVirtual.bg }]}>
+              <Ionicons name="videocam-outline" size={20} color={t.statusVirtual.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Virtual Call</Text>
               <Text style={[s.bookCardSub, { color: t.textMuted }]}>Choose a preferred doctor</Text>
             </View>
-            <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+            <Text style={{ color: t.accent, fontSize: 18 }}>›</Text>
           </TouchableOpacity>
         </View>
 
@@ -359,21 +363,21 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={[s.bookCardLabel, { color: t.textPrimary }]}>Book a Doctor Directly</Text>
             <Text style={[s.bookCardSub, { color: t.textMuted }]}>Independent doctors — virtual consult or home visit</Text>
           </View>
-          <Text style={{ color: t.accent, fontSize: 16 }}>›</Text>
+          <Text style={{ color: t.accent, fontSize: 18 }}>›</Text>
         </TouchableOpacity>
 
         {/* Emergency CTA */}
-        <View style={s.emergency}>
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
+        <View style={[s.emergency, { backgroundColor: t.dangerContainer, borderColor: 'transparent' }]}>
+          <Text style={{ fontSize: 25 }}>🚨</Text>
           <View style={{ flex: 1 }}>
-            <Text style={s.emergencyTitle}>Need urgent care?</Text>
-            <Text style={[s.emergencySub, { color: 'rgba(255,255,255,0.6)' }]}>
+            <Text style={[s.emergencyTitle, { color: t.onDangerContainer }]}>Need urgent care?</Text>
+            <Text style={[s.emergencySub, { color: t.onDangerContainer, opacity: 0.75 }]}>
               Emergency slots available · Premium fee applies
             </Text>
           </View>
-          <TouchableOpacity style={s.emergencyBtn}
+          <TouchableOpacity style={[s.emergencyBtn, { backgroundColor: t.danger }]}
             onPress={() => { haptics.heavy(); navigation.navigate('EmergencyBooking') }}>
-            <Text style={s.emergencyBtnText}>Book now</Text>
+            <Text style={[s.emergencyBtnText, { color: t.onDanger }]}>Book now</Text>
           </TouchableOpacity>
         </View>
 
@@ -391,7 +395,7 @@ export function HomeScreen({ navigation }: Props) {
                   borderColor:     active ? t.accent    : t.cardBorder,
                   borderWidth:     active ? 1.5 : 1,
                 }]}>
-                <Ionicons name={sp.icon as any} size={14} color={active ? t.accent : sp.color} />
+                <Text style={{ fontSize: 16 }}>{sp.icon}</Text>
                 <Text style={[s.chipLabel, { color: active ? t.accent : t.textMuted, fontWeight: active ? '700' : '500' }]}>
                   {sp.label}
                 </Text>
@@ -472,8 +476,8 @@ export function HomeScreen({ navigation }: Props) {
             </Text>
             <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Search') }}
               style={[s.clearBtn, { backgroundColor: t.accent, borderColor: t.accent, marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Search hospitals</Text>
-              <Ionicons name="arrow-forward" size={14} color="#fff" />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.onAccent }}>Search hospitals</Text>
+              <Ionicons name="arrow-forward" size={14} color={t.onAccent} />
             </TouchableOpacity>
           </View>
         )}
@@ -488,64 +492,64 @@ const s = StyleSheet.create({
   safe:              { flex: 1 },
   scroll:            { flex: 1, paddingHorizontal: 20 },
   header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 16, marginBottom: 18 },
-  greeting:          { fontSize: 12, letterSpacing: 0.4 },
-  headline:          { fontSize: 22, fontWeight: '800', letterSpacing: -0.8, marginTop: 2 },
-  dayMsg:            { fontSize: 11, marginTop: 3, opacity: 0.8 },
+  greeting:          { fontSize: 14, letterSpacing: 0.4 },
+  headline:          { fontSize: 25, fontWeight: '800', letterSpacing: -0.8, marginTop: 2 },
+  dayMsg:            { fontSize: 13, marginTop: 3, opacity: 0.8 },
   notifBtn:          { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   notifDot:          { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
   // Profile completion banner
   profileBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 16 },
-  profileBannerTitle:{ fontSize: 12, fontWeight: '800' },
-  profileBannerSub:  { fontSize: 10, marginTop: 2, lineHeight: 14 },
+  profileBannerTitle:{ fontSize: 14, fontWeight: '800' },
+  profileBannerSub:  { fontSize: 12, marginTop: 2, lineHeight: 14 },
   profileBannerBtn:  { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   profileBannerDismiss: { padding: 4 },
   // Banners
   banner:            { borderRadius: 20, padding: 14, marginBottom: 18, borderWidth: 1 },
-  bannerLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  bannerLabel:       { fontSize: 12, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
   bannerRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  bannerDoctor:      { fontSize: 15, fontWeight: '700', color: '#fff' },
-  bannerSub:         { fontSize: 11, marginTop: 2 },
+  bannerDoctor:      { fontSize: 17, fontWeight: '700' },
+  bannerSub:         { fontSize: 13, marginTop: 2 },
   bannerChip:        { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  bannerChipText:    { fontSize: 10, fontWeight: '700' },
-  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 14, borderWidth: 1 },
+  bannerChipText:    { fontSize: 12, fontWeight: '700' },
+  searchBar:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 28, paddingHorizontal: 18, paddingVertical: 12, marginBottom: 14, borderWidth: 1 },
   bookRow:           { flexDirection: 'row', gap: 8, marginBottom: 16 },
   bookCard:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 12, borderWidth: 1 },
   bookIcon:          { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  bookCardLabel:     { fontSize: 12, fontWeight: '700' },
-  bookCardSub:       { fontSize: 10, marginTop: 1 },
-  searchPH:          { fontSize: 13 },
-  emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#7B1A1A', borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(163,45,45,0.5)' },
-  emergencyTitle:    { fontSize: 13, fontWeight: '700', color: '#fff' },
-  emergencySub:      { fontSize: 11, marginTop: 1 },
-  emergencyBtn:      { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  emergencyBtnText:  { fontSize: 11, fontWeight: '700', color: '#A32D2D' },
-  sectionLabel:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 },
+  bookCardLabel:     { fontSize: 14, fontWeight: '700' },
+  bookCardSub:       { fontSize: 12, marginTop: 1 },
+  searchPH:          { fontSize: 15 },
+  emergency:         { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 12, marginBottom: 20, borderWidth: 1 },
+  emergencyTitle:    { fontSize: 15, fontWeight: '700' },
+  emergencySub:      { fontSize: 13, marginTop: 1 },
+  emergencyBtn:      { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
+  emergencyBtnText:  { fontSize: 13, fontWeight: '700' },
+  sectionLabel:      { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 },
   sectionRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 10 },
-  seeAll:            { fontSize: 12, fontWeight: '600' },
+  seeAll:            { fontSize: 14, fontWeight: '600' },
   specialtyScroll:   { marginHorizontal: -20, marginBottom: 4 },
   chip:              { borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, alignItems: 'center', gap: 3 },
-  chipLabel:         { fontSize: 10 },
+  chipLabel:         { fontSize: 12 },
   moreChip:          { minWidth: 58 },
   // Active filter banner
   filterBanner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 11, marginTop: 10, marginBottom: 4 },
-  filterBannerTitle: { fontSize: 12, fontWeight: '700' },
-  filterBannerSub:   { fontSize: 10, marginTop: 1 },
+  filterBannerTitle: { fontSize: 14, fontWeight: '700' },
+  filterBannerSub:   { fontSize: 12, marginTop: 1 },
   clearBtn:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  clearBtnText:      { fontSize: 11, fontWeight: '700' },
+  clearBtnText:      { fontSize: 13, fontWeight: '700' },
   // Empty state
   emptyFilter:       { borderRadius: 18, borderWidth: 1, padding: 28, alignItems: 'center', marginVertical: 8 },
-  emptyFilterTitle:  { fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  emptyFilterSub:    { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  emptyFilterTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  emptyFilterSub:    { fontSize: 15, textAlign: 'center', lineHeight: 18 },
   // Modal
   overlay:           { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet:             { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10 },
   handle:            { width: 40, height: 4, borderRadius: 99, alignSelf: 'center', marginBottom: 14 },
   sheetHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
-  sheetTitle:        { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  sheetTitle:        { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
   closeBtn:          { width: 30, height: 30, borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
   clearModalBtn:     { borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, alignItems: 'center' },
-  clearModalText:    { fontSize: 12, fontWeight: '700' },
+  clearModalText:    { fontSize: 14, fontWeight: '700' },
   dividerRow:        { flexDirection: 'row', justifyContent: 'center', marginVertical: 14, borderTopWidth: 1, paddingTop: 14 },
   dividerPill:       { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  dividerText:       { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  dividerText:       { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
 })

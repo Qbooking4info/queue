@@ -17,8 +17,8 @@ const ROLE_LABEL: Record<string, string> = {
 interface Props { navigation: any }
 
 export function StaffMoreScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
-  const { staffProfile, setStaffMode, signOut } = useAuth()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
+  const { staffProfile, signOut } = useAuth()
   const [hospitalName,   setHospitalName]   = useState<string | null>(null)
   const [clinicModel,    setClinicModel]    = useState<string | null>(null)
   const [signingOut,     setSigningOut]      = useState(false)
@@ -43,6 +43,10 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    // Front desk, clinic admins, and hospital admins can all arrange transport
+    // for a patient -- doctors get the same action from PatientConsultScreen
+    // instead, mid-consult, where it's actually needed.
+    { icon: 'medkit-outline', label: 'Request Ambulance', onPress: () => navigation.navigate('RequestAmbulance') },
     // Staff Management also holds doctor-linking (see StaffManagementScreen's
     // own role check for what a sub-admin can and can't do once inside it) --
     // a clinic's own sub-admin needs to reach it to add a doctor to their
@@ -109,25 +113,24 @@ export function StaffMoreScreen({ navigation }: Props) {
           </>
         )}
 
-        {/* Switch to patient mode */}
         <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 16 }]}>ACCOUNT</Text>
         <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
-            style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
-            <View style={[s.menuIcon, { backgroundColor: t.infoSubtle }]}>
-              <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
-            </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
-          </TouchableOpacity>
-
-          {/* Theme toggle */}
+          {/* Theme toggle -- family (Forest/Clinical) and mode (Light/Dark) are
+              independent now, so each gets its own row/switch. */}
           <View style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={18} color={t.accent} />
+              <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={18} color={t.accent} />
             </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Dark theme' : 'Light theme'}</Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
+            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Teal' : 'Clinical'} theme</Text>
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme}
+              trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
+          <View style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
+            <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>
+              <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={18} color={t.accent} />
+            </View>
+            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{mode === 'dark' ? 'Dark' : 'Light'} mode</Text>
+            <Switch value={mode === 'dark'} onValueChange={toggleMode}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
 

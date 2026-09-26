@@ -1,32 +1,73 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { runDispatchRound } from '@/lib/dispatch/engine'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 /**
  * POST /api/transport/request
  *
  * Creates a transport request and kicks off the first dispatch round.
  *
- * Auth here is the patient's own session, not requireRole — requireRole only
- * covers staff roles. The caller is resolved through users.auth_id the same way
- * the mobile RLS policies do it.
+ * Two ways in, both a bearer token on the same Authorization header:
+ *
+ *   1. A patient's own session (the original, and still the common case) --
+ *      resolved directly through users.auth_id, same as mobile's RLS does it.
+ *      No requireRole here since requireRole only covers staff roles.
+ *
+ *   2. Hospital staff or a doctor requesting transport on a patient's behalf
+ *      (front desk booking an ambulance for someone at the desk, a doctor
+ *      mid-consult arranging an emergency transfer) -- checked FIRST via
+ *      requireRole, since it's the narrower, role-gated path. A 403 from it
+ *      (a real signed-in user who simply isn't staff -- the normal patient
+ *      case) falls through to path 1; a 401 (no valid token at all) is
+ *      returned immediately, since neither path can succeed without one.
  */
+export async function OPTIONS() {
+  return corsOptions()
+}
+
 export async function POST(req: NextRequest) {
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+const STAFF_REQUESTER_ROLES = ['hospital_admin', 'clinic_admin', 'front_desk', 'doctor'] as const
+
+async function handlePOST(req: NextRequest) {
   const db = createAdminClient()
 
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return Errors.unauthenticated()
+  let callerId: string        // users.id making the request
+  let callerPhone: string | null
+  let isStaffRequester = false
+  let staffHospitalId: string | undefined
 
-  const { data: userRes } = await db.auth.getUser(authHeader.slice(7))
-  if (!userRes?.user) return Errors.unauthenticated()
+  const staffAuth = await requireRole([...STAFF_REQUESTER_ROLES], req)
+  if (!(staffAuth instanceof NextResponse)) {
+    isStaffRequester = true
+    staffHospitalId = staffAuth.caller.hospitalId
+    const { data: staffProfile } = await db.from('users')
+      .select('id, phone').eq('auth_id', staffAuth.caller.authId).single()
+    if (!staffProfile) return Errors.notFound('User')
+    callerId = staffProfile.id
+    callerPhone = staffProfile.phone
+  } else if (staffAuth.status === 401) {
+    return staffAuth // no valid token at all -- neither a staff nor a patient session
+  } else {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return Errors.unauthenticated()
 
-  const { data: caller } = await db.from('users')
-    .select('id, phone, full_name')
-    .eq('auth_id', userRes.user.id)
-    .single()
+    const { data: userRes } = await db.auth.getUser(authHeader.slice(7))
+    if (!userRes?.user) return Errors.unauthenticated()
 
-  if (!caller) return Errors.notFound('User')
+    const { data: patientProfile } = await db.from('users')
+      .select('id, phone').eq('auth_id', userRes.user.id).single()
+    if (!patientProfile) return Errors.notFound('User')
+    callerId = patientProfile.id
+    callerPhone = patientProfile.phone
+  }
 
   const body = await req.json()
   const {
@@ -45,6 +86,12 @@ export async function POST(req: NextRequest) {
     scheduledFor,
     requesterRelationship = 'self',
     paymentMethod,
+    // Staff-initiated only: an existing registered patient by id, or a named
+    // walk-in with no account -- mirrors the walk-in appointment pattern
+    // (walkin_patient_name/phone) rather than inventing a new one.
+    patientId,
+    walkinPatientName,
+    walkinPatientPhone,
   } = body
 
   // Range-checked, not just typeof: NaN and Infinity are both `number`, and
@@ -64,23 +111,46 @@ export async function POST(req: NextRequest) {
     return Errors.validation('scheduledFor is required for scheduled transport')
   }
 
-  // A dependent booking must actually be the caller's dependent. Checked here
-  // because this route uses the service role and bypasses RLS.
-  if (dependentId) {
-    const { data: dep } = await db.from('dependents')
-      .select('id')
-      .eq('id', dependentId)
-      .eq('user_id', caller.id)
-      .single()
-    if (!dep) return Errors.forbidden('That dependent does not belong to you')
+  let subjectPatientId: string | null = null
+  let subjectDependentId: string | null = null
+  let subjectCallerName: string | null = null
+  let resolvedRequesterRelationship = requesterRelationship
+
+  if (isStaffRequester) {
+    if (patientId) {
+      const { data: patient } = await db.from('users').select('id').eq('id', patientId).single()
+      if (!patient) return Errors.validation('patientId does not match a registered patient')
+      subjectPatientId = patient.id
+    } else if (walkinPatientName?.trim()) {
+      subjectCallerName = walkinPatientName.trim()
+    } else {
+      return Errors.validation('patientId or walkinPatientName is required')
+    }
+    resolvedRequesterRelationship = 'staff'
+  } else {
+    // A dependent booking must actually be the caller's dependent. Checked here
+    // because this route uses the service role and bypasses RLS.
+    if (dependentId) {
+      const { data: dep } = await db.from('dependents')
+        .select('id')
+        .eq('id', dependentId)
+        .eq('user_id', callerId)
+        .single()
+      if (!dep) return Errors.forbidden('That dependent does not belong to you')
+      subjectDependentId = dependentId
+    } else {
+      subjectPatientId = callerId
+    }
   }
 
-  // Duplicate guard: one live emergency request per caller. Panicked users tap
-  // twice, and two ambulances to one incident is a real cost to the network.
+  // Duplicate guard: one live emergency request per caller (staff included --
+  // this stops one front desk clerk double-tapping, same as it stops a
+  // panicked patient double-tapping). Two ambulances to one incident is a
+  // real cost to the network either way.
   if (requestType === 'emergency') {
     const { data: live } = await db.from('transport_requests')
       .select('id, booking_ref, status')
-      .eq('requester_id', caller.id)
+      .eq('requester_id', callerId)
       .in('status', ['requested', 'searching', 'matched', 'en_route_to_patient', 'on_scene', 'transporting'])
       .limit(1)
 
@@ -97,15 +167,17 @@ export async function POST(req: NextRequest) {
       booking_ref: '', // trigger-generated (set_transport_booking_ref); '' satisfies the NOT NULL column
       request_type: requestType,
       status: requestType === 'emergency' ? 'requested' : 'scheduled',
-      patient_id: dependentId ? null : caller.id,
-      dependent_id: dependentId ?? null,
-      requester_id: caller.id,
-      requester_relationship: dependentId ? 'dependent' : requesterRelationship,
-      contact_phone: contactPhone || caller.phone,
+      patient_id: subjectPatientId,
+      dependent_id: subjectDependentId,
+      requester_id: callerId,
+      requester_relationship: subjectDependentId ? 'dependent' : resolvedRequesterRelationship,
+      caller_patient_name: subjectCallerName,
+      contact_phone: contactPhone || walkinPatientPhone || callerPhone,
       pickup_point: `SRID=4326;POINT(${lng} ${lat})`,
       pickup_address: pickupAddress ?? null,
       pickup_notes: pickupNotes ?? null,
       destination_hospital_id: destinationHospitalId ?? null,
+      origin_hospital_id: isStaffRequester ? (staffHospitalId ?? null) : null,
       triage_level: triageLevel ?? null,
       required_tier: requiredTier,
       required_capabilities: requiredCapabilities,

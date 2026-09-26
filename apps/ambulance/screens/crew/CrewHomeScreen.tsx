@@ -14,6 +14,7 @@ import {
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
+import { MOCK_LOCATION, mockCoord, mockLivePoint } from '@queue/shared/lib/mock-location'
 import { JobPatientMap } from '@queue/shared/components/emergency/JobPatientMap'
 
 // Foreground pings. These are now a supplement, not the only source: while on
@@ -28,11 +29,11 @@ function countdown(expiresAt: string, now: number): number {
   return Math.max(0, Math.round((new Date(expiresAt).getTime() - now) / 1000))
 }
 
-function triageColor(level: number | null): string {
-  if (level == null) return '#7A9089'
-  if (level <= 2) return '#FF5C5C'
-  if (level === 3) return '#FFB547'
-  return '#7A9089'
+function triageColor(level: number | null, t: any): string {
+  if (level == null) return t.textMuted
+  if (level <= 2) return t.danger
+  if (level === 3) return t.statusBusy.text
+  return t.textMuted
 }
 
 export function CrewHomeScreen() {
@@ -151,6 +152,11 @@ export function CrewHomeScreen() {
   // a job. Now the ping follows *duty*, so an on-duty idle rig is visible to
   // dispatch — which is the entire point of being on duty.
   const pingUnitId = activeJob?.assigned_unit_id ?? onDutyUnit?.ambulance_id ?? null
+  // Home base of whichever unit we're pinging for -- MOCK_LOCATION reports a
+  // point orbiting it instead of a real GPS fix.
+  const pingUnit = units.find(u => u.ambulance_id === pingUnitId) ?? null
+  const pingHomeLat = pingUnit?.home_lat
+  const pingHomeLng = pingUnit?.home_lng
 
   useEffect(() => {
     if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null }
@@ -161,23 +167,34 @@ export function CrewHomeScreen() {
     async function pingOnce() {
       if (stopped || !pingUnitId) return
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-        if (status !== 'granted') {
-          // Without location the unit is on duty but undispatchable. Surfaced in
-          // the duty card rather than failing silently.
-          setLocationDenied(true)
-          return
+        let lat: number, lng: number, heading: number | undefined, speedKmh: number | undefined, accuracyM: number | undefined, recordedAt: string
+        if (MOCK_LOCATION) {
+          const base = (pingHomeLat != null && pingHomeLng != null)
+            ? { latitude: pingHomeLat, longitude: pingHomeLng }
+            : mockCoord(pingUnitId)
+          const p = mockLivePoint(base)
+          lat = p.latitude; lng = p.longitude
+          heading = undefined; speedKmh = undefined; accuracyM = 8
+          recordedAt = new Date().toISOString()
+          setLocationDenied(false)
+        } else {
+          const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+          if (status !== 'granted') {
+            // Without location the unit is on duty but undispatchable. Surfaced in
+            // the duty card rather than failing silently.
+            setLocationDenied(true)
+            return
+          }
+          setLocationDenied(false)
+          const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+          lat = pos.coords.latitude
+          lng = pos.coords.longitude
+          heading = pos.coords.heading ?? undefined
+          speedKmh = pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined
+          accuracyM = pos.coords.accuracy ?? undefined
+          recordedAt = new Date(pos.timestamp).toISOString()
         }
-        setLocationDenied(false)
-        const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-        await sendLocationPing(pingUnitId, [{
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          heading: pos.coords.heading ?? undefined,
-          speedKmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined,
-          accuracyM: pos.coords.accuracy ?? undefined,
-          recordedAt: new Date(pos.timestamp).toISOString(),
-        }])
+        await sendLocationPing(pingUnitId, [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }])
       } catch (err) {
         console.warn('[crew] location ping failed', err)
       }
@@ -186,7 +203,7 @@ export function CrewHomeScreen() {
     pingOnce()
     pingTimer.current = setInterval(pingOnce, PING_INTERVAL_MS)
     return () => { stopped = true; if (pingTimer.current) clearInterval(pingTimer.current) }
-  }, [pingUnitId])
+  }, [pingUnitId, pingHomeLat, pingHomeLng])
 
   async function handleRespond(offerId: string, action: 'accept' | 'decline') {
     setRespondingId(offerId)
@@ -246,7 +263,7 @@ export function CrewHomeScreen() {
           return (
             <View key={unit.ambulance_id} style={[s.card, {
               backgroundColor: t.cardBg,
-              borderColor: unit.on_duty ? (stale ? '#FFB547' : t.accentDark) : t.cardBorder,
+              borderColor: unit.on_duty ? (stale ? t.statusBusy.text : t.accentDark) : t.cardBorder,
               borderWidth: unit.on_duty ? 1.5 : 1,
             }]}>
               <View style={[s.row, { alignItems: 'center' }]}>
@@ -262,15 +279,15 @@ export function CrewHomeScreen() {
                   onPress={() => handleToggleDuty(unit)}
                   disabled={dutyBusy === unit.ambulance_id}
                   style={[s.secondaryBtn, {
-                    borderColor: unit.on_duty ? '#FF5C5C55' : '#00C26555',
-                    backgroundColor: unit.on_duty ? '#FF5C5C14' : '#00C26514',
+                    borderColor: unit.on_duty ? `${t.danger}55` : `${t.accentDark}55`,
+                    backgroundColor: unit.on_duty ? `${t.danger}14` : `${t.accentDark}14`,
                     opacity: dutyBusy === unit.ambulance_id ? 0.5 : 1,
                     paddingHorizontal: 16,
                   }]}
                 >
                   {dutyBusy === unit.ambulance_id
                     ? <ActivityIndicator size="small" color={t.textMuted} />
-                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? t.danger : t.accentDark }}>
+                    : <Text style={{ fontSize: 15, fontWeight: '800', color: unit.on_duty ? t.danger : t.accentDark }}>
                         {unit.on_duty ? 'Go off duty' : 'Go on duty'}
                       </Text>}
                 </TouchableOpacity>
@@ -282,10 +299,10 @@ export function CrewHomeScreen() {
                 <Ionicons
                   name={unit.visible_to_dispatch ? 'radio-outline' : unit.on_duty ? 'warning-outline' : 'moon-outline'}
                   size={14}
-                  color={unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted}
+                  color={unit.visible_to_dispatch ? t.accentDark : stale ? t.statusBusy.text : t.textMuted}
                 />
                 <Text style={[s.detailText, {
-                  color: unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted, flex: 1,
+                  color: unit.visible_to_dispatch ? t.accentDark : stale ? t.statusBusy.text : t.textMuted, flex: 1,
                 }]}>
                   {unit.visible_to_dispatch
                     ? 'Visible to dispatch — you can receive jobs'
@@ -305,8 +322,8 @@ export function CrewHomeScreen() {
         {activeJob ? (
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <View style={s.row}>
-              <View style={[s.triageBadge, { backgroundColor: `${triageColor(activeJob.triage_level)}18`, borderColor: `${triageColor(activeJob.triage_level)}40` }]}>
-                <Text style={[s.triageBadgeText, { color: triageColor(activeJob.triage_level) }]}>
+              <View style={[s.triageBadge, { backgroundColor: `${triageColor(activeJob.triage_level, t)}18`, borderColor: `${triageColor(activeJob.triage_level, t)}40` }]}>
+                <Text style={[s.triageBadgeText, { color: triageColor(activeJob.triage_level, t) }]}>
                   {activeJob.triage_level ? `Triage ${activeJob.triage_level}` : 'Scheduled'}
                 </Text>
               </View>
@@ -367,8 +384,8 @@ export function CrewHomeScreen() {
             return (
               <View key={o.offer_id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <View style={s.row}>
-                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(o.triage_level)}18`, borderColor: `${triageColor(o.triage_level)}40` }]}>
-                    <Text style={[s.triageBadgeText, { color: triageColor(o.triage_level) }]}>
+                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(o.triage_level, t)}18`, borderColor: `${triageColor(o.triage_level, t)}40` }]}>
+                    <Text style={[s.triageBadgeText, { color: triageColor(o.triage_level, t) }]}>
                       {o.triage_level ? `Triage ${o.triage_level}` : '—'}
                     </Text>
                   </View>
@@ -392,7 +409,7 @@ export function CrewHomeScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'accept')} disabled={busy}
                     style={[s.primaryBtn, { flex: 1, backgroundColor: t.danger, opacity: busy ? 0.6 : 1 }]}>
-                    {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>Accept</Text>}
+                    {busy ? <ActivityIndicator color={t.onDanger} /> : <Text style={[s.primaryBtnText, { color: t.onDanger }]}>Accept</Text>}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -406,24 +423,24 @@ export function CrewHomeScreen() {
 
 const s = StyleSheet.create({
   safe:  { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
+  title: { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
   card:  { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
   row:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  triageBadgeText: { fontSize: 11, fontWeight: '800' },
-  bookingRef: { fontSize: 11 },
-  countdown:  { fontSize: 16, fontWeight: '800' },
-  statusLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  symptom:    { fontSize: 15, fontWeight: '600', marginBottom: 8 },
+  triageBadgeText: { fontSize: 13, fontWeight: '800' },
+  bookingRef: { fontSize: 13 },
+  countdown:  { fontSize: 18, fontWeight: '800' },
+  statusLabel: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  symptom:    { fontSize: 17, fontWeight: '600', marginBottom: 8 },
   detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  detailText: { fontSize: 12 },
+  detailText: { fontSize: 14 },
   offerActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   primaryBtn:   { padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  primaryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  primaryBtnText: { fontSize: 16, fontWeight: '700' },
   secondaryBtn: { flexDirection: 'row', gap: 6, padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700' },
+  secondaryBtnText: { fontSize: 16, fontWeight: '700' },
   noteBox:  { borderRadius: 12, padding: 13, borderWidth: 1, marginTop: 14 },
-  noteText: { fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  noteText: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
   emptyBox: { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText: { fontSize: 13 },
+  emptyText: { fontSize: 15 },
 })

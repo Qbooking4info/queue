@@ -30,6 +30,7 @@ export default async function AmbulancesPage() {
       <AmbulancesList
         requests={requestsRaw ?? []}
         canManageFleet={adminRecord.role === 'admin' || adminRecord.role === 'owner'}
+        hospitalId={adminRecord.hospital_id}
       />
     </>
   )

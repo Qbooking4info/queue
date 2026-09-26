@@ -398,7 +398,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                 <button onClick={() => { onCreated(); onClose() }}
                   style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
                     background: C.accent, border: 'none',
-                    color: C.id === 'forest' ? '#061208' : '#fff',
+                    color: C.onAccent,
                     fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
                   Done
                 </button>
@@ -481,7 +481,7 @@ export default function ClinicsPage() {
           </div>
         </div>
         <button onClick={() => setShowModal(true)}
-          style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+          style={{ background: C.accent, color: C.onAccent,
             border: 'none', borderRadius: 10, padding: '10px 18px',
             fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
             display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -523,7 +523,7 @@ export default function ClinicsPage() {
             doctors, and front desk staff.
           </div>
           <button onClick={() => setShowModal(true)}
-            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+            style={{ background: C.accent, color: C.onAccent,
               border: 'none', borderRadius: 10, padding: '11px 24px',
               fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             + Create First Clinic

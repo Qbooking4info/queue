@@ -66,7 +66,7 @@ export function SpecialtyResultsScreen({ navigation, route }: Props) {
             style={[st.toggleBtn, mode === m && { backgroundColor: t.accentBg }]}>
             <Ionicons name={m === 'hospitals' ? 'business-outline' : 'medkit-outline'} size={14}
               color={mode === m ? t.accent : t.textMuted} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: mode === m ? t.accent : t.textMuted }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: mode === m ? t.accent : t.textMuted }}>
               {m === 'hospitals' ? 'Hospitals' : 'Independent Doctors'}
             </Text>
           </TouchableOpacity>
@@ -115,10 +115,10 @@ function Empty({ theme: t, icon, title, sub }: { theme: any; icon: keyof typeof 
 const st = StyleSheet.create({
   safe:       { flex: 1 },
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:      { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  title:      { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
   toggle:     { flexDirection: 'row', marginHorizontal: 20, borderRadius: 12, borderWidth: 1, padding: 4, gap: 4, marginBottom: 16 },
   toggleBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
-  emptySub:   { fontSize: 12, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
+  emptySub:   { fontSize: 14, textAlign: 'center' },
 })

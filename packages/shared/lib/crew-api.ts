@@ -76,6 +76,13 @@ export interface MyUnit {
    * covering an area they are not.
    */
   visible_to_dispatch: boolean
+  // Geocoded at registration, always present. Lets the operator console's
+  // Fleet Map show a freshly added unit somewhere real before it has ever
+  // sent a live GPS ping -- "for testing sake, i can register and add
+  // ambulance with address only" -- rather than needing a real device fix
+  // just to see it plotted.
+  home_lat: number
+  home_lng: number
 }
 
 export async function getMyUnits(): Promise<MyUnit[]> {

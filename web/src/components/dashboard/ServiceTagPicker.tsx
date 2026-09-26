@@ -122,7 +122,7 @@ export function ServiceTagPicker({ selected, onChange }: Props) {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all .1s',
                       }}>
-                        {checked && <Check size={11} color={C.id === 'forest' ? '#061208' : '#fff'} strokeWidth={3} />}
+                        {checked && <Check size={11} color={C.onAccent} strokeWidth={3} />}
                       </div>
                       <span style={{ fontSize: 13, color: checked ? C.accent : C.text }}>{service}</span>
                     </div>

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ValueChip } from './ui/ValueChip'
+import { Hero, HeroChip } from './ui/Glass'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
@@ -62,54 +64,60 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
   const isInProgress = status === 'in_progress'
 
   return (
-    <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+    // Being in the queue right now is the most live thing on the home screen, so
+    // it takes the gradient hero -- teal or blue depending on the family -- rather
+    // than another quiet white panel. The raised white ValueChips read especially
+    // well against it, which is the point: the numbers stay the loudest element.
+    <Hero style={st.card} radius={20} pad={16}>
       <View style={st.header}>
-        <Text style={[st.label, { color: t.accent }]}>
+        <Text style={[st.label, { color: t.onHero, opacity: 0.85 }]}>
           {isInProgress ? "YOU'RE BEING SEEN" : "YOU'RE IN THE QUEUE"}
         </Text>
         <TouchableOpacity onPress={() => { haptics.tap(); onOpenDetail() }}>
-          <Text style={[st.detailLink, { color: t.textMuted }]}>Details</Text>
+          <Text style={[st.detailLink, { color: t.onHero, opacity: 0.85 }]}>Details</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={[st.doctorName, { color: t.textPrimary }]}>
+      <Text style={[st.doctorName, { color: t.onHero }]}>
         {appointment.doctor?.full_name ? `Dr. ${appointment.doctor.full_name}` : 'Doctor'}
       </Text>
-      <Text style={[st.hospitalName, { color: t.textMuted }]}>{appointment.hospital?.name ?? ''}</Text>
+      <Text style={[st.hospitalName, { color: t.onHero, opacity: 0.8 }]}>{appointment.hospital?.name ?? ''}</Text>
 
       {isInProgress ? (
-        <View style={[st.inProgressBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-          <Ionicons name="medical" size={16} color={t.accent} />
-          <Text style={[st.inProgressText, { color: t.accent }]}>The doctor is seeing you now</Text>
-        </View>
+        <HeroChip style={st.inProgressBox}>
+          <Ionicons name="medical" size={16} color={t.onHero} />
+          <Text style={[st.inProgressText, { color: t.onHero }]}>The doctor is seeing you now</Text>
+        </HeroChip>
       ) : (
+        // Both figures are server-computed and real (queue_position and the
+        // historically-derived estimated_wait), so they earn the raised chip
+        // treatment -- the number is the whole point of this card.
         <View style={st.statsRow}>
           <View style={st.statBox}>
-            <Text style={[st.statNum, { color: t.accent }]}>{position ?? '—'}</Text>
-            <Text style={[st.statLabel, { color: t.textMuted }]}>Position</Text>
+            <ValueChip value={position ?? '—'} unit="in line" />
           </View>
-          <View style={[st.statDivider, { backgroundColor: t.cardBorder }]} />
           <View style={st.statBox}>
-            <Text style={[st.statNum, { color: t.textPrimary }]}>{estimatedWait != null ? `~${estimatedWait}m` : '—'}</Text>
-            <Text style={[st.statLabel, { color: t.textMuted }]}>Est. wait</Text>
+            <ValueChip value={estimatedWait != null ? estimatedWait : '—'} unit="min wait" />
           </View>
         </View>
       )}
 
       {vitals && (vitals.weight_kg != null || vitals.height_cm != null || vitals.bp_systolic != null || vitals.blood_sugar != null) && (
-        <View style={[st.vitalsRow, { borderTopColor: t.cardBorder }]}>
-          {vitals.weight_kg != null && <Text style={[st.vitalChip, { color: t.textMuted }]}>{vitals.weight_kg}kg</Text>}
-          {vitals.height_cm != null && <Text style={[st.vitalChip, { color: t.textMuted }]}>{vitals.height_cm}cm</Text>}
+        <View style={[st.vitalsRow, { borderTopColor: 'rgba(255,255,255,0.28)' }]}>
+          {vitals.weight_kg != null && <Text style={[st.vitalChip, { color: t.onHero, opacity: 0.9 }]}>{vitals.weight_kg}kg</Text>}
+          {vitals.height_cm != null && <Text style={[st.vitalChip, { color: t.onHero, opacity: 0.9 }]}>{vitals.height_cm}cm</Text>}
           {(vitals.bp_systolic != null && vitals.bp_diastolic != null) &&
-            <Text style={[st.vitalChip, { color: t.textMuted }]}>{vitals.bp_systolic}/{vitals.bp_diastolic}</Text>}
-          {vitals.blood_sugar != null && <Text style={[st.vitalChip, { color: t.textMuted }]}>{vitals.blood_sugar}mg/dL</Text>}
+            <Text style={[st.vitalChip, { color: t.onHero, opacity: 0.9 }]}>{vitals.bp_systolic}/{vitals.bp_diastolic}</Text>}
+          {vitals.blood_sugar != null && <Text style={[st.vitalChip, { color: t.onHero, opacity: 0.9 }]}>{vitals.blood_sugar}mg/dL</Text>}
         </View>
       )}
 
       {status === 'checked_in' && (
-        <TouchableOpacity onPress={() => { haptics.tap(); setShowPicker(true) }} style={[st.changeBtn, { borderColor: t.cardBorder }]}>
-          <Ionicons name="swap-vertical-outline" size={14} color={t.textMuted} />
-          <Text style={[st.changeBtnText, { color: t.textMuted }]}>Change my position</Text>
+        <TouchableOpacity
+          onPress={() => { haptics.tap(); setShowPicker(true) }}
+          style={[st.changeBtn, { borderColor: 'rgba(255,255,255,0.35)', backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+          <Ionicons name="swap-vertical-outline" size={14} color={t.onHero} />
+          <Text style={[st.changeBtnText, { color: t.onHero }]}>Change my position</Text>
         </TouchableOpacity>
       )}
 
@@ -120,24 +128,21 @@ export function LiveQueueCard({ appointment, onOpenDetail }: Props) {
           onMoved={(newPosition) => { setPosition(newPosition); setShowPicker(false) }}
         />
       )}
-    </View>
+    </Hero>
   )
 }
 
 const st = StyleSheet.create({
-  card:        { borderRadius: 20, padding: 16, marginBottom: 18, borderWidth: 1 },
+  card:        { marginBottom: 18 },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   label:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   detailLink:  { fontSize: 11, fontWeight: '700' },
   doctorName:  { fontSize: 16, fontWeight: '800' },
   hospitalName:{ fontSize: 12, marginTop: 1 },
-  inProgressBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
+  inProgressBox: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 10, marginTop: 12 },
   inProgressText: { fontSize: 13, fontWeight: '700' },
-  statsRow:    { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
-  statBox:     { flex: 1, alignItems: 'center' },
-  statNum:     { fontSize: 24, fontWeight: '800' },
-  statLabel:   { fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, height: 32 },
+  statsRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  statBox:     { flex: 1, alignItems: 'stretch' },
   vitalsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
   vitalChip:   { fontSize: 11, fontWeight: '600' },
   changeBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingVertical: 10, marginTop: 14 },

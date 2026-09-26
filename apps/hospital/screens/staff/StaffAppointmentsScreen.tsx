@@ -11,6 +11,8 @@ import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { Button } from '@queue/shared/components/ui/Button'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -69,6 +71,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
   const [actioning,  setActioning]  = useState<string | null>(null)
   const [tab,        setTab]        = useState<FilterTab>('pending')
   const [search,     setSearch]     = useState('')
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null)
 
   const hospitalId = staffProfile?.hospitalId
   const today = todayLocalDate()
@@ -236,6 +239,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
             const meta = STATUS_META[dispStatus] ?? { label: dispStatus, color: sc.no_show.text, bg: sc.no_show.bg }
             const isLoading = actioning === appt.id
             const canApprove = appt.approval_status === 'pending_approval'
+            const canReschedule = ['pending', 'confirmed'].includes(appt.status)
             const isEmergency = appt.urgency === 'emergency'
 
             return (
@@ -262,19 +266,38 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                     {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
                   </View>
                 </View>
-                {canApprove && (
+                {(canApprove || canReschedule) && (
                   <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-                    <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
-                    <Button
-                      label="Approve" onPress={() => handleApprove(appt)} loading={isLoading}
-                      disabled={!!actioning} variant="success" icon="checkmark" size="sm" style={{ flex: 2 }}
-                    />
+                    {canApprove && (
+                      <>
+                        <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
+                        <Button
+                          label="Approve" onPress={() => handleApprove(appt)} loading={isLoading}
+                          disabled={!!actioning} variant="success" icon="checkmark" size="sm" style={{ flex: 2 }}
+                        />
+                      </>
+                    )}
+                    {canReschedule && (
+                      <Button label="Reschedule" onPress={() => setRescheduleId(appt.id)} disabled={!!actioning} variant="outline" size="sm" style={{ flex: canApprove ? undefined : 1 }} />
+                    )}
                   </View>
                 )}
               </View>
             )
           })}
         </ScrollView>
+      )}
+
+      {rescheduleId && (
+        <RescheduleModal
+          patientName={appts.find(a => a.id === rescheduleId)?.patient?.full_name ?? appts.find(a => a.id === rescheduleId)?.walkin_patient_name ?? undefined}
+          onClose={() => setRescheduleId(null)}
+          onConfirm={async payload => {
+            const err = await rescheduleHospitalAppointment(rescheduleId, payload)
+            if (!err) { setRescheduleId(null); load(true) }
+            return err
+          }}
+        />
       )}
     </SafeAreaView>
   )

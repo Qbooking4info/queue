@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     qualification: string | null; years_experience: number | null
     virtual_fee: number | null; home_visit_fee: number | null
     accepts_direct_virtual: boolean; accepts_direct_home_visit: boolean
-    show_phone_to_patients: boolean
+    show_phone_to_patients: boolean; is_paused: boolean
     specialty: { name: string; icon: string | null } | null
   }
 
@@ -38,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .select(
       'title, level, specialty_id, bio, qualification, years_experience, ' +
       'virtual_fee, home_visit_fee, accepts_direct_virtual, accepts_direct_home_visit, ' +
-      'show_phone_to_patients, specialty:specialties!doctor_profiles_specialty_id_fkey(name, icon)',
+      'show_phone_to_patients, is_paused, specialty:specialties!doctor_profiles_specialty_id_fkey(name, icon)',
     )
     .eq('user_id', id)
     .maybeSingle() as unknown as PromiseLike<{ data: ProfileRow | null }>
@@ -74,8 +74,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return { id: d.id, title: d.title, url: signed?.signedUrl ?? null }
   }))
 
-  const acceptsDirectVirtual = profile?.accepts_direct_virtual ?? false
-  const acceptsDirectHomeVisit = profile?.accepts_direct_home_visit ?? false
+  // A doctor "resting" their account (is_paused) stops appearing bookable for
+  // either visit type without touching their underlying accept preferences --
+  // folded in here so every consumer of acceptsDirectVirtual/HomeVisit
+  // (booking CTAs, search filtering) gets the right answer for free, with
+  // nothing else needing to separately know about is_paused at all.
+  const acceptsDirectVirtual = !profile?.is_paused && (profile?.accepts_direct_virtual ?? false)
+  const acceptsDirectHomeVisit = !profile?.is_paused && (profile?.accepts_direct_home_visit ?? false)
 
   return NextResponse.json({
     doctor: {

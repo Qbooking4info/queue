@@ -128,8 +128,8 @@ export function DoctorRegisterScreen({ navigation }: Props) {
             </View>
 
             {!!error && (
-              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-                <Text style={s.errText}>{error}</Text>
+              <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
               </View>
             )}
 
@@ -158,19 +158,19 @@ const s = StyleSheet.create({
   safe:      { flex: 1 },
   scroll:    { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24 },
   backBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 20 },
-  backText:  { fontSize: 14, fontWeight: '600' },
-  title:     { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  sub:       { fontSize: 13, marginTop: 4, marginBottom: 24 },
+  backText:  { fontSize: 16, fontWeight: '600' },
+  title:     { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  sub:       { fontSize: 15, marginTop: 4, marginBottom: 24 },
   card:      { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14, marginBottom: 20 },
   fieldWrap: { gap: 6 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  label:     { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 16 },
   passRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
-  passInput: { flex: 1, paddingVertical: 11, fontSize: 14 },
+  passInput: { flex: 1, paddingVertical: 11, fontSize: 16 },
   errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
-  errText:   { color: '#F87171', fontSize: 12 },
+  errText:   { fontSize: 14 },
   footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  footerText:{ fontSize: 13 },
-  footerLink:{ fontSize: 13, fontWeight: '700' },
-  terms:     { fontSize: 11, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
+  footerText:{ fontSize: 15 },
+  footerLink:{ fontSize: 15, fontWeight: '700' },
+  terms:     { fontSize: 13, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
 })

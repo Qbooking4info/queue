@@ -13,6 +13,7 @@ import { haptics } from '@queue/shared/lib/haptics'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
 
 interface Props { navigation: any }
 
@@ -62,6 +63,8 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
     load()
   }
 
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null)
+
   const filtered = appts.filter(a => {
     if (tab === 'pending') return a.status === 'pending'
     if (tab === 'upcoming') return ['confirmed', 'in_progress'].includes(a.status)
@@ -71,8 +74,8 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
   return (
       <View style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 }}>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Appointments</Text>
-          <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>Direct bookings from patients — virtual consults and home visits.</Text>
+          <Text style={{ fontSize: 25, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Appointments</Text>
+          <Text style={{ fontSize: 14, color: t.textMuted, marginTop: 2 }}>Direct bookings from patients — virtual consults and home visits.</Text>
         </View>
 
         <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 12 }}>
@@ -83,7 +86,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
                 backgroundColor: tab === item ? t.accentBg : t.cardBg,
                 borderWidth: 1, borderColor: tab === item ? t.accentBorder : t.cardBorder,
               }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: tab === item ? t.accent : t.textMuted, textTransform: 'capitalize' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: tab === item ? t.accent : t.textMuted, textTransform: 'capitalize' }}>
                 {item}{item === 'pending' && appts.some(a => a.status === 'pending') ? ` (${appts.filter(a => a.status === 'pending').length})` : ''}
               </Text>
             </TouchableOpacity>
@@ -95,7 +98,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
         ) : filtered.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
             <Ionicons name="calendar-outline" size={44} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary, textAlign: 'center' }}>No {tab} appointments</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary, textAlign: 'center' }}>No {tab} appointments</Text>
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -107,18 +110,33 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
                 onComplete={() => act(a.id, { action: 'complete' })}
                 onCancel={reason => act(a.id, { action: 'cancel', reason })}
                 onJoinCall={() => navigation.navigate('DoctorVideoCall', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
+                onReschedule={() => setRescheduleId(a.id)}
+                onViewSummary={() => navigation.navigate('ConsultationPlan', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
               />
             ))}
           </ScrollView>
+        )}
+
+        {rescheduleId && (
+          <RescheduleModal
+            patientName={appts.find(a => a.id === rescheduleId)?.patient?.full_name}
+            onClose={() => setRescheduleId(null)}
+            onConfirm={async payload => {
+              const err = await reviewDirectAppointment(rescheduleId, { action: 'reschedule', ...payload })
+              if (!err) { setRescheduleId(null); load() }
+              return err
+            }}
+          />
         )}
       </View>
   )
 }
 
-function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall }: {
+function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall, onReschedule, onViewSummary }: {
   appt: DirectAppt; theme: any; busy: boolean
   onApprove: () => void; onReject: (reason: string) => void; onStart: () => void
   onComplete: () => void; onCancel: (reason: string) => void; onJoinCall: () => void
+  onReschedule: () => void; onViewSummary: () => void
 }) {
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
@@ -136,34 +154,34 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
     <View style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>{appt.patient?.full_name ?? 'Patient'}</Text>
-          <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{appt.patient?.full_name ?? 'Patient'}</Text>
+          <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
             {fmtDate(appt.appointment_date)} · {fmt12(appt.start_time)} · {appt.type === 'virtual' ? 'Virtual consult' : 'Home visit'}
           </Text>
         </View>
         <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: meta.bg }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: meta.color }}>{meta.label}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: meta.color }}>{meta.label}</Text>
         </View>
       </View>
 
-      {appt.reason && <Text style={{ fontSize: 12, color: t.textSecondary, marginBottom: 6 }}>{appt.reason}</Text>}
+      {appt.reason && <Text style={{ fontSize: 14, color: t.textSecondary, marginBottom: 6 }}>{appt.reason}</Text>}
       {appt.type === 'home_visit' && appt.home_visit_address && (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
           <Ionicons name="location-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
-          <Text style={{ fontSize: 12, color: t.textSecondary, flex: 1 }}>{appt.home_visit_address}</Text>
+          <Text style={{ fontSize: 14, color: t.textSecondary, flex: 1 }}>{appt.home_visit_address}</Text>
         </View>
       )}
       {appt.patient?.phone && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <Ionicons name="call-outline" size={13} color={t.textMuted} />
-          <Text style={{ fontSize: 12, color: t.textSecondary }}>{appt.patient.phone}</Text>
+          <Text style={{ fontSize: 14, color: t.textSecondary }}>{appt.patient.phone}</Text>
         </View>
       )}
 
       {showReject ? (
         <View>
           <TextInput value={reason} onChangeText={setReason} placeholder="Reason for declining…" placeholderTextColor={t.textMuted}
-            style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 12, color: t.textPrimary, marginBottom: 8 }} />
+            style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 14, color: t.textPrimary, marginBottom: 8 }} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <ActionBtn label="Cancel" theme={t} onPress={() => setShowReject(false)} muted />
             <ActionBtn label="Confirm Decline" theme={t} danger disabled={!reason.trim() || busy}
@@ -196,6 +214,16 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
           {appt.status === 'in_progress' && appt.type === 'home_visit' && (
             <ActionBtn label="Mark Completed" theme={t} primary disabled={busy} onPress={onComplete} />
           )}
+          {/* Reschedule is pre-check-in only -- pending/confirmed bookings can
+              still move; once a visit has started there's nothing left to move. */}
+          {['pending', 'confirmed'].includes(appt.status) && (
+            <ActionBtn label="Reschedule" theme={t} muted disabled={busy} onPress={onReschedule} />
+          )}
+          {/* The one place a doctor writes diagnosis/investigations/treatment
+              for a virtual visit and the patient gets to see it. */}
+          {appt.status === 'completed' && appt.type === 'virtual' && (
+            <ActionBtn label="Consultation Plan" theme={t} muted disabled={busy} onPress={onViewSummary} />
+          )}
         </View>
       )}
     </View>
@@ -207,11 +235,11 @@ function ActionBtn({ label, theme: t, onPress, primary, danger, muted, disabled 
 }) {
   const bg = primary ? t.accent : danger ? t.dangerSubtle : t.inputBg
   const border = primary ? t.accent : danger ? t.dangerBorder : t.cardBorder
-  const color = primary ? (t.id === 'forest' ? '#061208' : '#fff') : danger ? t.danger : t.textSecondary
+  const color = primary ? t.onAccent : danger ? t.danger : t.textSecondary
   return (
     <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}
       style={{ flex: 1, minWidth: 100, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: bg, borderWidth: 1, borderColor: border, opacity: disabled ? 0.5 : 1 }}>
-      <Text style={{ fontSize: 12, fontWeight: '700', color }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color }}>{label}</Text>
     </TouchableOpacity>
   )
 }

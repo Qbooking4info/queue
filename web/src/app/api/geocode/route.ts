@@ -3,6 +3,16 @@ import { getServerUser } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+// Called cross-origin by the Ambulance Expo app (localhost:8097 -> localhost:3000
+// in development) for geocoding a unit's or provider's home base address --
+// same CORS handling every other bearer-token route needs, added here because
+// this route was previously only ever called same-origin from the web
+// dashboard's own fleet/settings pages.
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 // BM6 — IMPORTANT: This in-process cache is INEFFECTIVE on Vercel serverless.
 // Each lambda invocation may run in a different container/process, so `cache` and
@@ -30,6 +40,12 @@ let lastCallAt = 0
 const RATE_LIMIT_MS = 1100
 
 export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
   // getServerUser (any authenticated user) allows the onboarding flow to geocode
   // before a hospital record (and therefore a role) exists.
   const user = await getServerUser(req)

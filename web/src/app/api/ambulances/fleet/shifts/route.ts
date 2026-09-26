@@ -1,14 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireRole } from '@/lib/supabase/auth-server'
+import { resolveProviderId, assertOwnAmbulance } from '@/lib/ambulance-fleet'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+
+export async function OPTIONS() {
+  return corsOptions()
+}
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin'], req)
+  const res = await handlePOST(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(req: NextRequest) {
+  const auth = await requireRole(['ambulance_admin'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
-  if (!caller.hospitalId) return Errors.forbidden()
   const db = createAdminClient()
+
+  const providerId = await resolveProviderId(caller, db)
+  if (!providerId) return Errors.forbidden()
 
   const body = await req.json()
   const { ambulanceId, startsAt, endsAt, crewTier } = body
@@ -16,12 +30,7 @@ export async function POST(req: NextRequest) {
     return Errors.validation('ambulanceId, startsAt, endsAt, and crewTier are required')
   }
 
-  const { data: unit } = await db.from('ambulances')
-    .select('id, ambulance_providers!inner(hospital_id)')
-    .eq('id', ambulanceId)
-    .single()
-  const provider = unit ? (Array.isArray(unit.ambulance_providers) ? unit.ambulance_providers[0] : unit.ambulance_providers) : null
-  if (!provider || provider.hospital_id !== caller.hospitalId) return Errors.notFound('Ambulance')
+  if (!(await assertOwnAmbulance(db, ambulanceId, providerId))) return Errors.notFound('Ambulance')
 
   const { data: created, error } = await db.from('ambulance_shifts').insert({
     ambulance_id: ambulanceId,
