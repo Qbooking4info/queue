@@ -3,6 +3,10 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { IconOrb } from '@queue/shared/components/ui/ValueChip'
+import { MetricCard } from '@queue/shared/components/ui/MetricCard'
+import { Spark, Ticks, Pill } from '@queue/shared/components/ui/DataViz'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import {
   getFleet, getFleetRequests,
@@ -30,12 +34,8 @@ function isToday(iso: string): boolean {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
 }
 
-function triageColor(level: number | null, t: any): string {
-  if (level == null) return t.textMuted
-  if (level <= 2) return t.danger
-  if (level === 3) return t.statusBusy.text
-  return t.textMuted
-}
+// triageColor() tinted a bespoke triage badge; <Pill> now carries triage via the
+// theme's own status tones, leaving the helper with no callers.
 
 export function AdminHomeScreen() {
   const { theme: t } = useTheme()
@@ -76,12 +76,31 @@ export function AdminHomeScreen() {
     : null
   const unitsAvailable = units.filter(u => u.visible_to_dispatch).length
 
-  const stats = [
-    { label: 'Active calls',  value: String(active.length) },
-    { label: 'Units ready',   value: `${unitsAvailable}/${units.length}` },
-    { label: 'Avg response',  value: avgResponseMin != null ? `${avgResponseMin}m` : '—' },
-    { label: 'Calls today',   value: String(todayRequests.length) },
-  ]
+  // Real series for the metric charts. Every one is derived from data already on
+  // this screen -- a chart drawn from a decorative fixed path would imply a trend
+  // that isn't there, which is worse than showing the bare number.
+  //
+  // Response minutes in the order the calls came in, so the line shows whether
+  // dispatch is speeding up or falling behind across the day.
+  const responseSeries = respondedToday
+    .slice()
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map(r => (new Date(r.matched_at!).getTime() - new Date(r.created_at).getTime()) / 60000)
+
+  // Today in 2-hour buckets, midnight to midnight.
+  const callsByBucket = Array.from({ length: 12 }, (_, i) =>
+    todayRequests.filter(r => Math.floor(new Date(r.created_at).getHours() / 2) === i).length)
+
+  // One tick per unit: full height if it can actually receive a job right now,
+  // stub if it's off duty or its position has gone stale.
+  const unitTicks = units.length
+    ? units.map(u => (u.visible_to_dispatch ? 1 : 0.28))
+    : [0]
+
+  // One tick per open call, taller the more urgent it is.
+  const activeTicks = active.length
+    ? active.map(r => (r.triage_level == null ? 0.3 : Math.max(0.3, (5 - r.triage_level) / 4)))
+    : [0]
 
   if (loading) {
     return (
@@ -105,12 +124,30 @@ export function AdminHomeScreen() {
         </Text>
 
         <View style={s.statGrid}>
-          {stats.map(st => (
-            <View key={st.label} style={[s.statCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.statValue, { color: t.textPrimary }]}>{st.value}</Text>
-              <Text style={[s.statLabel, { color: t.textMuted }]}>{st.label}</Text>
-            </View>
-          ))}
+          <MetricCard
+            icon="alert-circle-outline" title="Active calls" sub="Open right now"
+            value={active.length} unit={active.length === 1 ? 'call' : 'calls'}
+            tone={active.length ? t.danger : undefined}
+            iconColor={active.length ? t.danger : t.accent}
+            chart={<Ticks data={activeTicks} />}
+          />
+          <MetricCard
+            icon="bus-outline" title="Units ready" sub={`Of ${units.length} in fleet`}
+            value={unitsAvailable} unit="ready"
+            chart={<Ticks data={unitTicks} />}
+          />
+        </View>
+        <View style={s.statGrid}>
+          <MetricCard
+            icon="timer-outline" title="Avg response" sub="Dispatched today"
+            value={avgResponseMin != null ? avgResponseMin : '—'} unit={avgResponseMin != null ? 'min' : undefined}
+            chart={<Spark data={responseSeries} />}
+          />
+          <MetricCard
+            icon="calendar-outline" title="Calls today" sub="Midnight to now"
+            value={todayRequests.length} unit={todayRequests.length === 1 ? 'call' : 'calls'}
+            chart={<Spark data={callsByBucket} />}
+          />
         </View>
 
         <View style={[s.tabRow, { borderColor: t.cardBorder }]}>
@@ -135,15 +172,24 @@ export function AdminHomeScreen() {
             const unit = embeddedUnit(r.unit)
             const name = embeddedName(r.patient) ?? embeddedName(r.dependent) ?? r.caller_patient_name ?? 'Unregistered caller'
             return (
-              <View key={r.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+              <Glass key={r.id} radius={22} pad={14} style={{ marginBottom: 10 }}>
                 <View style={s.row}>
-                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(r.triage_level, t)}18`, borderColor: `${triageColor(r.triage_level, t)}40` }]}>
-                    <Text style={[s.triageBadgeText, { color: triageColor(r.triage_level, t) }]}>
-                      {r.triage_level ? `Triage ${r.triage_level}` : r.request_type === 'scheduled' ? 'Scheduled' : '—'}
-                    </Text>
-                  </View>
-                  <Text style={[s.bookingRef, { color: t.textMuted }]}>{r.booking_ref}</Text>
+                  <Pill
+                    label={r.triage_level ? `Triage ${r.triage_level}` : r.request_type === 'scheduled' ? 'Scheduled' : 'Untriaged'}
+                    tone={r.triage_level == null
+                      ? (r.request_type === 'scheduled' ? 'statusVirtual' : 'statusNeutral')
+                      : r.triage_level <= 2 ? 'statusCancelled' : 'statusBusy'}
+                    dot={r.triage_level != null && r.triage_level <= 2}
+                  />
+                  <Text style={[s.bookingRef, { color: t.textSecondary }]}>{r.booking_ref}</Text>
                 </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                  <IconOrb
+                    name={r.triage_level ? 'alert-circle-outline' : 'calendar-outline'}
+                    size={40}
+                    color={r.triage_level && r.triage_level <= 2 ? t.danger : t.accent}
+                  />
+                  <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[s.name, { color: t.textPrimary }]}>{name}</Text>
                 <Text style={[s.statusLine, { color: t.accent }]}>{TRANSPORT_STATUS_LABEL[r.status] ?? r.status}</Text>
                 {r.symptom_description && (
@@ -169,7 +215,9 @@ export function AdminHomeScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
+                  </View>
+                </View>
+              </Glass>
             )
           })
         )}
@@ -182,16 +230,11 @@ const s = StyleSheet.create({
   safe:     { flex: 1 },
   title:    { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
   subtitle: { fontSize: 15, marginTop: 2, marginBottom: 16 },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
-  statCard: { flexGrow: 1, flexBasis: '46%', borderRadius: 16, borderWidth: 1, padding: 14 },
-  statValue:{ fontSize: 23, fontWeight: '800' },
-  statLabel:{ fontSize: 13, marginTop: 2 },
+  statGrid: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   tabRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3, marginBottom: 14, gap: 3 },
   tabBtn:   { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
   card:     { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
   row:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  triageBadgeText: { fontSize: 13, fontWeight: '800' },
   bookingRef: { fontSize: 13 },
   name:       { fontSize: 17, fontWeight: '700' },
   statusLine: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2, marginBottom: 4 },

@@ -6,8 +6,10 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
-import { Avatar } from '@queue/shared/components/ui/Avatar'
-import { bgFromName } from '@queue/shared/lib/adapters'
+import { ProfileCard } from '@queue/shared/components/ui/ProfileCard'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { Pill } from '@queue/shared/components/ui/DataViz'
+import { getMyCrewStats, type CrewStats } from '@queue/shared/lib/crew-api'
 
 const ROLE_LABEL: Record<string, string> = {
   driver:     'Driver',
@@ -18,12 +20,22 @@ const ROLE_LABEL: Record<string, string> = {
   dispatcher: 'Dispatcher',
 }
 
+// Months under a year, whole years after that -- "0 yrs" reads as an error.
+function serviceLabel(since: string | null): string {
+  if (!since) return '—'
+  const months = Math.max(0, Math.round((Date.now() - new Date(since).getTime()) / (30.44 * 864e5)))
+  if (months < 1) return 'New'
+  if (months < 12) return `${months} mo`
+  return `${Math.floor(months / 12)} yr${months >= 24 ? 's' : ''}`
+}
+
 export function CrewProfileScreen() {
   const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
   const { crewProfile, staffProfile, user, signOut } = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut,     setSigningOut]     = useState(false)
   const [hospitalName,   setHospitalName]   = useState<string | null>(null)
+  const [stats,          setStats]          = useState<CrewStats | null>(null)
 
   // Hospital-fleet crew resolve through staffProfile, not crewProfile (that's
   // third-party only) — same organisation display either way, different source.
@@ -31,13 +43,22 @@ export function CrewProfileScreen() {
   const crewRole = crewProfile?.crewRole ?? staffProfile?.crewRole
   const crewTier = crewProfile?.crewTier ?? staffProfile?.crewTier
 
-  const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
   useEffect(() => {
     if (!isHospitalFleet || !staffProfile?.hospitalId) return
     supabase.from('hospitals').select('name').eq('id', staffProfile.hospitalId).single()
       .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
   }, [isHospitalFleet, staffProfile?.hospitalId])
+
+  // Stats are decoration on this screen, not the point of it: a failure here must
+  // not stop the profile rendering, so it resolves to null and the chips show em dashes.
+  useEffect(() => {
+    let alive = true
+    getMyCrewStats()
+      .then(r => { if (alive) setStats(r) })
+      .catch(() => { if (alive) setStats(null) })
+    return () => { alive = false }
+  }, [])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -49,29 +70,31 @@ export function CrewProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
 
-        <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={{ marginBottom: 12 }}>
-            <Avatar initials={initials} bg={bgFromName(user?.full_name ?? '?')} size={72} />
-          </View>
-          <Text style={[s.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
-          <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.roleBadgeText, { color: t.accent }]}>
-              {ROLE_LABEL[crewRole ?? ''] ?? crewRole ?? 'Crew'}
-            </Text>
-          </View>
-          {(crewProfile?.providerName ?? hospitalName) && (
-            <Text style={[s.providerName, { color: t.textMuted }]}>{crewProfile?.providerName ?? hospitalName}</Text>
-          )}
-        </View>
+        <ProfileCard
+          name={user?.full_name ?? '—'}
+          sub={crewProfile?.providerName ?? hospitalName}
+          badge={<Pill label={ROLE_LABEL[crewRole ?? ''] ?? crewRole ?? 'Crew'} tone="statusOpen" />}
+          stats={[
+            { label: 'Jobs', value: stats ? String(stats.jobs_completed) : '—' },
+            {
+              label: 'Avg arrival',
+              value: stats?.avg_arrival_secs != null
+                ? `${Math.max(1, Math.round(stats.avg_arrival_secs / 60))} min`
+                : '—',
+            },
+            { label: 'Service', value: serviceLabel(stats?.member_since ?? null) },
+          ]}
+          style={{ marginHorizontal: 16, marginBottom: 12 }}
+        />
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DETAILS</Text>
+        <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
+          <Text style={[s.sectionTitle, { color: t.textSecondary, borderBottomColor: t.cardBorder }]}>DETAILS</Text>
           <Row label="Care tier"  value={crewTier ?? '—'} theme={t} />
           <Row label="Phone"     value={user?.phone ?? '—'} theme={t} last />
-        </View>
+        </Glass>
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
+        <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
+          <Text style={[s.sectionTitle, { color: t.textSecondary, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
               {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
@@ -86,7 +109,7 @@ export function CrewProfileScreen() {
             <Switch value={mode === 'dark'} onValueChange={toggleMode}
               trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
-        </View>
+        </Glass>
 
         {confirmVisible ? (
           <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
