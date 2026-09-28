@@ -6,8 +6,9 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
-import { Avatar } from '@queue/shared/components/ui/Avatar'
-import { bgFromName } from '@queue/shared/lib/adapters'
+import { ProfileCard } from '@queue/shared/components/ui/ProfileCard'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { Pill } from '@queue/shared/components/ui/DataViz'
 
 interface Props { navigation: any }
 
@@ -22,7 +23,6 @@ export function AdminProfileScreen({ navigation }: Props) {
   const roleLabel = providerAdminProfile?.role === 'owner'
     ? (isHospitalFleet ? 'Hospital fleet owner' : 'Owner')
     : (isHospitalFleet ? 'Hospital fleet admin' : 'Admin')
-  const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -34,26 +34,22 @@ export function AdminProfileScreen({ navigation }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
 
-        <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={{ marginBottom: 12 }}>
-            <Avatar initials={initials} bg={bgFromName(user?.full_name ?? '?')} size={72} />
-          </View>
-          <Text style={[s.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
-          <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.roleBadgeText, { color: t.accent }]}>{roleLabel}</Text>
-          </View>
-          {!!orgName && <Text style={[s.orgName, { color: t.textMuted }]}>{orgName}</Text>}
-        </View>
+        <ProfileCard
+          name={user?.full_name ?? '—'}
+          sub={orgName}
+          badge={<Pill label={roleLabel} tone="statusOpen" />}
+          style={{ marginHorizontal: 16, marginBottom: 12 }}
+        />
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
           <TouchableOpacity onPress={() => navigation.navigate('ProviderSettings')} style={s.linkRow}>
             <Ionicons name="options-outline" size={16} color={t.textPrimary} />
             <Text style={[s.linkText, { color: t.textPrimary }]}>Service settings</Text>
             <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
           </TouchableOpacity>
-        </View>
+        </Glass>
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
           <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
             <Text style={[s.rowLabel, { color: t.textPrimary }]}>
               {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
@@ -66,7 +62,7 @@ export function AdminProfileScreen({ navigation }: Props) {
             </Text>
             <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
-        </View>
+        </Glass>
 
         {confirmVisible ? (
           <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, RefreshControl } from 'react-native'
+  ActivityIndicator, RefreshControl, Switch} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { IconOrb } from '@queue/shared/components/ui/ValueChip'
 import { Button } from '@queue/shared/components/ui/Button'
 import { authedRequest } from '@queue/shared/lib/ambulance-api'
 import {
@@ -276,30 +278,57 @@ export function AdminFleetScreen() {
               units.map(u => {
                 const shift = coveringShift(u)
                 return (
-                  <View key={u.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: u.on_duty ? t.accentBorder : t.cardBorder }]}>
-                    <View style={s.unitHeadRow}>
-                      <View style={{ flex: 1 }}>
+                  <Glass key={u.id} radius={22} pad={14} style={{
+                    marginBottom: 12,
+                    borderColor: u.on_duty ? (u.visible_to_dispatch ? t.accent : t.statusBusy.text) + '55' : t.cardBorder,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <IconOrb name="bus-outline" size={42} color={u.on_duty ? t.accent : t.textFaint} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={[s.unitTitle, { color: t.textPrimary }]}>{u.call_sign ?? u.plate_number}</Text>
-                        <Text style={[s.unitSub, { color: t.textMuted }]}>{u.plate_number} · {u.vehicle_tier} · {u.status}</Text>
+                        <Text style={[s.unitSub, { color: t.textSecondary }]} numberOfLines={1}>
+                          {u.plate_number}, {u.vehicle_tier}
+                        </Text>
                       </View>
-                      <TouchableOpacity onPress={() => handleToggleDuty(u)} disabled={dutyBusy === u.id}
-                        style={[s.dutyBtn, { borderColor: u.on_duty ? `${t.danger}55` : `${t.accentDark}55`, backgroundColor: u.on_duty ? `${t.danger}14` : `${t.accentDark}14` }]}>
-                        {dutyBusy === u.id ? <ActivityIndicator size="small" color={t.textMuted} /> :
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: u.on_duty ? t.danger : t.accentDark }}>{u.on_duty ? 'Go off duty' : 'Go on duty'}</Text>}
-                      </TouchableOpacity>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        {dutyBusy === u.id ? (
+                          <ActivityIndicator color={t.accent} />
+                        ) : (
+                          <Switch
+                            value={u.on_duty}
+                            onValueChange={() => handleToggleDuty(u)}
+                            trackColor={{ false: t.inputBorder, true: t.accent + '99' }}
+                            thumbColor={u.on_duty ? t.accent : undefined}
+                          />
+                        )}
+                        <Text style={{ fontSize: 10.5, color: t.textSecondary, marginTop: 4 }}>
+                          {u.on_duty ? 'On duty' : 'Off duty'}
+                        </Text>
+                      </View>
                       <TouchableOpacity onPress={() => handleRemoveUnit(u)} style={{ padding: 6 }}>
                         <Ionicons name="trash-outline" size={16} color={t.danger} />
                       </TouchableOpacity>
                     </View>
 
                     {u.on_duty && (
-                      <View style={[s.dispatchNote, { backgroundColor: u.visible_to_dispatch ? `${t.accentDark}10` : `${t.statusBusy.text}10`, borderColor: u.visible_to_dispatch ? `${t.accentDark}44` : `${t.statusBusy.text}44` }]}>
-                        <Text style={{ color: u.visible_to_dispatch ? t.accentDark : t.statusBusy.text, fontSize: 13 }}>
+                      <View style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12,
+                        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+                        backgroundColor: u.visible_to_dispatch ? t.statusOpen.bg : t.statusBusy.bg,
+                      }}>
+                        <View style={{
+                          width: 7, height: 7, borderRadius: 4,
+                          backgroundColor: u.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
+                        }} />
+                        <Text style={{
+                          flex: 1, fontSize: 12,
+                          color: u.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
+                        }}>
                           {u.visible_to_dispatch
-                            ? 'Visible to dispatch — can receive jobs.'
+                            ? 'Visible to dispatch, can receive jobs'
                             : u.seconds_since_ping == null
-                              ? 'On duty but not dispatchable — no position reported yet.'
-                              : `On duty but not dispatchable — position is ${u.seconds_since_ping}s old.`}
+                              ? 'Not dispatchable, no position reported yet'
+                              : `Not dispatchable, position is ${u.seconds_since_ping}s old`}
                         </Text>
                       </View>
                     )}
@@ -346,7 +375,7 @@ export function AdminFleetScreen() {
                       </View>
                       )
                     })()}
-                  </View>
+                  </Glass>
                 )
               })
             )}
