@@ -284,7 +284,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Field label="Phone" value={phone} onChange={setPhone} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
               <Field label="WhatsApp (optional)" value={whatsapp} onChange={setWhatsapp} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>HOSPITAL TYPE</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {HOSPITAL_TYPES.map(tp => (
                     <TouchableOpacity key={tp.value} onPress={() => setType(tp.value)}
@@ -295,7 +295,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                 </View>
               </ScrollView>
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>OWNERSHIP (OPTIONAL)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {OWNERSHIP_OPTIONS.map(op => {
                     const active = ownership === op.value
@@ -336,7 +336,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Field label="City" value={city} onChange={setCity} placeholder="Lagos" theme={t} />
 
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>STATE</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {NIGERIAN_STATES.map(st => (
                     <TouchableOpacity key={st} onPress={() => setState(st)}

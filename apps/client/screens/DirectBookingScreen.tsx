@@ -100,7 +100,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
           </View>
 
           <Text style={[st.label, { color: t.textMuted }]}>PREFERRED DATE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+          <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
             {DATES.map(d => (
               <TouchableOpacity key={d.iso} onPress={() => { haptics.tap(); setDate(d.iso) }}
                 style={[st.dateChip, { backgroundColor: date === d.iso ? t.accentBg : t.cardBg, borderColor: date === d.iso ? t.accentBorder : t.cardBorder }]}>

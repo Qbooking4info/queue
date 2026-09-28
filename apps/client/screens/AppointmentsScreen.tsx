@@ -111,7 +111,7 @@ export function AppointmentsScreen({ navigation }: { navigation?: any }) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={s.filterScroll}
+          style={[s.filterScroll, { flexGrow: 0, flexShrink: 0 }]}
           contentContainerStyle={s.filterContent}>
           {FILTERS.map((f, i) => {
             const active = filter === f

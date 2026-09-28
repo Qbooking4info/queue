@@ -110,7 +110,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
       </View>
 
       {/* Period filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 8 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
         {PERIODS.map(p => (
           <TouchableOpacity key={p.key} onPress={() => { haptics.tap(); setPeriodMode(p.key) }}
             style={[s.chip, { borderColor: periodMode === p.key ? t.accent : t.cardBorder, backgroundColor: periodMode === p.key ? `${t.accent}18` : t.cardBg }]}>

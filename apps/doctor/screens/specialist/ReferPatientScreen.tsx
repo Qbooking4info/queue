@@ -421,7 +421,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
             <>
               <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Date</Text>
               {openDates.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                   {openDates.map(d => (
                     <TouchableOpacity key={d.iso} onPress={() => setDate(d.iso)}
                       style={[st.chip, { borderColor: date === d.iso ? t.accent : t.cardBorder, backgroundColor: date === d.iso ? t.accentBg : t.cardBg }]}>
@@ -435,7 +435,7 @@ export function ReferPatientScreen({ navigation, route }: Props) {
 
               <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Preferred time</Text>
               {timeOptions.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                   {timeOptions.map(time => (
                     <TouchableOpacity key={time} onPress={() => setStartTime(time)}
                       style={[st.chip, { borderColor: startTime === time ? t.accent : t.cardBorder, backgroundColor: startTime === time ? t.accentBg : t.cardBg }]}>

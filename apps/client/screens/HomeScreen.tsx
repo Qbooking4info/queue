@@ -384,7 +384,7 @@ export function HomeScreen({ navigation }: Props) {
         {/* Specialties row */}
         <Text style={[s.sectionLabel, { color: t.textMuted }]}>Specialties</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={s.specialtyScroll}
+          style={[s.specialtyScroll, { flexGrow: 0, flexShrink: 0 }]}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
           {preview.map(sp => {
             const active = activeSpecialty === sp.label

@@ -126,7 +126,7 @@ function appendOrFill<T extends { id: number; text: string }>(list: T[], item: T
 
 function ChipRow({ options, onPick, theme: t }: { options: string[]; onPick: (v: string) => void; theme: any }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+    <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
       {options.map(opt => (
         <TouchableOpacity key={opt} onPress={() => onPick(opt)}
           style={[st.chip, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>

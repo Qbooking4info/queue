@@ -1008,7 +1008,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
+                    style={{ flexGrow: 0, flexShrink: 0, marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
                     {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
                       const active = selectedDate === d.iso
                       const full   = !!dateFullMap[d.iso]
@@ -1148,7 +1148,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     <Text style={{ fontSize: 13, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
                   )}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
+                    style={{ flexGrow: 0, flexShrink: 0, marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
                     {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
                       const active = selectedDate === d.iso
                       const full   = !!dateFullMap[d.iso]

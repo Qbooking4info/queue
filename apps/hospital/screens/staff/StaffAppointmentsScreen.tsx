@@ -193,7 +193,7 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
       </View>
 
       {/* Tab filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabContent}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[s.tabScroll, { flexGrow: 0, flexShrink: 0 }]} contentContainerStyle={s.tabContent}>
         {TABS.map(tb => (
           <TouchableOpacity key={tb.key} onPress={() => setTab(tb.key)}
             style={[s.tab, tab === tb.key && { backgroundColor: t.accent, borderColor: t.accent }, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>

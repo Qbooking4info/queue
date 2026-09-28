@@ -91,7 +91,7 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
         </View>
 
         {/* Specialty chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
+        <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
           <TouchableOpacity onPress={() => { haptics.tap(); setSpecialtyId(undefined) }}
             style={[st.chip, { backgroundColor: !specialtyId ? t.accent : t.cardBg, borderColor: !specialtyId ? t.accent : t.cardBorder }]}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: !specialtyId ? t.onAccent : t.textPrimary }}>All Specialties</Text>

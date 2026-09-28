@@ -62,7 +62,7 @@ export function RescheduleModal({ patientName, onClose, onConfirm }: Props) {
           {patientName && <Text style={[st.sub, { color: t.textMuted }]}>{patientName}</Text>}
 
           <Text style={[st.label, { color: t.textMuted }]}>NEW DATE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 14 }}>
             {DATES.map(d => (
               <TouchableOpacity key={d.iso} onPress={() => { haptics.tap(); setDate(d.iso) }}
                 style={[st.dateChip, { backgroundColor: date === d.iso ? t.accentBg : t.inputBg, borderColor: date === d.iso ? t.accentBorder : t.cardBorder }]}>

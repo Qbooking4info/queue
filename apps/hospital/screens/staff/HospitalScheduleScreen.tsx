@@ -138,14 +138,14 @@ export function HospitalScheduleScreen({ navigation }: Props) {
       </View>
 
       {/* Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 10 }}>
+      <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 10 }}>
         <Chip theme={t} label="All doctors" active={!doctorId} onPress={() => setDoctorId(null)} />
         {doctors.map(d => (
           <Chip key={d.id} theme={t} label={d.full_name} active={doctorId === d.id} onPress={() => setDoctorId(d.id)} />
         ))}
       </ScrollView>
       {clinicModel === 'multi' && clinics.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 12 }}>
+        <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 12 }}>
           <Chip theme={t} label="All clinics" active={!clinicId} onPress={() => setClinicId(null)} />
           {clinics.map(c => (
             <Chip key={c.id} theme={t} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(c.id)} />
