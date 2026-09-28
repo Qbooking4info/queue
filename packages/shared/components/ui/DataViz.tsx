@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { View, Text, StyleProp, ViewStyle, LayoutChangeEvent } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, Animated, StyleProp, ViewStyle, LayoutChangeEvent } from 'react-native'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 // Small data visuals for the glass language: a line spark, a tick bar and a
 // countdown ring.
@@ -196,5 +197,131 @@ export function Pill({
       {dot && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: s.text }} />}
       <Text style={{ fontSize: 11, fontWeight: '600', color: s.text }}>{label}</Text>
     </View>
+  )
+}
+
+/**
+ * A 270-degree segmented arc with a figure in the middle — "14 of 20 seen".
+ *
+ * Segmented for the same reason as Ring: a swept arc needs SVG or a clipping trick
+ * whose geometry can't be verified without a device, whereas placing N ticks by
+ * rotation is exact by construction. The 90-degree gap sits at the bottom, so the
+ * arc reads as a dial rather than a ring.
+ */
+export function Gauge({
+  fraction, caption, sub, size = 118, segments = 32, color, style,
+}: {
+  /** 0..1. Clamped. */
+  fraction: number
+  caption: string | number
+  sub?: string
+  size?: number
+  segments?: number
+  color?: string
+  style?: StyleProp<ViewStyle>
+}) {
+  const { theme: t } = useTheme()
+  const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0))
+  const lit = Math.round(f * segments)
+  const tickH = Math.max(6, size * 0.11)
+  const tickW = 3
+  const SWEEP = 270
+  const START = -135
+
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      {Array.from({ length: segments }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute',
+            width: tickW, height: tickH, borderRadius: tickW,
+            backgroundColor: i < lit ? (color || t.accent) : t.tick,
+            transform: [
+              { rotate: `${START + (i / (segments - 1)) * SWEEP}deg` },
+              { translateY: -(size / 2 - tickH / 2 - 1) },
+            ],
+          }}
+        />
+      ))}
+      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 28, fontWeight: '700', letterSpacing: -0.8, color: t.textPrimary }}>
+          {caption}
+        </Text>
+        {!!sub && <Text style={{ fontSize: 10, color: t.textSecondary, marginTop: 1 }}>{sub}</Text>}
+      </View>
+    </View>
+  )
+}
+
+/** The glass pill-group used to switch between a few views. Controlled. */
+export function Segmented({
+  options, value, onChange, style,
+}: {
+  options: string[]
+  value: number
+  onChange: (index: number) => void
+  style?: StyleProp<ViewStyle>
+}) {
+  const { theme: t, chipElevation } = useTheme()
+  return (
+    <View style={[{
+      flexDirection: 'row', gap: 4, padding: 4, borderRadius: 999,
+      backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
+    }, style]}>
+      {options.map((o, i) => {
+        const on = i === value
+        return (
+          <TouchableOpacity
+            key={o}
+            onPress={() => onChange(i)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            style={[{
+              flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 999,
+              backgroundColor: on ? t.chip : 'transparent',
+              borderWidth: 1, borderColor: on ? t.chipBorder : 'transparent',
+            }, on ? chipElevation : null]}
+          >
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: on ? t.textPrimary : t.textSecondary }}>
+              {o}
+            </Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
+}
+
+/**
+ * A dot that breathes, for "this is live and needs attention" — an emergency in the
+ * queue, a call in progress. Honours reduce-motion by holding steady at full opacity,
+ * so the signal survives without the movement.
+ */
+export function PulseDot({ color, size = 7, style }: { color?: string; size?: number; style?: StyleProp<ViewStyle> }) {
+  const { theme: t } = useTheme()
+  const reduceMotion = useReducedMotion()
+  const pulse = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (reduceMotion) { pulse.setValue(1); return }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.25, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])
+    )
+    anim.start()
+    return () => anim.stop()
+  }, [reduceMotion, pulse])
+
+  return (
+    <Animated.View
+      style={[{
+        width: size, height: size, borderRadius: size / 2,
+        backgroundColor: color || t.danger,
+        opacity: reduceMotion ? 1 : pulse,
+      }, style]}
+    />
   )
 }

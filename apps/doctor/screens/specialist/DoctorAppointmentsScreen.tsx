@@ -14,6 +14,7 @@ import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { Segmented } from '@queue/shared/components/ui/DataViz'
 
 interface Props { navigation: any }
 
@@ -30,6 +31,8 @@ interface DirectAppt {
 }
 
 type FilterTab = 'pending' | 'upcoming' | 'past'
+
+const TABS: FilterTab[] = ['pending', 'upcoming', 'past']
 
 export function DoctorAppointmentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -65,6 +68,8 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
 
   const [rescheduleId, setRescheduleId] = useState<string | null>(null)
 
+  const pendingCount = appts.filter(a => a.status === 'pending').length
+
   const filtered = appts.filter(a => {
     if (tab === 'pending') return a.status === 'pending'
     if (tab === 'upcoming') return ['confirmed', 'in_progress'].includes(a.status)
@@ -78,20 +83,15 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
           <Text style={{ fontSize: 14, color: t.textMuted, marginTop: 2 }}>Direct bookings from patients — virtual consults and home visits.</Text>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 12 }}>
-          {(['pending', 'upcoming', 'past'] as FilterTab[]).map(item => (
-            <TouchableOpacity key={item} onPress={() => setTab(item)}
-              style={{
-                paddingVertical: 7, paddingHorizontal: 14, borderRadius: 99,
-                backgroundColor: tab === item ? t.accentBg : t.cardBg,
-                borderWidth: 1, borderColor: tab === item ? t.accentBorder : t.cardBorder,
-              }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: tab === item ? t.accent : t.textMuted, textTransform: 'capitalize' }}>
-                {item}{item === 'pending' && appts.some(a => a.status === 'pending') ? ` (${appts.filter(a => a.status === 'pending').length})` : ''}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Pending keeps its count in the label: it is the one tab representing work
+            waiting on the doctor, so the number belongs where they will see it. */}
+        <Segmented
+          options={TABS.map(item =>
+            item === 'pending' && pendingCount > 0 ? `Pending (${pendingCount})` : item[0].toUpperCase() + item.slice(1))}
+          value={TABS.indexOf(tab)}
+          onChange={i => setTab(TABS[i])}
+          style={{ marginHorizontal: 20, marginBottom: 12 }}
+        />
 
         {loading ? (
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />

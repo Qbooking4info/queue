@@ -10,6 +10,8 @@ import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { ValueChip } from '@queue/shared/components/ui/ValueChip'
+import { PulseDot } from '@queue/shared/components/ui/DataViz'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
@@ -232,7 +234,7 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
   appt: ApptRow; navigation: any; showDate: boolean; onReschedule?: () => void
   onRing?: () => void; ringing?: boolean
 }) {
-  const { theme: t } = useTheme()
+  const { theme: t, chipElevation } = useTheme()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
     pending:     { label: 'Pending',     color: sc.pending.text,      bg: sc.pending.bg },
@@ -252,10 +254,10 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
     <TouchableOpacity
       activeOpacity={0.8}
       style={[st.card, {
-        backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
-        borderColor: isEmergency ? t.danger : t.cardBorder,
+        backgroundColor: isEmergency ? t.dangerSubtle : t.glass,
+        borderColor: isEmergency ? t.danger : t.glassBorder,
         borderLeftWidth: isEmergency ? 4 : 1,
-      }]}
+      }, chipElevation]}
       onPress={() => {
         haptics.tap()
         navigation.navigate('PatientConsult', { appointmentId: appt.id })
@@ -276,9 +278,9 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
             {appt.patient_name ?? 'Unknown patient'}
           </Text>
           {isEmergency ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }}>
-              <Ionicons name="alert-circle-outline" size={9} color={t.danger} />
-              <Text style={{ fontSize: 10, fontWeight: '800', color: t.danger }}>EMERGENCY</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <PulseDot color={t.danger} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: t.danger }}>Emergency</Text>
             </View>
           ) : urgencyColor && (
             <Text style={{ fontSize: 10, fontWeight: '800', color: urgencyColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
