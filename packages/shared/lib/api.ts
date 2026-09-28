@@ -876,12 +876,14 @@ export interface DoctorAnalyticsStats {
 }
 
 export async function getMyDoctorAnalytics(
-  from: string, to: string, type?: 'in-person' | 'virtual' | 'home_visit'
+  from: string, to: string, type?: 'in-person' | 'virtual' | 'home_visit',
+  /** Narrow to one hospital link. Omitted aggregates every link plus direct bookings. */
+  hospitalId?: string,
 ): Promise<{ ok: true; data: DoctorAnalyticsStats } | { ok: false; error: string }> {
   const headers = await doctorAuthHeader()
   if (!headers) return { ok: false, error: 'Not authenticated' }
   try {
-    const qs = new URLSearchParams({ from, to, ...(type ? { type } : {}) })
+    const qs = new URLSearchParams({ from, to, ...(type ? { type } : {}), ...(hospitalId ? { hospitalId } : {}) })
     const res = await fetch(`${API_URL}/api/doctors/me/stats?${qs}`, { headers })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, error: body?.error ?? 'Please try again' }

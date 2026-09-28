@@ -46,6 +46,15 @@ interface ApptRow {
 // that already labels its hospital-side revenue "estimated, not a settled
 // ledger" -- multiplying that same uncertainty across several fee sources
 // risks a doctor mistaking a rough guess for money actually received.
+// Same shape the success path returns, for the case where a hospital filter matches
+// none of the caller's links.
+const EMPTY_RESPONSE = {
+  total: 0, completed: 0, cancelled: 0, noShow: 0, open: 0, uniquePatients: 0,
+  byType: { inPerson: 0, virtual: 0, homeVisit: 0 },
+  avgWaitMinutes: null, avgConsultMinutes: null,
+  rating: { avg: null, count: 0 }, monthly: [],
+}
+
 export async function GET(req: NextRequest) {
   const res = await handleGET(req)
   for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
@@ -61,6 +70,9 @@ async function handleGET(req: NextRequest) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const type = searchParams.get('type')
+  // Optional. Narrows to one of the caller's hospital links; omitted means every
+  // link plus their direct bookings, which is the default this route was built for.
+  const hospitalId = searchParams.get('hospitalId')
   if (!from || !to) return Errors.validation('from and to are required')
   if (type && !VALID_TYPES.includes(type)) return Errors.validation('type must be in-person, virtual or home_visit')
 
@@ -70,12 +82,25 @@ async function handleGET(req: NextRequest) {
   if (!profile) return Errors.notFound('User')
   const userId = profile.id
 
-  const { data: doctorRows } = await db.from('doctors').select('id').eq('user_id', userId)
+  let doctorQuery = db.from('doctors').select('id').eq('user_id', userId)
+  if (hospitalId) doctorQuery = doctorQuery.eq('hospital_id', hospitalId)
+  const { data: doctorRows } = await doctorQuery
   const doctorIds = (doctorRows ?? []).map((d: any) => d.id as string)
+
+  // A hospital filter that matched none of the caller's links must return nothing,
+  // not silently widen to every hospital. Without this guard an unknown hospitalId
+  // would leave orParts holding only the direct-booking clause and quietly report
+  // the doctor's direct work as if it were that hospital's.
+  if (hospitalId && doctorIds.length === 0) {
+    return NextResponse.json(EMPTY_RESPONSE)
+  }
 
   const orParts = [
     ...(doctorIds.length ? [`doctor_id.in.(${doctorIds.join(',')})`, `assigned_doctor_id.in.(${doctorIds.join(',')})`] : []),
-    `doctor_user_id.eq.${userId}`,
+    // Direct bookings have no hospital at all, so they belong only to the
+    // unfiltered view -- including them under a hospital filter would attribute
+    // independent work to that hospital.
+    ...(hospitalId ? [] : [`doctor_user_id.eq.${userId}`]),
   ]
 
   const fetchRange = async (rangeFrom: string, rangeTo: string, typeFilter?: string): Promise<ApptRow[]> => {

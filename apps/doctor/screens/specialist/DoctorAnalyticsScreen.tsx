@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { Dropdown, type DropdownOption } from '@queue/shared/components/ui/Dropdown'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtLocalDate, fmtDate, todayLocalDate } from '@queue/shared/lib/format'
 import { getMyDoctorAnalytics, type DoctorAnalyticsStats } from '@queue/shared/lib/api'
@@ -34,6 +36,7 @@ interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean } 
 
 export function DoctorAnalyticsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
+  const { doctorProfile } = useAuth()
 
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
   const [pickedDate, setPickedDate] = useState<string>(todayLocalDate())
@@ -41,6 +44,7 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
   const [visitType, setVisitType] = useState<VisitType>('all')
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showMonthPicker, setShowMonthPicker] = useState(false)
+  const [hospitalFilter, setHospitalFilter] = useState<string>('all')
 
   const [stats, setStats] = useState<DoctorAnalyticsStats>(EMPTY_STATS)
   const [loading, setLoading] = useState(true)
@@ -72,30 +76,48 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
     setError('')
     const { from, to } = getBounds()
     const type = visitType === 'all' ? undefined : visitType
-    const res = await getMyDoctorAnalytics(from, to, type)
+    const res = await getMyDoctorAnalytics(from, to, type, hospitalFilter === 'all' ? undefined : hospitalFilter)
     if (res.ok) setStats(res.data)
     else setError(res.error)
     setLoading(false)
     setRefreshing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodMode, pickedDate, pickedMonth, visitType])
+  }, [periodMode, pickedDate, pickedMonth, visitType, hospitalFilter])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
   const showUp = stats.total > 0 ? Math.round(stats.completed / stats.total * 100) : 0
   const typeTotal = stats.byType.inPerson + stats.byType.virtual + stats.byType.homeVisit || 1
 
-  const PERIODS: { key: PeriodMode; label: string }[] = [
-    { key: 'today', label: 'Today' },
-    { key: 'week',  label: '7 Days' },
-    { key: 'month', label: 'This Month' },
-    { key: 'year',  label: 'This Year' },
+  // Labels carry the resolved value for the two custom modes, so the pill reads
+  // "12 Mar 2026" rather than a generic "Custom date" once one is applied.
+  const PERIOD_OPTIONS: DropdownOption<PeriodMode>[] = [
+    { key: 'today',       label: 'Today' },
+    { key: 'week',        label: 'Last 7 days' },
+    { key: 'month',       label: 'This month' },
+    { key: 'year',        label: 'This year' },
+    { key: 'date',        label: periodMode === 'date' ? fmtDate(pickedDate) : 'Pick a date…' },
+    { key: 'pickedMonth', label: periodMode === 'pickedMonth'
+        ? `${MONTH_NAMES_FULL[pickedMonth.getMonth()].slice(0, 3)} ${pickedMonth.getFullYear()}`
+        : 'Pick a month…' },
   ]
-  const VISIT_TYPES: { key: VisitType; label: string }[] = [
-    { key: 'all',        label: 'All' },
+
+  const VISIT_TYPE_OPTIONS: DropdownOption<VisitType>[] = [
+    { key: 'all',        label: 'All types' },
     { key: 'in-person',  label: 'Physical' },
     { key: 'virtual',    label: 'Virtual' },
-    { key: 'home_visit', label: 'Home Visit' },
+    { key: 'home_visit', label: 'Home visit' },
+  ]
+
+  // linkedHospitals is every hospital this account is linked to, already resolved by
+  // AuthContext, so the filter needs no fetch of its own. "All" is not merely the
+  // union of the links: it also includes direct bookings, which have no hospital.
+  const HOSPITAL_OPTIONS: DropdownOption<string>[] = [
+    { key: 'all', label: 'All practice', hint: 'Every hospital, plus direct bookings' },
+    ...(doctorProfile?.linkedHospitals ?? []).map(h => ({
+      key: h.hospitalId,
+      label: h.hospitalName,
+    })),
   ]
 
   return (
@@ -109,38 +131,40 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
         <Text style={[s.title, { color: t.textPrimary }]}>My Analytics</Text>
       </View>
 
-      {/* Period filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 8 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-        {PERIODS.map(p => (
-          <TouchableOpacity key={p.key} onPress={() => { haptics.tap(); setPeriodMode(p.key) }}
-            style={[s.chip, { borderColor: periodMode === p.key ? t.accent : t.cardBorder, backgroundColor: periodMode === p.key ? `${t.accent}18` : t.cardBg }]}>
-            <Text style={[s.chipText, { color: periodMode === p.key ? t.accent : t.textMuted }]}>{p.label}</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity onPress={() => { haptics.tap(); setShowDatePicker(true) }}
-          style={[s.chip, { flexDirection: 'row', alignItems: 'center', gap: 5, borderColor: periodMode === 'date' ? t.accent : t.cardBorder, backgroundColor: periodMode === 'date' ? `${t.accent}18` : t.cardBg }]}>
-          <Ionicons name="calendar-outline" size={13} color={periodMode === 'date' ? t.accent : t.textMuted} />
-          <Text style={[s.chipText, { color: periodMode === 'date' ? t.accent : t.textMuted }]}>
-            {periodMode === 'date' ? fmtDate(pickedDate) : 'Pick Date'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { haptics.tap(); setShowMonthPicker(true) }}
-          style={[s.chip, { flexDirection: 'row', alignItems: 'center', gap: 5, borderColor: periodMode === 'pickedMonth' ? t.accent : t.cardBorder, backgroundColor: periodMode === 'pickedMonth' ? `${t.accent}18` : t.cardBg }]}>
-          <Ionicons name="calendar-clear-outline" size={13} color={periodMode === 'pickedMonth' ? t.accent : t.textMuted} />
-          <Text style={[s.chipText, { color: periodMode === 'pickedMonth' ? t.accent : t.textMuted }]}>
-            {periodMode === 'pickedMonth' ? `${MONTH_NAMES_FULL[pickedMonth.getMonth()].slice(0, 3)} ${pickedMonth.getFullYear()}` : 'Pick Month'}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Visit type filter */}
+      {/* Three filters on one row: when, what kind of visit, and which hospital.
+          Dropdowns rather than chip rows -- the period list alone has six entries
+          including two that open pickers, which never fit as chips and forced a
+          horizontal scroll that hid the later options off-screen. */}
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 14 }}>
-        {VISIT_TYPES.map(vt => (
-          <TouchableOpacity key={vt.key} onPress={() => { haptics.tap(); setVisitType(vt.key) }}
-            style={[s.typeChip, { borderColor: visitType === vt.key ? t.info : t.cardBorder, backgroundColor: visitType === vt.key ? `${t.info}18` : t.cardBg }]}>
-            <Text style={[s.chipText, { color: visitType === vt.key ? t.info : t.textMuted }]}>{vt.label}</Text>
-          </TouchableOpacity>
-        ))}
+        <Dropdown
+          label="Period"
+          icon="calendar-outline"
+          value={periodMode}
+          options={PERIOD_OPTIONS}
+          onChange={key => {
+            haptics.tap()
+            // The two custom entries open a picker instead of selecting directly;
+            // periodMode only moves once the picker is applied.
+            if (key === 'date') { setShowDatePicker(true); return }
+            if (key === 'pickedMonth') { setShowMonthPicker(true); return }
+            setPeriodMode(key)
+          }}
+        />
+        <Dropdown
+          label="Consultation type"
+          icon="medkit-outline"
+          value={visitType}
+          options={VISIT_TYPE_OPTIONS}
+          onChange={key => { haptics.tap(); setVisitType(key) }}
+        />
+        <Dropdown
+          label="Hospital"
+          icon="business-outline"
+          value={hospitalFilter}
+          options={HOSPITAL_OPTIONS}
+          onChange={key => { haptics.tap(); setHospitalFilter(key) }}
+          disabled={HOSPITAL_OPTIONS.length <= 1}
+        />
       </View>
 
       {loading ? (
@@ -314,9 +338,6 @@ const s = StyleSheet.create({
   safe:        { flex: 1 },
   header:      { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
   title:       { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  chipText:    { fontSize: 14, fontWeight: '700' },
-  typeChip:    { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   kpiCard:     { flexBasis: '31%', flexGrow: 1, borderRadius: 14, borderWidth: 1, padding: 12 },
   kpiValue:    { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
