@@ -4,6 +4,7 @@
 // regardless of which hospital (if any) is active.
 import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -12,9 +13,11 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
-import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
-import { Segmented } from '@queue/shared/components/ui/DataViz'
+import { Segmented, Pill } from '@queue/shared/components/ui/DataViz'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { Avatar } from '@queue/shared/components/ui/Avatar'
+import { bgFromName } from '@queue/shared/lib/adapters'
 
 interface Props { navigation: any }
 
@@ -33,6 +36,10 @@ interface DirectAppt {
 type FilterTab = 'pending' | 'upcoming' | 'past'
 
 const TABS: FilterTab[] = ['pending', 'upcoming', 'past']
+
+function initialsOf(name: string): string {
+  return (name || '?').split(/\s+/).map(w => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
+}
 
 export function DoctorAppointmentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -77,7 +84,11 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
   })
 
   return (
-      <View style={{ flex: 1 }}>
+      // SafeAreaView with an opaque canvas, matching Queue and Profile. The tab
+      // navigator sets sceneStyle backgroundColor 'transparent' (App.tsx), so a screen
+      // that paints nothing lets the previously-visited screen show through it --
+      // which is exactly how this one read: transparent and overlapping.
+      <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
         <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 }}>
           <Text style={{ fontSize: 25, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Appointments</Text>
           <Text style={{ fontSize: 14, color: t.textMuted, marginTop: 2 }}>Direct bookings from patients — virtual consults and home visits.</Text>
@@ -128,7 +139,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
             }}
           />
         )}
-      </View>
+      </SafeAreaView>
   )
 }
 
@@ -140,43 +151,80 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
 }) {
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
-  const sc = statusBadgeColors(t)
-  const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-    pending:     { label: 'Awaiting your review', color: sc.pending.text,     bg: sc.pending.bg },
-    confirmed:   { label: 'Confirmed',            color: sc.confirmed.text,   bg: sc.confirmed.bg },
-    in_progress: { label: 'In progress',          color: sc.in_progress.text, bg: sc.in_progress.bg },
-    completed:   { label: 'Completed',            color: sc.completed.text,   bg: sc.completed.bg },
-    cancelled:   { label: 'Cancelled',            color: sc.cancelled.text,   bg: sc.cancelled.bg },
+  const { chipElevation } = useTheme()
+  // Tones rather than raw colours now, so the pill matches every other status pill in
+  // the app instead of carrying its own palette. Dots only on live states -- a settled
+  // Completed or Cancelled has nothing to signal.
+  type Tone = 'statusOpen' | 'statusBusy' | 'statusVirtual' | 'statusCancelled' | 'statusProgress' | 'statusNeutral'
+  const STATUS_META: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
+    pending:     { label: 'Awaiting review', tone: 'statusBusy',      dot: true },
+    confirmed:   { label: 'Confirmed',       tone: 'statusOpen',      dot: true },
+    in_progress: { label: 'In progress',     tone: 'statusProgress',  dot: true },
+    completed:   { label: 'Completed',       tone: 'statusNeutral' },
+    cancelled:   { label: 'Cancelled',       tone: 'statusCancelled' },
   }
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
 
   return (
-    <View style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 16 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{appt.patient?.full_name ?? 'Patient'}</Text>
-          <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
-            {fmtDate(appt.appointment_date)} · {fmt12(appt.start_time)} · {appt.type === 'virtual' ? 'Virtual consult' : 'Home visit'}
+    <Glass radius={20} pad={16} style={{ marginHorizontal: 20, marginBottom: 12 }}>
+      {/* Identity row: who, what kind of visit, and where it stands. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar
+          initials={initialsOf(appt.patient?.full_name ?? 'Patient')}
+          bg={bgFromName(appt.patient?.full_name ?? 'Patient')}
+          size={44}
+        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }} numberOfLines={1}>
+            {appt.patient?.full_name ?? 'Patient'}
+          </Text>
+          <Text style={{ fontSize: 11.5, color: t.textSecondary, marginTop: 1 }}>
+            {appt.type === 'virtual' ? 'Virtual consult' : 'Home visit'}
           </Text>
         </View>
-        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: meta.bg }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: meta.color }}>{meta.label}</Text>
+        <Pill label={meta.label} tone={meta.tone} dot={meta.dot} />
+      </View>
+
+      {/* When, in a raised chip so the date and time are the one thing that reads at
+          a glance down a long list. */}
+      <View style={[{
+        flexDirection: 'row', gap: 14, marginTop: 12,
+        paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14,
+        backgroundColor: t.chip, borderWidth: 1, borderColor: t.chipBorder,
+      }, chipElevation]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={14} color={t.accent} />
+          <Text style={{ fontSize: 12, color: t.textSecondary }}>{fmtDate(appt.appointment_date)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="time-outline" size={14} color={t.accent} />
+          <Text style={{ fontSize: 12, color: t.textSecondary }}>{fmt12(appt.start_time)}</Text>
         </View>
       </View>
 
-      {appt.reason && <Text style={{ fontSize: 14, color: t.textSecondary, marginBottom: 6 }}>{appt.reason}</Text>}
-      {appt.type === 'home_visit' && appt.home_visit_address && (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
-          <Ionicons name="location-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
-          <Text style={{ fontSize: 14, color: t.textSecondary, flex: 1 }}>{appt.home_visit_address}</Text>
+      {/* Detail lines share one gap instead of the 6/6/10 mix they had, which made
+          the block read as unaligned. */}
+      {(!!appt.reason || (appt.type === 'home_visit' && !!appt.home_visit_address) || !!appt.patient?.phone) && (
+        <View style={{ gap: 6, marginTop: 12 }}>
+          {!!appt.reason && (
+            <Text style={{ fontSize: 13.5, color: t.textSecondary }}>{appt.reason}</Text>
+          )}
+          {appt.type === 'home_visit' && !!appt.home_visit_address && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+              <Ionicons name="location-outline" size={13} color={t.textSecondary} style={{ marginTop: 2 }} />
+              <Text style={{ fontSize: 13.5, color: t.textSecondary, flex: 1 }}>{appt.home_visit_address}</Text>
+            </View>
+          )}
+          {!!appt.patient?.phone && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="call-outline" size={13} color={t.textSecondary} />
+              <Text style={{ fontSize: 13.5, color: t.textSecondary }}>{appt.patient.phone}</Text>
+            </View>
+          )}
         </View>
       )}
-      {appt.patient?.phone && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <Ionicons name="call-outline" size={13} color={t.textMuted} />
-          <Text style={{ fontSize: 14, color: t.textSecondary }}>{appt.patient.phone}</Text>
-        </View>
-      )}
+
+      <View style={{ height: 12 }} />
 
       {showReject ? (
         <View>
@@ -226,7 +274,7 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
           )}
         </View>
       )}
-    </View>
+    </Glass>
   )
 }
 
