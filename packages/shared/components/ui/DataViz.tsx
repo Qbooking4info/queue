@@ -325,3 +325,55 @@ export function PulseDot({ color, size = 7, style }: { color?: string; size?: nu
     />
   )
 }
+
+/**
+ * Wraps a tile in a flashing outline to demand attention, without touching the
+ * tile's own colours or hiding its content — an overlay ring pulses rather than
+ * the children fading, so the thing being pointed at stays readable throughout.
+ *
+ * Under reduce-motion the ring is drawn steadily instead of pulsing: the call to
+ * action survives, the movement doesn't.
+ */
+export function Flashing({
+  active, color, radius = 18, children, style,
+}: {
+  active: boolean
+  color?: string
+  /** Match the wrapped tile's borderRadius or the ring will not sit on its edge. */
+  radius?: number
+  children?: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}) {
+  const { theme: t } = useTheme()
+  const reduceMotion = useReducedMotion()
+  const glow = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (!active || reduceMotion) { glow.setValue(active ? 1 : 0); return }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 620, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 620, useNativeDriver: true }),
+      ])
+    )
+    anim.start()
+    return () => anim.stop()
+  }, [active, reduceMotion, glow])
+
+  return (
+    <View style={[{ position: 'relative' }, style]}>
+      {children}
+      {active && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: -3, left: -3, right: -3, bottom: -3,
+            borderRadius: radius + 3, borderWidth: 2,
+            borderColor: color || t.accent,
+            opacity: glow,
+          }}
+        />
+      )}
+    </View>
+  )
+}

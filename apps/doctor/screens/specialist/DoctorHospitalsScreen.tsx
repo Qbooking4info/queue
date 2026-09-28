@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { ShellScroll } from '@queue/shared/components/AppShell'
 import { getMyDoctorClinics, switchMyActiveClinic, type DoctorClinicOption } from '@queue/shared/lib/api'
@@ -13,6 +14,9 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile, switchHospital } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
+  // doctorId -> whether this link offers virtual. accepts_virtual is a column on
+  // doctors, and there is one doctors row per hospital, so it varies by link.
+  const [virtualByDoctorId, setVirtualByDoctorId] = useState<Record<string, boolean>>({})
 
   // Clinics assigned to this doctor at the currently-active hospital -- a
   // doctor may be assigned to several, but only one is active at a time
@@ -49,6 +53,20 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
     if (!err) setActiveClinicId(clinicId)
     setClinicSwitching(null)
   }
+
+  useEffect(() => {
+    const ids = doctorProfile?.linkedHospitals.map(h => h.doctorId) ?? []
+    if (!ids.length) return
+    let alive = true
+    supabase.from('doctors').select('id, accepts_virtual').in('id', ids)
+      .then(({ data }: { data: { id: string; accepts_virtual: boolean | null }[] | null }) => {
+        if (!alive) return
+        const map: Record<string, boolean> = {}
+        for (const d of data ?? []) map[d.id] = !!d.accepts_virtual
+        setVirtualByDoctorId(map)
+      })
+    return () => { alive = false }
+  }, [doctorProfile])
 
   const activeHospitalName = doctorProfile?.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName
 
@@ -95,9 +113,22 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
                     borderColor: active ? t.accentBorder : t.cardBorder,
                     backgroundColor: active ? t.accentBg : t.cardBg,
                   }}>
-                  <View>
+                  <View style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
                     <Text style={{ fontSize: 16, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{h.hospitalName}</Text>
                     {active && <Text style={{ fontSize: 13, color: t.accent, marginTop: 2 }}>Active — you'll see this hospital's queue</Text>}
+                    {/* What this link actually offers. Physical always -- a hospital
+                        link is a physical posting by definition. Virtual only when
+                        that doctors row has accepts_virtual. No home visit here at
+                        all: the booking trigger (20260913000001) only permits
+                        home_visit on hospital-less direct bookings, so offering it
+                        against a hospital would be claiming something the database
+                        would reject. */}
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                      <TypeChip theme={t} label="Physical" icon="business-outline" />
+                      {virtualByDoctorId[h.doctorId] && (
+                        <TypeChip theme={t} label="Virtual" icon="videocam-outline" tone={t.info} />
+                      )}
+                    </View>
                   </View>
                   {switching === h.hospitalId ? (
                     <ActivityIndicator size="small" color={t.accent} />
@@ -163,5 +194,21 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
           </Text>
         </View>
       </ShellScroll>
+  )
+}
+
+function TypeChip({ theme: t, label, icon, tone }: {
+  theme: any; label: string; icon: keyof typeof Ionicons.glyphMap; tone?: string
+}) {
+  const color = tone ?? t.textSecondary
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 4,
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+      borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.canvasBg,
+    }}>
+      <Ionicons name={icon} size={10} color={color} />
+      <Text style={{ fontSize: 10.5, fontWeight: '700', color }}>{label}</Text>
+    </View>
   )
 }

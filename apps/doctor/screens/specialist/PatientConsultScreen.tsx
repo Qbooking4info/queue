@@ -4,6 +4,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import { visitTypeLabel, visitTypeIcon } from '@queue/shared/lib/format'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -405,9 +406,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? t.statusVirtual.text : t.accent} />
+                  <Ionicons name={visitTypeIcon(appt.type)} size={11} color={isVirtual ? t.statusVirtual.text : t.accent} />
                   <Text style={[st.typeChip, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
-                    {isVirtual ? 'Virtual' : 'In-person'}
+                    {visitTypeLabel(appt.type)}
                   </Text>
                 </View>
                 <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>

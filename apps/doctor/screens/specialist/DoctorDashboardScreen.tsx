@@ -11,14 +11,27 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { ShellScroll } from '@queue/shared/components/AppShell'
-import { getMyDoctorStats, updateMyAvailability, type DoctorAvailability } from '@queue/shared/lib/api'
+import {
+  getMyDoctorStats, updateMyAvailability, getMyDoctorClinics, switchMyActiveClinic,
+  type DoctorAvailability, type DoctorClinicOption,
+} from '@queue/shared/lib/api'
+import { useMorningNudge } from '@queue/shared/hooks/useMorningNudge'
+import { Flashing } from '@queue/shared/components/ui/DataViz'
+import { Dropdown } from '@queue/shared/components/ui/Dropdown'
 
 interface Props { navigation: any }
 
-const AVAIL_OPTIONS: { key: DoctorAvailability; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'on_duty',  label: 'On Duty',  icon: 'radio-button-on' },
-  { key: 'on_break', label: 'On Break', icon: 'cafe-outline' },
-  { key: 'off_duty', label: 'Off Duty', icon: 'moon-outline' },
+// Bright by request, with the foreground picked per colour rather than one shared
+// text colour: measured against each fill, near-black reads 7.39:1 on the green and
+// 11.00:1 on the yellow, while white reads 4.83:1 on the red. A single foreground
+// would have failed on at least one of the three.
+const DUTY_STATES: {
+  key: DoctorAvailability; label: string; icon: keyof typeof Ionicons.glyphMap
+  bg: string; fg: string
+}[] = [
+  { key: 'on_duty',  label: 'On duty',  icon: 'radio-button-on', bg: '#22C55E', fg: '#10210F' },
+  { key: 'on_break', label: 'On break', icon: 'cafe-outline',    bg: '#FACC15', fg: '#10210F' },
+  { key: 'off_duty', label: 'Off duty', icon: 'moon-outline',    bg: '#DC2626', fg: '#FFFFFF' },
 ]
 
 export function DoctorDashboardScreen({ navigation }: Props) {
@@ -34,6 +47,15 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [queueEmergencies, setQueueEmergencies] = useState(0)
   const [availability, setAvailability] = useState<DoctorAvailability | null>(null)
   const [savingAvailability, setSavingAvailability] = useState(false)
+  const [clinics, setClinics] = useState<DoctorClinicOption[]>([])
+  const [activeClinicId, setActiveClinicId] = useState<string | null>(null)
+  const [clinicSwitching, setClinicSwitching] = useState(false)
+
+  // Two independent nudges: confirming you are on duty and confirming which clinic
+  // you are sitting in are separate decisions, so acknowledging one must not silence
+  // the other.
+  const dutyNudge   = useMorningNudge('qb_doctor_duty_ack')
+  const clinicNudge = useMorningNudge('qb_doctor_clinic_ack')
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
@@ -66,12 +88,13 @@ export function DoctorDashboardScreen({ navigation }: Props) {
         )
       }
 
-      const [results, stats, availRow] = await Promise.all([
+      const [results, stats, availRow, clinicRes] = await Promise.all([
         Promise.all(queries),
         doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
         doctorProfile
           ? supabase.from('doctors').select('availability_status').eq('id', doctorProfile.doctorId).single()
           : Promise.resolve({ data: null }),
+        doctorProfile ? getMyDoctorClinics().catch(() => null) : Promise.resolve(null),
       ])
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
@@ -82,15 +105,30 @@ export function DoctorDashboardScreen({ navigation }: Props) {
       setQueueEmergencies(doctorProfile ? (results[5]?.count ?? 0) : 0)
       setAvgConsultSecs(stats?.avgConsultSecs ?? null)
       setAvailability(((availRow as any)?.data?.availability_status as DoctorAvailability) ?? null)
+      setClinics(clinicRes?.clinics ?? [])
+      setActiveClinicId(clinicRes?.activeClinicId ?? null)
       setLoading(false)
     }
     load()
     return () => { cancelled = true }
   }, [user?.id, doctorProfile]))
 
+  async function changeClinic(clinicId: string) {
+    clinicNudge.acknowledge()
+    if (clinicId === activeClinicId || clinicSwitching) return
+    const prev = activeClinicId
+    setActiveClinicId(clinicId)   // optimistic, same as availability above
+    setClinicSwitching(true)
+    haptics.tap()
+    const err = await switchMyActiveClinic(clinicId)
+    if (err) setActiveClinicId(prev)
+    setClinicSwitching(false)
+  }
+
   const firstName = (doctorProfile?.fullName ?? user?.full_name ?? '').split(' ')[0] || 'there'
 
   async function changeAvailability(status: DoctorAvailability) {
+    dutyNudge.acknowledge()
     if (status === availability || savingAvailability) return
     const prev = availability
     setAvailability(status) // optimistic -- this is the same status hospital staff see live
@@ -114,25 +152,86 @@ export function DoctorDashboardScreen({ navigation }: Props) {
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
+            {/* Duty and active clinic, side by side. Both flash from 7am each day
+                until touched -- a doctor who forgets to come on duty receives no
+                patients, and one sitting in the wrong clinic gets the wrong queue,
+                and neither failure announces itself. */}
             {doctorProfile && availability && (
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20 }}>
-                {AVAIL_OPTIONS.map(opt => {
-                  const active = availability === opt.key
-                  return (
-                    <TouchableOpacity key={opt.key} onPress={() => changeAvailability(opt.key)}
-                      disabled={savingAvailability}
-                      style={{
-                        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
-                        paddingVertical: 9, borderRadius: 12, borderWidth: 1,
-                        backgroundColor: active ? t.accentBg : t.cardBg,
-                        borderColor: active ? t.accentBorder : t.cardBorder,
-                        opacity: savingAvailability && !active ? 0.5 : 1,
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20, alignItems: 'stretch' }}>
+                <Flashing active={dutyNudge.nudging} radius={18} color={t.accent} style={{ flex: 1 }}>
+                  <View style={{
+                    borderRadius: 18, padding: 10, gap: 6,
+                    backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
+                  }}>
+                    <Text style={{
+                      fontSize: 10, fontWeight: '700', letterSpacing: 0.6,
+                      color: t.textSecondary, marginLeft: 2, marginBottom: 1,
+                    }}>
+                      MY STATUS
+                    </Text>
+                    {/* Stacked, so the three states read as one control with one
+                        selected rather than three competing buttons. */}
+                    {DUTY_STATES.map(opt => {
+                      const active = availability === opt.key
+                      return (
+                        <TouchableOpacity
+                          key={opt.key}
+                          onPress={() => changeAvailability(opt.key)}
+                          disabled={savingAvailability}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: active }}
+                          style={{
+                            flexDirection: 'row', alignItems: 'center', gap: 7,
+                            paddingVertical: 9, paddingHorizontal: 10, borderRadius: 12,
+                            backgroundColor: active ? opt.bg : t.canvasBg,
+                            borderWidth: 1,
+                            borderColor: active ? opt.bg : t.cardBorder,
+                            opacity: savingAvailability && !active ? 0.5 : 1,
+                          }}
+                        >
+                          <Ionicons name={opt.icon} size={13} color={active ? opt.fg : t.textSecondary} />
+                          <Text style={{
+                            fontSize: 12.5, fontWeight: active ? '800' : '600',
+                            color: active ? opt.fg : t.textSecondary,
+                          }}>
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </Flashing>
+
+                {/* Only when there is a choice to make: one clinic (or none) means
+                    nothing to switch, and an inert tile would just be noise. */}
+                {clinics.length > 1 && (
+                  <Flashing active={clinicNudge.nudging} radius={18} color={t.accent} style={{ flex: 1 }}>
+                    <View style={{
+                      flex: 1, borderRadius: 18, padding: 10, gap: 6,
+                      backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
+                    }}>
+                      <Text style={{
+                        fontSize: 10, fontWeight: '700', letterSpacing: 0.6,
+                        color: t.textSecondary, marginLeft: 2, marginBottom: 1,
                       }}>
-                      <Ionicons name={opt.icon} size={12} color={active ? t.accent : t.textMuted} />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  )
-                })}
+                        ACTIVE CLINIC
+                      </Text>
+                      <Dropdown
+                        label="Active clinic"
+                        icon="git-branch-outline"
+                        value={activeClinicId ?? ''}
+                        options={clinics.map(c => ({ key: c.clinicId, label: c.clinicName }))}
+                        onChange={changeClinic}
+                        disabled={clinicSwitching}
+                      />
+                      <Text style={{ fontSize: 11, color: t.textSecondary, marginTop: 2, lineHeight: 15 }}>
+                        {clinicSwitching
+                          ? 'Switching…'
+                          : `You're seeing this clinic's queue. ${clinics.length} assigned.`}
+                      </Text>
+                    </View>
+                  </Flashing>
+                )}
               </View>
             )}
 
@@ -228,12 +327,6 @@ export function DoctorDashboardScreen({ navigation }: Props) {
               </View>
             )}
 
-            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-              <QuickLink theme={t} icon="calendar-outline" label="Review appointments" onPress={() => navigation.navigate('Appointments')} />
-              <QuickLink theme={t} icon="bar-chart-outline" label="My Analytics" onPress={() => navigation.navigate('DoctorAnalytics')} />
-              <QuickLink theme={t} icon="settings-outline" label="Edit settings & fees" onPress={() => navigation.navigate('Settings')} />
-              <QuickLink theme={t} icon="business-outline" label="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} />
-            </View>
           </>
         )}
       </ShellScroll>
@@ -243,20 +336,5 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 // StatCard lived here. MetricCard now carries these figures, with a chart that
 // encodes the real counts, so the plain icon-and-number tile had no callers left.
 
-function QuickLink({ theme: t, icon, label, onPress }: {
-  theme: any; icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void
-}) {
-  return (
-    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}>
-      <Glass radius={999} pad={0} blur={false}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', gap: 8,
-          paddingVertical: 10, paddingHorizontal: 16,
-        }}>
-          <Ionicons name={icon} size={15} color={t.accent} />
-          <Text style={{ fontSize: 14, fontWeight: '500', color: t.textPrimary }}>{label}</Text>
-        </View>
-      </Glass>
-    </TouchableOpacity>
-  )
-}
+// QuickLink moved to SpecialistProfileScreen: these four are navigation, which
+// belongs on the profile tab, not competing with the day's figures on Home.

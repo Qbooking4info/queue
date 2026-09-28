@@ -149,6 +149,18 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           </TouchableOpacity>
         )}
 
+        {/* Moved here from the Home screen: these four are navigation, and they belong
+            with the account rather than competing with the day's figures on Home. */}
+        {navigation && (
+          <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
+            <Text style={[st.sectionTitle, { color: t.textSecondary, borderBottomColor: t.cardBorder }]}>MANAGE</Text>
+            <LinkRow theme={t} icon="calendar-outline"  label="Review appointments" onPress={() => navigation.navigate('Appointments')} />
+            <LinkRow theme={t} icon="bar-chart-outline" label="My Analytics"        onPress={() => navigation.navigate('DoctorAnalytics')} />
+            <LinkRow theme={t} icon="settings-outline"  label="Edit settings & fees" onPress={() => navigation.navigate('Settings')} />
+            <LinkRow theme={t} icon="business-outline"  label="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} last />
+          </Glass>
+        )}
+
         {/* Practice info */}
         <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
           <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>PRACTICE INFO</Text>
@@ -234,3 +246,23 @@ const st = StyleSheet.create({
   rowValue:        { fontSize: 15, fontWeight: '600' },
   bio:             { padding: 14, fontSize: 15, lineHeight: 20 },
 })
+
+function LinkRow({ theme: t, icon, label, onPress, last }: {
+  theme: any; icon: keyof typeof Ionicons.glyphMap; label: string
+  onPress: () => void; last?: boolean
+}) {
+  return (
+    <TouchableOpacity
+      onPress={() => { haptics.tap(); onPress() }}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder,
+      }}
+    >
+      <Ionicons name={icon} size={17} color={t.accent} />
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={t.textSecondary} />
+    </TouchableOpacity>
+  )
+}

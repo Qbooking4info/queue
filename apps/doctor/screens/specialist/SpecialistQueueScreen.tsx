@@ -11,6 +11,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { ValueChip } from '@queue/shared/components/ui/ValueChip'
+import { visitTypeLabel, visitTypeIcon } from '@queue/shared/lib/format'
 import { PulseDot } from '@queue/shared/components/ui/DataViz'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
@@ -33,6 +34,7 @@ interface ApptRow {
   referred_by_doctor_name?: string | null
   referring_hospital_name?: string | null
   referring_clinic_name?:   string | null
+  hospital_id?:             string | null
 }
 
 interface Props { navigation: any }
@@ -235,6 +237,7 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
   onRing?: () => void; ringing?: boolean
 }) {
   const { theme: t, chipElevation } = useTheme()
+  const { doctorProfile } = useAuth()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
     pending:     { label: 'Pending',     color: sc.pending.text,      bg: sc.pending.bg },
@@ -247,6 +250,8 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
   const meta = STATUS_META[appt.status] ?? STATUS_META.pending
   const initials = getInitials(appt.patient_name)
   const isVirtual = appt.type === 'virtual'
+  const hospitalName = doctorProfile?.linkedHospitals
+    .find(h => h.hospitalId === appt.hospital_id)?.hospitalName ?? null
   const isEmergency = appt.urgency === 'emergency'
   const urgencyColor = isEmergency ? t.danger : appt.urgency === 'urgent' ? t.statusBusy.text : null
 
@@ -292,12 +297,24 @@ function ApptCard({ appt, navigation, showDate, onReschedule, onRing, ringing }:
           <Text style={[st.metaText, { color: t.textMuted }]}>
             {showDate ? fmtDate(appt.appointment_date) + ' · ' : ''}{fmt12(appt.start_time)}
           </Text>
+          {/* Three-way, not a virtual/not-virtual boolean: the old form printed
+              "In-person" for a home visit, which is the opposite of true. */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? t.info : t.textMuted} />
+            <Ionicons name={visitTypeIcon(appt.type)} size={11} color={isVirtual ? t.info : t.textMuted} />
             <Text style={[st.typeDot, { color: isVirtual ? t.info : t.textMuted }]}>
-              {isVirtual ? 'Virtual' : 'In-person'}
+              {visitTypeLabel(appt.type)}
             </Text>
           </View>
+          {/* Which hospital this one is at. A doctor linked to several sees a single
+              merged queue, so without this two identically-timed patients at
+              different hospitals are indistinguishable. Name resolved from the
+              links AuthContext already holds -- the RPC returns only hospital_id. */}
+          {!!hospitalName && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Ionicons name="medkit-outline" size={11} color={t.textMuted} />
+              <Text style={[st.typeDot, { color: t.textMuted }]} numberOfLines={1}>{hospitalName}</Text>
+            </View>
+          )}
         </View>
         {appt.reason && (
           <Text style={[st.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>
