@@ -36,7 +36,7 @@ const DUTY_STATES: {
 
 export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user, doctorProfile } = useAuth()
+  const { user, doctorProfile, switchHospital } = useAuth()
   const [loading, setLoading] = useState(true)
   const [todayCount, setTodayCount] = useState(0)
   const [pendingDirect, setPendingDirect] = useState(0)
@@ -50,12 +50,15 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [clinics, setClinics] = useState<DoctorClinicOption[]>([])
   const [activeClinicId, setActiveClinicId] = useState<string | null>(null)
   const [clinicSwitching, setClinicSwitching] = useState(false)
+  const [hospitalSwitching, setHospitalSwitching] = useState(false)
 
   // Two independent nudges: confirming you are on duty and confirming which clinic
   // you are sitting in are separate decisions, so acknowledging one must not silence
   // the other.
   const dutyNudge   = useMorningNudge('qb_doctor_duty_ack')
-  const clinicNudge = useMorningNudge('qb_doctor_clinic_ack')
+  // Key renamed from ..._clinic_ack now it covers hospital as well as clinic. The
+  // only cost of the rename is one extra nudge on the day of the upgrade.
+  const contextNudge = useMorningNudge('qb_doctor_context_ack')
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
@@ -114,7 +117,7 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   }, [user?.id, doctorProfile]))
 
   async function changeClinic(clinicId: string) {
-    clinicNudge.acknowledge()
+    contextNudge.acknowledge()
     if (clinicId === activeClinicId || clinicSwitching) return
     const prev = activeClinicId
     setActiveClinicId(clinicId)   // optimistic, same as availability above
@@ -124,6 +127,25 @@ export function DoctorDashboardScreen({ navigation }: Props) {
     if (err) setActiveClinicId(prev)
     setClinicSwitching(false)
   }
+
+  async function changeHospital(hospitalId: string) {
+    contextNudge.acknowledge()
+    if (hospitalId === doctorProfile?.hospitalId || hospitalSwitching) return
+    setHospitalSwitching(true)
+    haptics.tap()
+    // Not optimistic, unlike duty and clinic: switching hospital re-resolves the
+    // whole doctor profile in AuthContext (a different doctors row, different
+    // queue), so the screen must follow that rather than guess ahead of it.
+    await switchHospital(hospitalId)
+    setHospitalSwitching(false)
+  }
+
+  const hospitalOptions = (doctorProfile?.linkedHospitals ?? [])
+    .map(h => ({ key: h.hospitalId, label: h.hospitalName }))
+  const hasHospitalLink = hospitalOptions.length > 0
+  // Only flash when something can actually be changed -- nudging someone to confirm
+  // a value they have no way to alter is just noise.
+  const canSwitchContext = hospitalOptions.length > 1 || clinics.length > 1
 
   const firstName = (doctorProfile?.fullName ?? user?.full_name ?? '').split(' ')[0] || 'there'
 
@@ -202,10 +224,15 @@ export function DoctorDashboardScreen({ navigation }: Props) {
                   </View>
                 </Flashing>
 
-                {/* Only when there is a choice to make: one clinic (or none) means
-                    nothing to switch, and an inert tile would just be noise. */}
-                {clinics.length > 1 && (
-                  <Flashing active={clinicNudge.nudging} radius={18} color={t.accent} style={{ flex: 1 }}>
+                {/* Where the doctor is working right now. Previously this only
+                    appeared when assigned to more than one clinic, which hid it from
+                    almost everyone -- exactly one doctor in the database has two
+                    clinics. It is shown whenever there is a hospital link at all,
+                    because confirming where you are is worth doing even when there is
+                    nothing to change, and switches to a Dropdown per line only where a
+                    real choice exists. */}
+                {hasHospitalLink && (
+                  <Flashing active={canSwitchContext && contextNudge.nudging} radius={18} color={t.accent} style={{ flex: 1 }}>
                     <View style={{
                       flex: 1, borderRadius: 18, padding: 10, gap: 6,
                       backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
@@ -214,20 +241,44 @@ export function DoctorDashboardScreen({ navigation }: Props) {
                         fontSize: 10, fontWeight: '700', letterSpacing: 0.6,
                         color: t.textSecondary, marginLeft: 2, marginBottom: 1,
                       }}>
-                        ACTIVE CLINIC
+                        WHERE I AM
                       </Text>
-                      <Dropdown
-                        label="Active clinic"
-                        icon="git-branch-outline"
-                        value={activeClinicId ?? ''}
-                        options={clinics.map(c => ({ key: c.clinicId, label: c.clinicName }))}
-                        onChange={changeClinic}
-                        disabled={clinicSwitching}
-                      />
+
+                      {hospitalOptions.length > 1 ? (
+                        <Dropdown
+                          label="Active hospital"
+                          icon="medkit-outline"
+                          value={doctorProfile?.hospitalId ?? ''}
+                          options={hospitalOptions}
+                          onChange={changeHospital}
+                          disabled={hospitalSwitching}
+                        />
+                      ) : (
+                        <ContextLine
+                          theme={t} icon="medkit-outline"
+                          value={hospitalOptions[0]?.label ?? '—'}
+                        />
+                      )}
+
+                      {clinics.length > 1 ? (
+                        <Dropdown
+                          label="Active clinic"
+                          icon="git-branch-outline"
+                          value={activeClinicId ?? ''}
+                          options={clinics.map(c => ({ key: c.clinicId, label: c.clinicName }))}
+                          onChange={changeClinic}
+                          disabled={clinicSwitching}
+                        />
+                      ) : clinics.length === 1 ? (
+                        <ContextLine theme={t} icon="git-branch-outline" value={clinics[0].clinicName} />
+                      ) : null}
+
                       <Text style={{ fontSize: 11, color: t.textSecondary, marginTop: 2, lineHeight: 15 }}>
-                        {clinicSwitching
+                        {hospitalSwitching || clinicSwitching
                           ? 'Switching…'
-                          : `You're seeing this clinic's queue. ${clinics.length} assigned.`}
+                          : canSwitchContext
+                            ? "This is the queue you're seeing. Tap to change."
+                            : "This is the queue you're seeing."}
                       </Text>
                     </View>
                   </Flashing>
@@ -338,3 +389,23 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
 // QuickLink moved to SpecialistProfileScreen: these four are navigation, which
 // belongs on the profile tab, not competing with the day's figures on Home.
+
+// One line of "where I am" when there is no choice to make: same shape as a
+// Dropdown's trigger so the tile reads consistently whether or not it can switch,
+// but without a chevron that would imply a menu that isn't there.
+function ContextLine({ theme: t, icon, value }: {
+  theme: any; icon: keyof typeof Ionicons.glyphMap; value: string
+}) {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      paddingVertical: 9, paddingHorizontal: 11, borderRadius: 12,
+      backgroundColor: t.canvasBg, borderWidth: 1, borderColor: t.cardBorder,
+    }}>
+      <Ionicons name={icon} size={13} color={t.accent} />
+      <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, fontWeight: '600', color: t.textPrimary }}>
+        {value}
+      </Text>
+    </View>
+  )
+}
