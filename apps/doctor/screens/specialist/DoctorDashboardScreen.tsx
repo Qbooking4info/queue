@@ -2,14 +2,14 @@ import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Glass } from '@queue/shared/components/ui/Glass'
 import { MetricCard } from '@queue/shared/components/ui/MetricCard'
-import { Ticks, Gauge, Pill } from '@queue/shared/components/ui/DataViz'
+import { Ticks, Gauge, PulseDot } from '@queue/shared/components/ui/DataViz'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
-import { todayLocalDate } from '@queue/shared/lib/format'
+import { todayLocalDate, fmt12, visitTypeLabel } from '@queue/shared/lib/format'
 import { ShellScroll } from '@queue/shared/components/AppShell'
 import {
   getMyDoctorStats, updateMyAvailability, getMyDoctorClinics, switchMyActiveClinic,
@@ -25,6 +25,17 @@ interface Props { navigation: any }
 // text colour: measured against each fill, near-black reads 7.39:1 on the green and
 // 11.00:1 on the yellow, while white reads 4.83:1 on the red. A single foreground
 // would have failed on at least one of the three.
+interface QueueRow {
+  id: string
+  start_time: string
+  type: string
+  status: string
+  reason: string | null
+  urgency: string | null
+  queue_position: number | null
+  patient_name: string | null
+}
+
 const DUTY_STATES: {
   key: DoctorAvailability; label: string; icon: keyof typeof Ionicons.glyphMap
   bg: string; fg: string
@@ -45,6 +56,8 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [todayCompleted, setTodayCompleted] = useState(0)
   const [inQueue, setInQueue] = useState(0)
   const [queueEmergencies, setQueueEmergencies] = useState(0)
+  const [queue, setQueue] = useState<QueueRow[]>([])
+  const [waitById, setWaitById] = useState<Record<string, number>>({})
   const [availability, setAvailability] = useState<DoctorAvailability | null>(null)
   const [savingAvailability, setSavingAvailability] = useState(false)
   const [clinics, setClinics] = useState<DoctorClinicOption[]>([])
@@ -91,13 +104,18 @@ export function DoctorDashboardScreen({ navigation }: Props) {
         )
       }
 
-      const [results, stats, availRow, clinicRes] = await Promise.all([
+      const [results, stats, availRow, clinicRes, queueRes] = await Promise.all([
         Promise.all(queries),
         doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
         doctorProfile
           ? supabase.from('doctors').select('availability_status').eq('id', doctorProfile.doctorId).single()
           : Promise.resolve({ data: null }),
         doctorProfile ? getMyDoctorClinics().catch(() => null) : Promise.resolve(null),
+        doctorProfile
+          ? supabase.rpc('get_doctor_queue', {
+              p_doctor_id: doctorProfile.doctorId, p_date: today, p_today: today,
+            })
+          : Promise.resolve({ data: null }),
       ])
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
@@ -108,6 +126,26 @@ export function DoctorDashboardScreen({ navigation }: Props) {
       setQueueEmergencies(doctorProfile ? (results[5]?.count ?? 0) : 0)
       setAvgConsultSecs(stats?.avgConsultSecs ?? null)
       setAvailability(((availRow as any)?.data?.availability_status as DoctorAvailability) ?? null)
+      const rows = (((queueRes as any)?.data ?? []) as QueueRow[])
+      setQueue(rows)
+
+      // How long each waiting patient has actually been there. get_doctor_queue does
+      // not return checked_in_at, and waiting_time_secs is only written once a
+      // consult starts, so neither tells us about someone still in the chairs.
+      const waitingIds = rows.filter(r => r.status === 'checked_in').map(r => r.id)
+      if (waitingIds.length) {
+        const { data: checkins } = await supabase
+          .from('appointments').select('id, checked_in_at').in('id', waitingIds)
+        const map: Record<string, number> = {}
+        for (const c of (checkins ?? []) as { id: string; checked_in_at: string | null }[]) {
+          if (!c.checked_in_at) continue
+          map[c.id] = Math.max(0, Math.round((Date.now() - new Date(c.checked_in_at).getTime()) / 60000))
+        }
+        if (!cancelled) setWaitById(map)
+      } else if (!cancelled) {
+        setWaitById({})
+      }
+
       setClinics(clinicRes?.clinics ?? [])
       setActiveClinicId(clinicRes?.activeClinicId ?? null)
       setLoading(false)
@@ -140,6 +178,18 @@ export function DoctorDashboardScreen({ navigation }: Props) {
     setHospitalSwitching(false)
   }
 
+  // A doctor works the queue by exceptions, so the figures that matter are who is
+  // next and who has waited longest -- not another count of today's volume.
+  const waiting = queue.filter(r => r.status === 'checked_in')
+  const upNext = waiting.slice(0, 3)
+  const longestWait = waiting.reduce((max, r) => Math.max(max, waitById[r.id] ?? 0), 0)
+  const longestWaitName = waiting.find(r => (waitById[r.id] ?? 0) === longestWait)?.patient_name ?? null
+  // Next scheduled start still to come, for the header's session line.
+  const nextStart = queue
+    .filter(r => r.status !== 'completed' && r.status !== 'cancelled' && !!r.start_time)
+    .map(r => r.start_time)
+    .sort()[0] ?? null
+
   const hospitalOptions = (doctorProfile?.linkedHospitals ?? [])
     .map(h => ({ key: h.hospitalId, label: h.hospitalName }))
   const hasHospitalLink = hospitalOptions.length > 0
@@ -166,8 +216,15 @@ export function DoctorDashboardScreen({ navigation }: Props) {
         <Text style={{ fontSize: 28, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5, marginBottom: 4 }}>
           Welcome, Dr. {firstName}
         </Text>
+        {/* The subtitle carries the day's shape now. The old line ("Here's what's
+            happening across your practice") occupied the most valuable strip of the
+            screen to say nothing the doctor could act on. */}
         <Text style={{ fontSize: 15, color: t.textMuted, marginBottom: 24 }}>
-          Here's what's happening across your practice.
+          {inQueue > 0
+            ? `${inQueue} waiting${nextStart ? ` · next at ${fmt12(nextStart)}` : ''}`
+            : todayCount > 0
+              ? `${todayCount} booked today${nextStart ? ` · next at ${fmt12(nextStart)}` : ''}`
+              : 'Nothing booked for today yet.'}
         </Text>
 
         {loading ? (
@@ -286,6 +343,129 @@ export function DoctorDashboardScreen({ navigation }: Props) {
               </View>
             )}
 
+            {/* An emergency waiting is the highest-stakes fact on this screen. It
+                used to be grey subtitle text under a number; it is a banner now
+                because it must not be scrollable-past. */}
+            {queueEmergencies > 0 && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { haptics.tap(); navigation.navigate('Queue') }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14,
+                  padding: 14, borderRadius: 16,
+                  backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger,
+                }}
+              >
+                <PulseDot color={t.danger} size={9} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 14.5, fontWeight: '800', color: t.danger }}>
+                    {queueEmergencies === 1 ? 'Emergency waiting' : `${queueEmergencies} emergencies waiting`}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: t.danger, opacity: 0.9, marginTop: 1 }}>
+                    Triaged ahead of the rest of the queue. Tap to open.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={t.danger} />
+              </TouchableOpacity>
+            )}
+
+            {/* Who is next, not just how many. This is the point of the screen: a
+                doctor between patients needs a name to call, and Home previously
+                showed five counts and not one person. Ordering comes from
+                get_doctor_queue -- the same RPC the Queue tab uses -- so the two can
+                never disagree about who is first. */}
+            {upNext.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Up next</Text>
+                  <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Queue') }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.accent }}>
+                      Open queue{waiting.length > upNext.length ? ` (${waiting.length})` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 8 }}>
+                  {upNext.map((r, i) => {
+                    const emergency = r.urgency === 'emergency'
+                    const mins = waitById[r.id]
+                    const virtual = r.type === 'virtual'
+                    return (
+                      <TouchableOpacity
+                        key={r.id}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          haptics.tap()
+                          navigation.navigate('PatientConsult', { appointmentId: r.id })
+                        }}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', gap: 10,
+                          padding: 12, borderRadius: 16,
+                          backgroundColor: emergency ? t.dangerSubtle : t.cardBg,
+                          borderWidth: 1, borderColor: emergency ? t.danger : t.cardBorder,
+                        }}
+                      >
+                        <View style={{
+                          width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: emergency ? t.danger : t.accentBg,
+                        }}>
+                          <Text style={{
+                            fontSize: 12, fontWeight: '800',
+                            color: emergency ? '#FFFFFF' : t.accent,
+                          }}>{r.queue_position ?? i + 1}</Text>
+                        </View>
+
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text numberOfLines={1} style={{ fontSize: 14.5, fontWeight: '700', color: t.textPrimary, flexShrink: 1 }}>
+                              {r.patient_name ?? 'Unknown patient'}
+                            </Text>
+                            {emergency && <PulseDot color={t.danger} size={7} />}
+                          </View>
+                          <Text numberOfLines={1} style={{ fontSize: 11.5, color: t.textSecondary, marginTop: 1 }}>
+                            {visitTypeLabel(r.type)}{r.reason ? ` · ${r.reason}` : ''}
+                          </Text>
+                        </View>
+
+                        {/* A scheduled virtual consult has no other way in from Home;
+                            without this the doctor must go to Appointments to start a
+                            call that is already due. */}
+                        {virtual && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              haptics.tap()
+                              navigation.navigate('DoctorVideoCall', {
+                                appointmentId: r.id,
+                                patientName: r.patient_name ?? 'Patient',
+                              })
+                            }}
+                            style={{
+                              flexDirection: 'row', alignItems: 'center', gap: 4,
+                              paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+                              backgroundColor: t.accentBg, borderWidth: 1, borderColor: t.accentBorder,
+                            }}
+                          >
+                            <Ionicons name="videocam" size={12} color={t.accent} />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: t.accent }}>Join</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {mins != null && !virtual && (
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{
+                              fontSize: 14, fontWeight: '800',
+                              color: mins >= 30 ? t.danger : t.textPrimary,
+                            }}>{mins}</Text>
+                            <Text style={{ fontSize: 9.5, color: t.textSecondary }}>min</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* Tick counts here encode the real figures rather than decorating: one tick
                 per person waiting (emergencies at full height), and one tick per patient
                 on today's list, lit as each is seen. */}
@@ -306,13 +486,15 @@ export function DoctorDashboardScreen({ navigation }: Props) {
               <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85}
                 onPress={() => { haptics.tap(); navigation.navigate('Queue') }} disabled={!doctorProfile}>
                 <MetricCard
-                  icon="medkit-outline" title="Seen today"
-                  sub={avgConsultSecs == null ? 'No consults yet' : `Avg ${Math.round(avgConsultSecs / 60)} min`}
-                  value={todayCompleted} unit={todayCompleted === 1 ? 'visit' : 'visits'}
-                  chart={<Ticks
-                    data={todayCount ? Array.from({ length: Math.min(todayCount, 14) }, () => 0.5) : [0]}
-                    highlight={todayCompleted > 0 ? Math.min(todayCompleted, 14) - 1 : undefined}
-                  />}
+                  icon="hourglass-outline" title="Longest wait"
+                  sub={longestWaitName ?? (waiting.length ? 'Waiting now' : 'Nobody waiting')}
+                  value={waiting.length ? longestWait : '—'}
+                  unit={waiting.length ? 'min' : undefined}
+                  tone={longestWait >= 30 ? t.danger : undefined}
+                  iconColor={longestWait >= 30 ? t.danger : t.accent}
+                  chart={<Ticks data={waiting.length
+                    ? waiting.slice(0, 14).map(r => Math.min(1, (waitById[r.id] ?? 0) / Math.max(longestWait, 1)))
+                    : [0]} />}
                 />
               </TouchableOpacity>
             </View>
@@ -336,13 +518,6 @@ export function DoctorDashboardScreen({ navigation }: Props) {
                         ? 'Everyone booked for today has been seen.'
                         : `${todayCount - todayCompleted} still to be seen${inQueue ? `, ${inQueue} waiting now` : ''}.`}
                   </Text>
-                  <View style={{ marginTop: 10, flexDirection: 'row' }}>
-                    <Pill
-                      label={availability === 'on_duty' ? 'On duty' : availability === 'on_break' ? 'On break' : 'Off duty'}
-                      tone={availability === 'on_duty' ? 'statusOpen' : availability === 'on_break' ? 'statusBusy' : 'statusNeutral'}
-                      dot={availability === 'on_duty'}
-                    />
-                  </View>
                 </View>
               </Glass>
             )}
