@@ -20,8 +20,19 @@ function initialsOf(name: string): string {
 }
 
 /**
- * The centred identity panel: ringed avatar, name, subline, an optional badge and a
- * row of raised stat chips.
+ * The identity panel: avatar and name on one line, with an optional row of stats
+ * underneath.
+ *
+ * Laid out horizontally rather than as a centred stack. Centred, the card had to be
+ * as wide as its widest child and no wider, so it rendered as a narrow column
+ * floating in the middle of the screen with the stat chips crushed together and
+ * their labels wrapping. Reading left-to-right uses the width that is actually
+ * there.
+ *
+ * Note the alignment lives on an inner View, never on the Glass itself: Glass
+ * applies `style` to its outermost wrapper, so `alignItems: 'center'` there makes
+ * the panel shrink-wrap its content instead of filling its container. That was the
+ * original bug.
  */
 export function ProfileCard({
   name, sub, badge, stats, style,
@@ -33,42 +44,53 @@ export function ProfileCard({
   stats?: { label: string; value: string }[]
   style?: StyleProp<ViewStyle>
 }) {
-  const { theme: t, chipElevation } = useTheme()
+  const { theme: t } = useTheme()
   return (
-    <Glass radius={26} pad={20} style={[{ alignItems: 'center' }, style]}>
-      <View style={{
-        padding: 5, borderRadius: 999, marginBottom: 12,
-        backgroundColor: t.glassStrong, borderWidth: 1, borderColor: t.glassBorder,
-      }}>
-        <Avatar initials={initialsOf(name)} bg={bgFromName(name || '?')} size={74} />
+    <Glass radius={24} pad={16} style={style}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <Avatar initials={initialsOf(name)} bg={bgFromName(name || '?')} size={60} />
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={2}
+            style={{ fontSize: 19, fontWeight: '700', color: t.textPrimary, letterSpacing: -0.3 }}
+          >
+            {name}
+          </Text>
+          {!!sub && (
+            <Text numberOfLines={1} style={{ fontSize: 12.5, color: t.textSecondary, marginTop: 2 }}>
+              {sub}
+            </Text>
+          )}
+          {!!badge && <View style={{ marginTop: 8, flexDirection: 'row' }}>{badge}</View>}
+        </View>
       </View>
 
-      <Text style={{ fontSize: 21, fontWeight: '700', color: t.textPrimary, letterSpacing: -0.4, textAlign: 'center' }}>
-        {name}
-      </Text>
-      {!!sub && (
-        <Text style={{ fontSize: 12.5, color: t.textSecondary, marginTop: 2, textAlign: 'center' }}>{sub}</Text>
-      )}
-      {!!badge && <View style={{ marginTop: 10 }}>{badge}</View>}
-
       {!!stats?.length && (
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16, alignSelf: 'stretch' }}>
-          {stats.map(s => (
-            <View
-              key={s.label}
-              style={[{
-                flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16,
-                alignItems: 'center', backgroundColor: t.chip,
-                borderWidth: 1, borderColor: t.chipBorder,
-              }, chipElevation]}
-            >
-              <Text style={{ fontSize: 17, fontWeight: '700', color: t.textPrimary }}>{s.value}</Text>
-              <Text style={{ fontSize: 10.5, color: t.textSecondary, marginTop: 1, textAlign: 'center' }}>
-                {s.label}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <>
+          <View style={{ height: 1, backgroundColor: t.cardBorder, marginTop: 14, marginBottom: 12 }} />
+          {/* One rule between columns instead of a box around each: three bordered
+              chips side by side on a phone left almost no room for the label, which
+              is why "This month" was wrapping onto two lines. */}
+          <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+            {stats.map((s, i) => (
+              <View key={s.label} style={{ flex: 1, flexDirection: 'row' }}>
+                {i > 0 && <View style={{ width: 1, backgroundColor: t.cardBorder, marginHorizontal: 4 }} />}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.3 }}>
+                    {s.value}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: 10.5, color: t.textSecondary, marginTop: 2 }}
+                  >
+                    {s.label}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
       )}
     </Glass>
   )
