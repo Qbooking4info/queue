@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/react-native'
 import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -36,6 +37,7 @@ import { HospitalClinicsScreen }       from './screens/staff/HospitalClinicsScre
 import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetailScreen'
 import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
+import { RequestAmbulanceScreen }      from './screens/staff/RequestAmbulanceScreen'
 import { AmbulanceRequestsScreen }     from './screens/staff/AmbulanceRequestsScreen'
 import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScreen'
 import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
@@ -65,15 +67,11 @@ function HospitalAuthStack() {
 }
 
 function StaffTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <StaffTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <StaffTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <StaffTab.Screen name="AdminDashboard"    component={AdminDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,           tabBarLabel: 'Home' }} />
       <StaffTab.Screen name="FrontDeskQueue"    component={FrontDeskQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,           tabBarLabel: 'Queue' }} />
       <StaffTab.Screen name="WalkInBooking"     component={WalkInBookingScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'add-circle' : 'add-circle-outline'} {...p} />, tabBarLabel: 'Walk-in' }} />
@@ -95,6 +93,7 @@ function StaffStack() {
       <StaffStackN.Screen name="HospitalClinicDetail"  component={HospitalClinicDetailScreen as any} />
       <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
       <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
+      <StaffStackN.Screen name="RequestAmbulance"      component={RequestAmbulanceScreen as any} />
       <StaffStackN.Screen name="AmbulanceRequests"     component={AmbulanceRequestsScreen as any} />
       <StaffStackN.Screen name="AmbulanceAlerts"       component={AmbulanceAlertsScreen as any} />
       <StaffStackN.Screen name="AmbulanceCoverage"     component={AmbulanceCoverageScreen as any} />
@@ -125,7 +124,7 @@ function AppNavigator() {
   if (loading) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} size="large" />
         </View>
       </SafeAreaProvider>
@@ -154,7 +153,7 @@ function AppNavigator() {
       content = <StaffStack />
     } else {
       content = (
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
           <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
           <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
             No hospital access on this account
@@ -210,9 +209,11 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
     },
   }
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
-      {children}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+        {children}
+      </NavigationContainer>
+    </View>
   )
 }
 

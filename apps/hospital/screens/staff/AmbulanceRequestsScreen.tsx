@@ -131,17 +131,20 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
           <Text style={[st.linkText, { color: t.textPrimary }]}>Alerts</Text>
         </TouchableOpacity>
         {isAdmin && (
-          <>
-            <TouchableOpacity onPress={() => navigation.navigate('AmbulanceCoverage')}
-              style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.linkText, { color: t.textPrimary }]}>Coverage</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('AmbulanceFleet')}
-              style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.linkText, { color: t.textPrimary }]}>Manage Fleet</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity onPress={() => navigation.navigate('AmbulanceCoverage')}
+            style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <Text style={[st.linkText, { color: t.textPrimary }]}>Coverage</Text>
+          </TouchableOpacity>
         )}
+        {/* "Manage Fleet" intentionally not linked here: fleet management (units,
+            crew, shifts) now lives exclusively in the standalone Ambulance app,
+            authenticated as ambulance_admin -- GET/POST /api/ambulances/fleet/*
+            no longer accept hospital_admin/front_desk callers at all, so this
+            button would 403 for every hospital-app user. AmbulanceFleetScreen
+            and AmbulanceUnitScheduleScreen are kept in the tree unreferenced
+            rather than deleted, in case a future hospital-app-side fleet view
+            is wanted -- see the merge notes for feature/hospital-ambulance-ops
+            vs feat/standalone-ambulance-app. */}
       </View>
 
       {loading ? (

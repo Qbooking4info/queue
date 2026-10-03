@@ -94,9 +94,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (doctorId) {
-      const { data: doc } = await db.from('doctors').select('hospital_id').eq('id', doctorId).single()
+      const { data: doc } = await db.from('doctors').select('hospital_id, availability_status').eq('id', doctorId).single()
       if (!doc || (doc as any).hospital_id !== hospitalId) {
         return Errors.validation('Doctor does not belong to this hospital')
+      }
+      // A walk-in is a patient physically present right now -- unlike a
+      // scheduled hospital booking picked for some future date, "is this
+      // doctor on duty" is meaningful at the moment of this insert. is_active
+      // is enforced independently for every insert path by the
+      // enforce_doctor_assignable trigger (supabase/migrations); this is the
+      // one additional, time-sensitive half only walk-ins need at write time.
+      if ((doc as any).availability_status && (doc as any).availability_status !== 'on_duty') {
+        return Errors.validation('Doctor is on break or off duty and cannot be assigned a walk-in')
       }
     }
 

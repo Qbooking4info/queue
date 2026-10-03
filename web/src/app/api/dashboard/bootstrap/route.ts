@@ -241,22 +241,62 @@ async function getTodayAppointments(db: ReturnType<typeof createAdminClient>, ho
   }))
 }
 
+// Resolves the same combined display status shown to staff everywhere a
+// doctor appears: 'inactive' (deactivated at this hospital, OR still active
+// but currently "at" a different hospital in a multi-hospital setup) or
+// their real on_duty/on_break/off_duty otherwise. Mirrors the exact
+// active-hospital resolution rule already implemented independently in
+// assign_doctor (web/src/app/api/appointments/[id]/route.ts), auth-server.ts,
+// /api/me/role, and the mobile AuthContext: users.active_hospital_id,
+// falling back to the doctor's earliest-created active hospital link when
+// unset. Only 'on_duty' may ever be assigned a patient -- enforced
+// separately by the enforce_doctor_assignable trigger; this is purely display.
+async function resolveDisplayStatuses(
+  db: ReturnType<typeof createAdminClient>,
+  rows: { user_id: string | null; hospital_id: string; is_active: boolean; availability_status: string | null }[],
+) {
+  const userIds = [...new Set(rows.map(d => d.user_id).filter((id): id is string => !!id))]
+  const [{ data: userRows }, { data: allDoctorRows }] = await Promise.all([
+    userIds.length ? db.from('users').select('id, active_hospital_id').in('id', userIds) : Promise.resolve({ data: [] as any[] }),
+    userIds.length
+      ? db.from('doctors').select('user_id, hospital_id, created_at').in('user_id', userIds).eq('is_active', true).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+  const activeHospitalByUser = new Map((userRows ?? []).map((u: any) => [u.id, u.active_hospital_id as string | null]))
+  const earliestActiveByUser = new Map<string, string>()
+  for (const d of (allDoctorRows ?? []) as any[]) {
+    if (!earliestActiveByUser.has(d.user_id)) earliestActiveByUser.set(d.user_id, d.hospital_id)
+  }
+
+  return rows.map(d => {
+    const effectiveActive = (d.user_id && activeHospitalByUser.get(d.user_id)) ?? (d.user_id ? earliestActiveByUser.get(d.user_id) : null) ?? null
+    const displayStatus = !d.is_active
+      ? 'inactive'
+      : (effectiveActive && effectiveActive !== d.hospital_id)
+        ? 'inactive'
+        : (d.availability_status ?? 'off_duty')
+    return displayStatus as 'inactive' | 'on_duty' | 'on_break' | 'off_duty'
+  })
+}
+
 async function getDoctors(db: ReturnType<typeof createAdminClient>, hospitalId: string, clinicId?: string) {
   let q = db
     .from('doctors')
     .select(`
       id, full_name, email, title, level, avg_rating, review_count, is_active,
       accepts_virtual, consultation_fee, years_experience, clinic_id,
-      availability_status,
+      availability_status, user_id, hospital_id,
       specialty:specialties!doctors_specialty_id_fkey(name)
     `)
     .eq('hospital_id', hospitalId)
-    .eq('is_active', true)
   if (clinicId) q = q.eq('clinic_id', clinicId)
   const { data, error } = await q.order('avg_rating', { ascending: false })
   if (error || !data) return []
 
-  return (data as any[]).map(d => ({
+  const rows = data as any[]
+  const displayStatuses = await resolveDisplayStatuses(db, rows)
+
+  return rows.map((d, i) => ({
     id: d.id,
     full_name: d.full_name,
     email: d.email ?? null,
@@ -272,7 +312,8 @@ async function getDoctors(db: ReturnType<typeof createAdminClient>, hospitalId: 
     avatar: nameToInitials(d.full_name),
     color: nameToColor(d.full_name),
     clinic_id: d.clinic_id ?? null,
-    availability_status: d.availability_status ?? 'on_duty',
+    availability_status: d.availability_status ?? 'off_duty',
+    display_status: displayStatuses[i],
   }))
 }
 

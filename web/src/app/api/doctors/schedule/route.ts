@@ -53,7 +53,7 @@ async function handlePOST(req: NextRequest) {
     end_time,          // "17:00"
     slot_duration,     // minutes: 15|20|30|45|60
     days_ahead,        // how many days to generate: 14|30|60|90
-    accepts_virtual,   // bool
+    slot_mode,         // 'physical' | 'virtual' | 'both' -- which slots this run generates
   } = body
   // clear_existing was removed — use POST /api/doctors/schedule/clear instead
 
@@ -76,6 +76,10 @@ async function handlePOST(req: NextRequest) {
   if (!VALID_DURATIONS.includes(slot_duration))
     return Errors.validation(`slot_duration must be one of ${VALID_DURATIONS.join(', ')}`)
 
+  const VALID_SLOT_MODES = ['physical', 'virtual', 'both'] as const
+  if (!VALID_SLOT_MODES.includes(slot_mode))
+    return Errors.validation(`slot_mode must be one of ${VALID_SLOT_MODES.join(', ')}`)
+
   // Verify doctor belongs to this hospital
   const { data: doctor } = await db.from('doctors')
     .select('id, accepts_virtual, clinic_id')
@@ -83,6 +87,13 @@ async function handlePOST(req: NextRequest) {
     .eq('hospital_id', adminRecord.hospital_id)
     .single()
   if (!doctor) return Errors.notFound('Doctor')
+
+  // A dedicated virtual-only or mixed block still needs the doctor's own
+  // profile flag on -- this batch-level mode only controls what a SINGLE
+  // generation run produces, not whether the doctor does virtual at all.
+  if (slot_mode !== 'physical' && !doctor.accepts_virtual) {
+    return Errors.validation('This doctor has not enabled virtual consultations — enable it on their profile first, or choose "Physical only".')
+  }
 
   // Slots may only be generated inside the doctor's clinic's declared operating
   // hours (falling back to the hospital's hours if the clinic has no custom
@@ -166,10 +177,14 @@ async function handlePOST(req: NextRequest) {
         booked_count: 0,
       }
 
-      slots.push({ ...base, is_virtual: false })
-      if (accepts_virtual && doctor.accepts_virtual) {
-        slots.push({ ...base, is_virtual: true })
-      }
+      // 'both' generates a physical AND a virtual slot at every time (today's
+      // mixed-queue behaviour -- a checked-in patient of either type shares one
+      // queue, ordered purely by check-in time). 'physical'/'virtual' generate
+      // only one or the other, which is how a dedicated virtual-only block gets
+      // built: run this generator again for a different day/time window with
+      // the other mode, and don't overlap the two windows.
+      if (slot_mode !== 'virtual')  slots.push({ ...base, is_virtual: false })
+      if (slot_mode !== 'physical') slots.push({ ...base, is_virtual: true })
 
       cursor += slot_duration
     }

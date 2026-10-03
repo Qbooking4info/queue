@@ -25,14 +25,22 @@ export function HospitalAuthScreen({ navigation }: Props) {
     setError('')
     if (!email.trim() || !password) { setError('Email and password are required.'); return }
     setLoading(true)
-    const err = await signIn(email.trim().toLowerCase(), password, 'hospital')
-    setLoading(false)
-    if (err) {
+    // try/finally, not a bare await: a throw out of signIn used to leave loading stuck
+    // true, so the button spun forever and the user never saw why.
+    try {
+      const err = await signIn(email.trim().toLowerCase(), password, 'hospital')
+      if (err) {
+        haptics.error()
+        setError(err)
+      } else {
+        haptics.success()
+        // AuthContext auto-detects staff/doctor role and sets staffMode=true
+      }
+    } catch (e) {
       haptics.error()
-      setError(err)
-    } else {
-      haptics.success()
-      // AuthContext auto-detects staff/doctor role and sets staffMode=true
+      setError(e instanceof Error ? e.message : 'Could not sign in. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
-import { safePatientName, calcAge, nameToColor, nameToInitials } from '@/lib/dashboard-utils'
+import { safePatientName, calcAge, nameToColor, nameToInitials, todayLocalDate } from '@/lib/dashboard-utils'
 
 interface VitalsRow {
   appointment_id: string
@@ -133,7 +133,9 @@ export async function GET(req: NextRequest) {
       .order('start_time')
     const rows = (data ?? []) as any[]
     const vitalsMap = await fetchVitalsBatch(db, rows.map(a => a.id))
-    return NextResponse.json({ appointments: rows.map(a => mapRow(a, vitalsMap.get(a.id))), doctors: [] })
+    // doctorDayLoad stays empty here for response-shape consistency: a doctor sees only
+    // their own appointments and never gets the assign-doctor picker that reads it.
+    return NextResponse.json({ appointments: rows.map(a => mapRow(a, vitalsMap.get(a.id))), doctors: [], doctorDayLoad: {} })
   }
 
   if (!caller.hospitalId) return Errors.forbidden()
@@ -167,11 +169,49 @@ export async function GET(req: NextRequest) {
     doctorsQuery = doctorsQuery.eq('clinic_id', caller.clinicId)
   }
 
-  const [{ data, error }, { data: doctorRows }] = await Promise.all([
+  // Today's per-doctor load, for the assign-doctor picker ("seen 5 of 13 today").
+  // Deliberately keyed to today and NOT to the caller's from/to range: the figure has
+  // to mean the same thing whether the page is showing today, this week or a month, and
+  // "how loaded is this doctor right now" is only ever a question about today. Same
+  // single-day convention as the live queue -- a booking dated for another day that
+  // physically checked in today belongs to today.
+  const today = todayLocalDate()
+  const dayLoadQuery = db
+    .from('appointments')
+    .select('doctor_id, assigned_doctor_id, status')
+    .eq('hospital_id', caller.hospitalId)
+    .or(`appointment_date.eq.${today},check_in_date.eq.${today}`)
+
+  const [{ data, error }, { data: doctorRows }, { data: dayRows }] = await Promise.all([
     query,
     doctorsQuery.order('avg_rating', { ascending: false }),
+    dayLoadQuery,
   ])
   if (error) return Errors.internal(error.message)
+
+  // "Seen" counts in_progress as well as completed -- the patient currently in the room
+  // has been seen, and excluding them would make the ratio read as one behind all day.
+  // Out of the denominator: 'cancelled', which is also where a *rejected* booking lands
+  // (the reject action writes status='cancelled' with approval_status='rejected', so
+  // there is no status='rejected' to match on). Still IN the denominator: 'no_show' --
+  // it was on the doctor's list for today, so it's part of how loaded they were, and
+  // dropping it would silently flatter the ratio.
+  const SEEN_STATUSES = ['completed', 'in_progress']
+  const NEVER_ASSIGNED = ['cancelled']
+  const visibleDoctorIds = new Set(((doctorRows ?? []) as any[]).map(d => d.id))
+  const doctorDayLoad: Record<string, { completed: number; assigned: number }> = {}
+  for (const r of (dayRows ?? []) as any[]) {
+    // assign_doctor writes doctor_id and assigned_doctor_id to the same value, so
+    // preferring doctor_id matches how every other route resolves the treating doctor.
+    const docId: string | null = r.doctor_id ?? r.assigned_doctor_id
+    // Scoped to the doctors this caller can already see, so a clinic-scoped front desk
+    // doesn't get counts for another clinic's doctors along the way.
+    if (!docId || !visibleDoctorIds.has(docId)) continue
+    if (NEVER_ASSIGNED.includes(r.status)) continue
+    const entry = (doctorDayLoad[docId] ??= { completed: 0, assigned: 0 })
+    entry.assigned++
+    if (SEEN_STATUSES.includes(r.status)) entry.completed++
+  }
 
   const rows = (data ?? []) as any[]
   const vitalsMap = await fetchVitalsBatch(db, rows.map(a => a.id))
@@ -195,5 +235,6 @@ export async function GET(req: NextRequest) {
       clinic_id: d.clinic_id ?? null,
       availability_status: d.availability_status ?? 'on_duty',
     })),
+    doctorDayLoad,
   })
 }

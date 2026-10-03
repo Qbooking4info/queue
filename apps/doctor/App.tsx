@@ -5,11 +5,13 @@ import * as Sentry from '@sentry/react-native'
 import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, ActivityIndicator, Text, TouchableOpacity, TextInput } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold } from '@expo-google-fonts/dm-sans'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
@@ -19,6 +21,7 @@ import { usePushNotifications }    from '@queue/shared/hooks/usePushNotification
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
 import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
+import { ConsultationPlanScreen } from '@queue/shared/screens/ConsultationPlanScreen'
 
 import { DoctorRegisterScreen }   from './screens/DoctorRegisterScreen'
 import { DoctorOnboardingScreen } from './screens/DoctorOnboardingScreen'
@@ -29,8 +32,10 @@ import { DoctorAppointmentsScreen } from './screens/specialist/DoctorAppointment
 import { SpecialistProfileScreen }  from './screens/specialist/SpecialistProfileScreen'
 import { PatientConsultScreen }     from './screens/specialist/PatientConsultScreen'
 import { ReferPatientScreen }       from './screens/specialist/ReferPatientScreen'
+import { RequestAmbulanceScreen }   from './screens/specialist/RequestAmbulanceScreen'
 import { DoctorHospitalsScreen }    from './screens/specialist/DoctorHospitalsScreen'
 import { DoctorSettingsScreen }     from './screens/specialist/DoctorSettingsScreen'
+import { DoctorAnalyticsScreen }    from './screens/specialist/DoctorAnalyticsScreen'
 
 // react-native-agora is a native module Expo Go cannot load, so the call screen is
 // lazy-loaded -- importing it eagerly would break the whole app under Expo Go, not
@@ -51,8 +56,10 @@ const DocTab      = createBottomTabNavigator()
 const DocStack    = createNativeStackNavigator()
 const OnboardStk  = createNativeStackNavigator()
 
-function TabIcon({ name, color, size }: any) {
-  return <Ionicons name={name} color={color} size={size ?? 22} />
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: any) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
 // LoginScreen is shared with the other three apps, so the doctor-specific bits (which
@@ -91,15 +98,11 @@ function DoctorOnboardingStack() {
 }
 
 function SpecialistTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <DocTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <DocTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
       <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
@@ -114,11 +117,29 @@ function SpecialistStack() {
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
       <DocStack.Screen name="Hospitals"       component={DoctorHospitalsScreen as any} />
       <DocStack.Screen name="Settings"        component={DoctorSettingsScreen  as any} />
+      <DocStack.Screen name="DoctorAnalytics" component={DoctorAnalyticsScreen as any} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
+      <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
+      <DocStack.Screen name="ConsultationPlan" component={ConsultationPlanScreen as any} />
     </DocStack.Navigator>
   )
+}
+
+// Matches the mockups' own typeface. Applied as a single global default
+// (Text/TextInput.defaultProps) so every existing screen picks it up with
+// no changes on its own end -- see the client app's own App.tsx for the
+// full reasoning (same helper, duplicated per-app since each app's entry
+// point is separate).
+let dmSansApplied = false
+function applyDMSansGlobally() {
+  if (dmSansApplied) return
+  dmSansApplied = true
+  for (const Comp of [Text, TextInput] as const) {
+    const existing = (Comp as any).defaultProps ?? {}
+    ;(Comp as any).defaultProps = { ...existing, style: [{ fontFamily: 'DMSans_400Regular' }, existing.style] }
+  }
 }
 
 function AppNavigator() {
@@ -130,11 +151,19 @@ function AppNavigator() {
   const { session, loading, user, doctorProfile, pendingDoctorOnboarding, signOut } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  const [fontsLoaded, fontError] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
+  })
+  if (fontsLoaded) applyDMSansGlobally()
 
-  if (loading) {
+  // Fonts are cosmetic, so they must never be able to brick the app. useFonts
+  // reports failure through its second value; without checking it, a blocked or
+  // stalled webfont request leaves fontsLoaded false forever and the whole app
+  // sits on this spinner with no way out -- a real risk on poor connectivity.
+  if (loading || (!fontsLoaded && !fontError)) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} size="large" />
         </View>
       </SafeAreaProvider>
@@ -155,7 +184,7 @@ function AppNavigator() {
     // This app is only ever the doctor's. A staff or crew account signing in here has
     // no stack to land on, so say which app they want rather than showing an empty one.
     const content = doctorProfile ? <SpecialistStack /> : needsDoctorOnboarding ? <DoctorOnboardingStack /> : (
-      <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
         <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
         <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
           This account is not a doctor
@@ -210,9 +239,11 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
     },
   }
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
-      {children}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+        {children}
+      </NavigationContainer>
+    </View>
   )
 }
 

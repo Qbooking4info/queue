@@ -74,6 +74,7 @@
       "@sentry/react-native",
       "expo-web-browser",
       "expo-audio",
+      "expo-font",
       "./plugins/withBouncyCastlePin.js",
       "./plugins/withAbiSplits.js",
       [

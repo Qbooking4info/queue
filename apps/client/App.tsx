@@ -11,11 +11,14 @@ import { NavigationContainer } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { SwitchedAccountBanner } from '@queue/shared/components/ui/SwitchedAccountBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
+import { TRANSPARENT_NAV_THEME } from '@queue/shared/components/ui/Glass'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator, Text, TextInput } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold } from '@expo-google-fonts/dm-sans'
 
 import { ThemeProvider, useTheme }     from '@queue/shared/contexts/ThemeContext'
 import { AlertProvider }               from '@queue/shared/contexts/AlertContext'
@@ -102,22 +105,20 @@ const AuthNav    = createNativeStackNavigator()
 const PatientNav = createNativeStackNavigator()
 const HospitalNav = createNativeStackNavigator()
 
-function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
-  return <Ionicons name={name} size={22} color={color} />
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: { name: React.ComponentProps<typeof Ionicons>['name']; focused: boolean; color: string }) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
 // ── Patient navigator ─────────────────────────────────────────────────────────
 
 function MainTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <Tab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <Tab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
       <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Bookings' }} />
@@ -188,10 +189,35 @@ function RootAuthNavigator() {
 
 // ── Root navigator ────────────────────────────────────────────────────────────
 
+// Matches the mockup's own typeface exactly. Applied as a single global
+// default (Text.defaultProps) rather than per-screen, which is why every
+// existing screen picks it up with zero changes -- but that means only one
+// weight (Regular) is actually wired up as the default face. RN doesn't
+// auto-select a matching bold/heavy font file for a custom fontFamily the
+// way it does for system fonts, so a style that also sets fontWeight still
+// renders in Regular's own glyphs -- iOS synthesizes a reasonable faux-bold
+// from that (it does this for most custom fonts), Android's is a bit
+// flatter. The other four weights are still loaded so any specific screen
+// can opt into an exact weight later by naming it directly
+// (fontFamily: 'DMSans_800ExtraBold'), without needing to load anything new.
+let dmSansApplied = false
+function applyDMSansGlobally() {
+  if (dmSansApplied) return
+  dmSansApplied = true
+  for (const Comp of [Text, TextInput] as const) {
+    const existing = (Comp as any).defaultProps ?? {}
+    ;(Comp as any).defaultProps = { ...existing, style: [{ fontFamily: 'DMSans_400Regular' }, existing.style] }
+  }
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
   const { session, loading, user, switchedInto } = useAuth()
   const { theme: t } = useTheme()
+  const [fontsLoaded, fontError] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
+  })
+  if (fontsLoaded) applyDMSansGlobally()
   // Suspended while switched into a dependent's account -- otherwise this device's
   // push token would silently overwrite the dependent's own push_token every time a
   // caretaker switches in, breaking notification delivery to the dependent's own phone.
@@ -203,7 +229,7 @@ function AppNavigator() {
   // so it fires on any tab, not just Home.
   const { ringNotif, dismissRing } = useRingAlert(session ? user?.id : undefined)
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -217,11 +243,11 @@ function AppNavigator() {
     const content: React.ReactElement = <AppStack />
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
           <OfflineBanner />
           <SwitchedAccountBanner />
           <SafeAreaProvider style={{ flex: 1 }}>
-            <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+            <NavigationContainer theme={TRANSPARENT_NAV_THEME as any} ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
           </SafeAreaProvider>
           {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
         </View>
@@ -242,13 +268,13 @@ function AppNavigator() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
         <OfflineBanner />
         {/* Nested provider so the banner's height is subtracted from the insets
             the screens below see. Without it every screen would add the full top
             inset again and sit in a gap under the banner. */}
         <SafeAreaProvider style={{ flex: 1 }}>
-          <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
+          <NavigationContainer theme={TRANSPARENT_NAV_THEME as any} ref={navigationRef} onReady={flushPendingNavigation}>
             <RootAuthNavigator />
           </NavigationContainer>
         </SafeAreaProvider>

@@ -4,7 +4,7 @@ import { createClient } from './server'
 import { createAdminClient } from './admin'
 import { NextResponse } from 'next/server'
 
-export type CallerRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'front_desk' | 'doctor' | 'ambulance_crew'
+export type CallerRole = 'super_admin' | 'hospital_admin' | 'clinic_admin' | 'front_desk' | 'doctor' | 'ambulance_crew' | 'ambulance_admin'
 
 export interface CallerInfo {
   authId: string
@@ -12,6 +12,12 @@ export interface CallerInfo {
   hospitalId?: string
   clinicId?: string
   doctorId?: string
+  // Set only for role='ambulance_admin' -- the ambulance_providers row this
+  // independent operator's admin/owner account manages. A hospital_admin who
+  // owns a fleet keeps their existing role and hospitalId instead; fleet
+  // routes resolve their provider by hospitalId, not this field. See
+  // web/src/lib/ambulance-fleet.ts's resolveProviderId.
+  providerId?: string
 }
 
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
@@ -151,6 +157,23 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
       .eq('is_active', true)
       .maybeSingle()
     if (crewRow) caller = { authId, role: 'ambulance_crew' }
+  }
+
+  if (!caller && profile) {
+    // Independent ambulance operator admin/owner (ambulance_provider_admins) --
+    // the standalone-app identity for a private/government operator that is
+    // not part of any hospital. A hospital that owns its own fleet keeps
+    // resolving as 'hospital_admin' above; this branch only fires for
+    // accounts with no hospital_admins/clinic_admins/doctors/ambulance_crew
+    // row at all, i.e. someone who signed up through the ambulance app's own
+    // independent-operator registration.
+    const { data: providerAdminRow } = await db
+      .from('ambulance_provider_admins')
+      .select('provider_id')
+      .eq('user_id', profile.id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (providerAdminRow) caller = { authId, role: 'ambulance_admin', providerId: providerAdminRow.provider_id }
   }
 
   if (!caller || !allowed.includes(caller.role)) {

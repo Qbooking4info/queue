@@ -10,6 +10,9 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { Button } from '@queue/shared/components/ui/Button'
+import { ProfileCard } from '@queue/shared/components/ui/ProfileCard'
+import { Glass } from '@queue/shared/components/ui/Glass'
+import { Pill } from '@queue/shared/components/ui/DataViz'
 
 interface Props { navigation?: any }
 
@@ -33,8 +36,8 @@ interface Stats {
 }
 
 export function SpecialistProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, doctorProfile, signOut, setStaffMode } = useAuth()
+  const { theme: t, themeId, toggleTheme, mode, toggleMode } = useTheme()
+  const { user, doctorProfile, signOut } = useAuth()
   const [doctor,       setDoctor]       = useState<DoctorDetails | null>(null)
   const [stats,        setStats]        = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
   const [loading,      setLoading]      = useState(true)
@@ -78,10 +81,6 @@ export function SpecialistProfileScreen({ navigation }: Props) {
     await signOut()
   }
 
-  const initials = doctor?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    ?? user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    ?? '?'
-
   if (loading) {
     return (
       <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
@@ -95,53 +94,47 @@ export function SpecialistProfileScreen({ navigation }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={[st.title, { color: t.textPrimary }]}>Profile</Text>
 
-        {/* Doctor Card */}
-        <View style={[st.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[st.avatarText, { color: t.accent }]}>{initials}</Text>
-          </View>
-          <Text style={[st.docName, { color: t.textPrimary }]}>{doctor?.full_name ?? user?.full_name ?? '—'}</Text>
-          {user?.doctor_code && (
-            <View style={[st.idPill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Ionicons name="key-outline" size={11} color={t.accent} />
-              <Text selectable style={[st.idPillText, { color: t.accent }]}>{user.doctor_code}</Text>
-            </View>
-          )}
-          {doctor?.specialty && (
-            <Text style={[st.specialty, { color: t.accent }]}>{(doctor.specialty as any).name}</Text>
-          )}
-          {doctor?.qualification && (
-            <Text style={[st.qual, { color: t.textMuted }]}>{doctor.qualification}</Text>
-          )}
-          {user?.email && (
-            <Text style={[st.email, { color: t.textMuted }]}>{user.email}</Text>
-          )}
+        <ProfileCard
+          name={doctor?.full_name ?? user?.full_name ?? '—'}
+          sub={doctor?.qualification ?? user?.email ?? null}
+          badge={doctor?.specialty
+            ? <Pill label={(doctor.specialty as any).name} tone="statusVirtual" />
+            : undefined}
+          stats={[
+            { label: 'Rating', value: (doctor?.avg_rating ?? 0) > 0 ? doctor!.avg_rating!.toFixed(1) : '—' },
+            { label: 'This month', value: String(stats.thisMonth) },
+            { label: 'All-time', value: String(stats.completed) },
+          ]}
+          style={{ marginHorizontal: 16, marginBottom: 12 }}
+        />
 
-          {(doctor?.avg_rating ?? 0) > 0 && (
-            <View style={st.ratingRow}>
-              {[0, 1, 2, 3, 4].map(i => (
-                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? t.statusBusy.text : t.textMuted} />
-              ))}
-              <Text style={[st.ratingNum, { color: t.textMuted }]}>
-                {doctor!.avg_rating!.toFixed(1)} ({doctor!.review_count ?? 0} reviews)
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Stats */}
-        <View style={[st.statsRow, { marginHorizontal: 16, marginBottom: 12 }]}>
-          {[
-            { label: 'Today',      value: stats.today },
-            { label: 'This month', value: stats.thisMonth },
-            { label: 'All-time',   value: stats.completed },
-          ].map(s => (
-            <View key={s.label} style={[st.statBox, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.statNum, { color: t.textPrimary }]}>{s.value}</Text>
-              <Text style={[st.statLabel, { color: t.textMuted }]}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Kept out of ProfileCard deliberately: the doctor code is the string a
+            hospital types to link this account, so it needs to stay selectable and
+            prominent rather than becoming a stat chip. */}
+        {(user?.doctor_code || (doctor?.avg_rating ?? 0) > 0) && (
+          <Glass radius={22} pad={14} style={{ marginHorizontal: 16, marginBottom: 12, gap: 10 }}>
+            {!!user?.doctor_code && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="key-outline" size={13} color={t.accent} />
+                <Text style={{ fontSize: 12.5, color: t.textSecondary }}>Doctor ID</Text>
+                <Text selectable style={{ fontSize: 13.5, fontWeight: '700', color: t.accent, marginLeft: 'auto' }}>
+                  {user.doctor_code}
+                </Text>
+              </View>
+            )}
+            {(doctor?.avg_rating ?? 0) > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                {[0, 1, 2, 3, 4].map(i => (
+                  <Ionicons key={i} name="star" size={15}
+                    color={i < Math.round(doctor!.avg_rating!) ? t.statusBusy.text : t.tick} />
+                ))}
+                <Text style={{ fontSize: 12, color: t.textSecondary, marginLeft: 6 }}>
+                  {doctor!.avg_rating!.toFixed(1)} from {doctor!.review_count ?? 0} review{(doctor!.review_count ?? 0) === 1 ? '' : 's'}
+                </Text>
+              </View>
+            )}
+          </Glass>
+        )}
 
         {/* Today's schedule quick link */}
         {navigation && (
@@ -154,6 +147,18 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="calendar-outline" size={14} color={t.accent} /><Text style={[st.scheduleBtnText, { color: t.accent }]}>View Today's Schedule</Text></View>
           </TouchableOpacity>
+        )}
+
+        {/* Moved here from the Home screen: these four are navigation, and they belong
+            with the account rather than competing with the day's figures on Home. */}
+        {navigation && (
+          <Glass radius={22} pad={0} style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden' }}>
+            <Text style={[st.sectionTitle, { color: t.textSecondary, borderBottomColor: t.cardBorder }]}>MANAGE</Text>
+            <LinkRow theme={t} icon="calendar-outline"  label="Review appointments" onPress={() => navigation.navigate('Appointments')} />
+            <LinkRow theme={t} icon="bar-chart-outline" label="My Analytics"        onPress={() => navigation.navigate('DoctorAnalytics')} />
+            <LinkRow theme={t} icon="settings-outline"  label="Edit settings & fees" onPress={() => navigation.navigate('Settings')} />
+            <LinkRow theme={t} icon="business-outline"  label="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} last />
+          </Glass>
         )}
 
         {/* Practice info */}
@@ -175,28 +180,26 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Switch to Patient Mode */}
-        <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
-          style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14 }]}>
-          <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
-          <View style={{ flex: 1 }}>
-            <Text style={[st.rowLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
-            <Text style={[{ fontSize: 11, color: t.textMuted, marginTop: 1 }]}>Book appointments as a patient</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-        </TouchableOpacity>
-
         {/* Settings */}
         <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
           <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
           <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Ionicons name={themeId === 'forest' ? 'leaf-outline' : 'medical-outline'} size={14} color={t.textPrimary} />
               <Text style={[st.rowLabel, { color: t.textPrimary }]}>
-                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
+                {themeId === 'forest' ? 'Teal' : 'Clinical'} theme
               </Text>
             </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+            <Switch value={themeId === 'clinical'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
+          </View>
+          <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
+              <Text style={[st.rowLabel, { color: t.textPrimary }]}>
+                {mode === 'dark' ? 'Dark' : 'Light'} mode
+              </Text>
+            </View>
+            <Switch value={mode === 'dark'} onValueChange={toggleMode} trackColor={{ true: t.accent, false: t.cardBorder }} />
           </View>
         </View>
 
@@ -232,28 +235,34 @@ function Row({ label, value, theme: t, accent }: { label: string; value: string;
 const st = StyleSheet.create({
   safe:            { flex: 1 },
   center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title:           { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:     { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:          { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:      { fontSize: 26, fontWeight: '800' },
-  docName:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  idPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 99, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
-  idPillText:      { fontSize: 12, fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1.5 },
-  specialty:       { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:            { fontSize: 12, marginTop: 3, textAlign: 'center' },
-  email:           { fontSize: 11, marginTop: 6 },
-  ratingRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingNum:       { fontSize: 12, marginLeft: 4 },
-  statsRow:        { flexDirection: 'row', gap: 8 },
-  statBox:         { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  statNum:         { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  statLabel:       { fontSize: 10, fontWeight: '600', marginTop: 3 },
+  title:           { fontSize: 32, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
+  specialty:       { fontSize: 15, fontWeight: '700', marginTop: 4 },
   scheduleBtn:     { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  scheduleBtnText: { fontSize: 14, fontWeight: '700' },
+  scheduleBtnText: { fontSize: 16, fontWeight: '700' },
   section:         { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   row:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  rowLabel:        { fontSize: 13 },
-  rowValue:        { fontSize: 13, fontWeight: '600' },
-  bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
+  rowLabel:        { fontSize: 15 },
+  rowValue:        { fontSize: 15, fontWeight: '600' },
+  bio:             { padding: 14, fontSize: 15, lineHeight: 20 },
 })
+
+function LinkRow({ theme: t, icon, label, onPress, last }: {
+  theme: any; icon: keyof typeof Ionicons.glyphMap; label: string
+  onPress: () => void; last?: boolean
+}) {
+  return (
+    <TouchableOpacity
+      onPress={() => { haptics.tap(); onPress() }}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder,
+      }}
+    >
+      <Ionicons name={icon} size={17} color={t.accent} />
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={t.textSecondary} />
+    </TouchableOpacity>
+  )
+}

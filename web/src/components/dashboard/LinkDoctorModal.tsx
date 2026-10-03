@@ -132,7 +132,7 @@ export function LinkDoctorModal({ clinicId, C, onClose, onLinked }: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
   }
   const card: React.CSSProperties = {
-    width: '100%', maxWidth: 440, background: C.card,
+    width: '100%', maxWidth: 440, background: C.popover,
     border: `1px solid ${C.border}`, borderRadius: 20,
     boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
   }

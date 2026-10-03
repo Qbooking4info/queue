@@ -7,6 +7,11 @@ import { ArrowLeft, CheckCircle2, Calendar, Monitor } from 'lucide-react'
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DURATIONS = [15, 20, 30, 45, 60]
 const HORIZONS  = [14, 30, 60, 90]
+const SLOT_MODES: { key: 'physical' | 'virtual' | 'both'; label: string }[] = [
+  { key: 'physical', label: 'Physical only' },
+  { key: 'virtual',  label: 'Virtual only' },
+  { key: 'both',     label: 'Both' },
+]
 
 interface Slot {
   id: string; slot_date: string; start_time: string; end_time: string
@@ -34,7 +39,7 @@ export default function DoctorSchedulePage() {
   const [endTime, setEndTime]           = useState('17:00')
   const [slotDuration, setDuration]     = useState(30)
   const [daysAhead, setDaysAhead]       = useState(30)
-  const [acceptsVirtual, setVirtual]    = useState(false)
+  const [slotMode, setSlotMode]         = useState<'physical' | 'virtual' | 'both'>('physical')
   const [clearExisting, setClear]       = useState(false)
 
   const [loading, setLoading]   = useState(false)
@@ -77,7 +82,7 @@ export default function DoctorSchedulePage() {
         end_time: endTime,
         slot_duration: slotDuration,
         days_ahead: daysAhead,
-        accepts_virtual: acceptsVirtual,
+        slot_mode: slotMode,
         clear_existing: clearExisting,
       }),
     })
@@ -175,23 +180,41 @@ export default function DoctorSchedulePage() {
             </div>
           </div>
 
-          {/* Toggles */}
-          <div className="flex flex-col gap-2">
-            {[
-              { key: 'virtual', label: 'Also generate virtual slots', value: acceptsVirtual, set: setVirtual },
-              { key: 'clear',   label: 'Clear existing unbooked slots first', value: clearExisting, set: setClear },
-            ].map(({ key, label, value, set }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer">
-                <div onClick={() => set(!value)}
-                  className="w-9 h-5 rounded-full relative transition-colors shrink-0"
-                  style={{ background: value ? '#00E87A' : 'rgba(255,255,255,0.1)' }}>
-                  <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                    style={{ left: value ? 20 : 2 }} />
-                </div>
-                <span className="text-sm text-[#7A9089]">{label}</span>
-              </label>
-            ))}
+          {/* Virtual/physical mode */}
+          <div>
+            <label className="text-xs font-semibold text-[#7A9089] uppercase tracking-wider block mb-2">Virtual or Physical</label>
+            <div className="flex gap-2">
+              {SLOT_MODES.map(m => (
+                <button key={m.key} type="button" onClick={() => setSlotMode(m.key)}
+                  className="flex-1 py-2 rounded-lg text-xs font-bold border transition-all"
+                  style={{
+                    borderColor: slotMode === m.key ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.1)',
+                    background:  slotMode === m.key ? 'rgba(0,232,122,0.1)' : 'rgba(255,255,255,0.03)',
+                    color:       slotMode === m.key ? '#00E87A' : '#7A9089',
+                  }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-[#4A6058] mt-2 leading-relaxed">
+              {slotMode === 'both'
+                ? 'Every slot in this range offers both — patients of either type share one queue by check-in time.'
+                : slotMode === 'virtual'
+                  ? 'This range becomes a dedicated virtual-only block — no physical slots are created for it.'
+                  : 'No virtual slots for this range. Run this again with a different range to add a virtual block.'}
+            </p>
           </div>
+
+          {/* Clear-existing toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => setClear(!clearExisting)}
+              className="w-9 h-5 rounded-full relative transition-colors shrink-0"
+              style={{ background: clearExisting ? '#00E87A' : 'rgba(255,255,255,0.1)' }}>
+              <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                style={{ left: clearExisting ? 20 : 2 }} />
+            </div>
+            <span className="text-sm text-[#7A9089]">Clear existing unbooked slots first</span>
+          </label>
 
           {/* Preview */}
           <div className="bg-white/3 rounded-xl p-3 text-xs text-[#7A9089]">
@@ -206,7 +229,7 @@ export default function DoctorSchedulePage() {
               Math.floor((
                 (parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1])) -
                 (parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]))
-              ) / slotDuration) * (acceptsVirtual ? 2 : 1)
+              ) / slotDuration) * (slotMode === 'both' ? 2 : 1)
             )} total slots
           </div>
 

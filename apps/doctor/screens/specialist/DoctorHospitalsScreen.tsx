@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { ShellScroll } from '@queue/shared/components/AppShell'
 import { getMyDoctorClinics, switchMyActiveClinic, type DoctorClinicOption } from '@queue/shared/lib/api'
@@ -13,6 +14,9 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile, switchHospital } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
+  // doctorId -> whether this link offers virtual. accepts_virtual is a column on
+  // doctors, and there is one doctors row per hospital, so it varies by link.
+  const [virtualByDoctorId, setVirtualByDoctorId] = useState<Record<string, boolean>>({})
 
   // Clinics assigned to this doctor at the currently-active hospital -- a
   // doctor may be assigned to several, but only one is active at a time
@@ -50,6 +54,20 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
     setClinicSwitching(null)
   }
 
+  useEffect(() => {
+    const ids = doctorProfile?.linkedHospitals.map(h => h.doctorId) ?? []
+    if (!ids.length) return
+    let alive = true
+    supabase.from('doctors').select('id, accepts_virtual').in('id', ids)
+      .then(({ data }: { data: { id: string; accepts_virtual: boolean | null }[] | null }) => {
+        if (!alive) return
+        const map: Record<string, boolean> = {}
+        for (const d of data ?? []) map[d.id] = !!d.accepts_virtual
+        setVirtualByDoctorId(map)
+      })
+    return () => { alive = false }
+  }, [doctorProfile])
+
   const activeHospitalName = doctorProfile?.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName
 
   return (
@@ -64,9 +82,9 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
               <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
             </TouchableOpacity>
           ) : null}
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Hospitals</Text>
+          <Text style={{ fontSize: 25, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Hospitals</Text>
         </View>
-        <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
+        <Text style={{ fontSize: 14, color: t.textMuted, marginBottom: 20 }}>
           Manage the hospitals and clinics you're linked to. Only one can be active at a time —
           that's the one whose queue and referrals you see.
         </Text>
@@ -74,10 +92,10 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
         {(doctorProfile?.linkedHospitals ?? []).length === 0 ? (
           <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 20, marginBottom: 20, alignItems: 'center' }}>
             <Ionicons name="business-outline" size={32} color={t.textMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary, marginBottom: 4, textAlign: 'center' }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary, marginBottom: 4, textAlign: 'center' }}>
               Not linked to any hospital yet
             </Text>
-            <Text style={{ fontSize: 12, color: t.textMuted, textAlign: 'center' }}>
+            <Text style={{ fontSize: 14, color: t.textMuted, textAlign: 'center' }}>
               You can still accept direct patient bookings — see Settings. To also work with a
               hospital's queue, share your Doctor ID below with their admin.
             </Text>
@@ -95,16 +113,29 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
                     borderColor: active ? t.accentBorder : t.cardBorder,
                     backgroundColor: active ? t.accentBg : t.cardBg,
                   }}>
-                  <View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{h.hospitalName}</Text>
-                    {active && <Text style={{ fontSize: 11, color: t.accent, marginTop: 2 }}>Active — you'll see this hospital's queue</Text>}
+                  <View style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{h.hospitalName}</Text>
+                    {active && <Text style={{ fontSize: 13, color: t.accent, marginTop: 2 }}>Active — you'll see this hospital's queue</Text>}
+                    {/* What this link actually offers. Physical always -- a hospital
+                        link is a physical posting by definition. Virtual only when
+                        that doctors row has accepts_virtual. No home visit here at
+                        all: the booking trigger (20260913000001) only permits
+                        home_visit on hospital-less direct bookings, so offering it
+                        against a hospital would be claiming something the database
+                        would reject. */}
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                      <TypeChip theme={t} label="Physical" icon="business-outline" />
+                      {virtualByDoctorId[h.doctorId] && (
+                        <TypeChip theme={t} label="Virtual" icon="videocam-outline" tone={t.info} />
+                      )}
+                    </View>
                   </View>
                   {switching === h.hospitalId ? (
                     <ActivityIndicator size="small" color={t.accent} />
                   ) : active ? (
                     <Ionicons name="checkmark-circle" size={20} color={t.accent} />
                   ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Switch</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.textMuted }}>Switch</Text>
                   )}
                 </TouchableOpacity>
               )
@@ -114,10 +145,10 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
 
         {clinics.length >= 2 && (
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: t.textPrimary, marginBottom: 4 }}>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary, marginBottom: 4 }}>
               Clinics at {activeHospitalName ?? 'this hospital'}
             </Text>
-            <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, color: t.textMuted, marginBottom: 12 }}>
               You're assigned to more than one clinic here. Only one can be active at a time.
             </Text>
             <View style={{ gap: 10 }}>
@@ -133,15 +164,15 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
                       backgroundColor: active ? t.accentBg : t.cardBg,
                     }}>
                     <View>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{c.clinicName}</Text>
-                      {active && <Text style={{ fontSize: 11, color: t.accent, marginTop: 2 }}>Active here</Text>}
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{c.clinicName}</Text>
+                      {active && <Text style={{ fontSize: 13, color: t.accent, marginTop: 2 }}>Active here</Text>}
                     </View>
                     {clinicSwitching === c.clinicId ? (
                       <ActivityIndicator size="small" color={t.accent} />
                     ) : active ? (
                       <Ionicons name="checkmark-circle" size={20} color={t.accent} />
                     ) : (
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Switch</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.textMuted }}>Switch</Text>
                     )}
                   </TouchableOpacity>
                 )
@@ -151,17 +182,33 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
         )}
 
         <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 16 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
             Your Doctor ID
           </Text>
           <View style={{ backgroundColor: t.inputBg, borderColor: t.inputBorder, borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 8, alignItems: 'center' }}>
-            <Text selectable style={{ fontSize: 24, fontFamily: 'monospace', fontWeight: '800', letterSpacing: 4, color: t.textPrimary }}>{user?.doctor_code ?? '—'}</Text>
+            <Text selectable style={{ fontSize: 28, fontFamily: 'monospace', fontWeight: '800', letterSpacing: 4, color: t.textPrimary }}>{user?.doctor_code ?? '—'}</Text>
           </View>
-          <Text style={{ fontSize: 11, color: t.textMuted }}>
+          <Text style={{ fontSize: 13, color: t.textMuted }}>
             Share this with a hospital admin to get linked — they'll enter it in their dashboard's
             "Link Existing Doctor" flow. Tap and hold to copy.
           </Text>
         </View>
       </ShellScroll>
+  )
+}
+
+function TypeChip({ theme: t, label, icon, tone }: {
+  theme: any; label: string; icon: keyof typeof Ionicons.glyphMap; tone?: string
+}) {
+  const color = tone ?? t.textSecondary
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 4,
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+      borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.canvasBg,
+    }}>
+      <Ionicons name={icon} size={10} color={color} />
+      <Text style={{ fontSize: 10.5, fontWeight: '700', color }}>{label}</Text>
+    </View>
   )
 }

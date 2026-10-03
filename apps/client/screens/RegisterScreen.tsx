@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
+import { CONSENT_STATEMENT } from '@queue/shared/lib/privacy'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { linkDependent } from '@queue/shared/lib/api'
 import { DateOfBirthSelect } from '@queue/shared/components/ui/DateOfBirthSelect'
@@ -46,6 +47,7 @@ export function RegisterScreen({ navigation }: Props) {
   const [confirm,  setConfirm]    = useState('')
   const [error,    setError]      = useState('')
   const [busy,     setBusy]       = useState(false)
+  const [consented, setConsented] = useState(false)
 
   const [showCaretaker, setShowCaretaker]   = useState(false)
   const [caretakerCode, setCaretakerCode]   = useState('')
@@ -68,6 +70,10 @@ export function RegisterScreen({ navigation }: Props) {
     if (pass.length < 6)  { setError('Password must be at least 6 characters.'); return }
     if (pass !== confirm) { setError('Passwords do not match.'); return }
     if (caretakerCode.trim() && !caretakerRel) { setError('Select your relationship to your caretaker.'); return }
+    // Consent has to be an act, not an inference from pressing a button labelled
+    // something else. Blocking here is the point: NDPR consent must be freely given
+    // and specific, and a pre-ticked or implied box is neither.
+    if (!consented) { setError('Please agree to the Privacy Policy and Terms to continue.'); return }
     setBusy(true); setError('')
     const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), dob)
     if (err) { setBusy(false); setError(err); return }
@@ -179,7 +185,7 @@ export function RegisterScreen({ navigation }: Props) {
                   placeholder="e.g. K7M3QX" placeholderTextColor={t.textMuted}
                   autoCapitalize="characters" maxLength={6}
                   style={[s.input, { backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary,
-                    fontFamily: 'monospace', fontSize: 16, letterSpacing: 2, textAlign: 'center' }]}
+                    fontFamily: 'monospace', fontSize: 18, letterSpacing: 2, textAlign: 'center' }]}
                 />
                 <Text style={[s.label, { color: t.textMuted, marginTop: 12 }]}>Your relationship to them</Text>
                 <View style={s.pillRow}>
@@ -212,9 +218,29 @@ export function RegisterScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          <Text style={[s.terms, { color: t.textMuted }]}>
-            By creating an account you agree to our Terms of Service and Privacy Policy.
-          </Text>
+          {/* An explicit, unticked control replacing the passive "by creating an
+              account you agree" line. That line recorded nothing and asked nothing;
+              this one gates submission and is written to user_consents with the
+              policy version the user actually saw. */}
+          <TouchableOpacity
+            onPress={() => setConsented(v => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: consented }}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: t.spacing.md }}
+          >
+            <View style={{
+              width: 22, height: 22, borderRadius: 6, marginTop: 1,
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: consented ? t.accent : t.inputBorder,
+              backgroundColor: consented ? t.accent : 'transparent',
+            }}>
+              {consented && <Ionicons name="checkmark" size={15} color={t.onAccent ?? '#FFFFFF'} />}
+            </View>
+            <Text style={[s.terms, { color: t.textSecondary, textAlign: 'left', flex: 1, paddingHorizontal: 0 }]}>
+              {CONSENT_STATEMENT}
+            </Text>
+          </TouchableOpacity>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -226,29 +252,29 @@ const s = StyleSheet.create({
   safe:      { flex: 1 },
   scroll:    { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24 },
   backBtn:   { marginBottom: 20 },
-  backText:  { fontSize: 14, fontWeight: '600' },
-  title:     { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  sub:       { fontSize: 13, marginTop: 4, marginBottom: 24 },
+  backText:  { fontSize: 16, fontWeight: '600' },
+  title:     { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  sub:       { fontSize: 15, marginTop: 4, marginBottom: 24 },
   card:      { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14, marginBottom: 20 },
   fieldWrap: { gap: 6 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  label:     { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 16 },
   errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
-  errText:   { color: '#F87171', fontSize: 12 },
+  errText:   { color: '#F87171', fontSize: 14 },
   footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  footerText:{ fontSize: 13 },
-  footerLink:{ fontSize: 13, fontWeight: '700' },
-  terms:     { fontSize: 11, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
+  footerText:{ fontSize: 15 },
+  footerLink:{ fontSize: 15, fontWeight: '700' },
+  terms:     { fontSize: 13, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
   recommendBanner:   { borderRadius: 12, borderWidth: 1, padding: 12 },
-  recommendText:     { fontSize: 12, lineHeight: 17 },
+  recommendText:     { fontSize: 14, lineHeight: 17 },
   caretakerToggle:   { paddingVertical: 4 },
-  caretakerToggleText: { fontSize: 13, fontWeight: '700' },
+  caretakerToggleText: { fontSize: 15, fontWeight: '700' },
   caretakerCard:     { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   caretakerHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  caretakerTitle:    { fontSize: 13, fontWeight: '800' },
-  caretakerRemove:   { fontSize: 12, fontWeight: '600' },
-  helpText:          { fontSize: 11, lineHeight: 16 },
+  caretakerTitle:    { fontSize: 15, fontWeight: '800' },
+  caretakerRemove:   { fontSize: 14, fontWeight: '600' },
+  helpText:          { fontSize: 13, lineHeight: 16 },
   pillRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   pill:              { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  pillText:          { fontSize: 12 },
+  pillText:          { fontSize: 14 },
 })

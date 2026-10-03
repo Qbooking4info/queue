@@ -8,6 +8,7 @@ import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { MOCK_LOCATION, mockCoord } from '@queue/shared/lib/mock-location'
 import * as Location from 'expo-location'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -142,6 +143,13 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   async function captureLocation() {
     setLocating(true)
     try {
+      if (MOCK_LOCATION) {
+        const c = mockCoord(user?.id ?? name ?? 'hospital')
+        setLatitude(c.latitude)
+        setLongitude(c.longitude)
+        haptics.success()
+        return
+      }
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Location access is required to pin your hospital on the map. You can also skip this and set it later from the web portal.')
@@ -276,7 +284,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Field label="Phone" value={phone} onChange={setPhone} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
               <Field label="WhatsApp (optional)" value={whatsapp} onChange={setWhatsapp} placeholder="+234 000 000 0000" keyboard="phone-pad" theme={t} />
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>HOSPITAL TYPE</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {HOSPITAL_TYPES.map(tp => (
                     <TouchableOpacity key={tp.value} onPress={() => setType(tp.value)}
@@ -287,7 +295,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
                 </View>
               </ScrollView>
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>OWNERSHIP (OPTIONAL)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {OWNERSHIP_OPTIONS.map(op => {
                     const active = ownership === op.value
@@ -328,7 +336,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               <Field label="City" value={city} onChange={setCity} placeholder="Lagos" theme={t} />
 
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>STATE</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {NIGERIAN_STATES.map(st => (
                     <TouchableOpacity key={st} onPress={() => setState(st)}

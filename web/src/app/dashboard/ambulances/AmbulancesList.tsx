@@ -1,8 +1,11 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
-import { Ambulance, Phone, Clock, MapPin, AlertTriangle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Ambulance, Phone, Clock, MapPin, AlertTriangle, Plus } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { safePatientName } from '@/lib/dashboard-utils'
+import { RequestAmbulanceModal } from './RequestAmbulanceModal'
 
 interface TransportRow {
   id: string
@@ -61,8 +64,10 @@ function formatEta(seconds: number | null): string {
   return `~${mins} min`
 }
 
-export function AmbulancesList({ requests, canManageFleet }: { requests: TransportRow[]; canManageFleet: boolean }) {
+export function AmbulancesList({ requests, canManageFleet, hospitalId }: { requests: TransportRow[]; canManageFleet: boolean; hospitalId: string }) {
   const { theme: C } = useTheme()
+  const router = useRouter()
+  const [requesting, setRequesting] = useState(false)
   const active = requests.filter(r => ACTIVE_STATUSES.includes(r.status))
   const history = requests.filter(r => !ACTIVE_STATUSES.includes(r.status))
 
@@ -94,6 +99,13 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Hospital admins/front desk/doctors can request transport on a
+              patient's behalf, not just receive it -- see POST /api/transport/
+              request's staff-initiated path. */}
+          <button onClick={() => setRequesting(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: C.accent, border: 'none', fontSize: 13, fontWeight: 700, borderRadius: 12, cursor: 'pointer', color: '#fff' }}>
+            <Plus size={14} /> Request Ambulance
+          </button>
           {/* Alerts first: dispatcher_alerts records every request that found no
               ambulance, and until now nothing surfaced it. */}
           <Link href="/dashboard/ambulances/alerts"
@@ -104,12 +116,6 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
             <Link href="/dashboard/ambulances/coverage"
               style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
               Coverage
-            </Link>
-          )}
-          {canManageFleet && (
-            <Link href="/dashboard/ambulances/fleet"
-              style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
-              Manage Fleet
             </Link>
           )}
         </div>
@@ -189,6 +195,14 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
             })}
           </div>
         </>
+      )}
+
+      {requesting && (
+        <RequestAmbulanceModal
+          C={C}
+          hospitalId={hospitalId}
+          onClose={(bookingRef) => { setRequesting(false); if (bookingRef) router.refresh() }}
+        />
       )}
     </div>
   )

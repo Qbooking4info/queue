@@ -1,9 +1,18 @@
 import type { DisplayHospital } from '../components/hospital/HospitalCard'
 import type { HospitalWithDoctors } from './api'
 
-const AVATAR_BG = ['#1A4A32','#1A2A4A','#3A1A0E','#2A1A40','#1A3A1A','#2A2A1A']
+// Fully saturated, mid-tone colors -- always readable with the white initials
+// text painted on top regardless of theme, unlike the near-black set these
+// replaced (tuned only for a dark card background; on a light-mode card they'd
+// have read as almost invisible). Matches the mockups' own hospital avatar
+// palette (Lagos Island General/Eko Specialist/Victoria Crown/Reddington),
+// extended by two more distinct hues so more than 4 hospitals still visibly vary.
+const AVATAR_BG = ['#006D3E','#005DB8','#7B4100','#4B3694','#B45309','#0E7490']
 
-function bgFromName(name: string): string {
+// Exported so any avatar (a doctor row in the booking flow, not just a
+// hospital card) can get the same "different colors per tile" treatment
+// from just a name, instead of a single hardcoded color for every avatar.
+export function bgFromName(name: string): string {
   let h = 0
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
   return AVATAR_BG[Math.abs(h) % AVATAR_BG.length]

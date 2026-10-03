@@ -55,9 +55,17 @@ export function LoginScreen({ navigation, route }: Props) {
   async function handleLogin() {
     if (!email.trim() || !pass) { setError('Enter your email and password.'); return }
     setBusy(true); setError('')
-    const err = await signIn(email.trim().toLowerCase(), pass, surface)
-    setBusy(false)
-    if (err) setError(err)
+    // try/finally, not a bare await: if signIn throws, an unhandled rejection used to
+    // leave busy stuck true, so the button spun forever and the user was never told
+    // anything went wrong -- indistinguishable from a hung network call.
+    try {
+      const err = await signIn(email.trim().toLowerCase(), pass, surface)
+      if (err) setError(err)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not sign in. Please try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -111,8 +119,8 @@ export function LoginScreen({ navigation, route }: Props) {
             </View>
 
             {!!error && (
-              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-                <Text style={s.errText}>{error}</Text>
+              <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
               </View>
             )}
 
@@ -156,7 +164,7 @@ const s = StyleSheet.create({
   label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   input:      { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
   errBox:     { borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 14 },
-  errText:    { color: '#F87171', fontSize: 12 },
+  errText:    { fontSize: 12 },
   forgotRow:  { alignItems: 'center', marginTop: 14 },
   forgotText: { fontSize: 13, fontWeight: '500' },
   footer:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },

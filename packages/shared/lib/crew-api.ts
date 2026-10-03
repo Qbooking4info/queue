@@ -76,12 +76,37 @@ export interface MyUnit {
    * covering an area they are not.
    */
   visible_to_dispatch: boolean
+  // Geocoded at registration, always present. Lets the operator console's
+  // Fleet Map show a freshly added unit somewhere real before it has ever
+  // sent a live GPS ping -- "for testing sake, i can register and add
+  // ambulance with address only" -- rather than needing a real device fix
+  // just to see it plotted.
+  home_lat: number
+  home_lng: number
 }
 
 export async function getMyUnits(): Promise<MyUnit[]> {
   const { data, error } = await supabase.rpc('get_my_units')
   if (error) throw error
   return (data ?? []) as MyUnit[]
+}
+
+export interface CrewStats {
+  /** Jobs this crew member personally took to handover. */
+  jobs_completed: number
+  /** Mean dispatch-to-scene time. Null until they have at least one on_scene step. */
+  avg_arrival_secs: number | null
+  /** When they joined the provider. Null if no active crew row. */
+  member_since: string | null
+}
+
+/** Lifetime stats for the crew profile. Attributed per person via
+ *  transport_events.actor_id, not per unit -- several crew share one rig. */
+export async function getMyCrewStats(): Promise<CrewStats | null> {
+  const { data, error } = await supabase.rpc('get_my_crew_stats')
+  if (error) throw error
+  const row = Array.isArray(data) ? data[0] : data
+  return (row as CrewStats | undefined) ?? null
 }
 
 export async function setUnitDuty(
@@ -140,6 +165,22 @@ export const CREW_STATUS_LABEL: Record<CrewJobStatus, string> = {
   on_scene:            'On scene',
   transporting:        'Transporting to hospital',
   arrived_at_destination: 'Arrived at hospital',
+}
+
+/**
+ * How long an offer was live for, in seconds — the window `expires_at` counts down
+ * from. Needed to draw a countdown as a proportion rather than a bare number.
+ *
+ * Mirrors policyFor() in web/src/lib/dispatch/matching.ts, which derives the TTL from
+ * triage: a critical call is offered for 30s, a routine one 60s, a scheduled booking
+ * 600s. Recomputed here from triage_level (already on every offer) rather than
+ * returning offered_at from the RPC, so no SQL function had to change — but it does
+ * mean the two must be kept in step if that policy is retuned.
+ */
+export function offerWindowSeconds(triageLevel: number | null): number {
+  if (triageLevel == null) return 600
+  if (triageLevel <= 2) return 30
+  return 60
 }
 
 /** The next crew-drivable status after the current one, or null if the crew's

@@ -164,32 +164,32 @@ function EmptyState({ iconName, title, sub }: { iconName: React.ComponentProps<t
     </View>
   )
 }
-const es = StyleSheet.create({ card: { borderRadius: 18, borderWidth: 1, padding: 32, alignItems: 'center' }, title: { fontSize: 15, fontWeight: '700', marginBottom: 6 }, sub: { fontSize: 12, textAlign: 'center', lineHeight: 18 } })
+const es = StyleSheet.create({ card: { borderRadius: 18, borderWidth: 1, padding: 32, alignItems: 'center' }, title: { fontSize: 17, fontWeight: '700', marginBottom: 6 }, sub: { fontSize: 14, textAlign: 'center', lineHeight: 18 } })
 
 const s = StyleSheet.create({
   safe:           { flex: 1 },
   header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  back:           { fontSize: 22 },
-  title:          { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  back:           { fontSize: 25 },
+  title:          { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
   tabBar:         { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
   tabItem:        { flex: 1, alignItems: 'center', paddingVertical: 11 },
-  tabText:        { fontSize: 12 },
+  tabText:        { fontSize: 14 },
   tabUnderline:   { height: 2, width: '80%', borderRadius: 99, marginTop: 4 },
-  sectionSub:     { fontSize: 11, marginBottom: 14 },
-  sectionTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 8 },
+  sectionSub:     { fontSize: 13, marginBottom: 14 },
+  sectionTitle:   { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 16, marginBottom: 8 },
   card:           { borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   cardHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   rxIcon:         { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  cardTitle:      { fontSize: 13, fontWeight: '700' },
-  cardSub:        { fontSize: 11, marginTop: 1 },
-  cardDate:       { fontSize: 10 },
+  cardTitle:      { fontSize: 15, fontWeight: '700' },
+  cardSub:        { fontSize: 13, marginTop: 1 },
+  cardDate:       { fontSize: 12 },
   infoRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 11, paddingHorizontal: 14, borderTopWidth: 1, gap: 16 },
-  infoLabel:      { fontSize: 11, fontWeight: '600', flexShrink: 0 },
-  infoValue:      { fontSize: 12, textAlign: 'right', flex: 1 },
+  infoLabel:      { fontSize: 13, fontWeight: '600', flexShrink: 0 },
+  infoValue:      { fontSize: 14, textAlign: 'right', flex: 1 },
   statusBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, borderWidth: 1 },
-  statusText:     { fontSize: 10, fontWeight: '700' },
+  statusText:     { fontSize: 12, fontWeight: '700' },
   simpleRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12, marginBottom: 7, borderWidth: 1 },
-  simpleTitle:    { fontSize: 13, fontWeight: '600' },
-  simpleSub:      { fontSize: 11, marginTop: 1 },
-  simpleStatus:   { fontSize: 11 },
+  simpleTitle:    { fontSize: 15, fontWeight: '600' },
+  simpleSub:      { fontSize: 13, marginTop: 1 },
+  simpleStatus:   { fontSize: 13 },
 })

@@ -72,7 +72,7 @@ export function ServiceTagPicker({ selected, onChange }: Props) {
       {open && (
         <div style={{
           position: 'absolute', zIndex: 200, top: 'calc(100% + 6px)', left: 0, right: 0,
-          background: C.card, border: `1px solid ${C.borderMed}`, borderRadius: 12,
+          background: C.popover, border: `1px solid ${C.borderMed}`, borderRadius: 12,
           boxShadow: '0 12px 36px rgba(0,0,0,0.3)', maxHeight: 340, display: 'flex',
           flexDirection: 'column', overflow: 'hidden',
         }}>
@@ -122,7 +122,7 @@ export function ServiceTagPicker({ selected, onChange }: Props) {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all .1s',
                       }}>
-                        {checked && <Check size={11} color={C.id === 'forest' ? '#061208' : '#fff'} strokeWidth={3} />}
+                        {checked && <Check size={11} color={C.onAccent} strokeWidth={3} />}
                       </div>
                       <span style={{ fontSize: 13, color: checked ? C.accent : C.text }}>{service}</span>
                     </div>

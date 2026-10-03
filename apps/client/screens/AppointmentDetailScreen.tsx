@@ -11,9 +11,10 @@ import { Stars } from '@queue/shared/components/ui/Stars'
 import { Button } from '@queue/shared/components/ui/Button'
 import { QueuePositionPicker } from '@queue/shared/components/QueuePositionPicker'
 import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
-import { toDisplayHospital } from '@queue/shared/lib/adapters'
+import { toDisplayHospital, bgFromName } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
+import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
 interface Props { navigation: any; route: any }
 
@@ -137,18 +138,18 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   // banner the instant the doctor starts the call.
   const canJoinVirtual = isVirtual && ['confirmed', 'checked_in', 'in_progress'].includes(appt.status)
   const isMissed    = appt.status === 'no_show'
-  const canReschedule = (isUpcoming || isMissed) && appt.rescheduleCount < 1
+  // Cancel/reschedule are pre-arrival actions only -- once checked in (or a virtual
+  // call is in progress), the patient has committed to being seen and the RLS policy
+  // backing cancelAppointment()/rescheduleAppointment() no longer permits the write
+  // (see 20260922000001_fix_patient_appointment_update_rls.sql). Separate from
+  // isUpcoming, which still covers checked_in/in_progress for display purposes
+  // (the check-in pass, the queue banner) -- those are read-only.
+  const canModify   = ['confirmed', 'pending'].includes(appt.status)
+  const canReschedule = (canModify || isMissed) && appt.rescheduleCount < 1
   const showPass    = isUpcoming && !cancelled && !isPendingReview && !isRejected
 
-  const statusColor = {
-    confirmed:   { bg: t.accentBg,  text: t.accent,    border: t.accentBorder },
-    pending:     { bg: '#FEF8E7',   text: '#633806',   border: 'rgba(196,127,0,0.3)' },
-    completed:   { bg: t.inputBg,   text: t.textMuted, border: t.cardBorder },
-    cancelled:   { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
-    checked_in:  { bg: '#E8F4FE',   text: '#1A5A8C',   border: 'rgba(26,90,140,0.3)' },
-    in_progress: { bg: '#FEF0E6',   text: '#7A3A00',   border: 'rgba(122,58,0,0.3)' },
-    no_show:     { bg: '#FCEBEB',   text: '#791F1F',   border: 'rgba(163,45,45,0.3)' },
-  }[cancelled ? 'cancelled' : appt.status as string] ?? { bg: t.accentBg, text: t.accent, border: t.accentBorder }
+  const sc = statusBadgeColors(t)
+  const statusColor = sc[(cancelled ? 'cancelled' : appt.status) as keyof typeof sc] ?? sc.confirmed
 
   const displayStatus = isPendingReview ? 'Pending Review'
     : isRejected ? 'Rejected'
@@ -157,9 +158,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     : appt.status.charAt(0).toUpperCase() + appt.status.slice(1)
 
   const displayStatusColor = isPendingReview
-    ? { bg: 'rgba(239,159,39,0.12)', text: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
+    ? { bg: t.statusBusy.bg, text: t.statusBusy.text, border: t.statusBusy.border }
     : isRejected
-    ? { bg: '#FCEBEB', text: '#791F1F', border: 'rgba(163,45,45,0.3)' }
+    ? { bg: t.dangerContainer, text: t.onDangerContainer, border: 'transparent' }
     : statusColor
 
   function copyRef() {
@@ -236,24 +237,24 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             borderColor: isVirtual ? t.infoBorder : t.accentBorder,
           }]}>
             <View style={[st.passHeader, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={isVirtual ? t.statusVirtual.text : t.accent} />
-              <Text style={[st.passTitle, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
+              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={t.onHero} />
+              <Text style={[st.passTitle, { color: t.onHero, opacity: 0.85 }]}>
                 {isVirtual ? 'VIRTUAL CONSULTATION PASS' : 'HOSPITAL CHECK-IN PASS'}
               </Text>
             </View>
 
             {/* Big booking ref */}
             <TouchableOpacity onPress={copyRef} style={st.passRefWrap} activeOpacity={0.7}>
-              <Text style={[st.passRef, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>{appt.id}</Text>
+              <Text style={[st.passRef, { color: t.onHero }]}>{appt.id}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                {copied && <Ionicons name="checkmark" size={10} color={t.accent} />}
-                <Text style={[st.passCopy, { color: copied ? t.accent : 'rgba(255,255,255,0.35)' }]}>
+                {copied && <Ionicons name="checkmark" size={10} color={t.onHero} />}
+                <Text style={[st.passCopy, { color: copied ? t.onHero : 'rgba(255,255,255,0.65)' }]}>
                   {copied ? 'Copied' : 'Tap to copy'}
                 </Text>
               </View>
             </TouchableOpacity>
 
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.22)' }]} />
 
             {/* Pass info */}
             {[
@@ -268,11 +269,11 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               </View>
             ))}
 
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)', marginTop: 10 }]} />
+            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.22)', marginTop: 10 }]} />
 
             <View style={st.passFooter}>
               <Ionicons name={isVirtual ? 'videocam-outline' : 'location-outline'} size={14} color="rgba(255,255,255,0.55)" />
-              <Text style={[st.passFooterText, { color: 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[st.passFooterText, { color: 'rgba(255,255,255,0.85)' }]}>
                 {isVirtual
                   ? 'Share this ID if asked by your doctor during the session'
                   : 'Show this ID at the hospital reception desk for check-in'}
@@ -283,17 +284,17 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
         {/* Pending review notice */}
         {isPendingReview && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(239,159,39,0.3)', backgroundColor: 'rgba(239,159,39,0.07)' }]}>
+          <View style={[st.pendingCard, { borderColor: t.statusBusy.border, backgroundColor: t.statusBusy.bg }]}>
             <Ionicons name="hourglass-outline" size={18} color={t.statusBusy.text} />
             <View style={{ flex: 1 }}>
               <Text style={[st.pendingTitle, { color: t.statusBusy.text }]}>Awaiting hospital approval</Text>
               {appt.clinic && !isOpdClinic && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 11, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)' }}>{appt.clinic}</Text>
+                  <Text style={{ fontSize: 13, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
+                  <Text style={{ fontSize: 13, color: t.statusBusy.text, opacity: 0.85 }}>{appt.clinic}</Text>
                 </View>
               )}
-              <Text style={[st.pendingSub, { color: 'rgba(239,159,39,0.65)' }]}>
+              <Text style={[st.pendingSub, { color: t.statusBusy.text, opacity: 0.75 }]}>
                 {isOpdClinic
                   ? 'The hospital is reviewing your booking. Your check-in pass will appear here once approved.'
                   : 'A desk officer will verify your referral or reason and approve or decline your specialist booking. You\'ll be notified of the outcome.'}
@@ -304,21 +305,21 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
         {/* Rejection card */}
         {isRejected && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.06)' }]}>
-            <Ionicons name="close-circle" size={20} color="#DC2626" />
+          <View style={[st.pendingCard, { borderColor: t.dangerBorder, backgroundColor: t.dangerBg }]}>
+            <Ionicons name="close-circle" size={20} color={t.danger} />
             <View style={{ flex: 1 }}>
-              <Text style={[st.pendingTitle, { color: '#DC2626', marginBottom: 6 }]}>Booking Rejected</Text>
+              <Text style={[st.pendingTitle, { color: t.danger, marginBottom: 6 }]}>Booking Rejected</Text>
               {(raw as any).approval_note ? (
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 3 }}>
                     Hospital's note:
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#DC2626', lineHeight: 18 }}>
+                  <Text style={{ fontSize: 14, color: t.danger, lineHeight: 18 }}>
                     {(raw as any).approval_note}
                   </Text>
                 </View>
               ) : null}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.danger, opacity: 0.7, marginBottom: 6 }}>
                 What you can do:
               </Text>
               {[
@@ -327,8 +328,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                 { icon: 'call-outline' as const,          text: 'Contact the hospital directly for more information' },
               ].map(tip => (
                 <View key={tip.text} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
-                  <Ionicons name={tip.icon} size={12} color="#DC2626" style={{ marginTop: 3 }} />
-                  <Text style={{ fontSize: 11, color: '#DC2626', lineHeight: 18, flex: 1 }}>{tip.text}</Text>
+                  <Ionicons name={tip.icon} size={12} color={t.danger} style={{ marginTop: 3 }} />
+                  <Text style={{ fontSize: 13, color: t.danger, lineHeight: 18, flex: 1 }}>{tip.text}</Text>
                 </View>
               ))}
               {raw.hospital && (
@@ -337,9 +338,9 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                     hospital:    toDisplayHospital(raw.hospital),
                     bookingType: 'physical',
                   })}
-                  style={[st.opdBtn, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.1)', marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Book OPD Appointment</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#DC2626" />
+                  style={[st.opdBtn, { borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.danger }}>Book OPD Appointment</Text>
+                  <Ionicons name="arrow-forward" size={14} color={t.danger} />
                 </TouchableOpacity>
               )}
             </View>
@@ -350,16 +351,16 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         <View style={[st.heroCard, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
           {/* Booking ID */}
           <View style={st.bookingIdRow}>
-            <Text style={[st.bookingIdLabel, { color: t.accent }]}>BOOKING ID</Text>
-            <Text style={[st.bookingId, { color: t.accent }]}>{appt.id}</Text>
+            <Text style={[st.bookingIdLabel, { color: t.onHero, opacity: 0.8 }]}>BOOKING ID</Text>
+            <Text style={[st.bookingId, { color: t.onHero }]}>{appt.id}</Text>
           </View>
 
           {/* Doctor / placeholder */}
           <View style={st.doctorRow}>
             {appt.doctor ? (
-              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={52} />
+              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={52} />
             ) : (
-              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
+              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
               </View>
             )}
@@ -367,23 +368,23 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Text style={st.doctorName}>
                 {appt.doctor ?? (isVirtual ? 'Doctor to be assigned' : 'Assigned at clinic')}
               </Text>
-              <Text style={[st.doctorSpec, { color: 'rgba(255,255,255,0.55)' }]}>
+              <Text style={[st.doctorSpec, { color: 'rgba(255,255,255,0.85)' }]}>
                 {appt.spec ?? (isVirtual ? 'Virtual consultation' : 'In-person visit')}
               </Text>
               {appt.doctor && appt.rating > 0 && <Stars rating={appt.rating} />}
             </View>
             {isVirtual ? (
-              <View style={[st.typePill, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: t.infoBorder }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="videocam-outline" size={11} color={t.statusVirtual.text} />
-                  <Text style={[st.typePillText, { color: t.statusVirtual.text }]}>Virtual</Text>
+                  <Ionicons name="videocam-outline" size={11} color={t.onHero} />
+                  <Text style={[st.typePillText, { color: t.onHero }]}>Virtual</Text>
                 </View>
               </View>
             ) : (
-              <View style={[st.typePill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
+              <View style={[st.typePill, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="walk-outline" size={11} color={t.accent} />
-                  <Text style={[st.typePillText, { color: t.accent }]}>In-person</Text>
+                  <Ionicons name="walk-outline" size={11} color={t.onHero} />
+                  <Text style={[st.typePillText, { color: t.onHero }]}>In-person</Text>
                 </View>
               </View>
             )}
@@ -396,7 +397,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               { icon: 'time-outline' as const,     val: fmt12(appt.time) },
               { icon: 'location-outline' as const, val: appt.hospital },
             ] as const).map(c => (
-              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
+              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: 'rgba(255,255,255,0.85)' }]}>
                 <Ionicons name={c.icon} size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 3 }} />
                 <Text style={st.chipText} numberOfLines={1}>{c.val}</Text>
               </View>
@@ -422,7 +423,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
         {/* Virtual join banner */}
         {canJoinVirtual && !cancelled && (
           <TouchableOpacity
-            style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: t.infoBorder }]}
+            style={[st.joinBanner, { backgroundColor: t.statusVirtual.bg, borderColor: t.statusVirtual.border }]}
             onPress={() => navigation.navigate('VideoCall', {
               appointmentId: raw.id,
               doctorName:    appt.doctor ?? 'your doctor',
@@ -431,10 +432,10 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <Ionicons name="videocam-outline" size={22} color={t.statusVirtual.text} />
             <View style={{ flex: 1 }}>
               <Text style={[st.joinTitle, { color: t.statusVirtual.text }]}>Virtual consultation</Text>
-              <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
+              <Text style={[st.joinSub, { color: t.statusVirtual.text, opacity: 0.7 }]}>Tap to join your video room</Text>
             </View>
-            <View style={[st.joinBtn, { backgroundColor: '#1A7FC1' }]}>
-              <Text style={st.joinBtnText}>Join</Text>
+            <View style={[st.joinBtn, { backgroundColor: t.accent }]}>
+              <Text style={[st.joinBtnText, { color: t.onAccent }]}>Join</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -488,11 +489,45 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </Section>
           )}
 
+          {/* Consultation Plan — diagnosis/investigations/prescription/plan the
+              doctor recorded for this visit, in-person or virtual alike (see
+              PatientConsultScreen on the doctor app). Only once the visit is
+              completed -- a mid-visit or not-yet-seen appointment has nothing
+              finalized to show yet. */}
+          {appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).prescription || (raw as any).treatment_plan) && (
+            <Section title="Consultation Plan">
+              {(raw as any).diagnosis && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Diagnosis</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).diagnosis}</Text>
+                </View>
+              )}
+              {(raw as any).investigations && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Investigations</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).investigations}</Text>
+                </View>
+              )}
+              {(raw as any).prescription && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Prescription</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).prescription}</Text>
+                </View>
+              )}
+              {(raw as any).treatment_plan && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Plan</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).treatment_plan}</Text>
+                </View>
+              )}
+            </Section>
+          )}
+
           {/* Doctor info — only show if a doctor was assigned */}
           {appt.doctor ? (
             <Section title="Your doctor">
               <View style={[st.doctorCard, { borderBottomColor: t.cardBorder }]}>
-                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={44} />
+                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg={bgFromName(appt.doctor)} size={44} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.dcName, { color: t.textPrimary }]}>{appt.doctor}</Text>
                   <Text style={[st.dcSpec, { color: t.textMuted }]}>{appt.spec} · {appt.hospital}</Text>
@@ -546,8 +581,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             {appt.paymentMethod && <InfoRow label="Payment method" value={appt.paymentMethod} />}
           </Section>
 
-          {/* Actions */}
-          {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
+          {/* Actions -- pre-arrival only, see canModify's comment above */}
+          {canModify && !cancelled && !isPendingReview && !isRejected && (
             <View style={st.actions}>
               {canReschedule && (
                 <Button
@@ -674,83 +709,86 @@ const st = StyleSheet.create({
   safe:               { flex: 1 },
   header:             { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:            { padding: 4 },
-  backArrow:          { fontSize: 22 },
-  headerTitle:        { flex: 1, fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  backArrow:          { fontSize: 25 },
+  headerTitle:        { flex: 1, fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
   statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  statusText:         { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  statusText:         { fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
   // Check-in pass
   passCard:           { marginHorizontal: 20, borderRadius: 20, borderWidth: 1.5, marginBottom: 12, overflow: 'hidden' },
   passHeader:         { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  passTitle:          { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  passTitle:          { fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
   passRefWrap:        { alignItems: 'center', paddingVertical: 18 },
-  passRef:            { fontSize: 32, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  passCopy:           { fontSize: 10, marginTop: 5, fontWeight: '600' },
+  passRef:            { fontSize: 37, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
+  passCopy:           { fontSize: 12, marginTop: 5, fontWeight: '600' },
   passDivider:        { height: 1, marginHorizontal: 16 },
   passRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6, gap: 12 },
-  passRowLabel:       { fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 },
-  passRowValue:       { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
+  passRowLabel:       { fontSize: 13, color: 'rgba(255,255,255,0.85)', flexShrink: 0 },
+  passRowValue:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
   passFooter:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, paddingTop: 10 },
-  passFooterText:     { fontSize: 11, flex: 1, lineHeight: 16 },
+  passFooterText:     { fontSize: 13, flex: 1, lineHeight: 16 },
   // Pending notice
   pendingCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  pendingIcon:        { fontSize: 20 },
-  pendingTitle:       { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  pendingSub:         { fontSize: 11, lineHeight: 16 },
+  pendingIcon:        { fontSize: 23 },
+  pendingTitle:       { fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  pendingSub:         { fontSize: 13, lineHeight: 16 },
   // Hero
   heroCard:           { marginHorizontal: 20, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
   bookingIdRow:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  bookingIdLabel:     { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
-  bookingId:          { fontSize: 11, fontWeight: '700' },
+  bookingIdLabel:     { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
+  bookingId:          { fontSize: 13, fontWeight: '700' },
   doctorRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   doctorAvatarPlaceholder: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  doctorName:         { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  doctorSpec:         { fontSize: 12, marginTop: 1, marginBottom: 4 },
+  doctorName:         { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  doctorSpec:         { fontSize: 14, marginTop: 1, marginBottom: 4 },
   typePill:           { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  typePillText:       { fontSize: 10, fontWeight: '700' },
+  typePillText:       { fontSize: 12, fontWeight: '700' },
   chipsRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip:               { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1, maxWidth: '100%' },
-  chipIcon:           { fontSize: 12 },
-  chipText:           { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '500', flexShrink: 1 },
+  chipIcon:           { fontSize: 14 },
+  chipText:           { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500', flexShrink: 1 },
   // Virtual join
   joinBanner:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 12 },
-  joinTitle:          { fontSize: 13, fontWeight: '700' },
-  joinSub:            { fontSize: 11, marginTop: 2 },
+  joinTitle:          { fontSize: 15, fontWeight: '700' },
+  joinSub:            { fontSize: 13, marginTop: 2 },
   joinBtn:            { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  joinBtnText:        { fontSize: 12, fontWeight: '700', color: '#fff' },
+  joinBtnText:        { fontSize: 14, fontWeight: '700' },
   // Queue
   queueCard:          { flexDirection: 'row', marginHorizontal: 20, borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   queueLeft:          { flex: 1, alignItems: 'center', padding: 14 },
   queueRight:         { flex: 1, alignItems: 'center', padding: 14 },
   queueDivider:       { width: 1 },
-  queueNum:           { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  queueLabel:         { fontSize: 10, marginTop: 2, textAlign: 'center' },
+  queueNum:           { fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },
+  queueLabel:         { fontSize: 12, marginTop: 2, textAlign: 'center' },
   // Pad
   pad:                { paddingHorizontal: 20 },
   // Section
   section:            { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionTitle:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
+  sectionTitle:       { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   // Rows
   infoRow:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  infoLabel:          { fontSize: 12, flexShrink: 0 },
-  infoValue:          { fontSize: 12, fontWeight: '600', textAlign: 'right', flex: 1 },
+  infoLabel:          { fontSize: 14, flexShrink: 0 },
+  infoValue:          { fontSize: 14, fontWeight: '600', textAlign: 'right', flex: 1 },
+  planBlock:          { padding: 12, paddingHorizontal: 14, borderTopWidth: 1 },
+  planLabel:          { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  planValue:          { fontSize: 15, lineHeight: 19 },
   // No-doctor placeholder
   noDoctorRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  noDoctorTitle:      { fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  noDoctorSub:        { fontSize: 11, lineHeight: 17 },
+  noDoctorTitle:      { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  noDoctorSub:        { fontSize: 13, lineHeight: 17 },
   // Doctor card
   doctorCard:         { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1 },
-  dcName:             { fontSize: 14, fontWeight: '700' },
-  dcSpec:             { fontSize: 11, marginTop: 1, marginBottom: 4 },
+  dcName:             { fontSize: 16, fontWeight: '700' },
+  dcSpec:             { fontSize: 13, marginTop: 1, marginBottom: 4 },
   // Tips
   tipRow:             { padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  tipText:            { fontSize: 12, lineHeight: 18 },
+  tipText:            { fontSize: 14, lineHeight: 18 },
   // Actions
   actions:            { flexDirection: 'row', gap: 10, marginBottom: 12 },
   rescheduleBtn:      { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
-  rescheduleTxt:      { fontSize: 13, fontWeight: '600' },
+  rescheduleTxt:      { fontSize: 15, fontWeight: '600' },
   // Refund
   refundNote:         { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 12 },
-  refundText:         { fontSize: 12, lineHeight: 18 },
+  refundText:         { fontSize: 14, lineHeight: 18 },
   // Rejection
   opdBtn:             { borderRadius: 10, borderWidth: 1, padding: 11, alignItems: 'center' },
 })

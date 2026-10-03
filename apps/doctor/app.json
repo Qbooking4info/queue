@@ -88,7 +88,8 @@
         }
       ],
       "./plugins/withGradleHeap.js",
-      "./plugins/withReleaseSigning.js"
+      "./plugins/withReleaseSigning.js",
+      "expo-font"
     ],
     "owner": "qbooking"
   }

@@ -220,7 +220,7 @@ export function DateFilter({ value, onChange, label }: Props) {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+          background: C.popover, border: `1px solid ${C.border}`, borderRadius: 14,
           boxShadow: '0 8px 32px rgba(0,0,0,0.35)', minWidth: 220,
           overflow: 'hidden',
         }}>

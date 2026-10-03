@@ -127,6 +127,25 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { load() }, [])
 
+  // Doctor status is meant to read as real-time to staff -- a doctor
+  // toggling their own on_duty/on_break/off_duty, or an admin activating/
+  // deactivating one, should show up here without anyone refreshing.
+  // Previously the only realtime subscription on this dashboard was scoped
+  // to `appointments` (see dashboard/appointments/page.tsx, dashboard/page.tsx's
+  // own appointments effect); a `doctors`-only change never triggered a
+  // refetch anywhere upstream of this context.
+  useEffect(() => {
+    if (!hospital?.id) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`admin-doctors:${hospital.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'doctors', filter: `hospital_id=eq.${hospital.id}`,
+      }, () => { load() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [hospital?.id])
+
   function clearHospital() {
     setHospital(null)
     setDoctors([])

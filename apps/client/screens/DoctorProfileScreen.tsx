@@ -40,7 +40,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
         <View style={st.center}>
-          <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '700' }}>Doctor not found</Text>
+          <Text style={{ color: t.textPrimary, fontSize: 16, fontWeight: '700' }}>Doctor not found</Text>
         </View>
       </SafeAreaView>
     )
@@ -58,7 +58,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={st.profileCard}>
           <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={{ fontSize: 26, fontWeight: '800', color: t.accent }}>{initials}</Text>
+            <Text style={{ fontSize: 30, fontWeight: '800', color: t.accent }}>{initials}</Text>
           </View>
           <Text style={[st.name, { color: t.textPrimary }]}>{doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}</Text>
           {doctor.specialty && (
@@ -72,7 +72,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
         {doctor.bio && (
           <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <Text style={[st.sectionTitle, { color: t.textMuted }]}>ABOUT</Text>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: t.textSecondary, padding: 14 }}>{doctor.bio}</Text>
+            <Text style={{ fontSize: 15, lineHeight: 20, color: t.textSecondary, padding: 14 }}>{doctor.bio}</Text>
           </View>
         )}
 
@@ -90,7 +90,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
                 style={[st.row, { borderBottomColor: t.cardBorder }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Ionicons name="business-outline" size={15} color={t.accent} />
-                  <Text style={{ fontSize: 13, color: t.textPrimary }}>{h.name}</Text>
+                  <Text style={{ fontSize: 15, color: t.textPrimary }}>{h.name}</Text>
                 </View>
                 {openingHospitalId === h.id ? (
                   <ActivityIndicator size="small" color={t.textMuted} />
@@ -110,7 +110,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
                 style={[st.row, { borderBottomColor: t.cardBorder }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Ionicons name="document-text-outline" size={15} color={t.accent} />
-                  <Text style={{ fontSize: 13, color: t.textPrimary }}>{d.title}</Text>
+                  <Text style={{ fontSize: 15, color: t.textPrimary }}>{d.title}</Text>
                 </View>
                 <Ionicons name="open-outline" size={14} color={t.textMuted} />
               </TouchableOpacity>
@@ -125,8 +125,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
             <TouchableOpacity
               onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
               style={[st.bookBtn, { backgroundColor: t.accent }]}>
-              <Ionicons name="videocam-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-              <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
+              <Ionicons name="videocam-outline" size={15} color={t.onAccent} />
+              <Text style={[st.bookBtnText, { color: t.onAccent }]}>
                 Book Virtual{doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString()}` : ''}
               </Text>
             </TouchableOpacity>
@@ -147,8 +147,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
           <TouchableOpacity
             onPress={() => viewHospital(doctor.hospitals[0].id)}
             style={[st.bookBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="business-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-            <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
+            <Ionicons name="business-outline" size={15} color={t.onAccent} />
+            <Text style={[st.bookBtnText, { color: t.onAccent }]}>
               Book via {doctor.hospitals[0].name}
             </Text>
           </TouchableOpacity>
@@ -161,8 +161,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
 function Row({ label, value, theme: t }: { label: string; value: string; theme: any }) {
   return (
     <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
-      <Text style={{ fontSize: 12, color: t.textMuted }}>{label}</Text>
-      <Text style={{ fontSize: 12, fontWeight: '700', color: t.textPrimary }}>{value}</Text>
+      <Text style={{ fontSize: 14, color: t.textMuted }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>{value}</Text>
     </View>
   )
 }
@@ -173,13 +173,13 @@ const st = StyleSheet.create({
   header:       { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
   profileCard:  { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },
   avatar:       { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  name:         { fontSize: 19, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  specialty:    { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:         { fontSize: 12, marginTop: 3, textAlign: 'center' },
+  name:         { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  specialty:    { fontSize: 15, fontWeight: '700', marginTop: 4 },
+  qual:         { fontSize: 14, marginTop: 3, textAlign: 'center' },
   section:      { marginHorizontal: 20, marginBottom: 12, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14 },
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
   footer:       { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
   bookBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 14, paddingVertical: 13 },
-  bookBtnText:  { fontSize: 13, fontWeight: '700' },
+  bookBtnText:  { fontSize: 15, fontWeight: '700' },
 })

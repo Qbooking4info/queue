@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
+import { notifyPatient } from '@/lib/notify-patient'
+import { todayLocalDate } from '@/lib/dashboard-utils'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 type Action =
@@ -10,6 +12,7 @@ type Action =
   | { action: 'start' } // home-visit only; virtual consults start via POST /api/virtual/token
   | { action: 'complete'; diagnosis?: string; doctorNotes?: string }
   | { action: 'cancel'; reason: string }
+  | { action: 'reschedule'; date: string; startTime: string; reason?: string }
 
 export async function OPTIONS() {
   return corsOptions()
@@ -85,6 +88,37 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
         })
         .eq('id', id)
       if (error) return Errors.internal(error.message)
+      return NextResponse.json({ success: true })
+    }
+    case 'reschedule': {
+      // Same in-place-mutation reasoning as the hospital-linked route's
+      // 'reschedule' action (web/src/app/api/appointments/[id]/route.ts) --
+      // avoids enforce_reschedule_limit/enforce_plan_booking_limit, both of
+      // which only fire on INSERT. Direct bookings never hold a time_slots
+      // reservation, so there's no slot_id to release here.
+      if (!['pending', 'confirmed'].includes(appt.status)) {
+        return Errors.validation(`Cannot reschedule an appointment that is already ${appt.status} — only pending/confirmed bookings can be moved`)
+      }
+      const dateRe = /^\d{4}-\d{2}-\d{2}$/
+      const timeRe = /^\d{2}:\d{2}$/
+      if (!dateRe.test(body.date) || !timeRe.test(body.startTime)) {
+        return Errors.validation('date must be YYYY-MM-DD and startTime must be HH:MM')
+      }
+      if (body.date < todayLocalDate()) return Errors.validation('Cannot reschedule to a date in the past')
+
+      const { error } = await db.from('appointments').update({
+        appointment_date: body.date,
+        start_time: `${body.startTime}:00`,
+        reschedule_reason: body.reason?.trim() || null,
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', id)
+      if (error) return Errors.internal(error.message)
+
+      const niceDate = new Date(body.date + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
+      await notifyPatient(
+        db, id, 'rescheduled', 'Appointment Rescheduled',
+        `Your appointment has been moved to ${niceDate} at ${body.startTime}.`,
+      )
       return NextResponse.json({ success: true })
     }
     case 'cancel': {

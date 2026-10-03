@@ -78,25 +78,62 @@ export function triageForSymptom(symptom: string): { triageLevel: number; requir
   return SYMPTOM_TRIAGE_MAP[symptom] ?? { triageLevel: 3, requiredTier: 'BLS' }
 }
 
-export async function authedFetch(path: string, body: unknown) {
+/**
+ * General-purpose authenticated request. authedFetch (below) is the POST-only
+ * original every existing caller uses; the admin console also needs GET/PATCH/
+ * DELETE (list the fleet, acknowledge an alert, unassign crew), so this is the
+ * one real implementation both build on rather than a second copy of the
+ * session/header/error-shape boilerplate.
+ */
+export async function authedRequest(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in')
 
   const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify(body),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
 
-  const json = await res.json()
+  const json = await res.json().catch(() => null)
   if (!res.ok) throw new Error(json?.error ?? 'Request failed')
   return json
 }
 
+export async function authedFetch(path: string, body: unknown) {
+  return authedRequest(path, 'POST', body)
+}
+
 export async function requestAmbulance(input: CreateTransportInput) {
+  return authedFetch('/api/transport/request', input) as Promise<{
+    request: TransportRequestRow
+    duplicate?: boolean
+  }>
+}
+
+export interface StaffCreateTransportInput extends CreateTransportInput {
+  // Exactly one of these two identifies who needs transport -- an existing
+  // registered patient, or someone with no account at all (mirrors the
+  // walk-in appointment pattern). requesterRelationship/dependentId from
+  // CreateTransportInput are ignored server-side on this path; the server
+  // sets requester_relationship='staff' itself once it resolves the caller
+  // via requireRole rather than a patient's own session.
+  patientId?: string
+  walkinPatientName?: string
+  walkinPatientPhone?: string
+}
+
+/**
+ * Hospital staff / a doctor requesting transport on a patient's behalf --
+ * front desk booking an ambulance for someone at the desk, a doctor mid-consult
+ * arranging an emergency transfer. Same route as requestAmbulance; the server
+ * tells the two apart by which kind of session sent the bearer token (see
+ * POST /api/transport/request's own comment).
+ */
+export async function requestAmbulanceForPatient(input: StaffCreateTransportInput) {
   return authedFetch('/api/transport/request', input) as Promise<{
     request: TransportRequestRow
     duplicate?: boolean

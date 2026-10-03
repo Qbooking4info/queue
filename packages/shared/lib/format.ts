@@ -32,3 +32,28 @@ export function fmt12(time: string): string {
   const ampm = h >= 12 ? 'PM' : 'AM'
   return `${h % 12 || 12}:${mStr} ${ampm}`
 }
+
+/**
+ * Display label for appointments.type.
+ *
+ * The stored values are 'in-person' (hyphen), 'virtual' and 'home_visit'. "Physical"
+ * rather than "In-person" is the wording used across the apps' filters, so the queue
+ * and the analytics filter agree on what to call the same thing.
+ *
+ * Falls back to the raw value rather than guessing, so an unrecognised type shows up
+ * as itself instead of being silently mislabelled — which is exactly what the old
+ * `isVirtual ? 'Virtual' : 'In-person'` did to home visits.
+ */
+export function visitTypeLabel(type: string | null | undefined): string {
+  if (type === 'virtual') return 'Virtual'
+  if (type === 'home_visit') return 'Home visit'
+  if (type === 'in-person' || type === 'in_person') return 'Physical'
+  return type ?? '—'
+}
+
+/** Ionicon matching a visit type, for the same three cases. */
+export function visitTypeIcon(type: string | null | undefined): 'videocam-outline' | 'home-outline' | 'business-outline' {
+  if (type === 'virtual') return 'videocam-outline'
+  if (type === 'home_visit') return 'home-outline'
+  return 'business-outline'
+}

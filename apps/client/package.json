@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/metro-runtime": "^56.0.13",
     "@expo/vector-icons": "^15.1.1",
+    "@queue/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-picker/picker": "2.11.4",
     "@react-navigation/bottom-tabs": "^7.16.2",
@@ -16,11 +18,14 @@
     "agora-rtc-sdk-ng": "^4.24.6",
     "expo": "~56.0.19",
     "expo-audio": "~56.0.13",
+    "expo-blur": "~56.0.4",
     "expo-build-properties": "~56.0.27",
     "expo-constants": "~56.0.21",
     "expo-device": "~56.0.4",
     "expo-document-picker": "~56.0.4",
+    "expo-font": "~56.0.7",
     "expo-haptics": "~56.0.3",
+    "expo-linear-gradient": "~56.0.4",
     "expo-location": "~56.0.23",
     "expo-network": "~56.0.5",
     "expo-notifications": "~56.0.23",
@@ -37,8 +42,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-url-polyfill": "^3.0.0",
-    "react-native-web": "^0.21.2",
-    "@queue/shared": "*"
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",

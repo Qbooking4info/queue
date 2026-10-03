@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { fmtLocalDate } from '@/lib/dashboard-utils'
+import { fmtLocalDate, todayLocalDate } from '@/lib/dashboard-utils'
 import { notifyPatient } from '@/lib/notify-patient'
 import { randomBytes } from 'crypto'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
@@ -89,11 +89,17 @@ async function handlePOST(req: NextRequest) {
     if (!receivingHospital) return Errors.notFound('Receiving hospital')
 
     if (receivingDoctorId) {
-      const { data: doc } = await db.from('doctors').select('hospital_id, clinic_id, is_active').eq('id', receivingDoctorId).single()
+      const { data: doc } = await db.from('doctors').select('hospital_id, clinic_id, is_active, availability_status').eq('id', receivingDoctorId).single()
       if (!doc || (doc as any).hospital_id !== receivingHospitalId) {
         return Errors.validation('Doctor does not belong to the receiving hospital')
       }
       if (!(doc as any).is_active) return Errors.validation('Receiving doctor is not active')
+      // On-duty only matters for a same-day referral -- a routine referral
+      // scheduled days out shouldn't be rejected just because the receiving
+      // doctor isn't at their desk at the moment the referral is being written.
+      if (date === todayLocalDate() && (doc as any).availability_status && (doc as any).availability_status !== 'on_duty') {
+        return Errors.validation('Receiving doctor is on break or off duty today')
+      }
     }
 
     if (receivingClinicId) {

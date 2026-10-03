@@ -52,7 +52,7 @@ type SelectedCell =
   | { kind: 'cell'; label: string; items: ScheduleSlot[] }
 
 function ScheduleContent() {
-  const { theme: C } = useTheme()
+  const { theme: C, mode } = useTheme()
   const { hospital, role, doctorId } = useAdmin()
   const searchParams = useSearchParams()
   const urlDoctorId  = searchParams.get('doctorId')
@@ -64,7 +64,7 @@ function ScheduleContent() {
   const [clinics, setClinics] = useState<ClinicOption[]>([])
   const [clinicId, setClinicId] = useState<string | null>(null)
   const [selected, setSelected] = useState<SelectedCell | null>(null)
-  const isDark = C.id === 'forest'
+  const isDark = mode === 'dark'
   const isMulti = hospital?.clinic_model === 'multi'
 
   const today = new Date()
@@ -194,7 +194,7 @@ function ScheduleContent() {
             </select>
           )}
           <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} />
-          <button onClick={load} style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+          <button onClick={load} style={{ background: C.accent, color: C.onAccent,
             border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6 }}>
             <RefreshCw size={13} /> Refresh
@@ -321,7 +321,7 @@ function ScheduleContent() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setSelected(null) }}>
           <div style={{ width: '100%', maxWidth: 480, maxHeight: '80vh', overflowY: 'auto',
-            background: C.card, border: `1px solid ${C.border}`, borderRadius: 20,
+            background: C.popover, border: `1px solid ${C.border}`, borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>

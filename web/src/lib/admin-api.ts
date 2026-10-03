@@ -98,7 +98,16 @@ export interface AdminDoctor {
   // (doctor_clinics, 20260903000001).
   is_active_here?: boolean
   availability_status: DoctorAvailabilityStatus
+  // The combined status staff should actually render: 'inactive' covers both
+  // a deactivated doctor AND one who's active but currently at a different
+  // hospital (multi-hospital setup) -- availability_status alone can't tell
+  // those apart from a real on_duty/on_break/off_duty. Only 'on_duty' may be
+  // assigned a patient. Optional because a couple of older endpoints
+  // (GET /api/doctors/unassigned) don't compute it yet.
+  display_status?: DoctorDisplayStatus
 }
+
+export type DoctorDisplayStatus = 'inactive' | DoctorAvailabilityStatus
 
 export interface AdminHospital {
   id: string
