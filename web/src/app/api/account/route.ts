@@ -51,15 +51,32 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Could not delete account' }, { status: 500 })
   }
 
-  // Delete the auth user. users.auth_id is ON DELETE SET NULL, not CASCADE --
-  // this orphans the users row (auth_id becomes null) rather than deleting
-  // it, which is consistent with the appointments just cancelled above
-  // referencing a profile that still exists.
-  const { error } = await adminDb.auth.admin.deleteUser(user.id)
-  if (error) {
-    console.error('[DELETE /api/account]', error.message)
+  // Strip identity BEFORE removing the login, not after. If the auth delete
+  // succeeded and this failed, the user could no longer sign in to retry and their
+  // name, phone and date of birth would sit in the database indefinitely with
+  // nobody able to reach them -- the exact state "delete my account" is meant to
+  // end. Doing it in this order means a failure here leaves the account intact and
+  // retryable.
+  const { error: anonErr } = await adminDb.rpc('anonymize_user', { p_user_id: profile.id })
+  if (anonErr) {
+    console.error('[DELETE /api/account] anonymise failed', anonErr.message)
     return NextResponse.json({ error: 'Could not delete account' }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  // Now remove the login. users.auth_id is ON DELETE SET NULL, not CASCADE, so the
+  // (now anonymous) profile row survives to keep the clinical records it owns
+  // referentially intact -- a hospital must retain those, and they are no longer
+  // attributable to a named person.
+  const { error } = await adminDb.auth.admin.deleteUser(user.id)
+  if (error) {
+    console.error('[DELETE /api/account]', error.message)
+    // Identity is already gone, which is the part that matters for the erasure
+    // request; say so rather than reporting a clean failure the user would retry.
+    return NextResponse.json(
+      { error: 'Your data was removed but the login could not be closed. Please contact support.' },
+      { status: 500 },
+    )
+  }
+
+  return NextResponse.json({ success: true, anonymised: true })
 }

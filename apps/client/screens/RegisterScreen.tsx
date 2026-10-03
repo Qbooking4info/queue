@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
+import { CONSENT_STATEMENT } from '@queue/shared/lib/privacy'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { linkDependent } from '@queue/shared/lib/api'
 import { DateOfBirthSelect } from '@queue/shared/components/ui/DateOfBirthSelect'
@@ -46,6 +47,7 @@ export function RegisterScreen({ navigation }: Props) {
   const [confirm,  setConfirm]    = useState('')
   const [error,    setError]      = useState('')
   const [busy,     setBusy]       = useState(false)
+  const [consented, setConsented] = useState(false)
 
   const [showCaretaker, setShowCaretaker]   = useState(false)
   const [caretakerCode, setCaretakerCode]   = useState('')
@@ -68,6 +70,10 @@ export function RegisterScreen({ navigation }: Props) {
     if (pass.length < 6)  { setError('Password must be at least 6 characters.'); return }
     if (pass !== confirm) { setError('Passwords do not match.'); return }
     if (caretakerCode.trim() && !caretakerRel) { setError('Select your relationship to your caretaker.'); return }
+    // Consent has to be an act, not an inference from pressing a button labelled
+    // something else. Blocking here is the point: NDPR consent must be freely given
+    // and specific, and a pre-ticked or implied box is neither.
+    if (!consented) { setError('Please agree to the Privacy Policy and Terms to continue.'); return }
     setBusy(true); setError('')
     const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), dob)
     if (err) { setBusy(false); setError(err); return }
@@ -212,9 +218,29 @@ export function RegisterScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          <Text style={[s.terms, { color: t.textMuted }]}>
-            By creating an account you agree to our Terms of Service and Privacy Policy.
-          </Text>
+          {/* An explicit, unticked control replacing the passive "by creating an
+              account you agree" line. That line recorded nothing and asked nothing;
+              this one gates submission and is written to user_consents with the
+              policy version the user actually saw. */}
+          <TouchableOpacity
+            onPress={() => setConsented(v => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: consented }}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: t.spacing.md }}
+          >
+            <View style={{
+              width: 22, height: 22, borderRadius: 6, marginTop: 1,
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: consented ? t.accent : t.inputBorder,
+              backgroundColor: consented ? t.accent : 'transparent',
+            }}>
+              {consented && <Ionicons name="checkmark" size={15} color={t.onAccent ?? '#FFFFFF'} />}
+            </View>
+            <Text style={[s.terms, { color: t.textSecondary, textAlign: 'left', flex: 1, paddingHorizontal: 0 }]}>
+              {CONSENT_STATEMENT}
+            </Text>
+          </TouchableOpacity>
 
         </ScrollView>
       </KeyboardAvoidingView>

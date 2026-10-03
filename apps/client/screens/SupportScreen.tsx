@@ -17,7 +17,12 @@ const FAQS = [
   { q: 'How do I cancel or reschedule?', a: 'Open the appointment in the Bookings tab and tap Reschedule or Cancel. Nothing is charged when you book — you pay at the hospital — so cancelling costs you nothing.' },
   { q: 'What payment methods are accepted?', a: 'We accept debit/credit cards, bank transfer, USSD, and HMO insurance. You can switch your payment method before confirming.' },
   { q: 'How does the virtual consultation work?', a: 'Choose "Virtual" when selecting consultation type. A video room link will be sent to you 5 minutes before your slot. Join from the Bookings tab.' },
-  { q: 'Is my health data secure?', a: 'Yes. All data is encrypted in transit and at rest. We comply with NDPR (Nigeria Data Protection Regulation) and never share identifiable data without consent.' },
+  // Describes what is actually true and verifiable rather than asserting regulatory
+  // compliance. The NDPR claim that used to sit here had nothing behind it: no
+  // consent record, no retention policy, no export path, and deletion that left
+  // medical data fully identifiable. Those are being built; the claim comes back
+  // when they are all in place and not before.
+  { q: 'Is my health data secure?', a: 'Your data is encrypted in transit and at rest, and access is restricted by role, so only staff involved in your care can see your records. You can download everything we hold about you, or delete your account, from Profile › Privacy & Security.' },
   { q: 'What is the emergency booking premium?', a: 'Marking a booking as Emergency carries a 2× fee and places you at the top of the queue — the same whether you start from the red banner on Home or flag a regular booking as Emergency during Details. Either way, a doctor is prioritized for you at the hospital.' },
   { q: 'How do I get a refund?', a: 'Queue does not take payment for bookings — you pay the hospital directly when you are seen. There is nothing to refund if you cancel.' },
 ]

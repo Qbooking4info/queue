@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import * as SecureStore from 'expo-secure-store'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { POLICY_VERSION, CONSENT_KIND } from '../lib/privacy'
 import { requestDependentSwitchToken } from '../lib/api'
 import type { User } from '../types/database'
 
@@ -476,6 +477,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // half-authenticated in a state nothing else expects.
         await signOut()
         return profileError.message
+      }
+
+      // Record the consent the user just gave, now that a profile row exists for it
+      // to hang off. Deliberately not fatal: a failure here must not block an
+      // account that has already been created, and the consent can be re-captured.
+      // NDPR wants the version they actually saw, which is why POLICY_VERSION is
+      // stamped rather than a bare boolean.
+      const { data: profileRow } = await supabase
+        .from('users').select('id').eq('auth_id', data.user.id).single()
+      if (profileRow?.id) {
+        const { error: consentError } = await supabase.from('user_consents').insert([
+          { user_id: profileRow.id, kind: CONSENT_KIND.privacy, policy_version: POLICY_VERSION, source: 'signup' },
+          { user_id: profileRow.id, kind: CONSENT_KIND.terms,   policy_version: POLICY_VERSION, source: 'signup' },
+        ] as any)
+        if (consentError) console.warn('[AuthContext] consent not recorded:', consentError.message)
       }
     }
     return null
