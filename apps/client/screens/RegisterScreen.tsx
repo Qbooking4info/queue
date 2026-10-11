@@ -9,6 +9,10 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
 import { CONSENT_STATEMENT } from '@queue/shared/lib/privacy'
+import {
+  requestVerificationCode, confirmVerificationCode, registerVerified,
+  type VerifyChannel,
+} from '@queue/shared/lib/api'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { linkDependent } from '@queue/shared/lib/api'
 import { DateOfBirthSelect } from '@queue/shared/components/ui/DateOfBirthSelect'
@@ -38,7 +42,7 @@ const CARETAKER_RECOMMENDED_BELOW_AGE = 16
 
 export function RegisterScreen({ navigation }: Props) {
   const { theme: t }              = useTheme()
-  const { signUp }                = useAuth()
+  const { signIn }                = useAuth()
   const [fullName, setFullName]   = useState('')
   const [dob,      setDob]        = useState('')
   const [phone,    setPhone]      = useState('')
@@ -48,6 +52,15 @@ export function RegisterScreen({ navigation }: Props) {
   const [error,    setError]      = useState('')
   const [busy,     setBusy]       = useState(false)
   const [consented, setConsented] = useState(false)
+
+  // Verification step. The screen stays one scroll; `stage` decides whether the
+  // details form or the code entry is showing, rather than pushing a second route
+  // that would lose the half-filled form on a back gesture.
+  const [stage,    setStage]    = useState<'details' | 'code'>('details')
+  const [channel,  setChannel]  = useState<VerifyChannel>('email')
+  const [sentTo,   setSentTo]   = useState('')
+  const [codeInput, setCodeInput] = useState('')
+  const [resending, setResending] = useState(false)
 
   const [showCaretaker, setShowCaretaker]   = useState(false)
   const [caretakerCode, setCaretakerCode]   = useState('')
@@ -74,9 +87,64 @@ export function RegisterScreen({ navigation }: Props) {
     // something else. Blocking here is the point: NDPR consent must be freely given
     // and specific, and a pre-ticked or implied box is neither.
     if (!consented) { setError('Please agree to the Privacy Policy and Terms to continue.'); return }
+
+    // Send the code and move to the code step. The account is NOT created here --
+    // it is created server-side only once a code has been confirmed, so closing the
+    // app at this point leaves nothing behind.
     setBusy(true); setError('')
-    const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), dob)
-    if (err) { setBusy(false); setError(err); return }
+    const dest = channel === 'email' ? email.trim().toLowerCase() : phone.trim()
+    const req = await requestVerificationCode(dest, channel)
+    setBusy(false)
+    if (!req.ok) {
+      setError(req.notConfigured && channel === 'sms'
+        ? 'SMS codes are not switched on yet. Please verify with your email instead.'
+        : req.error)
+      // Steer them to the channel that does work rather than leaving them stuck.
+      if (req.notConfigured && channel === 'sms') setChannel('email')
+      return
+    }
+    setSentTo(req.destination)
+    setCodeInput('')
+    setStage('code')
+  }
+
+  async function handleResend() {
+    setResending(true); setError('')
+    const dest = channel === 'email' ? email.trim().toLowerCase() : phone.trim()
+    const req = await requestVerificationCode(dest, channel)
+    setResending(false)
+    if (!req.ok) { setError(req.error); return }
+    setSentTo(req.destination)
+    Alert.alert('Code sent', `A new code is on its way to ${req.destination}.`)
+  }
+
+  async function handleConfirmCode() {
+    if (!/^\d{6}$/.test(codeInput.trim())) { setError('Enter the 6-digit code.'); return }
+    setBusy(true); setError('')
+
+    const dest = channel === 'email' ? email.trim().toLowerCase() : phone.trim()
+    const confirmed = await confirmVerificationCode(dest, channel, codeInput.trim())
+    if (!confirmed.ok) { setBusy(false); setError(confirmed.error); return }
+
+    const regErr = await registerVerified({
+      claimToken:  confirmed.claimToken,
+      email:       email.trim().toLowerCase(),
+      password:    pass,
+      fullName:    fullName.trim(),
+      phone:       phone.trim(),
+      dateOfBirth: dob,
+    })
+    if (regErr) { setBusy(false); setError(regErr); return }
+
+    // The route deliberately returns no session, so sign in with the password just
+    // set. That keeps session minting entirely with Supabase rather than having an
+    // API route hand out credentials.
+    const signInErr = await signIn(email.trim().toLowerCase(), pass, 'patient')
+    if (signInErr) {
+      setBusy(false)
+      setError(`Your account was created, but sign-in failed: ${signInErr}. Please sign in from the login screen.`)
+      return
+    }
 
     // Best-effort: the account is already created either way -- a bad caretaker
     // code shouldn't block registration, just get reported after the fact. This
@@ -104,8 +172,66 @@ export function RegisterScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <Text style={[s.title,  { color: t.textPrimary }]}>Create account</Text>
-          <Text style={[s.sub,    { color: t.textMuted   }]}>Join Queue to book appointments easily</Text>
 
+          {/* Code step. Shown instead of the form so the screen never presents two
+              submit actions at once. The details stay in state, so Back returns to
+              a fully populated form rather than an empty one. */}
+          {stage === 'code' && (
+            <View style={{ marginTop: 18 }}>
+              <Text style={{ fontSize: 15, color: t.textSecondary, lineHeight: 21, marginBottom: 4 }}>
+                We sent a 6-digit code to
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary, marginBottom: 16 }}>
+                {sentTo}
+              </Text>
+
+              <Text style={[s.label, { color: t.textMuted }]}>Verification code</Text>
+              <TextInput
+                value={codeInput}
+                onChangeText={v => setCodeInput(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                placeholder="000000"
+                placeholderTextColor={t.textFaint}
+                style={[s.input, {
+                  backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary,
+                  fontSize: 26, letterSpacing: 10, textAlign: 'center', fontWeight: '700',
+                }]}
+              />
+
+              {!!error && (
+                <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                  <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
+                </View>
+              )}
+
+              <Button
+                label="Verify and create account"
+                onPress={handleConfirmCode}
+                loading={busy}
+                size="lg"
+                style={{ marginTop: t.spacing.md }}
+              />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
+                <TouchableOpacity onPress={() => { setStage('details'); setError('') }} disabled={busy}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: t.textSecondary }}>Change details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleResend} disabled={busy || resending}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>
+                    {resending ? 'Sending…' : 'Resend code'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {stage === 'details' && (
+          <Text style={[s.sub,    { color: t.textMuted   }]}>Join Queue to book appointments easily</Text>
+          )}
+
+          {stage === 'details' && (
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
 
             {[
@@ -207,9 +333,37 @@ export function RegisterScreen({ navigation }: Props) {
               </View>
             )}
 
-            <Button label="Create account" onPress={handleRegister} loading={busy} size="lg" style={{ marginTop: t.spacing.sm }} />
+            {/* Channel choice. SMS is offered but may be unconfigured; the request
+                handler says so plainly and moves them to email rather than
+                pretending a text was sent. */}
+            <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Send my verification code by</Text>
+            <View style={s.pillRow}>
+              {([
+                { key: 'email' as VerifyChannel, label: 'Email', icon: 'mail-outline' as const },
+                { key: 'sms'   as VerifyChannel, label: 'SMS',   icon: 'chatbubble-outline' as const },
+              ]).map(c => (
+                <TouchableOpacity
+                  key={c.key}
+                  onPress={() => setChannel(c.key)}
+                  style={[s.pill, {
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    borderColor: channel === c.key ? t.accent : t.cardBorder,
+                    backgroundColor: channel === c.key ? t.accentBg : t.cardBg,
+                  }]}
+                >
+                  <Ionicons name={c.icon} size={14} color={channel === c.key ? t.accent : t.textMuted} />
+                  <Text style={[s.pillText, {
+                    color: channel === c.key ? t.accent : t.textMuted,
+                    fontWeight: channel === c.key ? '700' : '400',
+                  }]}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Button label="Send verification code" onPress={handleRegister} loading={busy} size="lg" style={{ marginTop: t.spacing.sm }} />
 
           </View>
+          )}
 
           <View style={s.footer}>
             <Text style={[s.footerText, { color: t.textMuted }]}>Already have an account? </Text>

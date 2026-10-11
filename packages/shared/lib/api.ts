@@ -1528,3 +1528,71 @@ export async function uploadQualificationDocument(
   if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Upload failed' }
   return null
 }
+
+// ── Pre-registration verification ───────────────────────────────────────────
+//
+// Registration for new patients goes through the server (POST /api/auth/register)
+// rather than supabase.auth.signUp(). That is the only way the code check can
+// actually gate it: signUp runs with the anon key, so anything the app verifies
+// first can be skipped by calling Supabase directly.
+
+export type VerifyChannel = 'email' | 'sms'
+
+export async function requestVerificationCode(
+  destination: string, channel: VerifyChannel,
+): Promise<{ ok: true; destination: string; expiresInMinutes: number } | { ok: false; error: string; notConfigured?: boolean }> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/verify/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destination, channel }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return { ok: false, error: body?.error ?? 'Could not send a code.', notConfigured: body?.code === 'CHANNEL_NOT_CONFIGURED' }
+    }
+    return { ok: true, destination: body.destination, expiresInMinutes: body.expiresInMinutes }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function confirmVerificationCode(
+  destination: string, channel: VerifyChannel, code: string,
+): Promise<{ ok: true; claimToken: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/verify/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destination, channel, code }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not verify that code.' }
+    return { ok: true, claimToken: body.claimToken }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function registerVerified(payload: {
+  claimToken: string
+  email: string
+  password: string
+  fullName: string
+  phone?: string
+  dateOfBirth?: string
+  registeredVia?: string
+}): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return body?.error ?? 'Could not create the account.'
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Network error'
+  }
+}
