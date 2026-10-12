@@ -71,6 +71,7 @@
       ],
       "expo-secure-store",
       "expo-status-bar",
+      "expo-font",
       "@sentry/react-native",
       "expo-web-browser",
       "expo-audio",

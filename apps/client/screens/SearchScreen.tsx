@@ -98,7 +98,7 @@ export function SearchScreen({ navigation }: Props) {
           style={[styles.specialtyBanner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Ionicons name="grid-outline" size={15} color={t.accent} />
           <Text style={[styles.specialtyBannerText, { color: t.textPrimary }]}>Browse by Specialty</Text>
-          <Text style={{ color: t.accent, fontSize: 16, marginLeft: 'auto' }}>›</Text>
+          <Text style={{ color: t.accent, fontSize: 18, marginLeft: 'auto' }}>›</Text>
         </TouchableOpacity>
 
         {/* Filter chips + list/map toggle */}
@@ -120,7 +120,7 @@ export function SearchScreen({ navigation }: Props) {
             <TouchableOpacity onPress={() => setViewMode('list')}
               accessibilityLabel="List view" accessibilityState={{ selected: viewMode === 'list' }}
               style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: t.accentBg }]}>
-              <Text style={{ fontSize: 15, color: viewMode === 'list' ? t.accent : t.textMuted }}>≡</Text>
+              <Text style={{ fontSize: 17, color: viewMode === 'list' ? t.accent : t.textMuted }}>≡</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode('map')}
               accessibilityLabel="Map view" accessibilityState={{ selected: viewMode === 'map' }}
@@ -176,15 +176,15 @@ export function SearchScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe:        { flex: 1 },
   container:   { flex: 1 },
-  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
-  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
-  input:       { flex: 1, fontSize: 13 },
+  title:       { fontSize: 23, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14, paddingHorizontal: 20, paddingTop: 16 },
+  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 28, paddingHorizontal: 18, paddingVertical: 12, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
+  input:       { flex: 1, fontSize: 15 },
   specialtyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, borderWidth: 1, marginHorizontal: 20 },
-  specialtyBannerText: { fontSize: 13, fontWeight: '700' },
+  specialtyBannerText: { fontSize: 15, fontWeight: '700' },
   filterPill:  { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, alignSelf: 'center' },
-  filterText:  { fontSize: 11, fontWeight: '600' },
-  resultCount: { fontSize: 11, marginBottom: 10, paddingHorizontal: 20 },
-  emptyText:   { fontSize: 13 },
+  filterText:  { fontSize: 13, fontWeight: '600' },
+  resultCount: { fontSize: 13, marginBottom: 10, paddingHorizontal: 20 },
+  emptyText:   { fontSize: 15 },
   viewToggle:  { flexDirection: 'row', borderRadius: 10, borderWidth: 1, overflow: 'hidden', marginRight: 20 },
   toggleBtn:   { paddingHorizontal: 10, paddingVertical: 6 },
 })

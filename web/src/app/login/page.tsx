@@ -55,25 +55,25 @@ function LoginContent() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Left panel — branding */}
-      <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#061208', display: 'flex',
+      <div className="auth-branding-panel" style={{ width: 420, flexShrink: 0, background: '#0B1740', display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
         position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
-          borderRadius: '50%', background: 'rgba(0,232,122,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+          borderRadius: '50%', background: 'rgba(168,200,255,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -40, right: -40, width: 240, height: 240,
-          borderRadius: '50%', background: 'rgba(0,232,122,0.03)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+          borderRadius: '50%', background: 'rgba(168,200,255,0.03)', filter: 'blur(40px)', pointerEvents: 'none' }} />
 
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(0,232,122,0.1)',
-              border: '1px solid rgba(0,232,122,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(168,200,255,0.1)',
+              border: '1px solid rgba(168,200,255,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
-                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2.5"/>
-                <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-                <circle cx="30" cy="30" r="8" fill="#061208" stroke="#00E87A" strokeWidth="2.5"/>
-                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-                <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
+                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#A8C8FF" strokeWidth="2.5"/>
+                <line x1="13" y1="16" x2="27" y2="16" stroke="#A8C8FF" strokeWidth="2.5" strokeLinecap="round"/>
+                <line x1="13" y1="20" x2="22" y2="20" stroke="#A8C8FF" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="30" cy="30" r="8" fill="#0B1740" stroke="#A8C8FF" strokeWidth="2.5"/>
+                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#A8C8FF" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="30" cy="31.5" r="1" fill="#A8C8FF"/>
               </svg>
             </div>
             <div>
@@ -97,8 +97,8 @@ function LoginContent() {
               { icon: <Bell size={16} />,         text: 'Instant booking notifications' },
             ].map(f => (
               <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,232,122,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00E87A', flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(168,200,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A8C8FF', flexShrink: 0 }}>
                   {f.icon}
                 </div>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{f.text}</span>
@@ -107,7 +107,7 @@ function LoginContent() {
           </div>
         </div>
 
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
           © {new Date().getFullYear()} Queue Health Technologies
         </div>
       </div>

@@ -5,15 +5,17 @@ import * as Sentry from '@sentry/react-native'
 import { NavigationContainer, DarkTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
+import { GlassDock } from '@queue/shared/components/ui/GlassDock'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, ActivityIndicator, Text, TouchableOpacity, TextInput } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold } from '@expo-google-fonts/dm-sans'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
-import { AuthProvider, useAuth }   from '@queue/shared/contexts/AuthContext'
+import { AuthProvider, useAuth, REGISTERED_VIA_AMBULANCE_PROVIDER } from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
 import { usePushNotifications }    from '@queue/shared/hooks/usePushNotifications'
 
@@ -32,59 +34,140 @@ import '@queue/shared/lib/location-task'
 import { CrewHomeScreen }    from './screens/crew/CrewHomeScreen'
 import { CrewProfileScreen } from './screens/crew/CrewProfileScreen'
 
-const AuthStack = createNativeStackNavigator()
-const CrewTab   = createBottomTabNavigator()
+import { AmbulanceProviderRegisterScreen }  from './screens/AmbulanceProviderRegisterScreen'
+import { AmbulanceProviderOnboardingScreen } from './screens/onboarding/AmbulanceProviderOnboardingScreen'
 
-function TabIcon({ name, color, size }: any) {
-  return <Ionicons name={name} color={color} size={size ?? 22} />
+import { AdminHomeScreen }       from './screens/admin/AdminHomeScreen'
+import { AdminFleetScreen }      from './screens/admin/AdminFleetScreen'
+import { FleetMapScreen }        from './screens/admin/FleetMapScreen'
+import { AdminProfileScreen }    from './screens/admin/AdminProfileScreen'
+import { ProviderSettingsScreen } from './screens/admin/ProviderSettingsScreen'
+
+const AuthStack   = createNativeStackNavigator()
+const OnboardStk  = createNativeStackNavigator()
+const CrewTab     = createBottomTabNavigator()
+const AdminTab    = createBottomTabNavigator()
+const AdminStackN = createNativeStackNavigator()
+
+// Just the glyph now -- GlassDock owns the active pill, its gradient and the
+// label, so the icon only has to render at the colour the dock hands it.
+function TabIcon({ name, color }: any) {
+  return <Ionicons name={name} size={19} color={color} />
 }
 
-// Crew accounts are provisioned by the fleet or hospital that employs them -- there's no
-// self-registration here, so registerRoute is null to hide the shared login screen's
-// "Create account" link (it pushed 'Register', a route only the patient app defines, so
-// the tap did nothing at all). surface 'crew' is what stops signIn from treating this as
-// the patient door and turning crew away from their own app.
+// Two doors into the same app: a crew/dispatcher account (provisioned by
+// whichever fleet employs them, so no self-registration for them --
+// registerRoute used to be null for exactly that reason) and now also a
+// provider admin/owner account, which DOES self-register -- hospital-owned
+// and independent fleets alike, one form, see AmbulanceProviderRegisterScreen
+// and AmbulanceProviderOnboardingScreen. A crew member tapping "Create
+// account" just finds nothing relevant and goes back, same as tapping it by
+// mistake on any app.
 const LOGIN_PARAMS = {
-  surface:       'crew' as const,
-  registerRoute: null,
-  tagline:       'Every minute counts',
-  subtitle:      'Sign in to your crew account',
+  surface:        'crew' as const,
+  registerRoute:  'AmbulanceProviderRegister',
+  tagline:        'Every minute counts',
+  subtitle:       'Sign in to your account',
+  registerPrompt: 'Running an ambulance service? ',
+  registerCta:    'Register it',
 }
 
-function CrewAuthStack() {
+function AmbulanceAuthStack() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <AuthStack.Screen name="Login" component={LoginScreen} initialParams={LOGIN_PARAMS} />
+      <AuthStack.Screen name="AmbulanceProviderRegister" component={AmbulanceProviderRegisterScreen} />
     </AuthStack.Navigator>
   )
 }
 
-function CrewTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
+// A freshly registered operator has no ambulance_provider_admins row yet -- that
+// only exists once this finishes. Same shape as HospitalOnboardingStack.
+function ProviderOnboardingStack() {
   return (
-    <CrewTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
-    }}>
+    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <OnboardStk.Screen name="AmbulanceProviderOnboarding" component={AmbulanceProviderOnboardingScreen} />
+    </OnboardStk.Navigator>
+  )
+}
+
+function CrewTabs() {
+  return (
+    <CrewTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
       <CrewTab.Screen name="CrewHome"    component={CrewHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'medkit' : 'medkit-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
       <CrewTab.Screen name="CrewProfile" component={CrewProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
     </CrewTab.Navigator>
   )
 }
 
+// The operator console -- one fleet's admin/owner, hospital-owned or
+// independent, both work identically here (see get_my_ambulance_admin_profile).
+// No Alerts tab: dispatcher_alerts is scoped to a request's destination
+// hospital, not to any ambulance provider, so it has nothing to show for
+// either kind of provider -- that stays a web-dashboard-only, hospital-side
+// concern.
+function AdminTabs() {
+  return (
+    <AdminTab.Navigator
+      tabBar={props => <GlassDock {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+    >
+      <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Home' }} />
+      <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'car-sport' : 'car-sport-outline'} {...p} />, tabBarLabel: 'Fleet' }} />
+      <AdminTab.Screen name="FleetMap"     component={FleetMapScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'map' : 'map-outline'} {...p} />, tabBarLabel: 'Map' }} />
+      <AdminTab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    </AdminTab.Navigator>
+  )
+}
+
+function AdminStack() {
+  return (
+    <AdminStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <AdminStackN.Screen name="AdminTabs" component={AdminTabs} />
+      <AdminStackN.Screen name="ProviderSettings" component={ProviderSettingsScreen as any} />
+    </AdminStackN.Navigator>
+  )
+}
+
+// Matches the mockups' own typeface. Applied as a single global default
+// (Text/TextInput.defaultProps) so every existing screen picks it up with
+// no changes on its own end -- see the client app's own App.tsx for the
+// full reasoning (same helper, duplicated per-app since each app's entry
+// point is separate).
+let dmSansApplied = false
+function applyDMSansGlobally() {
+  if (dmSansApplied) return
+  dmSansApplied = true
+  for (const Comp of [Text, TextInput] as const) {
+    const existing = (Comp as any).defaultProps ?? {}
+    ;(Comp as any).defaultProps = { ...existing, style: [{ fontFamily: 'DMSans_400Regular' }, existing.style] }
+  }
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user, staffProfile, crewProfile, signOut } = useAuth()
+  const {
+    session, loading, user, crewProfile, providerAdminProfile,
+    pendingAmbulanceProviderOnboarding, signOut,
+  } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  const [fontsLoaded, fontError] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold, DMSans_800ExtraBold,
+  })
+  if (fontsLoaded) applyDMSansGlobally()
 
-  if (loading) {
+  // Fonts are cosmetic, so they must never be able to brick the app. useFonts
+  // reports failure through its second value; without checking it, a blocked or
+  // stalled webfont request leaves fontsLoaded false forever and the whole app
+  // sits on this spinner with no way out -- a real risk on poor connectivity.
+  if (loading || (!fontsLoaded && !fontError)) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} size="large" />
         </View>
       </SafeAreaProvider>
@@ -92,30 +175,51 @@ function AppNavigator() {
   }
 
   if (session) {
-    // Crew reach this app one of two ways: a dedicated crew row, or a hospital-fleet
-    // staff row whose role is 'ambulance_crew'. Both must land on the jobs board.
-    const isCrew = !!crewProfile || staffProfile?.role === 'ambulance_crew'
+    // Hospital-owned and independent providers work identically now -- one
+    // ambulance_crew row for a driver/EMT (get_my_crew_profile), one
+    // ambulance_provider_admins row for an owner/admin (get_my_ambulance_admin_profile),
+    // regardless of which kind of provider it is.
+    const isCrew  = !!crewProfile
+    const isAdmin = !!providerAdminProfile
 
-    const content = isCrew ? <CrewTabs /> : (
-      <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
-        <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
-        <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
-          This account is not ambulance crew
-        </Text>
-        <Text style={{ color: t.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
-          Queue Ambulance is for ambulance crews on duty. Hospital staff should use
-          Queue Hospital, doctors Queue Doctor, and patients the Queue app.
-        </Text>
-        <TouchableOpacity
-          onPress={() => { void signOut() }}
-          activeOpacity={0.8}
-          style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 30, borderRadius: 14,
-                   borderWidth: 1, borderColor: t.cardBorder }}
-        >
-          <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600' }}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
-    )
+    // Same escape hatch as hospital/doctor onboarding: someone who registered as
+    // an independent operator but closed the app before finishing has no
+    // ambulance_provider_admins row yet -- registered_via is the only thing that
+    // still tells them apart from a plain patient account at that point.
+    const registeredForProvider =
+      (session.user?.user_metadata as Record<string, unknown> | undefined)?.registered_via
+        === REGISTERED_VIA_AMBULANCE_PROVIDER
+    const needsProviderOnboarding = !isAdmin && !isCrew && (pendingAmbulanceProviderOnboarding || registeredForProvider)
+
+    let content: React.ReactElement
+    if (needsProviderOnboarding) {
+      content = <ProviderOnboardingStack />
+    } else if (isCrew) {
+      content = <CrewTabs />
+    } else if (isAdmin) {
+      content = <AdminStack />
+    } else {
+      content = (
+        <View style={{ flex: 1, backgroundColor: t.canvasSolid, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+          <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
+          <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
+            This account is not ambulance crew
+          </Text>
+          <Text style={{ color: t.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
+            Queue Ambulance is for ambulance crews, dispatchers, and fleet operators. Hospital
+            staff should use Queue Hospital, doctors Queue Doctor, and patients the Queue app.
+          </Text>
+          <TouchableOpacity
+            onPress={() => { void signOut() }}
+            activeOpacity={0.8}
+            style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 30, borderRadius: 14,
+                     borderWidth: 1, borderColor: t.cardBorder }}
+          >
+            <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600' }}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
     return <SafeAreaProvider>{content}<OfflineBanner /></SafeAreaProvider>
   }
 
@@ -130,7 +234,7 @@ function AppNavigator() {
         /></SafeAreaProvider>
   }
 
-  return <SafeAreaProvider><CrewAuthStack /><OfflineBanner /></SafeAreaProvider>
+  return <SafeAreaProvider><AmbulanceAuthStack /><OfflineBanner /></SafeAreaProvider>
 }
 
 // React Navigation paints its own scene background behind every screen, and with no
@@ -152,9 +256,11 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
     },
   }
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
-      {children}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: t.canvasSolid }}>
+      <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} theme={navTheme}>
+        {children}
+      </NavigationContainer>
+    </View>
   )
 }
 

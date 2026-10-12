@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { supabase } from '@queue/shared/lib/supabase'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import {
   getRangeStats, getTodayAppointments, getDoctorsOnDuty, fmtLocalDate,
   type RangeStats, type AdminAppointmentRow, type AdminDoctorRow } from '@queue/shared/lib/admin-api'
-import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { statusBadgeColors, doctorStatusColors, DOCTOR_STATUS_LABEL } from '@queue/shared/lib/statusColors'
 
 export function AdminDashboardScreen() {
   const { theme: t } = useTheme()
@@ -30,11 +31,7 @@ export function AdminDashboardScreen() {
     cancelled:        { label: 'Cancelled',   color: sc.cancelled.text,        bg: sc.cancelled.bg },
     no_show:          { label: 'No Show',     color: sc.no_show.text,          bg: sc.no_show.bg },
   }
-  const AVAILABILITY_META: Record<string, { label: string; color: string }> = {
-    on_duty:  { label: 'On duty',  color: t.statusOpen.text },
-    on_break: { label: 'On break', color: t.statusBusy.text },
-    off_duty: { label: 'Off duty', color: t.statusNeutral.text },
-  }
+  const dc = doctorStatusColors(t)
 
   const [stats,      setStats]      = useState<RangeStats | null>(null)
   const [appts,      setAppts]      = useState<AdminAppointmentRow[]>([])
@@ -64,7 +61,21 @@ export function AdminDashboardScreen() {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  const onDutyCount = doctors.filter(d => d.availability_status === 'on_duty').length
+  // Doctor status should read as real-time here -- a doctor toggling their
+  // own on_duty/on_break/off_duty (or an admin activating/deactivating one)
+  // previously only showed up on the next screen-focus or pull-to-refresh.
+  useEffect(() => {
+    if (!hospitalId) return
+    const channel = supabase
+      .channel(`admin-doctors:${hospitalId}`)
+      .on('postgres_changes' as any, {
+        event: '*', schema: 'public', table: 'doctors', filter: `hospital_id=eq.${hospitalId}`,
+      }, () => load(true))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [hospitalId, load])
+
+  const onDutyCount = doctors.filter(d => d.display_status === 'on_duty').length
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
@@ -106,16 +117,16 @@ export function AdminDashboardScreen() {
             {doctors.length === 0 ? (
               <Text style={[s.emptyText, { color: t.textMuted }]}>No doctors found.</Text>
             ) : doctors.map(d => {
-              const av = AVAILABILITY_META[d.availability_status] ?? AVAILABILITY_META.on_duty
+              const av = dc[d.display_status]
               return (
                 <View key={d.id} style={[s.doctorRow, { borderTopColor: t.cardBorder }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.doctorName, { color: t.textPrimary }]}>{[d.title, d.full_name].filter(Boolean).join(' ')}</Text>
                     {d.specialty_name && <Text style={[s.doctorSpec, { color: t.textMuted }]}>{d.specialty_name}</Text>}
                   </View>
-                  <View style={[s.availBadge, { backgroundColor: `${av.color}1F` }]}>
-                    <View style={[s.availDot, { backgroundColor: av.color }]} />
-                    <Text style={[s.availText, { color: av.color }]}>{av.label}</Text>
+                  <View style={[s.availBadge, { backgroundColor: av.bg }]}>
+                    <View style={[s.availDot, { backgroundColor: av.text }]} />
+                    <Text style={[s.availText, { color: av.text }]}>{DOCTOR_STATUS_LABEL[d.display_status]}</Text>
                   </View>
                 </View>
               )

@@ -130,7 +130,7 @@ function EditClinicModal({
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
 
-      <div style={{ width: '100%', maxWidth: 440, background: C.card,
+      <div style={{ width: '100%', maxWidth: 440, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
@@ -288,7 +288,7 @@ function EditClinicHoursModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
 
       <div style={{ width: '100%', maxWidth: 460, maxHeight: '85vh', overflowY: 'auto',
-        background: C.card, border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        background: C.popover, border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
@@ -395,7 +395,7 @@ function AssignDoctorModal({
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
 
-      <div style={{ width: '100%', maxWidth: 520, background: C.card,
+      <div style={{ width: '100%', maxWidth: 520, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
 
@@ -537,7 +537,7 @@ function AddStaffModal({
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
 
-      <div style={{ width: '100%', maxWidth: 480, background: C.card,
+      <div style={{ width: '100%', maxWidth: 480, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
 
@@ -708,7 +708,7 @@ function ManageStaffModal({ staff, col, C, onClose, onRemoved, onUpdated }: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
   }
   const card: React.CSSProperties = {
-    width: '100%', maxWidth: 460, background: C.card,
+    width: '100%', maxWidth: 460, background: C.popover,
     border: `1px solid ${C.border}`, borderRadius: 20,
     boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px',
   }
@@ -1833,7 +1833,7 @@ export default function ClinicDetailPage() {
               background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
               onClick={e => { if (e.target === e.currentTarget) setRejectClinicAppt(null) }}>
-              <div style={{ width: '100%', maxWidth: 420, background: C.card,
+              <div style={{ width: '100%', maxWidth: 420, background: C.popover,
                 border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
                 boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
@@ -2061,7 +2061,7 @@ export default function ClinicDetailPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ width: '100%', maxWidth: 420, background: C.card,
+          <div style={{ width: '100%', maxWidth: 420, background: C.popover,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '28px 28px 24px' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="1.5" style={{display:"block",margin:"0 auto 16px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>

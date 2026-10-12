@@ -83,7 +83,21 @@ async function handleGET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireRole(['doctor'])
+  const res = await handlePATCH(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePATCH(req: NextRequest) {
+  // Was previously called as requireRole(['doctor']) with no `req` -- that
+  // always takes the cookie-session branch (see auth-server.ts's `req?.headers`
+  // check), so a bearer-token caller (the doctor app, cross-origin) always
+  // resolved to no user and got 401 regardless of how valid its token was.
+  // Missing the CORS-header wrapper on top of that meant the browser/RN fetch
+  // layer would have rejected the response even once auth was fixed. Between
+  // the two, this endpoint could never have been called successfully from the
+  // doctor app -- which is exactly why no on-duty toggle was ever built against it.
+  const auth = await requireRole(['doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.doctorId) return Errors.forbidden()

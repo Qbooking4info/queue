@@ -1,19 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, RefreshControl, Switch } from 'react-native'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
+import { Glass, Hero, HeroChip } from '@queue/shared/components/ui/Glass'
+import { IconOrb } from '@queue/shared/components/ui/ValueChip'
+import { Ring, Pill } from '@queue/shared/components/ui/DataViz'
 import {
   getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus,
   sendLocationPing, nextJobStatus, CREW_STATUS_LABEL,
-  getMyUnits, setUnitDuty,
+  getMyUnits, setUnitDuty, offerWindowSeconds,
   type PendingOffer, type ActiveJob, type MyUnit,
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
+import { MOCK_LOCATION, mockCoord, mockLivePoint } from '@queue/shared/lib/mock-location'
 import { JobPatientMap } from '@queue/shared/components/emergency/JobPatientMap'
 
 // Foreground pings. These are now a supplement, not the only source: while on
@@ -28,12 +32,8 @@ function countdown(expiresAt: string, now: number): number {
   return Math.max(0, Math.round((new Date(expiresAt).getTime() - now) / 1000))
 }
 
-function triageColor(level: number | null): string {
-  if (level == null) return '#7A9089'
-  if (level <= 2) return '#FF5C5C'
-  if (level === 3) return '#FFB547'
-  return '#7A9089'
-}
+// triageColor() lived here to tint a bespoke triage badge. <Pill> now carries triage
+// via the theme's own status tones, so the helper had no callers left.
 
 export function CrewHomeScreen() {
   const { theme: t } = useTheme()
@@ -151,6 +151,11 @@ export function CrewHomeScreen() {
   // a job. Now the ping follows *duty*, so an on-duty idle rig is visible to
   // dispatch — which is the entire point of being on duty.
   const pingUnitId = activeJob?.assigned_unit_id ?? onDutyUnit?.ambulance_id ?? null
+  // Home base of whichever unit we're pinging for -- MOCK_LOCATION reports a
+  // point orbiting it instead of a real GPS fix.
+  const pingUnit = units.find(u => u.ambulance_id === pingUnitId) ?? null
+  const pingHomeLat = pingUnit?.home_lat
+  const pingHomeLng = pingUnit?.home_lng
 
   useEffect(() => {
     if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null }
@@ -161,23 +166,34 @@ export function CrewHomeScreen() {
     async function pingOnce() {
       if (stopped || !pingUnitId) return
       try {
-        const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
-        if (status !== 'granted') {
-          // Without location the unit is on duty but undispatchable. Surfaced in
-          // the duty card rather than failing silently.
-          setLocationDenied(true)
-          return
+        let lat: number, lng: number, heading: number | undefined, speedKmh: number | undefined, accuracyM: number | undefined, recordedAt: string
+        if (MOCK_LOCATION) {
+          const base = (pingHomeLat != null && pingHomeLng != null)
+            ? { latitude: pingHomeLat, longitude: pingHomeLng }
+            : mockCoord(pingUnitId)
+          const p = mockLivePoint(base)
+          lat = p.latitude; lng = p.longitude
+          heading = undefined; speedKmh = undefined; accuracyM = 8
+          recordedAt = new Date().toISOString()
+          setLocationDenied(false)
+        } else {
+          const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+          if (status !== 'granted') {
+            // Without location the unit is on duty but undispatchable. Surfaced in
+            // the duty card rather than failing silently.
+            setLocationDenied(true)
+            return
+          }
+          setLocationDenied(false)
+          const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+          lat = pos.coords.latitude
+          lng = pos.coords.longitude
+          heading = pos.coords.heading ?? undefined
+          speedKmh = pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined
+          accuracyM = pos.coords.accuracy ?? undefined
+          recordedAt = new Date(pos.timestamp).toISOString()
         }
-        setLocationDenied(false)
-        const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
-        await sendLocationPing(pingUnitId, [{
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          heading: pos.coords.heading ?? undefined,
-          speedKmh: pos.coords.speed != null ? pos.coords.speed * 3.6 : undefined,
-          accuracyM: pos.coords.accuracy ?? undefined,
-          recordedAt: new Date(pos.timestamp).toISOString(),
-        }])
+        await sendLocationPing(pingUnitId, [{ lat, lng, heading, speedKmh, accuracyM, recordedAt }])
       } catch (err) {
         console.warn('[crew] location ping failed', err)
       }
@@ -186,7 +202,7 @@ export function CrewHomeScreen() {
     pingOnce()
     pingTimer.current = setInterval(pingOnce, PING_INTERVAL_MS)
     return () => { stopped = true; if (pingTimer.current) clearInterval(pingTimer.current) }
-  }, [pingUnitId])
+  }, [pingUnitId, pingHomeLat, pingHomeLng])
 
   async function handleRespond(offerId: string, action: 'accept' | 'decline') {
     setRespondingId(offerId)
@@ -232,168 +248,236 @@ export function CrewHomeScreen() {
     )
   }
 
+  // Header summary. "On duty" and "dispatchable" are different states and the crew
+  // has to be able to tell them apart at a glance: an on-duty unit with a stale GPS
+  // fix receives nothing, which looks identical to a quiet night.
+  const anyOnDuty = units.some(u => u.on_duty)
+  const anyDispatchable = units.some(u => u.visible_to_dispatch)
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
       >
-        {/* Duty. Above everything else because an off-duty unit receives no
-            offers at all — if this is off, the empty offer list below is not a
-            quiet night, it's the crew being invisible. */}
+        <View style={s.header}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[s.title, { color: t.textPrimary }]}>{activeJob ? 'Active job' : 'Pending offers'}</Text>
+            <Text style={[s.sub, { color: t.textSecondary }]}>
+              {onDutyUnit
+                ? `${onDutyUnit.call_sign ?? onDutyUnit.plate_number}, ${onDutyUnit.vehicle_tier}`
+                : units.length ? 'No unit on duty' : 'No unit assigned to you'}
+            </Text>
+          </View>
+          <Pill
+            label={anyDispatchable ? 'On duty' : anyOnDuty ? 'Position stale' : 'Off duty'}
+            tone={anyDispatchable ? 'statusOpen' : anyOnDuty ? 'statusBusy' : 'statusNeutral'}
+            dot={anyDispatchable}
+          />
+        </View>
+
+        {/* Duty, above everything else: an off-duty unit receives no offers at all,
+            so if this is off, the empty offer list below is not a quiet night. */}
         {units.map(unit => {
           const stale = unit.on_duty && !unit.visible_to_dispatch
+          const busy = dutyBusy === unit.ambulance_id
           return (
-            <View key={unit.ambulance_id} style={[s.card, {
-              backgroundColor: t.cardBg,
-              borderColor: unit.on_duty ? (stale ? '#FFB547' : t.accentDark) : t.cardBorder,
-              borderWidth: unit.on_duty ? 1.5 : 1,
-            }]}>
-              <View style={[s.row, { alignItems: 'center' }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.statusLabel, { color: t.textPrimary }]}>
-                    {unit.call_sign ?? unit.plate_number}
-                  </Text>
-                  <Text style={[s.detailText, { color: t.textMuted, marginTop: 2 }]}>
-                    {unit.vehicle_tier} · {unit.provider_name}
+            <Glass
+              key={unit.ambulance_id}
+              radius={22}
+              pad={14}
+              style={{
+                marginBottom: 10,
+                borderColor: unit.on_duty ? (stale ? t.statusBusy.text : t.accent) + '55' : t.cardBorder,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <IconOrb name="bus-outline" size={42} color={unit.on_duty ? t.accent : t.textFaint} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.unitPlate, { color: t.textPrimary }]}>{unit.call_sign ?? unit.plate_number}</Text>
+                  <Text style={[s.detailText, { color: t.textSecondary }]} numberOfLines={1}>
+                    {unit.vehicle_tier}, {unit.provider_name}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => handleToggleDuty(unit)}
-                  disabled={dutyBusy === unit.ambulance_id}
-                  style={[s.secondaryBtn, {
-                    borderColor: unit.on_duty ? '#FF5C5C55' : '#00C26555',
-                    backgroundColor: unit.on_duty ? '#FF5C5C14' : '#00C26514',
-                    opacity: dutyBusy === unit.ambulance_id ? 0.5 : 1,
-                    paddingHorizontal: 16,
-                  }]}
-                >
-                  {dutyBusy === unit.ambulance_id
-                    ? <ActivityIndicator size="small" color={t.textMuted} />
-                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? t.danger : t.accentDark }}>
-                        {unit.on_duty ? 'Go off duty' : 'Go on duty'}
-                      </Text>}
-                </TouchableOpacity>
+                <View style={{ alignItems: 'flex-end' }}>
+                  {busy ? (
+                    <ActivityIndicator color={t.accent} />
+                  ) : (
+                    <Switch
+                      value={unit.on_duty}
+                      onValueChange={() => handleToggleDuty(unit)}
+                      trackColor={{ false: t.inputBorder, true: t.accent + '99' }}
+                      thumbColor={unit.on_duty ? t.accent : undefined}
+                    />
+                  )}
+                  <Text style={{ fontSize: 10.5, color: t.textSecondary, marginTop: 4 }}>
+                    {unit.on_duty ? 'On duty' : 'Off duty'}
+                  </Text>
+                </View>
               </View>
 
-              {/* On duty and dispatchable are different things, and the crew has
-                  to be told which one they actually are. */}
-              <View style={[s.detailRow, { marginTop: 10 }]}>
-                <Ionicons
-                  name={unit.visible_to_dispatch ? 'radio-outline' : unit.on_duty ? 'warning-outline' : 'moon-outline'}
-                  size={14}
-                  color={unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted}
-                />
-                <Text style={[s.detailText, {
-                  color: unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted, flex: 1,
-                }]}>
-                  {unit.visible_to_dispatch
-                    ? 'Visible to dispatch — you can receive jobs'
-                    : stale
-                      ? locationDenied
-                        ? 'On duty, but location is off. Dispatch cannot see you.'
-                        : 'On duty, but your position is stale. Keep this screen open to stay dispatchable.'
-                      : 'Off duty — you will not receive any jobs'}
-                </Text>
-              </View>
-            </View>
+              {unit.on_duty && (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12,
+                  paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+                  backgroundColor: unit.visible_to_dispatch ? t.statusOpen.bg : t.statusBusy.bg,
+                }}>
+                  <View style={{
+                    width: 7, height: 7, borderRadius: 4,
+                    backgroundColor: unit.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
+                  }} />
+                  <Text style={{
+                    fontSize: 12, flex: 1,
+                    color: unit.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
+                  }}>
+                    {unit.visible_to_dispatch
+                      ? 'Visible to dispatch, you can receive jobs'
+                      : locationDenied
+                        ? 'Not dispatchable, location is off'
+                        : 'Not dispatchable, location is stale'}
+                  </Text>
+                </View>
+              )}
+            </Glass>
           )
         })}
 
-        <Text style={[s.title, { color: t.textPrimary }]}>{activeJob ? 'Active Job' : 'Pending Offers'}</Text>
-
         {activeJob ? (
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={s.row}>
-              <View style={[s.triageBadge, { backgroundColor: `${triageColor(activeJob.triage_level)}18`, borderColor: `${triageColor(activeJob.triage_level)}40` }]}>
-                <Text style={[s.triageBadgeText, { color: triageColor(activeJob.triage_level) }]}>
-                  {activeJob.triage_level ? `Triage ${activeJob.triage_level}` : 'Scheduled'}
-                </Text>
+          <>
+            {/* The live job is the most urgent thing on the screen, so it takes the
+                gradient hero rather than another quiet panel. */}
+            <Hero style={{ marginTop: 8, marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <HeroChip>
+                  <Ionicons
+                    name={activeJob.triage_level ? 'alert-circle-outline' : 'calendar-outline'}
+                    size={13}
+                    color={t.onHero}
+                  />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: t.onHero }}>
+                    {activeJob.triage_level ? `Triage ${activeJob.triage_level}` : 'Scheduled'}
+                  </Text>
+                </HeroChip>
+                <Text style={{ fontSize: 11.5, color: t.onHero, opacity: 0.85 }}>{activeJob.booking_ref}</Text>
               </View>
-              <Text style={[s.bookingRef, { color: t.textMuted }]}>{activeJob.booking_ref}</Text>
-            </View>
 
-            <Text style={[s.statusLabel, { color: t.accent }]}>{TRANSPORT_STATUS_LABEL[activeJob.status as TransportStatus] ?? activeJob.status}</Text>
-            <Text style={[s.symptom, { color: t.textPrimary }]}>{activeJob.symptom_description ?? 'No condition details provided'}</Text>
+              <Text style={{ fontSize: 12, color: t.onHero, opacity: 0.85, marginTop: 14 }}>
+                {TRANSPORT_STATUS_LABEL[activeJob.status as TransportStatus] ?? activeJob.status}
+              </Text>
+              <Text style={{ fontSize: 20, fontWeight: '700', letterSpacing: -0.3, color: t.onHero, marginTop: 2 }}>
+                {activeJob.symptom_description ?? 'No condition details provided'}
+              </Text>
 
-            {activeJob.pickup_address && (
-              <View style={s.detailRow}>
-                <Ionicons name="location-outline" size={14} color={t.textMuted} />
-                <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.pickup_address}</Text>
+              {!!activeJob.pickup_address && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                  <Ionicons name="location-outline" size={14} color={t.onHero} />
+                  <Text style={{ fontSize: 12.5, color: t.onHero, opacity: 0.9, flex: 1 }}>{activeJob.pickup_address}</Text>
+                </View>
+              )}
+              {!!activeJob.destination_hospital_name && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <Ionicons name="business-outline" size={14} color={t.onHero} />
+                  <Text style={{ fontSize: 12.5, color: t.onHero, opacity: 0.9, flex: 1 }}>{activeJob.destination_hospital_name}</Text>
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 }}>
+                <HeroChip style={{ paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'column', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: t.onHero }}>
+                    {activeJob.eta_seconds != null ? `${Math.max(1, Math.round(activeJob.eta_seconds / 60))} min` : '—'}
+                  </Text>
+                  <Text style={{ fontSize: 9.5, color: t.onHero, opacity: 0.85 }}>ETA</Text>
+                </HeroChip>
+                {nextJobStatus(activeJob.status) ? (
+                  <TouchableOpacity
+                    onPress={handleAdvanceStatus}
+                    disabled={updatingStatus}
+                    style={{
+                      flex: 1, paddingVertical: 13, borderRadius: 999, alignItems: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.92)', opacity: updatingStatus ? 0.6 : 1,
+                    }}
+                  >
+                    {updatingStatus
+                      ? <ActivityIndicator color={t.bannerBg} />
+                      : <Text style={{ fontSize: 13, fontWeight: '700', color: t.bannerBg }}>
+                          {`Mark: ${CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}`}
+                        </Text>}
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={{ flex: 1, fontSize: 12, color: t.onHero, opacity: 0.9 }}>
+                    Arrived. The receiving facility completes handover from here.
+                  </Text>
+                )}
               </View>
-            )}
-            {activeJob.destination_hospital_name && (
-              <View style={s.detailRow}>
-                <Ionicons name="business-outline" size={14} color={t.textMuted} />
-                <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.destination_hospital_name}</Text>
-              </View>
-            )}
+            </Hero>
 
-            {/* Where the patient actually is, and how long until we're there.
-                Both come from the server, so the crew and the patient are
-                reading the same number rather than two guesses. */}
-            <JobPatientMap
-              requestId={activeJob.request_id}
-              pickup={activeJob.pickup_lat != null && activeJob.pickup_lng != null
-                ? { lat: activeJob.pickup_lat, lng: activeJob.pickup_lng }
-                : null}
-              etaSeconds={activeJob.eta_seconds}
-            />
-
-            <Button label="Call patient" onPress={callPatient} variant="outline" icon="call-outline" style={{ marginTop: 14 }} />
-
-            {nextJobStatus(activeJob.status) ? (
-              <Button
-                label={`Mark: ${CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}`}
-                onPress={handleAdvanceStatus} loading={updatingStatus} style={{ marginTop: 14 }}
+            {/* Where the patient actually is, and how long until we're there. Both
+                come from the server, so crew and patient read the same number. */}
+            <Glass radius={22} pad={12} style={{ marginBottom: 12 }}>
+              <JobPatientMap
+                requestId={activeJob.request_id}
+                pickup={activeJob.pickup_lat != null && activeJob.pickup_lng != null
+                  ? { lat: activeJob.pickup_lat, lng: activeJob.pickup_lng }
+                  : null}
+                etaSeconds={activeJob.eta_seconds}
               />
-            ) : (
-              <View style={[s.noteBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.noteText, { color: t.accent }]}>
-                  Arrived — the receiving facility completes handover from here.
-                </Text>
-              </View>
-            )}
-          </View>
+            </Glass>
+
+            <Button label="Call patient" onPress={callPatient} variant="outline" icon="call-outline" />
+          </>
         ) : offers.length === 0 ? (
-          <View style={[s.emptyBox, { borderColor: t.cardBorder }]}>
-            <Ionicons name="checkmark-done-outline" size={32} color={t.textMuted} style={{ marginBottom: 8 }} />
-            <Text style={[s.emptyText, { color: t.textMuted }]}>No pending offers right now</Text>
-          </View>
+          <Glass radius={22} pad={32} style={{ alignItems: 'center', marginTop: 8 }}>
+            <IconOrb name="checkmark-done-outline" size={46} color={t.textSecondary} />
+            <Text style={{ fontSize: 15, color: t.textSecondary, marginTop: 12 }}>No pending offers right now</Text>
+          </Glass>
         ) : (
           offers.map(o => {
             const secs = countdown(o.expires_at, now)
+            const window = offerWindowSeconds(o.triage_level)
             const busy = respondingId === o.offer_id
+            const urgent = secs <= 10
             return (
-              <View key={o.offer_id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={s.row}>
-                  <View style={[s.triageBadge, { backgroundColor: `${triageColor(o.triage_level)}18`, borderColor: `${triageColor(o.triage_level)}40` }]}>
-                    <Text style={[s.triageBadgeText, { color: triageColor(o.triage_level) }]}>
-                      {o.triage_level ? `Triage ${o.triage_level}` : '—'}
-                    </Text>
+              <View key={o.offer_id} style={{ marginTop: 8, marginBottom: 10 }}>
+                <Glass radius={22} pad={14}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {/* Ring, not a bare number: the proportion left is the thing that
+                        matters when deciding whether to take a job. */}
+                    <Ring fraction={secs / window} color={urgent ? t.danger : t.accent}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: urgent ? t.danger : t.textPrimary }}>
+                        {secs}s
+                      </Text>
+                    </Ring>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Pill
+                        label={o.triage_level ? `Triage ${o.triage_level}` : 'Scheduled'}
+                        tone={o.triage_level == null ? 'statusVirtual' : o.triage_level <= 2 ? 'statusCancelled' : 'statusBusy'}
+                      />
+                      <Text style={{ fontSize: 13.5, fontWeight: '600', color: t.textPrimary, marginTop: 6 }}>
+                        {o.symptom_description ?? 'No condition details provided'}
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: t.textSecondary, marginTop: 1 }} numberOfLines={2}>
+                        {o.pickup_address ?? 'Pickup address not given'}
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: t.textSecondary, marginTop: 1 }}>
+                        ETA ~{Math.max(1, Math.round((o.eta_seconds ?? 0) / 60))} min away
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[s.countdown, { color: secs <= 10 ? t.danger : t.textMuted }]}>{secs}s</Text>
-                </View>
-                <Text style={[s.symptom, { color: t.textPrimary }]}>{o.symptom_description ?? 'No condition details provided'}</Text>
-                {o.pickup_address && (
-                  <View style={s.detailRow}>
-                    <Ionicons name="location-outline" size={14} color={t.textMuted} />
-                    <Text style={[s.detailText, { color: t.textSecondary }]}>{o.pickup_address}</Text>
-                  </View>
-                )}
-                <View style={s.detailRow}>
-                  <Ionicons name="time-outline" size={14} color={t.textMuted} />
-                  <Text style={[s.detailText, { color: t.textSecondary }]}>ETA ~{Math.round((o.eta_seconds ?? 0) / 60)} min</Text>
-                </View>
-                <View style={s.offerActions}>
-                  <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'decline')} disabled={busy}
-                    style={[s.secondaryBtn, { flex: 1, borderColor: t.cardBorder, opacity: busy ? 0.6 : 1 }]}>
-                    <Text style={[s.secondaryBtnText, { color: t.textPrimary }]}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'accept')} disabled={busy}
-                    style={[s.primaryBtn, { flex: 1, backgroundColor: t.danger, opacity: busy ? 0.6 : 1 }]}>
-                    {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>Accept</Text>}
-                  </TouchableOpacity>
+                </Glass>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <Button
+                    label="Pass"
+                    onPress={() => handleRespond(o.offer_id, 'decline')}
+                    variant="outline"
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    label="Accept"
+                    onPress={() => handleRespond(o.offer_id, 'accept')}
+                    loading={busy}
+                    icon="checkmark"
+                    style={{ flex: 1 }}
+                  />
                 </View>
               </View>
             )
@@ -406,24 +490,9 @@ export function CrewHomeScreen() {
 
 const s = StyleSheet.create({
   safe:  { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
-  card:  { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
-  row:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  triageBadgeText: { fontSize: 11, fontWeight: '800' },
-  bookingRef: { fontSize: 11 },
-  countdown:  { fontSize: 16, fontWeight: '800' },
-  statusLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  symptom:    { fontSize: 15, fontWeight: '600', marginBottom: 8 },
-  detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  detailText: { fontSize: 12 },
-  offerActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  primaryBtn:   { padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  primaryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  secondaryBtn: { flexDirection: 'row', gap: 6, padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700' },
-  noteBox:  { borderRadius: 12, padding: 13, borderWidth: 1, marginTop: 14 },
-  noteText: { fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  emptyBox: { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText: { fontSize: 13 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18 },
+  title: { fontSize: 25, fontWeight: '700', letterSpacing: -0.5 },
+  sub:   { fontSize: 12.5, marginTop: 4 },
+  unitPlate:  { fontSize: 14.5, fontWeight: '700', letterSpacing: 0.3 },
+  detailText: { fontSize: 11.5, marginTop: 1 },
 })

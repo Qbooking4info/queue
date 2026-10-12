@@ -128,7 +128,7 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
             />
 
             <TouchableOpacity onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-              <Text style={[styles.saveBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>{saving ? 'Saving…' : 'Save Insurance Details'}</Text>
+              <Text style={[styles.saveBtnText, { color: t.onAccent }]}>{saving ? 'Saving…' : 'Save Insurance Details'}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -148,16 +148,16 @@ const styles = StyleSheet.create({
   safe:          { flex: 1 },
   header:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
   backBtn:       { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title:         { fontSize: 16, fontWeight: '800', letterSpacing: -0.4 },
+  title:         { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
   scroll:        { flex: 1, paddingHorizontal: 20, paddingTop: 12 },
-  placeholder:   { textAlign: 'center', paddingVertical: 40, fontSize: 12 },
+  placeholder:   { textAlign: 'center', paddingVertical: 40, fontSize: 14 },
   infoBox:       { borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 20 },
-  infoText:      { fontSize: 12, lineHeight: 20 },
-  label:         { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
+  infoText:      { fontSize: 14, lineHeight: 20 },
+  label:         { fontSize: 13, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
   chips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  chipText:      { fontSize: 12, fontWeight: '600' },
-  input:         { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, fontSize: 14 },
+  chipText:      { fontSize: 14, fontWeight: '600' },
+  input:         { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16 },
   saveBtn:       { borderRadius: 20, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
-  saveBtnText:   { fontSize: 14, fontWeight: '800' },
+  saveBtnText:   { fontSize: 16, fontWeight: '800' },
 })

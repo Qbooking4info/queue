@@ -248,7 +248,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           {doctors.length > 0 && (
             <>
               <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>ASSIGN DOCTOR (OPTIONAL)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0, marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity onPress={() => setDoctorId(null)}
                     style={[s.docChip, { borderColor: !doctorId ? t.accent : t.cardBorder, backgroundColor: !doctorId ? `${t.accent}18` : t.cardBg }]}>
@@ -273,7 +273,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           {clinics.length > 0 && (
             <>
               <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 16 }]}>ASSIGN CLINIC (OPTIONAL)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <ScrollView style={{ flexGrow: 0, flexShrink: 0 }} horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity onPress={() => setClinicId(null)}
                     style={[s.docChip, { borderColor: !clinicId ? t.accent : t.cardBorder, backgroundColor: !clinicId ? `${t.accent}18` : t.cardBg }]}>

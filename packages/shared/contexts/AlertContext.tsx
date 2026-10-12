@@ -56,7 +56,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal visible={!!state} transparent animationType="fade" onRequestClose={() => setState(null)}>
         <View style={st.overlay} accessibilityViewIsModal accessible={false}>
-          <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+          <View style={[st.card, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
             <Text style={[st.title, { color: t.textPrimary }]} accessibilityRole="header">{state?.title}</Text>
             {!!state?.message && <Text style={[st.message, { color: t.textMuted }]}>{state.message}</Text>}
             <View style={st.buttonRow}>

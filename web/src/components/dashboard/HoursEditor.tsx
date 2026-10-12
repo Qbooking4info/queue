@@ -5,7 +5,7 @@ import type { DayHours } from '@/lib/admin-api'
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function HoursEditor({ hours, onChange }: { hours: DayHours[]; onChange: (hours: DayHours[]) => void }) {
-  const { theme: C } = useTheme()
+  const { theme: C, mode } = useTheme()
 
   function update(day: number, field: 'open' | 'close' | 'closed', value: string | boolean) {
     onChange(hours.map(h => h.day === day ? { ...h, [field]: value } : h))
@@ -14,7 +14,7 @@ export function HoursEditor({ hours, onChange }: { hours: DayHours[]; onChange: 
   const timeInput: React.CSSProperties = {
     background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 8,
     padding: '6px 8px', fontSize: 12, color: C.text, outline: 'none',
-    fontFamily: 'inherit', colorScheme: C.id === 'forest' ? 'dark' : 'light',
+    fontFamily: 'inherit', colorScheme: mode,
   }
 
   return (

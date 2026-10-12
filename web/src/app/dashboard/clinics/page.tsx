@@ -243,7 +243,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
 
-      <div style={{ width: '100%', maxWidth: 480, background: C.card,
+      <div style={{ width: '100%', maxWidth: 480, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20, overflow: 'hidden',
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
 
@@ -398,7 +398,7 @@ function CreateClinicModal({ hospitalId, onClose, onCreated }: CreateModalProps)
                 <button onClick={() => { onCreated(); onClose() }}
                   style={{ flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
                     background: C.accent, border: 'none',
-                    color: C.id === 'forest' ? '#061208' : '#fff',
+                    color: C.onAccent,
                     fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
                   Done
                 </button>
@@ -481,7 +481,7 @@ export default function ClinicsPage() {
           </div>
         </div>
         <button onClick={() => setShowModal(true)}
-          style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+          style={{ background: C.accent, color: C.onAccent,
             border: 'none', borderRadius: 10, padding: '10px 18px',
             fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
             display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -523,7 +523,7 @@ export default function ClinicsPage() {
             doctors, and front desk staff.
           </div>
           <button onClick={() => setShowModal(true)}
-            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+            style={{ background: C.accent, color: C.onAccent,
               border: 'none', borderRadius: 10, padding: '11px 24px',
               fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             + Create First Clinic
@@ -559,7 +559,7 @@ export default function ClinicsPage() {
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteError('') } }}>
-          <div style={{ width: '100%', maxWidth: 420, background: C.card,
+          <div style={{ width: '100%', maxWidth: 420, background: C.popover,
             border: '1px solid rgba(220,60,60,0.3)', borderRadius: 20,
             padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="1.5" style={{display:"block",margin:"0 auto 14px"}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>

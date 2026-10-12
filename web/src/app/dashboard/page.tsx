@@ -9,11 +9,12 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { BedSpaceCard } from '@/components/dashboard/BedSpaceCard'
-import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
+import type { AdminAppointment, DoctorAvailabilityStatus, DoctorDisplayStatus } from '@/lib/admin-api'
 import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useEmergencyAccess } from '@/lib/useEmergencyAccess'
+import { DOCTOR_STATUS_META } from '@/lib/doctor-status'
 import {
   CalendarDays, CheckCircle2, Users, Star, Clock, Stethoscope,
   Tag, Settings, Video, Building2, Calendar, ClipboardList,
@@ -25,12 +26,6 @@ const PALETTE = ['#1A4A32','#1A2A4A','#3A1A4A','#4A2A1A','#2A1A4A','#1A3A4A']
 function docColor(name: string) {
   if (!DOC_COLORS[name]) DOC_COLORS[name] = PALETTE[Object.keys(DOC_COLORS).length % PALETTE.length]
   return DOC_COLORS[name]
-}
-
-const AVAIL_CONFIG: Record<DoctorAvailabilityStatus, { label: string; color: string; bg: string; border: string }> = {
-  on_duty:  { label: 'On Duty',  color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.3)' },
-  on_break: { label: 'On Break', color: '#EF9F27', bg: 'rgba(239,159,39,0.12)', border: 'rgba(239,159,39,0.3)' },
-  off_duty: { label: 'Off Duty', color: '#888',    bg: 'rgba(128,128,128,0.1)', border: 'rgba(128,128,128,0.25)' },
 }
 
 function ApptRow({ a, range, C }: { a: AdminAppointment; range: DateRangeKey; C: any }) {
@@ -218,15 +213,15 @@ export default function OverviewPage() {
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: SPACE.xl, marginBottom: SPACE.xl }}>
           <div style={{ ...T.label, color: C.textSub, marginBottom: SPACE.md }}>My Availability Status</div>
           <div style={{ display: 'flex', gap: SPACE.sm, flexWrap: 'wrap' }}>
-            {(Object.keys(AVAIL_CONFIG) as DoctorAvailabilityStatus[]).map(s => {
-              const c = AVAIL_CONFIG[s]
+            {(['on_duty', 'on_break', 'off_duty'] as DoctorAvailabilityStatus[]).map(s => {
+              const c = DOCTOR_STATUS_META[s]
               const active = avail === s
               return (
                 <button key={s} onClick={() => handleAvailabilityChange(s)} disabled={savingAvail}
                   style={{ padding: '9px 20px', borderRadius: 10, cursor: savingAvail ? 'not-allowed' : 'pointer',
                     fontFamily: 'inherit', ...T.body, fontWeight: 700,
                     background: active ? c.bg : C.bgAlt,
-                    color: active ? c.color : C.textMuted,
+                    color: active ? c.text : C.textMuted,
                     border: `1px solid ${active ? c.border : C.border}`,
                     opacity: savingAvail ? 0.7 : 1, transition: 'all .15s' }}>
                   {c.label}
@@ -378,7 +373,7 @@ export default function OverviewPage() {
             sub={rangeStats.total > 0 ? `${Math.round(rangeStats.completed / rangeStats.total * 100)}% done` : '—'}
             colorKey="blue" />
           <StatCard icon={<Stethoscope size={18} />} label="Doctors Available"
-            value={ctxLoading ? '…' : doctors.filter(d => ((d as any).availability_status ?? 'on_duty') === 'on_duty').length}
+            value={ctxLoading ? '…' : doctors.filter(d => ((d as any).display_status ?? 'inactive') === 'on_duty').length}
             sub="Currently on duty" colorKey="purple" />
         </div>
 
@@ -420,8 +415,7 @@ export default function OverviewPage() {
             ) : doctors.length === 0 ? (
               <div style={{ padding: `${SPACE.lg}px 18px`, ...T.caption, color: C.textMuted }}>No doctors assigned</div>
             ) : doctors.map(d => {
-              const status = ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus
-              const cfg = AVAIL_CONFIG[status]
+              const cfg = DOCTOR_STATUS_META[((d as any).display_status as DoctorDisplayStatus | undefined) ?? 'inactive']
               return (
                 <div key={d.id} style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
@@ -436,7 +430,7 @@ export default function OverviewPage() {
                     <div style={{ fontSize: 10, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
                   </div>
                   <span style={{ ...T.label, padding: '2px 8px', borderRadius: 99,
-                    background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+                    background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
                     {cfg.label}
                   </span>
                 </div>
@@ -530,8 +524,7 @@ export default function OverviewPage() {
             ) : doctors.length === 0 ? (
               <div style={{ padding: `${SPACE.lg}px 18px`, ...T.caption, color: C.textMuted }}>No doctors yet</div>
             ) : doctors.slice(0, 5).map(d => {
-              const status = ((d as any).availability_status ?? 'on_duty') as DoctorAvailabilityStatus
-              const cfg = AVAIL_CONFIG[status]
+              const cfg = DOCTOR_STATUS_META[((d as any).display_status as DoctorDisplayStatus | undefined) ?? 'inactive']
               return (
                 <div key={d.id} style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
                   display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
@@ -546,7 +539,7 @@ export default function OverviewPage() {
                     <div style={{ fontSize: 10, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
                   </div>
                   <span style={{ ...T.label, padding: '2px 8px', borderRadius: 99,
-                    background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+                    background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
                     {cfg.label}
                   </span>
                 </div>

@@ -52,7 +52,7 @@ export function MovePositionModal({ appt, queue, onClose, onMoved }: Props) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={st.overlay}>
-        <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={[st.card, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
           <Text style={[st.title, { color: t.textPrimary }]}>Move in Queue</Text>
           <Text style={[st.sub, { color: t.textMuted }]}>{name} · currently #{appt.queue_position ?? '—'}</Text>
 

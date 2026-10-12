@@ -1,50 +1,51 @@
-// icon values are Ionicons glyph names (@expo/vector-icons) — the app moved off
-// emoji icons everywhere else, so specialties follow the same convention. `color`
-// gives each specialty its own identity (outline icons render as one flat color
-// each, unlike emoji, which are naturally multi-colored) — shown at full color
-// when unselected, and swapped for the theme accent when a chip is active so
-// selection state still reads clearly.
+// Emoji glyphs, matching the DB-backed specialty list's own convention
+// (getSpecialties()/SpecialtyRow.icon, rendered by SpecialtyBrowseScreen) --
+// this static local list now reads the same way instead of being the one
+// outlier still on Ionicons. No per-item `color` anymore: emoji are already
+// naturally multi-colored and can't be recolored to the accent on selection
+// the way a flat outline icon could, so "selected" now reads entirely from
+// the chip's own background/border (see HomeScreen's SpecialtyGrid/chip row).
 export const specialties = [
-  { icon: 'medical-outline',           label: 'General Practice',    color: '#5B9EFF' },
-  { icon: 'heart-outline',             label: 'Cardiology',          color: '#FF5C5C' },
-  { icon: 'flash-outline',             label: 'Neurology',           color: '#A78BFA' },
-  { icon: 'happy-outline',             label: 'Dentistry',           color: '#5BC8FF' },
-  { icon: 'eye-outline',               label: 'Ophthalmology',       color: '#38BDF8' },
-  { icon: 'walk-outline',              label: 'Orthopedics',         color: '#94A3B8' },
-  { icon: 'body-outline',              label: 'Pediatrics',          color: '#FFB547' },
-  { icon: 'female-outline',            label: 'OB / GYN',            color: '#F472B6' },
-  { icon: 'ribbon-outline',            label: 'Oncology',            color: '#C084FC' },
-  { icon: 'cloud-outline',             label: 'Pulmonology',         color: '#7DD3FC' },
-  { icon: 'sparkles-outline',          label: 'Dermatology',         color: '#FDBA74' },
-  { icon: 'ear-outline',               label: 'ENT',                 color: '#FACC15' },
-  { icon: 'sync-outline',              label: 'Endocrinology',       color: '#34D399' },
-  { icon: 'moon-outline',              label: 'Mental Health',       color: '#818CF8' },
-  { icon: 'shield-checkmark-outline',  label: 'HIV & PrEP',          color: '#22D3EE' },
-  { icon: 'flask-outline',             label: 'Hematology',          color: '#EF4444' },
-  { icon: 'water-outline',             label: 'Nephrology',          color: '#0EA5E9' },
-  { icon: 'scan-outline',              label: 'Radiology',           color: '#94A3B8' },
-  { icon: 'accessibility-outline',     label: 'Physiotherapy',       color: '#4ADE80' },
-  { icon: 'bug-outline',               label: 'Infectious Disease',  color: '#84CC16' },
-  { icon: 'flower-outline',            label: 'Fertility',           color: '#F9A8D4' },
-  { icon: 'water-outline',             label: 'Urology',             color: '#0EA5E9' },
-  { icon: 'restaurant-outline',        label: 'Gastroenterology',    color: '#FB923C' },
-  { icon: 'egg-outline',               label: 'Neonatology',         color: '#FDE68A' },
-  { icon: 'cloudy-outline',            label: 'Psychiatry',          color: '#A5B4FC' },
-  { icon: 'male-female-outline',       label: 'Sexual Health',       color: '#F472B6' },
-  { icon: 'nutrition-outline',         label: 'Nutrition',           color: '#65A30D' },
-  { icon: 'walk-outline',              label: 'Rheumatology',        color: '#94A3B8' },
-  { icon: 'alert-circle-outline',      label: 'Emergency',           color: '#FF5C5C' },
+  { icon: '🩺', label: 'General Practice' },
+  { icon: '🫀', label: 'Cardiology' },
+  { icon: '🧠', label: 'Neurology' },
+  { icon: '🦷', label: 'Dentistry' },
+  { icon: '👁️', label: 'Ophthalmology' },
+  { icon: '🦴', label: 'Orthopedics' },
+  { icon: '🍼', label: 'Pediatrics' },
+  { icon: '🤰', label: 'OB / GYN' },
+  { icon: '🎗️', label: 'Oncology' },
+  { icon: '🫁', label: 'Pulmonology' },
+  { icon: '🧴', label: 'Dermatology' },
+  { icon: '👂', label: 'ENT' },
+  { icon: '💉', label: 'Endocrinology' },
+  { icon: '🧘', label: 'Mental Health' },
+  { icon: '🛡️', label: 'HIV & PrEP' },
+  { icon: '🩸', label: 'Hematology' },
+  { icon: '💧', label: 'Nephrology' },
+  { icon: '🩻', label: 'Radiology' },
+  { icon: '🤸', label: 'Physiotherapy' },
+  { icon: '🦠', label: 'Infectious Disease' },
+  { icon: '🌸', label: 'Fertility' },
+  { icon: '🫘', label: 'Urology' },
+  { icon: '🍽️', label: 'Gastroenterology' },
+  { icon: '👶', label: 'Neonatology' },
+  { icon: '💭', label: 'Psychiatry' },
+  { icon: '🩹', label: 'Sexual Health' },
+  { icon: '🥗', label: 'Nutrition' },
+  { icon: '🦵', label: 'Rheumatology' },
+  { icon: '🚨', label: 'Emergency' },
   // Surgery sub-specialties
-  { icon: 'cut-outline',               label: 'General Surgery',     color: '#F87171' },
-  { icon: 'sparkles-outline',          label: 'Plastic Surgery',     color: '#FDBA74' },
-  { icon: 'flash-outline',             label: 'Neurosurgery',        color: '#A78BFA' },
-  { icon: 'pulse-outline',             label: 'Cardiothoracic',      color: '#FF5C5C' },
-  { icon: 'construct-outline',         label: 'Ortho Surgery',       color: '#94A3B8' },
-  { icon: 'search-outline',            label: 'Laparoscopic',        color: '#38BDF8' },
-  { icon: 'people-outline',            label: 'Paediatric Surgery',  color: '#FFB547' },
-  { icon: 'git-network-outline',       label: 'Vascular Surgery',    color: '#F87171' },
-  { icon: 'ellipse-outline',           label: 'Maxillofacial',       color: '#C4B5FD' },
-  { icon: 'telescope-outline',         label: 'Endoscopic Surgery',  color: '#38BDF8' },
+  { icon: '✂️', label: 'General Surgery' },
+  { icon: '✨', label: 'Plastic Surgery' },
+  { icon: '⚡', label: 'Neurosurgery' },
+  { icon: '💓', label: 'Cardiothoracic' },
+  { icon: '🔧', label: 'Ortho Surgery' },
+  { icon: '🔬', label: 'Laparoscopic' },
+  { icon: '🧸', label: 'Paediatric Surgery' },
+  { icon: '🩹', label: 'Vascular Surgery' },
+  { icon: '😷', label: 'Maxillofacial' },
+  { icon: '🔭', label: 'Endoscopic Surgery' },
 ]
 
 export interface Doctor {

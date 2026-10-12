@@ -87,6 +87,7 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
 }
 
 export type DoctorAvailabilityStatus = 'on_duty' | 'on_break' | 'off_duty'
+export type DoctorDisplayStatus = 'inactive' | DoctorAvailabilityStatus
 
 export interface AdminDoctorRow {
   id: string
@@ -94,24 +95,30 @@ export interface AdminDoctorRow {
   title: string | null
   specialty_name: string | null
   availability_status: DoctorAvailabilityStatus
+  // 'inactive' covers both deactivated-at-this-hospital and "active, but
+  // currently at a different hospital" -- see get_hospital_staff_roster
+  // (supabase/migrations/20260914000001_doctor_display_status.sql). Only
+  // on_duty may be assigned a patient.
+  display_status: DoctorDisplayStatus
 }
 
+// Was a direct client-side `.from('doctors')` query -- switched to the same
+// SECURITY DEFINER RPC StaffManagementScreen already uses so both mobile
+// doctor lists get is_active/display_status from one place instead of this
+// screen inventing its own (and never having them at all, previously).
 export async function getDoctorsOnDuty(hospitalId: string, clinicId?: string | null): Promise<AdminDoctorRow[]> {
-  let query = supabase
-    .from('doctors')
-    .select('id, full_name, title, availability_status, specialty:specialties!doctors_specialty_id_fkey(name)')
-    .eq('hospital_id', hospitalId)
-    .order('full_name')
-
-  if (clinicId) query = query.eq('clinic_id', clinicId)
-
-  const { data, error } = await query
+  const { data, error } = await supabase.rpc('get_hospital_staff_roster', { p_hospital_id: hospitalId })
   if (error || !data) return []
-  return (data as any[]).map(d => ({
-    id: d.id,
-    full_name: d.full_name,
-    title: d.title ?? null,
-    specialty_name: d.specialty?.name ?? null,
-    availability_status: (d.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
-  }))
+  let doctors = (data.doctors ?? []) as any[]
+  if (clinicId) doctors = doctors.filter(d => d.clinic_id === clinicId)
+  return doctors
+    .map(d => ({
+      id: d.id,
+      full_name: d.full_name,
+      title: d.title ?? null,
+      specialty_name: d.specialty_name ?? null,
+      availability_status: (d.availability_status ?? 'off_duty') as DoctorAvailabilityStatus,
+      display_status: (d.display_status ?? 'inactive') as DoctorDisplayStatus,
+    }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
 }

@@ -102,7 +102,10 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
     } catch (err) {
       console.warn('[video] failed to end session on leave', err)
     }
-    navigation.goBack()
+    // replace, not goBack -- lands the doctor on the plan screen instead of
+    // back into the call, and "Save"/"Skip" from there both return cleanly to
+    // wherever the call was launched from (the queue, or the appointments list).
+    navigation.replace('ConsultationPlan', { appointmentId, patientName })
   }
 
   function handleEndSession() {
@@ -284,10 +287,10 @@ function CallTimer({ connected, waitingLabel }: { connected: boolean; waitingLab
 const st = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#050d09', minHeight: '100vh' as any },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
-  waitingText:  { fontSize: 14, color: '#4A6058', textAlign: 'center' },
-  loadingText:  { fontSize: 13, color: '#4A6058', marginTop: 14, textAlign: 'center' },
-  errorTitle:   { fontSize: 18, fontWeight: '700', color: '#FF5C5C', marginBottom: 8, textAlign: 'center' },
-  errorSub:     { fontSize: 13, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
+  waitingText:  { fontSize: 16, color: '#4A6058', textAlign: 'center' },
+  loadingText:  { fontSize: 15, color: '#4A6058', marginTop: 14, textAlign: 'center' },
+  errorTitle:   { fontSize: 21, fontWeight: '700', color: '#FF5C5C', marginBottom: 8, textAlign: 'center' },
+  errorSub:     { fontSize: 15, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
   backCallBtn:  { marginTop: 20, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
   localPip: {
     position: 'absolute', top: 68, right: 16,
@@ -301,8 +304,8 @@ const st = StyleSheet.create({
     paddingTop: 20, paddingHorizontal: 20, paddingBottom: 14,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  headerName:   { color: '#fff', fontSize: 16, fontWeight: '700' },
-  headerStatus: { fontSize: 12, marginTop: 3 },
+  headerName:   { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerStatus: { fontSize: 14, marginTop: 3 },
   controls: {
     position: 'absolute', bottom: 32, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,

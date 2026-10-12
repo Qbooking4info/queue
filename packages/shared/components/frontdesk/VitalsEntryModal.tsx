@@ -46,7 +46,7 @@ export function VitalsEntryModal({ appointmentId, patientName, onClose, onSaved 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView style={st.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View style={[st.card, { backgroundColor: t.popover, borderColor: t.popoverBorder }]}>
           <Text style={[st.title, { color: t.textPrimary }]}>Record Vitals</Text>
           <Text style={[st.sub, { color: t.textMuted }]}>{patientName}</Text>
 

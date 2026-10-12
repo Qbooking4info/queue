@@ -1,0 +1,569 @@
+<!doctype html>
+<title>Queue Platform Audit</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #F4F6F1;
+    --surface: #FFFFFF;
+    --surface-alt: #ECF0E8;
+    --border: #D7DED2;
+    --text: #171D18;
+    --text-muted: #4B564C;
+    --text-faint: #7B857A;
+    --accent: #046A38;
+    --accent-strong: #024F29;
+    --accent-soft: #E1F1E5;
+    --accent-border: rgba(4,106,56,0.28);
+    --critical: #9A2A22;
+    --critical-bg: #FCEAE7;
+    --critical-border: rgba(154,42,34,0.28);
+    --high: #8A4B00;
+    --high-bg: #FBF0DC;
+    --high-border: rgba(138,75,0,0.28);
+    --medium: #1D4ED8;
+    --medium-bg: #E9EEFC;
+    --medium-border: rgba(29,78,216,0.24);
+    --good: #1F7A4D;
+    --good-bg: #E5F4EA;
+    --good-border: rgba(31,122,77,0.26);
+    --mono-bg: #EEF1EA;
+    --mono-text: #2C352C;
+    --shadow: 0 1px 3px rgba(20,30,20,0.07);
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #12160F;
+      --surface: #191F17;
+      --surface-alt: #212A1D;
+      --border: #38432F;
+      --text: #E7ECE3;
+      --text-muted: #AEBAA6;
+      --text-faint: #7E8A76;
+      --accent: #6FD69B;
+      --accent-strong: #93EBB8;
+      --accent-soft: #1D3524;
+      --accent-border: rgba(111,214,155,0.28);
+      --critical: #FFB4AA;
+      --critical-bg: #3B1A16;
+      --critical-border: rgba(255,180,170,0.28);
+      --high: #F2C177;
+      --high-bg: #3A2A0C;
+      --high-border: rgba(242,193,119,0.28);
+      --medium: #A9C4FF;
+      --medium-bg: #182238;
+      --medium-border: rgba(169,196,255,0.26);
+      --good: #8FE0B3;
+      --good-bg: #16301F;
+      --good-border: rgba(143,224,179,0.26);
+      --mono-bg: #212A1D;
+      --mono-text: #C7D2BE;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12160F;
+    --surface: #191F17;
+    --surface-alt: #212A1D;
+    --border: #38432F;
+    --text: #E7ECE3;
+    --text-muted: #AEBAA6;
+    --text-faint: #7E8A76;
+    --accent: #6FD69B;
+    --accent-strong: #93EBB8;
+    --accent-soft: #1D3524;
+    --accent-border: rgba(111,214,155,0.28);
+    --critical: #FFB4AA;
+    --critical-bg: #3B1A16;
+    --critical-border: rgba(255,180,170,0.28);
+    --high: #F2C177;
+    --high-bg: #3A2A0C;
+    --high-border: rgba(242,193,119,0.28);
+    --medium: #A9C4FF;
+    --medium-bg: #182238;
+    --medium-border: rgba(169,196,255,0.26);
+    --good: #8FE0B3;
+    --good-bg: #16301F;
+    --good-border: rgba(143,224,179,0.26);
+    --mono-bg: #212A1D;
+    --mono-text: #C7D2BE;
+    --shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0;
+    padding: 0 20px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding-block: 40px 80px; }
+
+  code, .cite { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  /* ---- Header ---- */
+  header.masthead { margin-bottom: 8px; }
+  .eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 40px); font-weight: 800; letter-spacing: -0.02em;
+    margin: 0 0 10px; text-wrap: balance;
+  }
+  .dek { font-size: 16px; color: var(--text-muted); max-width: 62ch; margin: 0 0 28px; }
+  .meta-row {
+    display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--text-faint);
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding-block: 12px; margin-bottom: 34px;
+  }
+  .meta-row b { color: var(--text); font-weight: 600; }
+
+  /* ---- Severity stat strip ---- */
+  .stat-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 36px;
+  }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 12px; text-align: center; box-shadow: var(--shadow);
+  }
+  .stat .n { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  .stat.crit .n, .stat.crit .l { color: var(--critical); }
+  .stat.high .n, .stat.high .l { color: var(--high); }
+  .stat.med .n, .stat.med .l { color: var(--medium); }
+  .stat.good .n, .stat.good .l { color: var(--good); }
+
+  /* ---- TOC ---- */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px 22px; margin-bottom: 40px; box-shadow: var(--shadow);
+  }
+  nav.toc .toc-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 10px; }
+  nav.toc ol { margin: 0; padding-left: 0; list-style: none; columns: 2; column-gap: 24px; }
+  nav.toc li { break-inside: avoid; margin-bottom: 6px; font-size: 14px; }
+  nav.toc a { color: var(--text); text-decoration: none; font-weight: 600; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+  nav.toc span.n { color: var(--text-faint); font-weight: 500; margin-right: 6px; }
+
+  /* ---- Sections ---- */
+  section { margin-bottom: 48px; scroll-margin-top: 20px; }
+  h2 {
+    font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .count { font-size: 13px; font-weight: 700; color: var(--text-faint); }
+  .section-intro { color: var(--text-muted); font-size: 14.5px; margin: 0 0 20px; max-width: 68ch; }
+
+  /* ---- Finding cards ---- */
+  .finding {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow);
+  }
+  .finding-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .pill {
+    flex-shrink: 0; font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid; margin-top: 2px;
+  }
+  .pill.critical { color: var(--critical); background: var(--critical-bg); border-color: var(--critical-border); }
+  .pill.high { color: var(--high); background: var(--high-bg); border-color: var(--high-border); }
+  .pill.medium { color: var(--medium); background: var(--medium-bg); border-color: var(--medium-border); }
+  .finding h3 { font-size: 15.5px; font-weight: 700; margin: 0; letter-spacing: -0.005em; }
+  .finding p { font-size: 14px; color: var(--text-muted); margin: 0 0 10px; }
+  .finding p:last-of-type { margin-bottom: 10px; }
+  .cites { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cites code {
+    font-size: 11.5px; background: var(--mono-bg); color: var(--mono-text);
+    padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  }
+
+  /* ---- Strengths ---- */
+  .strength {
+    background: var(--good-bg); border: 1px solid var(--good-border); border-radius: 14px;
+    padding: 14px 18px; margin-bottom: 10px;
+  }
+  .strength h3 { font-size: 14.5px; font-weight: 700; margin: 0 0 4px; color: var(--good); }
+  .strength p { font-size: 13.5px; color: var(--text); margin: 0; opacity: 0.92; }
+
+  /* ---- Recommendations ---- */
+  .rec-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .rec {
+    background: var(--surface); border: 1px solid var(--accent-border); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow); position: relative; padding-left: 52px;
+  }
+  .rec .num {
+    position: absolute; left: 16px; top: 16px; width: 26px; height: 26px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent-strong); font-weight: 800; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rec h3 { font-size: 15px; font-weight: 700; margin: 0 0 5px; }
+  .rec p { font-size: 13.5px; color: var(--text-muted); margin: 0; }
+  .rec .tag {
+    display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--accent-strong); background: var(--accent-soft); border-radius: 6px; padding: 2px 7px; margin-bottom: 6px;
+  }
+
+  /* ---- Priority list ---- */
+  .priority-list { list-style: none; margin: 0; padding: 0; counter-reset: p; }
+  .priority-list li {
+    counter-increment: p; display: flex; gap: 12px; align-items: baseline;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14.5px;
+  }
+  .priority-list li::before {
+    content: counter(p); flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--critical-bg); color: var(--critical); font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .priority-list li:nth-child(n+6)::before { background: var(--high-bg); color: var(--high); }
+
+  footer {
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-faint);
+  }
+
+  @media (max-width: 640px) {
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    nav.toc ol { columns: 1; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Engineering &amp; Product Audit</div>
+    <h1>Queue Platform Audit</h1>
+    <p class="dek">A source-level review of the patient, doctor, hospital, and ambulance apps plus the Supabase/Next.js backend — what's real vs. stubbed, where the risk sits, and what a Nigeria/Africa-market launch specifically needs.</p>
+    <div class="meta-row">
+      <span>Scope: <b>4 mobile apps + web dashboard + backend</b></span>
+      <span>Method: <b>direct source reads, file:line evidence</b></span>
+      <span>Date: <b>21 Sep 2026</b></span>
+    </div>
+  </header>
+
+  <div class="stat-strip">
+    <div class="stat crit"><div class="n">10</div><div class="l">Critical</div></div>
+    <div class="stat high"><div class="n">17</div><div class="l">High</div></div>
+    <div class="stat med"><div class="n">10</div><div class="l">Structural</div></div>
+    <div class="stat good"><div class="n">5</div><div class="l">Real strengths</div></div>
+  </div>
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><span class="n">01</span><a href="#summary">Executive summary</a></li>
+      <li><span class="n">02</span><a href="#critical">Critical issues</a></li>
+      <li><span class="n">03</span><a href="#high">High-severity bugs &amp; gaps</a></li>
+      <li><span class="n">04</span><a href="#structural">Structural gaps</a></li>
+      <li><span class="n">05</span><a href="#strengths">What's genuinely solid</a></li>
+      <li><span class="n">06</span><a href="#nigeria">Nigeria / Africa readiness</a></li>
+      <li><span class="n">07</span><a href="#priority">Suggested fix order</a></li>
+    </ol>
+  </nav>
+
+  <section id="summary">
+    <h2>Executive summary</h2>
+    <p class="section-intro">
+      Queue is further along than a typical early-stage build in several places — the Paystack payment integration, the queue/wait-time math, and the ambulance dispatch-matching engine are all genuinely well-engineered, with evidence of a real, iterative security-hardening process (multiple documented, fixed vulnerabilities). But the review surfaced a consistent pattern: <b>trust boundaries that look closed are often open one layer down.</b> A payment system exists, but refunds don't. An ambulance dispatch engine is sophisticated, but nothing verifies the vehicles or crew it's dispatching, or ever bills for the trip. A notification pipeline exists, but two of its three channels were confirmed broken in production until roughly a month ago, and the one channel Nigerian patients would most reliably reach — SMS — doesn't exist for them at all. Several user-facing screens make promises (SMS confirmations, "skip the queue," "HMO accepted," refund eligibility) that no backend code actually fulfills.
+    </p>
+    <p class="section-intro">
+      None of this is unusual for a fast-moving build — it's the normal shape of "shipped the feature, didn't close the loop." The list below is organized by what would actually hurt a patient, a hospital, or the business first if left alone.
+    </p>
+  </section>
+
+  <section id="critical">
+    <h2>Critical issues <span class="count">— safety, money, or legal exposure</span></h2>
+    <p class="section-intro">These are the findings worth treating as launch-blocking or near-blocking, roughly in the order they'd bite.</p>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Data integrity</span><h3>A patient can cancel an appointment they've already checked into, or that's in progress</h3></div>
+      <p>Two RLS <code>UPDATE</code> policies exist on <code>appointments</code> for patients. The intended one restricts updates to <code>pending</code>/<code>confirmed</code> status; a second, broader policy has no status restriction at all. Postgres OR-combines permissive RLS policies, so the broader one silently nullifies the restriction — a patient can cancel (or otherwise modify) their own appointment in any status, including while checked in or mid-consultation. The app's own UI reflects this: the Cancel button renders and works for <code>checked_in</code>/<code>in_progress</code> appointments with no server-side stop.</p>
+      <div class="cites"><code>supabase/migrations/20260827000001_dependent_account_linking.sql:170-179</code><code>apps/client/screens/AppointmentDetailScreen.tsx:132,578-590</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Money</span><h3>Refunds don't exist — and patients who paid online are told otherwise</h3></div>
+      <p>The cancellation screen tells every patient "nothing has been charged — payment is made at the hospital, so there is nothing to refund." That copy was accurate when it was written, before online payment existed. Real Paystack payments now go through the app, the <code>payments</code> table has <code>refund_reason</code>/<code>refunded_at</code> columns, and no code anywhere — no cron, no API route, no Paystack refund call — ever writes to them. A patient who pays online and then cancels is given false information and has no path to a refund.</p>
+      <div class="cites"><code>apps/client/screens/AppointmentDetailScreen.tsx:168</code><code>packages/shared/lib/api.ts:682-710</code><code>web/src/app/api/payments/ (no refund route)</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Clinical safety</span><h3>Doctor identity and license (MDCN) are entirely self-reported, with no verification step</h3></div>
+      <p>Registration collects name/email/phone/password only. A doctor is linked into a hospital's active roster purely by exchanging a 6-character code — no admin input, no license check. <code>mdcn_number</code> is a free nullable text column; there is no <code>is_verified</code> column for doctors at all (unlike hospitals and ambulance providers, which have one — see below). A genuine credential-document upload feature exists, but nothing in the admin dashboard ever displays, reviews, or approves an uploaded document.</p>
+      <div class="cites"><code>web/src/app/api/doctors/link/route.ts:93-229</code><code>apps/doctor/screens/specialist/DoctorSettingsScreen.tsx:186</code><code>web/src/app/dashboard/doctors/page.tsx:23-27</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Regulatory / safety</span><h3>Ambulance providers are dispatchable the moment they self-register — the one verification flag is never set or checked</h3></div>
+      <p>There is no field anywhere for a NEMSAS or state EMS license (e.g. Lagos's LASEMS). An <code>is_verified</code> column exists on <code>ambulance_providers</code> and even gates a public directory policy — but registration never sets it, no route in the entire backend ever flips it to true, and — critically — the function that actually decides who gets offered a dispatch job never checks it. An unverified, self-registered operator is fully live and dispatchable the moment they add a unit and go on duty.</p>
+      <div class="cites"><code>supabase/migrations/20260729000001_ambulance_core.sql:59,572</code><code>web/src/app/api/ambulances/register/route.ts:107-115</code><code>find_candidate_units() — 20260906000001_ambulance_provider_admins.sql:461-462</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Clinical safety</span><h3>Ambulance vehicle tier and crew qualification are self-declared, and the dispatch engine trusts them for triage-critical matching</h3></div>
+      <p>"BLS/ALS/CCT" and crew roles like "paramedic" are plain checkbox/dropdown selections at registration — no document, no inspection record, no certification check, at any layer. The dispatch matching engine's tier-fit scoring (a real strength — see §5) is only as good as this input, meaning a critical (triage 1–2) patient can be matched to a unit whose declared capability was never independently confirmed.</p>
+      <div class="cites"><code>apps/ambulance/screens/admin/AdminFleetScreen.tsx:17-19,236-253</code><code>web/src/app/api/ambulances/fleet/units/route.ts:32-46</code><code>web/src/app/api/ambulances/fleet/crew/route.ts:66-76</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Broken promise</span><h3>The emergency-booking confirmation screen promises an SMS that is never sent</h3></div>
+      <p>"Hospital contact will be shared via SMS shortly" is hardcoded UI copy on the highest-stakes screen in the app. There is no SMS integration anywhere in the codebase capable of sending it — patient notifications are push/in-app only, full stop (see §"Nigeria readiness" for the one SMS integration that does exist, which pages ambulance dispatchers, not patients).</p>
+      <div class="cites"><code>apps/client/screens/EmergencyConfirmationScreen.tsx:162</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Emergency reliability</span><h3>The most safety-critical automated message in the app can't reach a patient who isn't already looking at their phone — and its own human-fallback list was empty in production</h3></div>
+      <p>"No ambulance available — call emergency services directly" is generated by a pg_cron sweep with no HTTP capability, so it can only write an in-app row — no push, no SMS. The screen designed to catch total dispatch failure (a cached, offline-first emergency-number directory) is genuinely well-built, but the repo's own seed-data file documents it had 0 rows in production as of the last check, at a point where every real transport request on the platform had ended in "no unit available." That means this fallback screen — showing nothing — had been the entire user-facing outcome of the ambulance feature to date.</p>
+      <div class="cites"><code>supabase/migrations/20260810000002_emergency_search_deadline.sql:172-183</code><code>supabase/seed/emergency_directory_lagos.sql:18-23</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Infrastructure</span><h3>Push and realtime notifications were both confirmed broken in production until roughly a month before this review</h3></div>
+      <p>An RLS lockdown never whitelisted the <code>push_token</code> column, so every attempt to save a push token had been silently failing — the fixing migration's own comment states plainly that no device had ever had a token on file. Separately, the Postgres realtime publication was missing the <code>appointments</code>/<code>notifications</code>/<code>transport_requests</code> tables, so every live-update subscription in the app (8 screens) had been silently inert. Both were fixed in late August 2026, roughly 3-4 weeks before this review — meaning the notification system, including the incoming-call "ring" alert, may only have been functionally alive for a few weeks, with a likely population of devices still carrying stale or never-set tokens.</p>
+      <div class="cites"><code>supabase/migrations/20260827000003_allow_push_token_update.sql</code><code>supabase/migrations/20260823000003_realtime_publication_fix.sql</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Product-market mismatch</span><h3>Ambulance billing is schema-only, and no transport request can currently reach "completed" through any screen</h3></div>
+      <p>Rate-card and invoice tables are fully modeled but never read or written by any application code — no trip has ever been billed. Deeper than that: the state transition into "completed" is deliberately reserved for a "receiving facility" actor, and no screen in the codebase implements that actor at all (the hospital's ambulance-requests screen is read-only). A transport request, as currently shippable, cannot be marked complete by anyone — which also means billing, even if built, would have nothing to trigger it.</p>
+      <div class="cites"><code>supabase/migrations/20260729000001_ambulance_core.sql:343-379</code><code>supabase/migrations/20260729000004_ambulance_crew_app_fns.sql:122-127</code><code>apps/hospital/screens/staff/AmbulanceRequestsScreen.tsx (read-only)</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill critical">Race condition</span><h3>A panicked double-tap during a real emergency can create two separately-billed, separately-queued bookings</h3></div>
+      <p>Emergency bookings are deliberately exempt from the duplicate-active-booking trigger (reasonable — a patient in crisis shouldn't be blocked by an existing routine booking), but nothing compensates for that exemption with request-level idempotency. A dropped connection followed by a retry — very plausible behavior for someone in a genuine emergency on a flaky connection — has no backstop.</p>
+      <div class="cites"><code>supabase/migrations/20260801000001_no_duplicate_active_bookings.sql:20-22</code><code>apps/client/screens/EmergencyBookingScreen.tsx:217-299</code></div>
+    </div>
+  </section>
+
+  <section id="high">
+    <h2>High-severity bugs &amp; gaps <span class="count">— real defects, not missing nice-to-haves</span></h2>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Payments</span><h3>The Card / Bank Transfer / USSD / HMO picker is decorative</h3></div>
+      <p>Whatever a patient taps is stored on the appointment row but never read by the payment-initialization code — every patient gets the same generic Paystack checkout regardless of selection. Tapping "USSD" specifically does not enable USSD; tapping "HMO" does not trigger anything HMO-related (see next finding).</p>
+      <div class="cites"><code>apps/client/screens/BookingFlowScreen.tsx:100-105</code><code>packages/shared/lib/payments.ts:36</code><code>web/src/app/api/payments/initialize/route.ts</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Payments</span><h3>HMO/Insurance is a label with nothing behind it</h3></div>
+      <p><code>user_insurance</code> stores provider/plan/member ID as free text with zero backend logic beyond CRUD. No eligibility check, no claim, no effect on the amount charged. A patient with real HMO coverage gets the identical checkout experience as one without.</p>
+      <div class="cites"><code>supabase/migrations/20260531120200_user_insurance.sql</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Concurrency</span><h3>Daily booking-limit enforcement has a real race condition</h3></div>
+      <p>Duplicate bookings, clinic age/gender eligibility, and time-slot capacity are all closed with real <code>BEFORE INSERT</code> triggers. The per-day/per-clinic booking cap is not — it's checked only via an advisory RPC before submit, so two concurrent bookings that both pass the check can both insert and push the day over capacity.</p>
+      <div class="cites"><code>supabase/migrations/20260810000007_clinic_daily_booking_limit.sql:19-51</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Data integrity</span><h3>Reschedule is two unguarded round trips, not one transaction</h3></div>
+      <p>A reschedule inserts a new appointment, then separately closes the old one. A dropped connection between the two calls — plausible on a flaky connection — leaves both live. The failure is only logged with <code>console.warn</code>, never surfaced to the patient, and the function still reports success.</p>
+      <div class="cites"><code>packages/shared/lib/api.ts:987-1031</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Broken feature</span><h3>The screen literally named "Prescriptions" doesn't show prescriptions</h3></div>
+      <p>It renders only doctor notes and diagnosis, even though the appointment record includes a real prescription field and a different screen (Appointment Detail) shows it correctly. Patients looking for their medication list in the obvious place find nothing.</p>
+      <div class="cites"><code>apps/client/screens/PrescriptionsScreen.tsx:66-133</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Transparency</span><h3>Patients have no visibility into referrals at all</h3></div>
+      <p>Who referred them, why, and from where is shown on the staff dashboard but is never even selected in the patient app's own appointment query — a referred appointment renders as an ordinary booking. If the receiving hospital requires manual approval, the patient isn't notified a referral happened until (or unless) it's approved.</p>
+      <div class="cites"><code>packages/shared/lib/api.ts:334-337 (APPOINTMENT_SELECT)</code><code>web/src/app/api/appointments/refer/route.ts:191-197</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Scheduling</span><h3>A doctor working at two hospitals can be double-booked with no warning</h3></div>
+      <p>Each hospital affiliation creates an independent doctor record with independently generated time slots — nothing ties scheduling back to the same real person across hospitals. Multi-clinic practice is extremely common in Nigeria; this is a live risk, not a theoretical one.</p>
+      <div class="cites"><code>web/src/app/api/doctors/link/route.ts:195-219</code><code>web/src/app/api/doctors/schedule/route.ts:207-209</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Fairness</span><h3>"Checked in but never called" gets the same no-show label as "never showed up"</h3></div>
+      <p>The nightly cleanup job marks both cases identically as <code>no_show</code>, with identical copy. A patient penalized for a hospital's own delay has no way to distinguish their situation from genuinely missing an appointment.</p>
+      <div class="cites"><code>supabase/migrations/20260809000001_cleanup_stuck_checkins.sql:74-97</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Copy accuracy</span><h3>Hospital settings tell staff "Queue does not process payments" next to the real Paystack payout setup</h3></div>
+      <p>Directly contradictory user-facing copy on the same settings page as the live online-payment configuration UI — worth fixing regardless of the refund gap above, since it actively misinforms hospital staff about their own obligations.</p>
+      <div class="cites"><code>web/src/app/dashboard/settings/page.tsx:403</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Dead feature</span><h3>SMS/Email reminder toggles in hospital settings do nothing</h3></div>
+      <p>The flags persist to the database when a hospital admin toggles them, but nothing anywhere ever reads them to send a reminder — there's no SMS/email sending infrastructure to send with in the first place.</p>
+      <div class="cites"><code>web/src/app/dashboard/settings/page.tsx:411-412</code><code>supabase/migrations/20260723000001_hospitals_reminder_flags.sql</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Access gap</span><h3>The mobile hospital app has no revenue or rating analytics — only the web dashboard does</h3></div>
+      <p>Both surfaces call the same backend endpoints, which already return revenue and rating figures, but the mobile analytics screen never renders them. A clinic owner who only carries a phone — plausibly the norm for many independent Nigerian clinics — can't see this data at all without separately accessing a desktop dashboard.</p>
+      <div class="cites"><code>web/src/app/dashboard/analytics/page.tsx:138-143</code><code>apps/hospital/screens/staff/StaffAnalyticsScreen.tsx</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Observability</span><h3>Crash reporting is wired into every app's code but isn't actually working in most of them</h3></div>
+      <p>Three of four mobile apps call <code>Sentry.wrap()</code> but never call <code>Sentry.init()</code> — no data is transmitted regardless. No Sentry DSN is present in any tracked environment or EAS build config across any app. As shipped, the team likely has no working crash visibility.</p>
+      <div class="cites"><code>apps/{ambulance,doctor,hospital}/App.tsx (no Sentry.init)</code><code>apps/{ambulance,client,doctor,hospital}/eas.json (no DSN in any profile)</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Resilience</span><h3>No retry/offline queue anywhere for actions that matter</h3></div>
+      <p>Ambulance crew accept/decline, location pings, and booking submission are all one-shot network calls. A connectivity gap at exactly the wrong moment — the norm, not the exception, in the coverage conditions this product targets — silently drops the action with no automatic recovery.</p>
+      <div class="cites"><code>packages/shared/lib/crew-api.ts:121-136</code><code>packages/shared/lib/location-task.ts:89-93</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Resilience</span><h3>Offline handling is excellent for the emergency flow and largely absent everywhere else</h3></div>
+      <p>The emergency-directory fallback is a genuinely well-built offline-first cache. Ordinary queue/appointment/notification screens have no equivalent caching, and a "spinner forever" bug class (an unhandled promise rejection leaving a screen stuck loading) has already shipped once in production and isn't uniformly fixed across other load paths that have the same shape.</p>
+      <div class="cites"><code>packages/shared/lib/emergency-directory.ts:38-92</code><code>apps/client/screens/HomeScreen.tsx:141-171 (unguarded)</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Notifications</span><h3>One push token per user — a second device silently gets nothing</h3></div>
+      <p>Logging in on a new phone overwrites the stored token; the previous device stops receiving pushes with no indication to the user that this happened.</p>
+      <div class="cites"><code>packages/shared/lib/api.ts:1055-1064</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Identity</span><h3>The patient "Verified" flag can never actually become true</h3></div>
+      <p>Every patient account shows a permanent "Unverified" badge — <code>users.is_verified</code> is deliberately excluded from the patient's own update grant (correct, it's a trust flag), but no staff action, admin route, or any other code path in the entire repo ever sets it to true either. The verification concept exists in schema and UI with no way to ever complete it.</p>
+      <div class="cites"><code>apps/client/screens/ProfileScreen.tsx:104-109</code><code>supabase/migrations/20260816000002_lock_down_users_self_update.sql</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill high">Family booking</span><h3>A dependent now needs their own full account — including an infant or toddler</h3></div>
+      <p>The lightweight "just a name and date of birth" dependent record was deprecated and is no longer insertable; every dependent must be a fully independent, separately-registered account (email, password, phone, DOB) that a caretaker then links by code. There is no path for a genuinely young child, or any dependent with no email of their own, to be added at all.</p>
+      <div class="cites"><code>supabase/migrations/20260827000001_dependent_account_linking.sql</code><code>apps/client/screens/RegisterScreen.tsx:50-85</code></div>
+    </div>
+  </section>
+
+  <section id="structural">
+    <h2>Structural gaps <span class="count">— foundational, worth planning around rather than patching</span></h2>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Localization</span><h3>Zero i18n infrastructure — every screen across all four apps and the web dashboard is hardcoded English</h3></div>
+      <p>No translation library, no <code>t()</code> pattern, no device-locale awareness beyond hardcoded <code>en-NG</code> date formatting. This is a from-scratch build, not a config flip.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Notifications</span><h3>No SMS or email channel exists for patients, anywhere</h3></div>
+      <p>Every patient-facing notification — booking status, payment, no-show, referral, incoming call — is push and/or in-app only. The one SMS integration in the codebase pages ambulance dispatchers when the automated matching fails; it was never extended to patients.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Identity</span><h3>No phone-based OTP or 2FA anywhere, including for accounts with medical-record and dispatch access</h3></div>
+      <p>Auth is email+password only. Password reset is also email-only, with no SMS-based alternative.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Identity</span><h3>No NIN, no next-of-kin/emergency-contact field, anywhere in the data model</h3></div>
+      <p>Notable specifically because the app has a dedicated emergency-booking flow with no structured way to know who to contact if a patient is incapacitated.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Compliance</span><h3>NDPR compliance is claimed in-app but has no backing implementation</h3></div>
+      <p>The Support screen states the app complies with the Nigeria Data Protection Regulation. There is no consent-tracking mechanism, no retention/purge policy, no data export path, and account deletion detaches login without deleting or anonymizing the underlying medical data.</p>
+      <div class="cites"><code>apps/client/screens/SupportScreen.tsx:20</code><code>web/src/app/api/account/route.ts:54-57</code></div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Clinical data</span><h3>Prescriptions are unstructured free text</h3></div>
+      <p>No drug code, no dosage-unit validation, no interaction checking, no machine-readable output a pharmacy could parse — just two free-text fields serialized into a text column.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Performance</span><h3>No virtualized lists anywhere in the codebase</h3></div>
+      <p>Zero <code>FlatList</code> usage found — every list is a <code>ScrollView</code> + <code>.map()</code>, which keeps every row mounted regardless of length. Not a problem yet at current data volumes, worth fixing before history/notification lists grow.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Ambulance</span><h3>GPS ping cadence doesn't actually speed up during the highest-value phase</h3></div>
+      <p>The design intent (30s idle, 5s once assigned/en route) isn't what's implemented — cadence is flat regardless of job state.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Referrals</span><h3>No escalation if a receiving hospital simply never responds to a referral</h3></div>
+      <p>Contrast with the ambulance system, which has genuine round-based retry and escalation infrastructure. Referrals have nothing equivalent — a referral to a hospital with an inactive front desk can sit silently indefinitely.</p>
+    </div>
+
+    <div class="finding">
+      <div class="finding-head"><span class="pill medium">Ambulance</span><h3>No mid-job cancellation path for a crew (breakdown, wrong dispatch)</h3></div>
+      <p>Named as a state-machine transition and a named edge case in the project's own design document, with no implementation anywhere — this scenario currently has to be handled entirely by a human calling a human.</p>
+    </div>
+  </section>
+
+  <section id="strengths">
+    <h2>What's genuinely solid</h2>
+    <p class="section-intro">Worth stating plainly, since a review like this reads one-sided otherwise — these are areas where the engineering is a real cut above "it demos."</p>
+
+    <div class="strength">
+      <h3>Paystack integration</h3>
+      <p>Server-side fee authority (a client amount is never trusted), signature-and-amount-verified webhooks, and real per-hospital payout splitting via Paystack subaccounts. The gaps found are in what surrounds this integration (refunds, method selection, HMO), not in the integration itself.</p>
+    </div>
+    <div class="strength">
+      <h3>Queue ordering &amp; wait-time estimation</h3>
+      <p>Genuinely computed from each doctor's own historical consult duration, serialized safely under concurrent check-ins with advisory locks, with a documented and properly-fixed prior race condition.</p>
+    </div>
+    <div class="strength">
+      <h3>Ambulance dispatch matching</h3>
+      <p>A real weighted-scoring engine (ETA, tier fit, shift headroom, network preference, reliability) with a triage-aware policy — critical calls explicitly disable fleet-preference weighting so commission incentives can't steer a life-threatening case. Three independent layers of timeout/re-offer handling, including a client-side deadline that doesn't depend on any server component staying alive.</p>
+    </div>
+    <div class="strength">
+      <h3>Live GPS tracking</h3>
+      <p>Real accuracy/drift/staleness filtering server-side, background-task resilience through app kills and dead zones, and reciprocal patient-location sharing to refine the final approach.</p>
+    </div>
+    <div class="strength">
+      <h3>Row-level security discipline</h3>
+      <p>Broadly well-architected, with clear evidence of an iterative, audit-driven security process — several real historical vulnerabilities (public anon-key data leaks, a privilege-escalation-adjacent RPC) were found and properly fixed. The gaps in this report sit inside an otherwise disciplined practice, not an absent one.</p>
+    </div>
+  </section>
+
+  <section id="nigeria">
+    <h2>Nigeria / Africa readiness</h2>
+    <p class="section-intro">
+      Recommendations below are drawn directly from the gaps above, prioritized by what would move the needle most for a Nigerian (and broadly West/Sub-Saharan African) launch — a market defined by phone-first identity, SMS/USSD-literate but data-cost-conscious users, variable connectivity, a large informal/multi-operator services layer (ambulances especially), and a regulatory environment (NDPR, MDCN, NEMSAS/state EMS bodies) that this build doesn't yet touch.
+    </p>
+
+    <div class="rec-grid">
+      <div class="rec"><div class="num">1</div><span class="tag">Highest leverage</span><h3>Wire SMS into patient notifications, not just ambulance-dispatcher paging</h3><p>The codebase already names Termii and Africa's Talking in its one existing SMS integration (dispatcher alerts) — extend that exact pattern to booking approval/rejection, no-show, and above all "no ambulance available." This single change closes the largest gap between what the app promises and what it delivers.</p></div>
+      <div class="rec"><div class="num">2</div><span class="tag">Payments</span><h3>Make USSD and bank transfer real, not just labels</h3><p>Paystack already supports both — the fix is passing a <code>channels</code> restriction based on what the patient actually picked, rather than always defaulting to the generic checkout. This is a market where card penetration is lower than transfer/USSD usage.</p></div>
+      <div class="rec"><div class="num">3</div><span class="tag">Identity</span><h3>Add phone-based OTP login alongside email</h3><p>Phone numbers are the more stable identifier for most users in this market; email is frequently shared, abandoned, or rarely checked. This also gives password reset a non-email path, which currently doesn't exist.</p></div>
+      <div class="rec"><div class="num">4</div><span class="tag">Clinical safety</span><h3>Build a real doctor-verification step before <code>is_verified</code>-equivalent trust is granted</h3><p>At minimum: format/checksum validation on the MDCN number and a manual admin review of the credential documents that are already being uploaded but never looked at. A hospital admin dashboard review queue is a small addition on top of what already exists.</p></div>
+      <div class="rec"><div class="num">5</div><span class="tag">Regulatory</span><h3>Add a NEMSAS / state EMS license field for ambulance providers, and make dispatch actually check it</h3><p>The <code>is_verified</code> column already exists on <code>ambulance_providers</code> — the fix is a license-number field, an admin verification workflow, and one line in the dispatch matching function to actually filter on it.</p></div>
+      <div class="rec"><div class="num">6</div><span class="tag">Insurance</span><h3>Turn HMO/NHIS from a label into a real workflow</h3><p>Even a manual pre-authorization/claim-reference flow (front desk records an authorization code) would be more honest than the current decorative field, and a natural stepping stone toward a real eligibility API integration with major Nigerian HMOs as they expose one.</p></div>
+      <div class="rec"><div class="num">7</div><span class="tag">Compliance</span><h3>Back the NDPR claim with actual mechanics</h3><p>Consent capture at signup, a stated retention policy, a real data-export endpoint, and genuine anonymization (not just an auth-table unlink) on account deletion. The app currently asserts compliance it doesn't have.</p></div>
+      <div class="rec"><div class="num">8</div><span class="tag">Language</span><h3>Plan for Pidgin, Hausa, Yoruba, and Igbo — starting with the front-desk and patient-booking screens</h3><p>These are the highest-friction, lowest-digital-literacy touchpoints in the product. No i18n scaffolding exists yet, so this needs to be budgeted as a real build, not a translation pass.</p></div>
+      <div class="rec"><div class="num">9</div><span class="tag">Resilience</span><h3>Apply the emergency flow's offline discipline everywhere else</h3><p>The team has already proven it knows how to build this well (the cached emergency-number directory, the client-side dispatch-deadline timer). Extending local caching and an explicit offline state to ordinary booking/queue/notification screens is applying a known pattern, not inventing a new one.</p></div>
+      <div class="rec"><div class="num">10</div><span class="tag">Clinical data</span><h3>Structure prescriptions for pharmacy handoff</h3><p>A drug-code and dosage-unit field, even a simple one, matters for community-pharmacy dispensing accuracy and positions the product ahead of any future e-prescription mandate.</p></div>
+      <div class="rec"><div class="num">11</div><span class="tag">Devices &amp; data</span><h3>Get ahead of data-cost pressure before the image features land</h3><p>No photos/avatars render anywhere today, so there's nothing to optimize yet — but flag <code>expo-image</code> with compression and virtualized lists (no <code>FlatList</code> usage exists anywhere currently) as requirements before that feature ships, not an afterthought once it's slow on a low-end Android device.</p></div>
+    </div>
+  </section>
+
+  <section id="priority">
+    <h2>Suggested fix order</h2>
+    <p class="section-intro">If only ten things get fixed before this goes further into real-world use, this is the order — weighted toward what could hurt a patient or the business fastest.</p>
+    <ol class="priority-list">
+      <li>Close the RLS gap allowing cancellation of checked-in/in-progress appointments</li>
+      <li>Remove or fix the false "nothing to refund" copy; decide whether refunds ship now or the online-payment flow is paused until they do</li>
+      <li>Remove the SMS promise from the emergency-confirmation screen, or actually wire the SMS</li>
+      <li>Add a human-reviewed verification step for doctor MDCN numbers before granting roster access</li>
+      <li>Wire <code>is_verified</code> into ambulance dispatch matching, and populate the emergency-number fallback directory</li>
+      <li>Add idempotency protection to the emergency-booking submit path</li>
+      <li>Fix or disable the decorative HMO/payment-method picker so it doesn't mislead patients</li>
+      <li>Verify Sentry is actually initialized and configured across all four mobile apps</li>
+      <li>Close the daily-booking-limit race with a real DB constraint, matching the other three booking invariants</li>
+      <li>Make the reschedule write atomic (single RPC/transaction) instead of two client round trips</li>
+    </ol>
+  </section>
+
+  <footer>
+    Compiled from direct source review across <code>apps/client</code>, <code>apps/doctor</code>, <code>apps/hospital</code>, <code>apps/ambulance</code>, <code>web/</code>, <code>packages/shared</code>, and <code>supabase/migrations</code>. File:line citations reflect the working tree at the time of review.
+  </footer>
+
+</div>

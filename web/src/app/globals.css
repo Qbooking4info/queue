@@ -1,20 +1,25 @@
 @import "tailwindcss";
 
+/* These are the pre-hydration fallbacks only -- ThemeProvider republishes the
+   real palette as custom properties as soon as it mounts. They track the
+   DEFAULT theme (clinical light), not the old dark one: the page ground is now
+   light, so the previous near-white --foreground would have flashed white text
+   on a light wash for the first paint. */
 :root {
-  --background: #0A0F0D;
-  --foreground: #F0F5F2;
-  --accent: #00E87A;
-  --accent-muted: rgba(0,232,122,0.12);
-  --accent-border: rgba(0,232,122,0.25);
-  --card: #111915;
-  --card-alt: #161D19;
-  --border: rgba(255,255,255,0.07);
-  --border-med: rgba(255,255,255,0.12);
-  --text-sub: #7A9089;
-  --text-muted: #4A6058;
-  /* Skeleton shimmer — dark (default) */
-  --skeleton-a: rgba(255,255,255,0.05);
-  --skeleton-b: rgba(255,255,255,0.10);
+  --background: #EFF2F8;
+  --foreground: #14213D;
+  --accent: #2F5BEA;
+  --accent-muted: rgba(47,91,234,0.11);
+  --accent-border: rgba(47,91,234,0.30);
+  --card: rgba(255,255,255,0.50);
+  --card-alt: rgba(255,255,255,0.74);
+  --border: rgba(255,255,255,0.92);
+  --border-med: rgba(22,36,74,0.13);
+  --text-sub: #44506B;
+  --text-muted: #44506B;
+  /* Skeleton shimmer — light, matching the default theme */
+  --skeleton-a: rgba(0,0,0,0.06);
+  --skeleton-b: rgba(0,0,0,0.12);
   /* Keyboard focus ring. Deliberately NOT --accent: that's forest's #00E87A, and the
      dashboard's default theme is the light one, where a green ring measures 1.64:1
      against a white card -- under WCAG 1.4.11's 3:1 floor for focus indicators.
@@ -58,21 +63,34 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Frosted-glass page ground ─────────────────────────────────────────────
+   The wash and the soft coloured light that every frosted panel sits on.
+   Painted once here from CSS custom properties that ThemeProvider republishes
+   whenever the family or mode changes, so no route has to declare its own
+   background -- the same trick as the mobile apps' single GlassBackdrop.
+   --page-bg and the --orb-* values are set in ThemeContext.tsx. */
 body {
-  background: transparent;
-  color: var(--foreground);
+  background: var(--page-bg, #EFF2F8);
+  color: var(--text, var(--foreground));
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
-/* Scrollbar */
-* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
 
-::selection { background: rgba(0,232,122,0.2); }
+/* Scrollbar and selection. These were fixed white/green for the old always-dark
+   dashboard, which left the scrollbar thumb invisible and the selection a
+   stray green on the light glass themes -- both now follow the live palette. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-med) transparent; }
+
+::selection { background: var(--accent-muted); }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: var(--border-med); border-radius: 99px; }
 
 /* ══════════════════════════════════════════════
    Dashboard Responsive System

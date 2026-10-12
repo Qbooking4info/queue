@@ -9,8 +9,18 @@ const workspaceRoot = path.resolve(projectRoot, '../..')
 
 const config = getDefaultConfig(projectRoot)
 
-// Watch the whole workspace so packages/shared is part of the build graph.
-config.watchFolders = [workspaceRoot]
+// Watch only what is actually in the build graph: this app (implicit via
+// projectRoot), the shared package, and the hoisted root node_modules.
+//
+// Watching the whole workspace root additionally crawled web/ -- 800MB of its
+// own node_modules that no mobile app imports -- plus .git and supabase/. On a
+// machine without watchman that pushed Metro's watcher past its 240s startup
+// deadline, so it failed with 'Failed to start watch mode' and sat holding the
+// port without ever serving a bundle.
+config.watchFolders = [
+  path.resolve(workspaceRoot, 'packages'),
+  path.resolve(workspaceRoot, 'node_modules'),
+]
 
 // Resolve from the app first, then the hoisted workspace root.
 config.resolver.nodeModulesPaths = [

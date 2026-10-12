@@ -150,13 +150,15 @@ function WalkInModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 480, background: C.card,
+      <div style={{ width: '100%', maxWidth: 480, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          position: 'sticky', top: 0, background: C.card, zIndex: 1 }}>
+          // Opaque: this header is sticky over a scrolling modal body, so a translucent
+          // fill let the rows underneath slide visibly through it.
+          position: 'sticky', top: 0, background: C.popover, zIndex: 1 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Walk-in Booking</div>
             <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
@@ -180,7 +182,7 @@ function WalkInModal({
               <div style={{ fontSize: 18, fontWeight: 800, color: C.accent, fontFamily: 'monospace' }}>{done}</div>
               <button onClick={onClose}
                 style={{ marginTop: 20, padding: '10px 32px', borderRadius: 10, background: C.accent,
-                  color: C.id === 'forest' ? '#061208' : '#fff', border: 'none',
+                  color: C.onAccent, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Done
               </button>
@@ -209,7 +211,7 @@ function WalkInModal({
                     <button onClick={searchByPatientNumber} disabled={!patientNumber.trim() || searching}
                       style={{ padding: '10px 16px', borderRadius: 10, border: 'none',
                         background: patientNumber.trim() ? C.accent : C.bgAlt,
-                        color: patientNumber.trim() ? (C.id === 'forest' ? '#061208' : '#fff') : C.textMuted,
+                        color: patientNumber.trim() ? C.onAccent : C.textMuted,
                         fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                       {searching ? '…' : 'Look up'}
                     </button>
@@ -318,9 +320,39 @@ function WalkInModal({
 
 // ── Assign Doctor Modal ───────────────────────────────────────────────────────
 
+/** doctorId -> today's seen/assigned tally, from GET /api/appointments. */
+export type DoctorDayLoad = Record<string, { completed: number; assigned: number }>
+
+// "5/13" — patients this doctor has seen today (the one in the room included) over the
+// total on their list. tabular-nums so the ratios line up down the picker instead of
+// jittering with digit width.
+function DayLoadBadge({ load }: { load?: { completed: number; assigned: number } }) {
+  const { theme: C } = useTheme()
+  const assigned = load?.assigned ?? 0
+  const completed = load?.completed ?? 0
+  const allDone = assigned > 0 && completed >= assigned
+  return (
+    <div style={{ textAlign: 'right', flexShrink: 0, lineHeight: 1.25 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+        color: assigned === 0 ? C.textMuted : allDone ? C.textSub : C.text }}>
+        {assigned === 0 ? '—' : `${completed}/${assigned}`}
+      </div>
+      <div style={{ fontSize: 10, color: C.textMuted }}>
+        {assigned === 0 ? 'none today' : 'seen today'}
+      </div>
+    </div>
+  )
+}
+
 function AssignDoctorModal({
-  appointment, doctors, onClose, onDone,
-}: { appointment: AdminAppointment; doctors: AdminDoctor[]; onClose: () => void; onDone: (doctorId: string) => void }) {
+  appointment, doctors, dayLoad, onClose, onDone,
+}: {
+  appointment: AdminAppointment
+  doctors: AdminDoctor[]
+  dayLoad: DoctorDayLoad
+  onClose: () => void
+  onDone: (doctorId: string) => void
+}) {
   const { theme: C } = useTheme()
   const currentDoctorId = appointment.assigned_doctor_id ?? appointment.doctor_id ?? ''
   const isReassign = !!currentDoctorId
@@ -355,7 +387,7 @@ function AssignDoctorModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
@@ -397,6 +429,10 @@ function AssignDoctorModal({
                 </div>
                 <div style={{ fontSize: 11, color: C.textSub }}>{d.specialty_name ?? 'General'}</div>
               </div>
+              {/* Today's workload, so whoever is assigning can spread the load instead of
+                  piling onto whoever happens to be first in the list. Reads "5/13" —
+                  seen (including the one in the room) over total on their list today. */}
+              <DayLoadBadge load={dayLoad[d.id]} />
               {selected === d.id && <CheckCircle2 size={15} color={C.accent} />}
             </button>
           ))}
@@ -448,7 +484,7 @@ function RejectModal({
       background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
         border: '1px solid rgba(220,60,60,0.25)', borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
@@ -475,6 +511,86 @@ function RejectModal({
   )
 }
 
+// ── Reschedule Modal ─────────────────────────────────────────────────────────
+// Staff/doctor-initiated, pre-check-in only (a.status is guarded to
+// pending/confirmed everywhere this modal is opened from). Free-form
+// date/time entry -- not bound to a real time_slots row, same discretion
+// walk-in booking already gets.
+
+function RescheduleModal({
+  appointment, onClose, onDone,
+}: { appointment: AdminAppointment; onClose: () => void; onDone: () => void }) {
+  const { theme: C } = useTheme()
+  const [date, setDate] = useState(appointment.appointment_date)
+  const [time, setTime] = useState(appointment.start_time?.slice(0, 5) ?? '')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleConfirm() {
+    if (!date || !time) return
+    setSaving(true); setError('')
+    const res = await fetch(`/api/appointments/${appointment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reschedule', date, startTime: time, reason: reason.trim() || undefined }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setError(body?.error ?? 'Reschedule failed')
+      return
+    }
+    onDone()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ width: '100%', maxWidth: 420, background: C.popover,
+        border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
+          Reschedule Appointment
+        </div>
+        <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
+          <strong style={{ color: C.text }}>{appointment.patient_name}</strong> will be notified of the new time.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>New date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: 'block', marginBottom: 4 }}>New time</label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)}
+              style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+                borderRadius: 10, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <textarea
+          value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Reason (optional)…"
+          rows={2}
+          style={{ width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+            borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
+            outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+        {error && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleConfirm} loading={saving} disabled={!date || !time} style={{ flex: 1 }}>
+            Confirm New Time
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Appointment Detail Panel ──────────────────────────────────────────────────
 
 function DetailPanel({
@@ -487,7 +603,7 @@ function DetailPanel({
       background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ width: '100%', maxWidth: 440, background: C.card,
+      <div style={{ width: '100%', maxWidth: 440, background: C.popover,
         border: `1px solid ${C.borderMed}`, borderRadius: 20,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`,
@@ -572,6 +688,8 @@ export default function AppointmentsPage() {
   const [bounds,  setBounds]  = useState<DateBounds>(getDateBounds('today'))
   const [appts,   setAppts]   = useState<AdminAppointment[]>([])
   const [doctors, setDoctors] = useState<AdminDoctor[]>([])
+  // Today's completed/assigned per doctor, always for today regardless of `range`.
+  const [dayLoad, setDayLoad] = useState<DoctorDayLoad>({})
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState('all')
   const [search,  setSearch]  = useState('')
@@ -579,6 +697,7 @@ export default function AppointmentsPage() {
   const [showWalkIn,     setShowWalkIn]     = useState(false)
   const [assignAppt,     setAssignAppt]     = useState<AdminAppointment | null>(null)
   const [rejectAppt,     setRejectAppt]     = useState<AdminAppointment | null>(null)
+  const [rescheduleAppt, setRescheduleAppt] = useState<AdminAppointment | null>(null)
   const [detailAppt,     setDetailAppt]     = useState<AdminAppointment | null>(null)
   const [vitalsAppt,     setVitalsAppt]     = useState<AdminAppointment | null>(null)
   const [actionError,    setActionError]    = useState('')
@@ -589,9 +708,10 @@ export default function AppointmentsPage() {
     setLoading(true)
     const res = await fetch(`/api/appointments?from=${bounds.from}&to=${bounds.to}`)
     if (res.ok) {
-      const { appointments, doctors: doctorList } = await res.json()
+      const { appointments, doctors: doctorList, doctorDayLoad: dayLoad } = await res.json()
       setAppts(appointments)
       setDoctors(doctorList)
+      setDayLoad(dayLoad ?? {})
     }
     setLoading(false)
   }, [hospital?.id, bounds])
@@ -764,7 +884,7 @@ export default function AppointmentsPage() {
             </button>
           )}
           <button onClick={load}
-            style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
+            style={{ background: C.accent, color: C.onAccent,
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
               transition: 'opacity 0.15s', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
@@ -1040,6 +1160,13 @@ export default function AppointmentsPage() {
                             {isPending ? '…' : 'No-Show'}
                           </button>
                         )}
+                        {/* Reschedule -- pre-check-in only */}
+                        {['pending','confirmed'].includes(a.status) && (
+                          <button onClick={() => setRescheduleAppt(a)} disabled={isPending}
+                            style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                            Reschedule
+                          </button>
+                        )}
                       </div>
                       )
                     })()}
@@ -1182,6 +1309,12 @@ export default function AppointmentsPage() {
                     {isPending ? '…' : 'No-Show'}
                   </button>
                 )}
+                {['pending','confirmed'].includes(a.status) && (
+                  <button onClick={() => setRescheduleAppt(a)} disabled={isPending}
+                    style={{ ...btnBase, border: `1px solid ${C.border}`, background: C.bgAlt, color: C.textMuted }}>
+                    Reschedule
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -1201,6 +1334,7 @@ export default function AppointmentsPage() {
         <AssignDoctorModal
           appointment={assignAppt}
           doctors={doctors}
+          dayLoad={dayLoad}
           onClose={() => setAssignAppt(null)}
           onDone={() => { load(); setAssignAppt(null) }}
         />
@@ -1210,6 +1344,13 @@ export default function AppointmentsPage() {
           appointment={rejectAppt}
           onClose={() => setRejectAppt(null)}
           onDone={() => { load(); setRejectAppt(null) }}
+        />
+      )}
+      {rescheduleAppt && (
+        <RescheduleModal
+          appointment={rescheduleAppt}
+          onClose={() => setRescheduleAppt(null)}
+          onDone={() => { load(); setRescheduleAppt(null) }}
         />
       )}
       {detailAppt && (

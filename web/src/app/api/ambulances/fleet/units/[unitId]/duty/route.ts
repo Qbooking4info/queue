@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createUserScopedClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 /**
  * POST /api/ambulances/fleet/units/[unitId]/duty   { onDuty: boolean, hours?: number }
@@ -10,20 +11,38 @@ import { Errors } from '@/lib/api-error'
  * the crew app's toggle. Both go through set_unit_duty(), which is the only
  * writer for ambulances.status.
  *
- * Uses the *user-scoped* client, not createAdminClient(). set_unit_duty resolves
+ * Uses createUserScopedClient(), not createAdminClient(). set_unit_duty resolves
  * the caller through auth.uid() to decide whether they may operate this unit, so
  * calling it with the service role would evaluate auth.uid() as null and fail
- * with "not authenticated". The authorization lives in the function; this route
- * only has to make sure it runs as the real caller.
+ * with "not authenticated" -- and a plain cookie-only client does exactly the
+ * same for the Ambulance app's console, which calls this with a bearer token
+ * and no cookies at all. The authorization lives in the function itself (a
+ * provider's own crew, or its own admin/owner toggling from the console --
+ * hospital-owned and independent providers work identically here); this
+ * route only has to make sure it runs as the real caller, whichever way they
+ * authenticated.
  *
  * requireRole still runs first so an unauthenticated request gets a clean 401
  * rather than a Postgres exception.
  */
+export async function OPTIONS() {
+  return corsOptions()
+}
+
 export async function POST(
+  req: NextRequest,
+  ctx: { params: Promise<{ unitId: string }> },
+) {
+  const res = await handlePOST(req, ctx)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handlePOST(
   req: NextRequest,
   { params }: { params: Promise<{ unitId: string }> },
 ) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'ambulance_crew'], req)
+  const auth = await requireRole(['ambulance_crew', 'ambulance_admin'], req)
   if (auth instanceof NextResponse) return auth
 
   const { unitId } = await params
@@ -36,7 +55,7 @@ export async function POST(
     return Errors.validation('hours must be between 0 and 24')
   }
 
-  const db = await createClient()
+  const db = await createUserScopedClient(req)
   // p_crew_tier omitted, not null: the function defaults it to the caller's own
   // crew tier, which is the right value for a fleet admin toggling a rig on.
   const { data, error } = await db.rpc('set_unit_duty', {

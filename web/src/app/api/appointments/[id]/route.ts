@@ -23,8 +23,9 @@ type Action =
   | { action: 'start_consultation' }
   | { action: 'end_consultation' }
   | { action: 'set_status'; status: string }
-  | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null }
+  | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null; investigations?: string | null; prescription?: string | null; treatmentPlan?: string | null }
   | { action: 'ring' }
+  | { action: 'reschedule'; date: string; startTime: string; reason?: string }
 
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
@@ -55,7 +56,7 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: appt, error: apptErr } = await db
     .from('appointments')
-    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date')
+    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date, appointment_date, start_time, slot_id')
     .eq('id', id)
     .single()
   if (apptErr || !appt) return Errors.notFound('Appointment')
@@ -209,6 +210,52 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: true })
     }
 
+    case 'reschedule': {
+      // Staff/doctor-initiated reschedule, pre-check-in only. Mutates the same
+      // row rather than following rescheduleAppointment()'s patient-side
+      // insert-new-row-and-cancel-original pattern (packages/shared/lib/api.ts)
+      // -- that pattern relies on a fresh INSERT, which trips
+      // enforce_reschedule_limit (one reschedule per booking chain, ever) and
+      // would double-count the visit against enforce_plan_booking_limit's
+      // monthly quota. An in-place UPDATE never fires either trigger.
+      if (caller.role === 'doctor' && caller.doctorId !== appt.doctor_id && caller.doctorId !== appt.assigned_doctor_id) {
+        return Errors.forbidden('You can only reschedule your own patient')
+      }
+
+      const dateRe = /^\d{4}-\d{2}-\d{2}$/
+      const timeRe = /^\d{2}:\d{2}$/
+      if (!dateRe.test(body.date) || !timeRe.test(body.startTime)) {
+        return Errors.validation('date must be YYYY-MM-DD and startTime must be HH:MM')
+      }
+      if (body.date < todayLocalDate()) {
+        return Errors.validation('Cannot reschedule to a date in the past')
+      }
+
+      // slot_id is always cleared: a staff/doctor reschedule is free-form (not
+      // bound to a specific time_slots row), and trg_release_appointment_slot_moved
+      // (supabase/migrations/20260811000003_reserve_time_slots.sql) automatically
+      // returns capacity to whatever slot this appointment was previously holding
+      // as soon as slot_id changes -- but only if we actually change it here.
+      const { data: updated, error } = await db.from('appointments').update({
+        appointment_date: body.date,
+        start_time: `${body.startTime}:00`,
+        slot_id: null,
+        reschedule_reason: body.reason?.trim() || null,
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', id).in('status', ['pending', 'confirmed']).select('id')
+      if (error) return Errors.internal(error.message)
+      if (!updated?.length) {
+        return Errors.validation(`Cannot reschedule an appointment that is already ${appt.status} — only pending/confirmed bookings can be moved`)
+      }
+
+      const niceDate = new Date(body.date + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
+      await notifyPatient(
+        db, id, 'rescheduled', 'Appointment Rescheduled',
+        `Your appointment has been moved to ${niceDate} at ${body.startTime}.`,
+      )
+      return NextResponse.json({ success: true })
+    }
+
     case 'check_in': {
       const result = await checkInAppointment(db, id)
       if (!result.ok) return Errors.validation(result.error)
@@ -334,6 +381,9 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
       if ('notes' in body) update.doctor_notes = body.notes?.trim() || null
       if ('diagnosis' in body) update.diagnosis = body.diagnosis?.trim() || null
+      if ('investigations' in body) update.investigations = body.investigations?.trim() || null
+      if ('prescription' in body) update.prescription = body.prescription?.trim() || null
+      if ('treatmentPlan' in body) update.treatment_plan = body.treatmentPlan?.trim() || null
       const { error } = await db.from('appointments').update(update as any).eq('id', id)
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })

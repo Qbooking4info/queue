@@ -108,7 +108,7 @@ export function DateOfBirthSelect({ value, onChange, placeholder = 'Select date 
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setOpen(false)} />
-        <View style={[s.sheet, { backgroundColor: t.cardBg }]}>
+        <View style={[s.sheet, { backgroundColor: t.popover }]}>
           <View style={[s.handle, { backgroundColor: t.inputBorder }]} />
           <Text style={[s.title, { color: t.textPrimary }]}>Date of birth</Text>
 
