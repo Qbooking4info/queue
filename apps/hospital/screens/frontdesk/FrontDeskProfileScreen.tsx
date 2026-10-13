@@ -8,6 +8,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 
 interface Props { navigation?: any }
 
@@ -28,14 +29,7 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
-    ;supabase
-      .from('hospitals')
-      .select('name')
-      .eq('id', staffProfile.hospitalId)
-      .single()
-      .then(({ data }: { data: { name: string } | null }) => {
-        if (data) setHospitalName(data.name)
-      })
+    getMyHospital(staffProfile.hospitalId).then(h => { if (h) setHospitalName(h.name) })
   }, [staffProfile?.hospitalId])
 
   async function handleSignOut() {

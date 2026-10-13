@@ -8,6 +8,7 @@ import { haptics }  from '@queue/shared/lib/haptics'
 import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton } from '@queue/shared/components/ui/v3'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 
 const ROLE_LABEL: Record<string, string> = {
   driver:     'Driver',
@@ -39,8 +40,7 @@ export function CrewProfileScreen() {
 
   useEffect(() => {
     if (!isHospitalFleet || !staffProfile?.hospitalId) return
-    supabase.from('hospitals').select('name').eq('id', staffProfile.hospitalId).single()
-      .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
+    getMyHospital(staffProfile.hospitalId).then(h => { if (h) setHospitalName(h.name) })
   }, [isHospitalFleet, staffProfile?.hospitalId])
 
   // Next 7 days of rota shifts (hospital-fleet crews are rostered in Queue Hospital).

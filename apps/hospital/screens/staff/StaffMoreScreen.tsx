@@ -8,6 +8,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 
 const ROLE_LABEL: Record<string, string> = {
   front_desk: 'Front Desk', clinic_admin: 'Clinic Admin', hospital_admin: 'Hospital Admin',
@@ -29,11 +30,9 @@ export function StaffMoreScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
-    ;supabase
-      .from('hospitals').select('name, clinic_model').eq('id', staffProfile.hospitalId).single()
-      .then(({ data }: { data: { name: string; clinic_model: string | null } | null }) => {
-        if (data) { setHospitalName(data.name); setClinicModel(data.clinic_model) }
-      })
+    getMyHospital(staffProfile.hospitalId).then(h => {
+      if (h) { setHospitalName(h.name); setClinicModel(h.clinic_model) }
+    })
   }, [staffProfile?.hospitalId])
 
   async function handleSignOut() {
