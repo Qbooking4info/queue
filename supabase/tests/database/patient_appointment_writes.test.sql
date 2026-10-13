@@ -5,7 +5,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(6);
+select plan(7);
 
 insert into auth.users (id, email) values
   ('77777777-7777-7777-7777-777777777771', 'pw-test-patient@example.com')
@@ -46,6 +46,14 @@ select lives_ok(
 
 select is((select status || '/' || refund_pct from appointments where id = 'bebebebe-0000-0000-0000-000000000001'),
           'cancelled/100', 'the cancel lands and the refund is computed server-side');
+
+-- A late cancel (start well inside 24h) gets 50% even if the client sends 100.
+insert into appointments (id, patient_id, hospital_id, appointment_date, start_time, type, reason, status, booking_mode, booking_ref)
+values ('bebebebe-0000-0000-0000-000000000002', 'bcbcbcbc-0000-0000-0000-000000000001', 'bdbdbdbd-0000-0000-0000-000000000001',
+        (now() at time zone 'Africa/Lagos')::date + 1, '00:30', 'in-person', 'x', 'pending', 'hospital', 'PWTEST-2');
+update appointments set status = 'cancelled', refund_pct = 100 where id = 'bebebebe-0000-0000-0000-000000000002';
+select is((select refund_pct from appointments where id = 'bebebebe-0000-0000-0000-000000000002'), 50,
+          'a late cancel gets the server''s 50% even when the client sends 100');
 
 select * from finish();
 rollback;
