@@ -650,7 +650,7 @@ Batch hospital payouts.
 | `status` | text | no | `waiting`, `active`, `ended` |
 | `room_name` | text | yes | |
 | `room_url` | text | yes | |
-| `host_token` | text | yes | Doctor token |
+| `host_token` | text | yes | Legacy: no longer written (the doctor gets the host token only in the `/api/virtual/token` response) and not selectable by clients since `20261013100001` |
 | `guest_token` | text | yes | Patient token |
 | `started_at` | timestamptz | yes | |
 | `ended_at` | timestamptz | yes | |
@@ -757,3 +757,6 @@ Batch hospital payouts.
 | `20260828000004` | **Location clock skew** — a crew phone with a wrong system clock stamped `recorded_at` 70 minutes in the past, and dispatch (correctly, by the rule as written) treated the unit as stale and excluded it. Makes the freshness check tolerant of clock skew so a bad device clock no longer removes a real on-duty unit from the network |
 | `20260903000001` | **Doctor multi-clinic assignment** — a doctor can be assigned to several clinics within one hospital but is "active" in only one at a time. `doctors.clinic_id` keeps its exact current meaning ("currently active clinic"); every operational read is unchanged. New `doctor_clinics` (`doctor_id`, `clinic_id`) is the assignment *pool* — which clinics a doctor may be active in — written by the clinic-detail "Doctors in this clinic" assign/unassign/Set-Active UI on web and in the Hospital app |
 | `20260910000000` | **Roster returns inactive doctors** — `get_hospital_staff_roster`'s `doctors` sub-select drops its `is_active = true` filter and adds `is_active` to each row, so the Hospital app's Staff screen can show a deactivated doctor and offer an Activate button (parity with web `/dashboard/doctors`). Two lines of the function body; auth check, `staff` sub-select, and grants unchanged. No table change — `doctors.is_active` already existed. The RPC's one other caller, `HospitalScheduleScreen`'s doctor picker, filters `is_active !== false` client-side (not `=== true`, so a missing flag counts as active during the app-build-vs-migration window) |
+| `20261013100002` | **Patient appointment guard** — BEFORE INSERT/UPDATE triggers: a patient-side PostgREST caller may only cancel; approval derives from `hospitals.approval_mode`; queue/consult/clinical fields can't be set by patients; booking advisory lock against the duplicate-booking race (repair REP-030–033) |
+| `20261013300001` | **Server-side refund on every patient cancel** — closes a gap in `20261013100002` where resending `refund_pct = 100` kept a full refund on a late cancel (REP-032) |
+| `20261013100001` | **Call tokens + ambulance requests** — `virtual_sessions`: staff policies (incl. three production-only ones) dropped, `host_token` cleared and not selectable, no client writes; trigger ends the session when the appointment completes/cancels/no-shows. `transport_requests`: no client INSERT/UPDATE/DELETE, `unit_matches_status` allows cancelling while searching, inbound-read policy excludes crew, `one_live_emergency_per_requester` unique index (REP-001/004/010/013/014/016) |

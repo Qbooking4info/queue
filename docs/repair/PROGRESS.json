@@ -1,8 +1,8 @@
 {
   "project": "Queue \u2014 hospital management and digital healthcare platform",
-  "last_updated": "2026-10-13T16:05:00+01:00",
+  "last_updated": "2026-10-13T16:35:00+01:00",
   "overall_status": "in_progress",
-  "current_phase": "batch_2_awaiting_migration_and_deploy_approval",
+  "current_phase": "batch_2_db_applied_awaiting_deploy_and_commit",
   "current_batch": 2,
   "applications": [
     {
@@ -177,7 +177,7 @@
       "severity": "P0",
       "component": "virtual",
       "title": "Agora tokens readable by hospital staff / host token by patient",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-001"
     },
     {
@@ -201,7 +201,7 @@
       "severity": "P2",
       "component": "db",
       "title": "Terminal appointment leaves call session active",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-004"
     },
     {
@@ -241,7 +241,7 @@
       "severity": "P0",
       "component": "db/ambulance",
       "title": "Patients can insert transport_requests directly",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-010"
     },
     {
@@ -265,7 +265,7 @@
       "severity": "P1",
       "component": "db/ambulance",
       "title": "Patient cannot cancel while searching",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-013"
     },
     {
@@ -273,7 +273,7 @@
       "severity": "P2",
       "component": "db/ambulance",
       "title": "Fleet crew read all inbound patient details",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-014"
     },
     {
@@ -289,7 +289,7 @@
       "severity": "P2",
       "component": "web/ambulance",
       "title": "Concurrent SOS creates two live requests",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-016"
     },
     {
@@ -377,7 +377,7 @@
       "severity": "P2",
       "component": "db/appointments",
       "title": "Client-computed refund_pct",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-032"
     },
     {
@@ -385,7 +385,7 @@
       "severity": "P2",
       "component": "db/appointments",
       "title": "Duplicate booking check races",
-      "status": "fixed_pending_verification",
+      "status": "verified_fixed",
       "details": "docs/repair/ISSUES.md#rep-033"
     },
     {
@@ -682,6 +682,36 @@
       "dir": "prod",
       "result": "PASS",
       "detail": "11/11; prod verified unchanged afterwards"
+    },
+    {
+      "id": "T-PROD-5",
+      "at": "2026-10-13T16:07:00+01:00",
+      "command": "post-apply catalog checks + rolled-back behaviour tests (live schema)",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "structural 13/13; behaviour 18/19, the 1 FAIL is the test fixture own host_token (real stored count 0)"
+    },
+    {
+      "id": "T-REL-1",
+      "at": "2026-10-13T16:20:00+01:00",
+      "command": "vitest + tsc + next build on clean worktree of a251beb",
+      "dir": "scratchpad/deploy/web",
+      "result": "PASS",
+      "detail": "20 files / 140 tests; build ok"
+    },
+    {
+      "id": "T-REL-2",
+      "command": "npx vercel@latest --prod (clean worktree)",
+      "result": "BLOCKED",
+      "detail": "auto-mode classifier denied [Production Deploy]; user must run"
+    },
+    {
+      "id": "T-RT-1",
+      "at": "2026-10-13T16:25:00+01:00",
+      "command": "Realtime delivery test as e2e TEST patient (temp TEST appointment, deleted)",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "start event with guest_token, no host_token; app query ok; ended event delivered; 0 rows left"
     }
   ],
   "decisions": [
@@ -690,12 +720,13 @@
     "Dashboard password reset limited to portal-generated logins (REP-040)",
     "Interim: caretakers may link only minors by code; adults link themselves (REP-041)",
     "No production DB reads/writes this session; SQL verified from migrations + parser only",
-    "Concurrent session (branch fix/audit-2026-10-13) owns 20261013000007/000008; duplicate revokes removed from 20261013100001"
+    "Concurrent session (branch fix/audit-2026-10-13) owns 20261013000007/000008; duplicate revokes removed from 20261013100001",
+    "2026-10-13 ~16:05 WAT: user applied 20261013100001 + 20261013300001 to production and repaired migration history (the agent was blocked from running the apply itself)"
   ],
   "next_actions": [
-    "Ask user: approve applying 20261013100001 and 20261013300001 to production",
-    "Ask user: approve Vercel deploy + commit/PR",
-    "Ask user: REP-041 consent flow design",
-    "REP-044 double payment, REP-045 payout swap, REP-051 get_my_hospital RPC, REP-053 server notifications"
+    "User: deploy web from the clean worktree (see STATUS.md)",
+    "User: decide on the one adult sibling dependent link (2026-08-31) and the consent model for child accounts",
+    "Device test of a real Agora call needs two devices + new builds (BLOCKED)",
+    "Code: REP-044 double payment, REP-045 payout swap, REP-051 get_my_hospital RPC (check the concurrent session is not on them first; it took REP-017)"
   ]
 }

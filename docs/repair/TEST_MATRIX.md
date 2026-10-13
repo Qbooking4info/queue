@@ -69,3 +69,23 @@ NOT_RUN · NOT_APPLICABLE. Times are WAT (Africa/Lagos, UTC+1).
 | `20261013100001` dry run + 11 assertions (tokens, staff access, transport insert, cancel while searching, session end trigger, index) | PASS (11/11) |
 | Production unchanged after dry runs (policies, token count, index, fixtures) | PASS |
 | pgTAP `patient_appointment_writes.test.sql` (concurrent session's) | PASS (final assertion visible; tool returns last result set only) |
+
+## After applying 20261013100001 + 20261013300001 — 2026-10-13 16:07 WAT
+
+| Check | Result |
+|---|---|
+| Both versions in `schema_migrations` | PASS |
+| Structural: staff session policies gone; host_token not selectable; 0 stored host tokens; no transport INSERT policy/privilege; inbound policy excludes crew; constraint relaxed; SOS index; session-end trigger; new guard body | PASS (13/13) |
+| Behaviour, live schema, rolled back: appointment guard incl. late-cancel refund | PASS (7/7) |
+| Behaviour, live schema, rolled back: sessions/transport | 10/11 PASS — the FAIL is the test's own fixture host_token (count 1); real count 0 |
+| Fixtures left behind | none (0/0/0) |
+| Patient app Realtime delivery of guest_token under column grants | NOT_RUN — needs a device |
+
+## Release checks — 2026-10-13 16:15–16:30 WAT
+
+| Check | Result |
+|---|---|
+| Clean worktree of `a251beb`: `npm ci`, vitest, tsc, `npm run build` | PASS — 20 files / 140 tests; build compiled |
+| `vercel --prod` from that worktree | BLOCKED — denied by the auto-mode safety classifier ("Production Deploy"); user to run |
+| Realtime: patient (e2e TEST account) receives session start with `guest_token`, no `host_token`; app select works; `ended` delivered; temp rows deleted | PASS (5/5) |
+| Real Agora audio/video call on devices | BLOCKED — needs two devices and new client/doctor builds |

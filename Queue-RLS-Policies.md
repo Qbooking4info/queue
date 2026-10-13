@@ -95,18 +95,26 @@ Web API routes use `createAdminClient()` (service role key) and are **not affect
 ---
 
 ## `appointments`
+*Re-checked against production 2026-10-13 (pg_policies). Patient writes are additionally constrained by guard triggers — see below.*
+
 | Policy | Operation | Rule |
 |---|---|---|
-| Patients can create their own appointments | INSERT | `patient_id = (SELECT id FROM users WHERE auth_id = auth.uid())` |
-| Patients can view their own appointments | SELECT | `patient_id = (SELECT id FROM users WHERE auth_id = auth.uid())` |
-| Hospital admins manage their appointments | ALL | `hospital_id IN (SELECT hospital_id FROM hospital_admins WHERE user_id = ...)` |
+| appointments_patient_insert / patients_insert_own | INSERT | `patient_id IN (SELECT current_patient_ids())` |
+| appointments_patient_select / patients_select_own | SELECT | `patient_id IN (SELECT current_patient_ids())` |
+| appointments_patient_update | UPDATE | patient's own row in `pending`/`confirmed`; WITH CHECK allows the new row to be `cancelled` (20261013200001) |
+| appointments_hospital_select / appointments_hospital_update | SELECT / UPDATE | active, non-crew `hospital_admins` of the row's hospital (20261013000009) |
+| Front desk can manage clinic appointments | ALL | `clinic_admins` of the row's hospital |
+| Doctors can read own appointments / own direct appointments | SELECT | `current_doctor_ids()` on `doctor_id`/`assigned_doctor_id`; `doctor_user_id` = caller |
 
 **DB Triggers on this table (not RLS but enforced at DB level):**
 - `appointment_status_guard` — BEFORE UPDATE; blocks status changes FROM `completed`, `cancelled`, `no_show`
 - `enforce_plan_booking_limit` — BEFORE INSERT; rejects insert if hospital's active plan `max_monthly_bookings` is reached
+- `guard_patient_appointment_insert` — BEFORE INSERT (20261013100002); for a patient-side PostgREST caller (not staff/doctor/service role): approval comes from `hospitals.approval_mode`, status forced to pending/confirmed, queue/consult/clinical fields nulled, `refund_pct` = 100
+- `guard_patient_appointment_update` — BEFORE UPDATE (20261013100002, 20261013300001); a patient may only cancel; `refund_pct` is computed server-side on every patient cancel (>24h before the Lagos start → 100, else 50) and cannot be edited otherwise
+- `a00_lock_patient_booking_slot` — BEFORE INSERT; advisory lock per (hospital or doctor, patient) so `enforce_no_duplicate_active_booking` can't be raced
+- `end_virtual_session_on_terminal_appointment` — AFTER UPDATE OF status (20261013100001); completed/cancelled/no_show ends the call session
 
 ---
-
 ## `patient_medical_history`
 | Policy | Operation | Rule |
 |---|---|---|
@@ -187,10 +195,29 @@ Web API routes use `createAdminClient()` (service role key) and are **not affect
 ---
 
 ## `virtual_sessions`
+*Since 20261013100001 (applied 2026-10-13).*
+
 | Policy | Operation | Rule |
 |---|---|---|
-| Patients can read own virtual sessions | SELECT | `appointment_id IN (SELECT id FROM appointments WHERE patient_id = ...)` |
-| Hospital staff can read hospital virtual sessions | SELECT | `appointment_id IN (SELECT id FROM appointments WHERE hospital_id IN (...hospital_admins...))` |
+| Patients can read own virtual sessions / virtual_sessions_select | SELECT | `appointment_id IN (SELECT id FROM appointments WHERE patient_id = ...)` |
+
+- No staff policies: "Hospital staff can read hospital virtual sessions" and the production-only `virtual_sessions_hospital_select/insert/update` were dropped — they exposed Agora tokens and let admins overwrite or end sessions. Staff surfaces read through the service role (`/api/virtual`).
+- Column privileges: `authenticated` may SELECT only `id, appointment_id, status, room_name, guest_token, started_at, ended_at, duration_secs, created_at` — **not `host_token`** (which is no longer stored). No client INSERT/UPDATE/DELETE. Realtime delivery to the patient was verified under these grants.
+
+---
+
+## `transport_requests`
+*Since 20261013100001 (applied 2026-10-13). Not previously documented here.*
+
+| Policy | Operation | Rule |
+|---|---|---|
+| Users can read own transport requests | SELECT | `requester_id` = caller |
+| Crew can read active assigned job | SELECT | caller is on the current shift of `assigned_unit_id` and the job is active |
+| Hospital staff can read inbound transports | SELECT | `destination_hospital_id` is the caller's hospital (non-crew `hospital_admins`, or `clinic_admins`) |
+
+- No client INSERT/UPDATE/DELETE (privileges revoked): requests are created by `POST /api/transport/request` (service role) and cancelled through `cancel_my_transport()`.
+- `unit_matches_status` allows cancelled statuses with or without a unit; `one_live_emergency_per_requester` (partial unique index) prevents two live SOS requests per requester.
+- Dispatch/location functions (`record_unit_location`, `accept_dispatch_offer`, `get_request_pickup_latlng`, `rank_destination_hospitals`, sweepers) are service_role only (20261013000007).
 
 ---
 

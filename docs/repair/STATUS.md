@@ -1,6 +1,6 @@
 # Repair campaign — status
 
-**Last updated:** 2026-10-13 ~16:05 WAT · **Overall:** in progress · **Current batch:** 2 (critical security + safety) — code done, awaiting approval to apply migrations and deploy.
+**Last updated:** 2026-10-13 16:35 WAT · **Overall:** in progress · **Current batch:** 2 (critical security + safety) — code done, awaiting approval to apply migrations and deploy.
 
 ## RESUME HERE
 
@@ -13,8 +13,9 @@
 1. Read this file, then `PROGRESS.json`, `ISSUES.md` (statuses), `TEST_MATRIX.md`; run `git status` — batch 2 is **uncommitted** in the working tree.
 2. **Production DB access granted** (`.claude/settings.local.json` allows `supabase db query`; user-approved 2026-10-13 for read-only checks + rolled-back tests; real changes still need an explicit "apply").
    Prod state verified ~16:00 WAT: `20261013100002` is LIVE (applied by the concurrent session, commit c10c18b) and independently re-verified; the dispatch-function revokes (000007) are LIVE.
+   **2026-10-13 ~16:05 WAT: the user applied `20261013100001` and `20261013300001` to production** (the agent's own apply was blocked by the safety classifier) and recorded them with `migration repair`. Verified 16:07: structural checks 13/13; rolled-back behaviour tests 18/19 (the single FAIL is the test's own fixture token; real stored host tokens = 0).
+   **16:15–16:35:** the concurrent session had already committed all batch-2 code (fa42aeb…a251beb). Clean worktree of a251beb at `<scratchpad>/deploy` passed vitest 140/140 + build, but **`vercel --prod` was denied** by the safety classifier → user runs it. Realtime under the new column grants verified with the e2e TEST patient. RLS/Schema docs updated.
    **Blocked on the user** (do not do without explicit approval):
-   - apply `20261013100001_repair_b2_security_hardening.sql` (dry run 11/11 PASS, pre-flight dup-SOS = 0) and `20261013300001_repair_refund_on_patient_cancel.sql` (dry run 7/7 PASS) — then run the verification queries below;
    - deploy web to Vercel (needs `vercel login` by the queue-web owner);
    - commit / open a PR. Before committing: update `Queue-RLS-Policies.md` / `Queue-Database-Schema.md` for the two migrations (CONTRIBUTING.md definition of done) and `Queue-API-Routes.md` / `Queue-Mobile-API-Routes.md` for the changed route behaviour (dependents/link, virtual/end, appointments/[id]).
 3. If none of those are approved yet, next code work in priority order:

@@ -24,7 +24,9 @@ listed in STATUS.md.
 - **Verification:** `web/src/app/api/virtual/token/route.test.ts` "stores only the guest token" — PASS (fails on the old route). Migration NOT applied.
 - **Production (read 2026-10-13):** 14 rows hold a host_token, and prod has three extra policies not in any repo migration — `virtual_sessions_hospital_select/insert/update` (`is_hospital_admin(...)`) — so admins can also INSERT/UPDATE sessions (overwrite a guest_token, end a live consult). `100001` now drops them too.
 - **Dry run against prod (BEGIN…ROLLBACK, synthetic fixtures):** 11/11 PASS — patient reads own guest_token; patient host_token → 42501; front desk sees 0 sessions and cannot update (42501); completing the appointment ends the session (REP-004); no host tokens left. Production verified unchanged afterwards.
-- **Remaining:** after applying, confirm (a) a staff session gets 0 rows, (b) patient `select('host_token')` errors, (c) patient app still receives `guest_token` via Realtime when the doctor starts (Realtime must honour column grants — verify on a device). Longer term, replace stored guest tokens with a `POST /api/virtual/join` endpoint.
+- **Realtime verified 2026-10-13 16:25** with the e2e TEST patient: session-start event delivered with `guest_token` and without `host_token`; the app's own select works; `ended` delivered. → `verified_fixed` at DB level; the web route change (stop writing host_token) ships with the next deploy.
+- **APPLIED 2026-10-13 ~16:05 WAT; verified 16:07:** staff policies gone, `host_token` not selectable, 0 stored tokens, staff session sees 0 rows / cannot update. Still to do: web deploy (deployed token route still writes host_token, now unreadable) and the device Realtime check.
+- **Remaining (original note):** after applying, confirm (a) a staff session gets 0 rows, (b) patient `select('host_token')` errors, (c) patient app still receives `guest_token` via Realtime when the doctor starts (Realtime must honour column grants — verify on a device). Longer term, replace stored guest tokens with a `POST /api/virtual/join` endpoint.
 - **Status:** `fixed_pending_verification`
 
 ### REP-002 · P1 · Patient leaving (or the crash fallback) marks the consult completed; rejoin impossible
@@ -62,7 +64,7 @@ listed in STATUS.md.
 - **Where:** policy "Users can create own transport requests" (`20260729000001_ambulance_core.sql:500`); `enforce_transport_transition` only fires on UPDATE.
 - **Impact:** a raw insert with `status='matched'` + any `assigned_unit_id` sends a real crew to an attacker-chosen pickup and later breaks `one_active_job_per_unit` for real patients; or many `searching` rows with far-future deadlines.
 - **Fix:** migration `20261013100001` drops the policy and revokes INSERT/UPDATE/DELETE from anon/authenticated. No client code inserts (only `POST /api/transport/request`, service role).
-- **Status:** `fixed_pending_verification`
+- **Status:** `verified_fixed` (applied + verified in prod 2026-10-13 16:07)
 
 ### REP-011 · P0 · `record_unit_location` executable by anyone (location spoofing / keep a dead unit "fresh")
 ### REP-012 · P0 · `accept_dispatch_offer(p_offer_id, p_auth_id)` executable by anyone; trusts caller-supplied auth id
@@ -84,7 +86,7 @@ listed in STATUS.md.
 - **Verification:** `web/src/app/api/transport/request/route.test.ts` (4 tests) PASS. Index NOT applied; migration aborts if prod already has a requester with two live emergency requests.
 - **Status:** `fixed_pending_verification`
 
-### REP-017 · P1 · No-unit / deadline dispatcher alerts likely seen by nobody — SUSPECTED
+### REP-017 · P1 · No-unit / deadline dispatcher alerts likely seen by nobody — SUSPECTED — **being worked by the concurrent session** (uncommitted `dispatcher-alerts.ts`, migration `20261013200002`) at 16:15; don't duplicate
 Emergency requests have no `destination_hospital_id` until a crew sets one, but both alert readers filter on it (`api/ambulances/alerts/route.ts:53`, `dashboard/ambulances/alerts/page.tsx:34`); `expire_overdue_searches()` only inserts rows; relay needs `DISPATCH_ALERT_*` env vars. Needs a product decision on who the dispatcher is. `open`
 
 ### REP-018 · P1 · Re-dispatch after a decline ran as a floating promise (Vercel may freeze it)
@@ -150,7 +152,7 @@ Emergency requests have no `destination_hospital_id` until a crew sets one, but 
 - **Where:** `api/dependents/link` created an active link from a code alone; `api/dependents/switch` then mints a magic-link session for the linked account. GET lookup returned name + DOB with no rate limit; codes exist on every user incl. staff and super admins.
 - **Fix (interim, no schema change):** caretaker-initiated links only for minors (<18 on the Lagos calendar; unknown DOB = adult); adults link themselves (`as=dependent`, already supported in the app); staff/doctor/platform-admin accounts can never be linked or switched into; lookup rate-limited (30/h) and no longer returns DOB; POST rate-limit counts failed guesses. New `web/src/lib/dependent-linking.ts`.
 - **Verification:** `dependents/link/route.test.ts` (5) + `lib/dependent-linking.test.ts` (4) PASS; 3 fail on the original.
-- **Production (counts only):** 2 active links, 1 of them to an adult or no-DOB account — review it with the audit query in STATUS.md.
+- **Production (reviewed without PII, 16:30):** 2 active links — a `child` link (2026-08-27, dependent is a minor: OK) and a `sibling` link (2026-08-31) to an **adult**, both real non-staff accounts; who initiated it is not recorded. Needs a human decision (contact them / unlink) — not changed by the agent.
 - **Remaining:** (1) a stranger who learns a *child's* code can still link it — needs a real consent step (pending link accepted by the account or verified guardian) = product decision + client UI; (2) links created before this fix are not re-validated — run the audit query in STATUS.md and review adult links where the caretaker initiated.
 - **Status:** `in_progress`
 
