@@ -18,6 +18,7 @@ import { Header, HeaderIconButton, HeaderTail, ServiceTile, SectionTitle, Card }
 import type { AppointmentWithRelations } from '@queue/shared/lib/api'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { todayLocalDate } from '@queue/shared/lib/format'
 
 function greeting() {
   const h = new Date().getHours()
@@ -30,7 +31,7 @@ function formatDistance(km?: number, city?: string | null) {
 }
 
 function visitWhen(a: AppointmentWithRelations) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalDate()  // local calendar date; the UTC slice is yesterday from 00:00-01:00 WAT
   const day = a.appointment_date === today ? 'Today'
     : new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
   return `${day}${a.start_time ? ' · ' + a.start_time.slice(0, 5) : ''}`

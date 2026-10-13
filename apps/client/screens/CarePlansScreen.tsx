@@ -77,7 +77,7 @@ export function CarePlansScreen({ navigation }: Props) {
       const { error } = await supabase.from('care_plan_task_logs').delete().eq('id', existing.id)
       if (error) Alert.alert('Could not update', error.message)
     } else if (!existing) {
-      const { error } = await supabase.from('care_plan_task_logs').insert({ task_id: task.id, plan_id: plan.id })
+      const { error } = await supabase.from('care_plan_task_logs').insert({ task_id: task.id, plan_id: plan.id, done_on: today })
       if (error) Alert.alert('Could not tick', 'Try again in a moment.')
       else haptics.success()
     }

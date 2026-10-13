@@ -672,13 +672,18 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
                       text: `${stars} Star${stars === 1 ? '' : 's'}`,
                       onPress: async () => {
                         if (!user || !doctorObj?.id) return
-                        await supabase.from('reviews').insert({
+                        const { error } = await supabase.from('reviews').insert({
                           appointment_id: raw.id,
                           patient_id:     user.id,
                           doctor_id:      doctorObj.id,
                           rating:         stars,
                           body:           '',
                         })
+                        if (error) {
+                          Alert.alert('Could not submit rating',
+                            error.code === '23505' ? 'You have already rated this consultation.' : 'Please try again in a moment.')
+                          return
+                        }
                         Alert.alert('Thank you!', 'Your rating has been submitted.')
                       },
                     }))

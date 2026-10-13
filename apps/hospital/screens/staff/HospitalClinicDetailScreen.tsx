@@ -11,6 +11,7 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { DayHours, getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { fmtLocalDate } from '@queue/shared/lib/format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -34,7 +35,7 @@ type RangeKey = 'today' | 'week' | 'month'
 
 function rangeBounds(key: RangeKey): { from: string; to: string } {
   const now = new Date()
-  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  const fmt = fmtLocalDate  // local calendar date; the UTC slice is a day behind from 00:00-01:00 WAT
   if (key === 'today') return { from: fmt(now), to: fmt(now) }
   if (key === 'week') {
     const start = new Date(now); start.setDate(now.getDate() - now.getDay())

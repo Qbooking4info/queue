@@ -7,6 +7,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Header, HeaderTail, Card, SegmentedControl, PrimaryButton, EmptyState, SectionTitle, KpiCard } from '@queue/shared/components/ui/v3'
 import { staffApi, fmtDay } from '../../lib/staffApi'
+import { fmtLocalDate } from '@queue/shared/lib/format'
 
 // v3.1 Care Plans in Queue Hospital: list, create and follow plans. Same API as
 // the web dashboard (/api/care-plans); patients tick tasks in the Queue app.
@@ -118,7 +119,7 @@ export function CarePlanNewScreen({ navigation, route }: { navigation: any; rout
     const d = new Date(); d.setDate(d.getDate() + Number(checkInDays))
     const r = await staffApi<{ id: string }>('/api/care-plans', { method: 'POST', body: {
       patientId: patient.id, title, condition, notes, tasks: clean,
-      nextCheckIn: checkInDays === 'none' ? null : d.toISOString().slice(0, 10),
+      nextCheckIn: checkInDays === 'none' ? null : fmtLocalDate(d),
     } })
     setSaving(false)
     if (!r.ok) { Alert.alert('Could not create the plan', r.error); return }
@@ -222,7 +223,7 @@ export function CarePlanDetailScreen({ navigation, route }: { navigation: any; r
   if (!d) return <View style={{ flex: 1, backgroundColor: t.canvasBg }}><Header title="Care plan" onBack={() => navigation.goBack()} /><ActivityIndicator color={t.accent} style={{ marginTop: 40 }} /></View>
 
   const { plan, logs } = d
-  const days = Array.from({ length: 7 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() - (6 - i)); return x.toISOString().slice(0, 10) })
+  const days = Array.from({ length: 7 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() - (6 - i)); return fmtLocalDate(x) })
 
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
