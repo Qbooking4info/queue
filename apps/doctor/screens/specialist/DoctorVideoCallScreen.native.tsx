@@ -116,7 +116,9 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
         if (active) setRemoteUid(uid)
       })
       engine.current.addListener('onUserOffline', (_conn: any, uid: number) => {
-        if (active && uid === remoteUid) setRemoteUid(null)
+        // Functional update: this listener is registered once, so a captured `remoteUid`
+        // would still be null here and the other party leaving would never register.
+        if (active) setRemoteUid(cur => (cur === uid ? null : cur))
       })
       engine.current.addListener('onRemoteVideoStateChanged', (_c: any, _uid: number, state: number) => {
         if (active) setRemoteVideoOn(state === 2)
