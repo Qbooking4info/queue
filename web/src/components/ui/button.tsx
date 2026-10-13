@@ -17,6 +17,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // useTheme() into an inline style instead of a static class). Tailwind classes stay
 // for the theme-independent structural bits (padding scale, radius, transition,
 // spinner, disabled state); color now comes from the live theme.
+const SIZE_STYLE: Record<'sm' | 'md' | 'lg', React.CSSProperties> = {
+  sm: { height: 32, padding: '0 12px', fontSize: 12 },
+  md: { height: 40, padding: '0 16px', fontSize: 14 },
+  lg: { height: 48, padding: '0 22px', fontSize: 15 },
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', loading, className, children, disabled, style, ...props }, ref) => {
     const { theme: C } = useTheme()
@@ -50,7 +56,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={clsx(base, sizes[size], className)}
-        style={{ ...variantStyle, ...style }}
+        // Sizing inline as well: the Tailwind padding/radius utilities above aren't
+        // always generated for the dashboard, which left buttons squashed to their text.
+        style={{ ...SIZE_STYLE[size], borderRadius: 12, border: 'none', fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, whiteSpace: 'nowrap',
+          ...variantStyle, ...style }}
         {...props}
       >
         {loading && <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />}

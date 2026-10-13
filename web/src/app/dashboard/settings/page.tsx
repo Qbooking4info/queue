@@ -196,8 +196,8 @@ export default function SettingsPage() {
         }
       `}</style>
       <div style={{ marginBottom: 24 }}>
-        <div className="dash-greeting-title" style={{ color: C.text }}>Hospital Settings</div>
-        <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>Manage hospital profile and booking policies</div>
+        <div style={{ fontSize: 13, color: C.textMuted }}>Hospital profile and booking policies</div>
+        <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>Settings</h1>
       </div>
 
       {loading ? (
