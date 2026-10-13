@@ -26,6 +26,10 @@ type Action =
   | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null }
   | { action: 'ring' }
 
+const DOCTOR_ACTIONS: Action['action'][] = [
+  'start_consultation', 'end_consultation', 'update_consult_notes', 'ring', 'mark_no_show',
+]
+
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
 // checkInAppointment/startConsultation/endConsultation, none of which had
@@ -69,6 +73,16 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const body = (await req.json()) as Action
+
+  // Doctors act only on their own patients, and only through the consult actions.
+  // The hospital check above admits every doctor at the hospital, so without this a
+  // doctor could start (and thereby force-complete another doctor's current consult),
+  // approve, reject, reassign or no-show any appointment in the building.
+  if (caller.role === 'doctor') {
+    const ownPatient = !!caller.doctorId && (caller.doctorId === appt.doctor_id || caller.doctorId === appt.assigned_doctor_id)
+    if (!ownPatient) return Errors.forbidden('You can only act on your own patients')
+    if (!DOCTOR_ACTIONS.includes(body.action)) return Errors.forbidden('This action is for hospital staff')
+  }
 
   switch (body.action) {
     case 'assign_doctor': {
