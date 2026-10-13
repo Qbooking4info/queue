@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Switch } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ScrollView, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton, ServiceTile } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 
 const ROLE_LABEL: Record<string, string> = {
   front_desk: 'Front Desk', clinic_admin: 'Clinic Admin', hospital_admin: 'Hospital Admin',
@@ -18,7 +17,7 @@ interface Props { navigation: any }
 
 export function StaffMoreScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { staffProfile, setStaffMode, signOut } = useAuth()
+  const { staffProfile, signOut } = useAuth()
   const [hospitalName,   setHospitalName]   = useState<string | null>(null)
   const [clinicModel,    setClinicModel]    = useState<string | null>(null)
   const [signingOut,     setSigningOut]      = useState(false)
@@ -43,12 +42,14 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    { icon: 'chatbubbles-outline', label: 'Messages', sub: 'Patients, doctors, crews', onPress: () => navigation.navigate('HospitalMessages') },
+    { icon: 'time-outline', label: 'Staff shifts', sub: isAdmin ? 'Plan the weekly rota' : 'Your shifts and the rota', onPress: () => navigation.navigate('StaffShifts') },
     // Staff Management also holds doctor-linking (see StaffManagementScreen's
     // own role check for what a sub-admin can and can't do once inside it) --
     // a clinic's own sub-admin needs to reach it to add a doctor to their
     // clinic, same as web's clinic-detail page already lets them.
     ...(isAdmin || isClinicAdmin ? [
-      { icon: 'people-outline', label: 'Staff Management', onPress: () => navigation.navigate('StaffManagement') },
+      { icon: 'people-outline', label: 'Staff & doctors', sub: 'Invite, link and manage', onPress: () => navigation.navigate('StaffManagement') },
     ] : []),
     // Mirrors web's dashboard/ambulances/page.tsx role gate (admin/owner/front_desk) --
     // front_desk had no management menu item at all before this; Ambulances is now the
@@ -56,120 +57,82 @@ export function StaffMoreScreen({ navigation }: Props) {
     // screen (same hub-and-spoke shape as the web page's own button row), not listed
     // here separately.
     ...(isAdmin || staffProfile?.role === 'front_desk' ? [
-      { icon: 'medical-outline', label: 'Ambulances', onPress: () => navigation.navigate('AmbulanceRequests') },
+      { icon: 'medical-outline', label: 'Ambulance desk', sub: 'Inbound, fleet, alerts', onPress: () => navigation.navigate('AmbulanceRequests') },
     ] : []),
     ...(isAdmin ? [
-      { icon: 'analytics-outline', label: 'Analytics', onPress: () => navigation.navigate('StaffAnalytics') },
+      { icon: 'analytics-outline', label: 'Analytics', sub: 'Trends and revenue', onPress: () => navigation.navigate('StaffAnalytics') },
       // Only hospitals onboarded with the multi-clinic model have clinics to manage --
       // mirrors web's Sidebar.tsx, which hides its own Clinics nav item the same way.
       ...(clinicModel === 'multi' ? [
-        { icon: 'business-outline', label: 'Clinics', onPress: () => navigation.navigate('HospitalClinics') },
+        { icon: 'business-outline', label: 'Clinics', sub: 'Departments and admins', onPress: () => navigation.navigate('HospitalClinics') },
       ] : []),
-      { icon: 'medkit-outline', label: 'Services & Specialties', onPress: () => navigation.navigate('HospitalServices') },
-      { icon: 'calendar-outline', label: 'Doctor Schedule', onPress: () => navigation.navigate('HospitalSchedule') },
-      { icon: 'settings-outline', label: 'Hospital Settings', onPress: () => navigation.navigate('HospitalSettings') },
+      { icon: 'medkit-outline', label: 'Services', sub: 'Specialties and prices', onPress: () => navigation.navigate('HospitalServices') },
+      { icon: 'calendar-outline', label: 'Doctor schedule', sub: 'Shifts and availability', onPress: () => navigation.navigate('HospitalSchedule') },
+      { icon: 'settings-outline', label: 'Hospital settings', sub: 'Profile, hours, payments', onPress: () => navigation.navigate('HospitalSettings') },
     ] : []),
   ]
 
+  // v3.1 All Modules (h-menu): identity in the teal header, a grid of every module this
+  // role can open (hidden when it can't), then the same account block as the other apps.
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
-        <Text style={[s.title, { color: t.textPrimary }]}>More</Text>
-
-        {/* Profile card */}
-        <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[s.avatar, { backgroundColor: `${t.accent}20`, borderColor: `${t.accent}40` }]}>
-            <Text style={[s.avatarText, { color: t.accent }]}>{initials}</Text>
-          </View>
+    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Header>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <ProfileAvatar size={60} editable name={staffProfile?.name} />
           <View style={{ flex: 1 }}>
-            <Text style={[s.profileName, { color: t.textPrimary }]}>{staffProfile?.name ?? '—'}</Text>
-            <View style={[s.roleBadge, { backgroundColor: `${t.accent}18`, borderColor: `${t.accent}30` }]}>
-              <Text style={[s.roleText, { color: t.accent }]}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? 'Staff'}</Text>
-            </View>
-            {hospitalName && <Text style={[s.hospitalText, { color: t.textMuted }]}>{hospitalName}</Text>}
+            <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{staffProfile?.name ?? 'Staff'}</Text>
+            <Text numberOfLines={1} style={{ color: '#CCFBF1', fontSize: 13, marginTop: 2 }}>
+              {ROLE_LABEL[staffProfile?.role ?? ''] ?? 'Staff'}{hospitalName ? ` · ${hospitalName}` : ''}
+            </Text>
           </View>
         </View>
-
-        {/* Menu items */}
-        {menuItems.length > 0 && (
-          <>
-            <Text style={[s.sectionLabel, { color: t.textMuted }]}>MANAGEMENT</Text>
-            <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              {menuItems.map((item, i) => (
-                <TouchableOpacity key={item.label} onPress={() => { haptics.tap(); item.onPress() }}
-                  style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: i < menuItems.length - 1 ? 1 : 0 }]}>
-                  <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>
-                    <Ionicons name={item.icon as any} size={18} color={t.accent} />
+      </Header>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ padding: 20, gap: 14 }}>
+          {menuItems.length > 0 && (
+            <>
+              <SectionTitle title="All modules" />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {menuItems.map(item => (
+                  <View key={item.label} style={{ flexBasis: '47%', flexGrow: 1 }}>
+                    <ServiceTile icon={item.icon as any} label={item.label} sublabel={item.sub} onPress={item.onPress} />
                   </View>
-                  <Text style={[s.menuLabel, { color: t.textPrimary }]}>{item.label}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Switch to patient mode */}
-        <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 16 }]}>ACCOUNT</Text>
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
-            style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
-            <View style={[s.menuIcon, { backgroundColor: t.infoSubtle }]}>
-              <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
-            </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
-          </TouchableOpacity>
-
-          {/* Theme toggle */}
-          <View style={[s.menuRow, { borderBottomColor: t.cardBorder, borderBottomWidth: 1 }]}>
-            <View style={[s.menuIcon, { backgroundColor: `${t.accent}12` }]}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={18} color={t.accent} />
-            </View>
-            <Text style={[s.menuLabel, { color: t.textPrimary }]}>{themeId === 'forest' ? 'Dark theme' : 'Light theme'}</Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
-              trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-
-          {/* Sign out */}
-          {confirmVisible ? (
-            <View style={{ padding: 12 }}>
-              <Text style={[{ color: t.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }]}>Sign out of your account?</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
-                <Button
-                  label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
-                  loading={signingOut} variant="danger" style={{ flex: 1 }}
-                />
+                ))}
               </View>
-            </View>
-          ) : (
-            <TouchableOpacity onPress={() => setConfirmVisible(true)} style={s.menuRow}>
-              <View style={[s.menuIcon, { backgroundColor: t.dangerSubtle }]}>
-                <Ionicons name="log-out-outline" size={18} color={t.danger} />
-              </View>
-              <Text style={[s.menuLabel, { color: t.danger }]}>Sign out</Text>
-            </TouchableOpacity>
+            </>
           )}
+
+          <SectionTitle title="Account" />
+          <Card style={{ paddingVertical: 0 }}>
+            <ListRow icon="person-circle-outline" title="My profile" subtitle="Role, clinic and sign out" last
+              onPress={() => navigation.navigate('FrontDeskProfile')} />
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
+            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
+              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
+              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          </Card>
+
+          {!confirmVisible ? (
+            <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }} accessibilityRole="button"
+              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
+            </TouchableOpacity>
+          ) : (
+            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirmVisible(false)} /></View>
+                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={handleSignOut} /></View>
+              </View>
+            </Card>
+          )}
+
+          <DeleteAccount what="your staff profile, photo and sign-in (the hospital itself stays)" />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  title:       { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
-  profileCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 16, borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
-  avatar:      { width: 52, height: 52, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  avatarText:  { fontSize: 18, fontWeight: '800' },
-  profileName: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
-  roleBadge:   { marginTop: 5, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99, borderWidth: 1, alignSelf: 'flex-start' },
-  roleText:    { fontSize: 11, fontWeight: '700' },
-  hospitalText: { fontSize: 11, marginTop: 4 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 20, marginBottom: 8 },
-  section:     { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 },
-  menuRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  menuIcon:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
-})

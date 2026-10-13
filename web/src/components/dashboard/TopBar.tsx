@@ -81,11 +81,11 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
           className="q-topbar-theme-toggle"
           style={{ display: 'flex', alignItems: 'center', gap: 7,
             padding: '5px 12px', borderRadius: 99,
-            background: isForest ? 'rgba(0,232,122,0.10)' : 'rgba(26,127,193,0.10)',
-            border: `1px solid ${isForest ? 'rgba(0,232,122,0.25)' : 'rgba(26,127,193,0.25)'}`,
+            background: isForest ? 'rgba(15,118,110,0.10)' : 'rgba(15,118,110,0.10)',
+            border: `1px solid ${isForest ? 'rgba(15,118,110,0.25)' : 'rgba(15,118,110,0.25)'}`,
             cursor: 'pointer', transition: 'all .3s' }}>
           <div style={{ width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
-            background: isForest ? 'rgba(0,232,122,0.25)' : 'rgba(26,127,193,0.25)',
+            background: isForest ? 'rgba(15,118,110,0.25)' : 'rgba(15,118,110,0.25)',
             transition: 'background .3s' }}>
             <div style={{ position: 'absolute', top: 2, left: isForest ? 17 : 2,
               width: 14, height: 14, borderRadius: '50%', background: C.accent,

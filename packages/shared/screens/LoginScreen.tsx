@@ -1,5 +1,9 @@
-import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { signInWithGoogle } from '../lib/googleAuth'
+import { haptics } from '../lib/haptics'
+import { useState, useEffect } from 'react'
+import { QueueMark, QUEUE_TAGLINE } from '../components/ui/QueueMark'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '../contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,6 +12,7 @@ import { useAuth }  from '../contexts/AuthContext'
 import type { AuthSurface } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
+import { PasswordInput } from '../components/ui/PasswordField'
 
 // Every app mounts this same screen, so the bits that differ per app are read off
 // route params (set with `initialParams` where the screen is registered) rather than
@@ -35,6 +40,13 @@ interface Props { navigation: any; route?: { params?: LoginScreenParams } }
 export function LoginScreen({ navigation, route }: Props) {
   const p = route?.params ?? {}
   const surface: AuthSurface = p.surface ?? 'patient'
+  const [googleBusy, setGoogleBusy] = useState(false)
+  async function handleGoogle() {
+    haptics.tap(); setGoogleBusy(true); setError('')
+    const err = await signInWithGoogle()
+    setGoogleBusy(false)
+    if (err) setError(err)
+  }
   // `undefined` means "not specified" -> patient default; explicit null means "no
   // registration in this app". Both are falsy, so they can't be collapsed with ??.
   const registerRoute = p.registerRoute === undefined ? 'Register' : p.registerRoute
@@ -44,6 +56,7 @@ export function LoginScreen({ navigation, route }: Props) {
   const [email, setEmail]   = useState('')
   const [pass,  setPass]    = useState('')
   const [error, setError]   = useState('')
+  useEffect(() => { if (error) haptics.error() }, [error])
   const [busy,  setBusy]    = useState(false)
 
   async function handleForgotPassword() {
@@ -62,7 +75,7 @@ export function LoginScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Back to role select */}
@@ -74,11 +87,9 @@ export function LoginScreen({ navigation, route }: Props) {
 
           {/* Logo */}
           <View style={s.logoWrap}>
-            <View style={[s.logoBox, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Text style={[s.logoText, { color: t.accent }]}>Q</Text>
-            </View>
+            <QueueMark size={64} style={{ marginBottom: 10 }} />
             <Text style={[s.appName, { color: t.textPrimary }]}>Queue</Text>
-            <Text style={[s.tagline, { color: t.textMuted }]}>{p.tagline ?? 'Your health, on your schedule'}</Text>
+            <Text style={[s.tagline, { color: t.textMuted }]}>{p.tagline ?? QUEUE_TAGLINE}</Text>
           </View>
 
           {/* Card */}
@@ -100,23 +111,34 @@ export function LoginScreen({ navigation, route }: Props) {
 
               <View style={s.fieldWrap}>
                 <Text style={[s.label, { color: t.textMuted }]}>Password</Text>
-                <TextInput
-                  value={pass} onChangeText={setPass}
-                  placeholder="••••••••"
-                  placeholderTextColor={t.textMuted}
-                  secureTextEntry
-                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                />
+                <PasswordInput value={pass} onChangeText={setPass} onSubmitEditing={handleLogin} />
               </View>
             </View>
 
             {!!error && (
-              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-                <Text style={s.errText}>{error}</Text>
+              <View accessibilityRole="alert" style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
               </View>
             )}
 
             <Button label="Sign in" onPress={handleLogin} loading={busy} size="lg" style={{ marginTop: t.spacing.xl }} />
+
+            {/* Google is for patients only -- staff, doctor and crew accounts come from invites. */}
+            {surface === 'patient' && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: t.cardBorder }} />
+                  <Text style={{ fontSize: 12, color: t.textMuted }}>or</Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: t.cardBorder }} />
+                </View>
+                <TouchableOpacity onPress={handleGoogle} disabled={googleBusy} accessibilityRole="button" accessibilityLabel="Continue with Google"
+                  style={{ marginTop: 14, minHeight: 52, borderRadius: 13, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg,
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <Ionicons name="logo-google" size={18} color="#EA4335" />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{googleBusy ? 'Opening Google…' : 'Continue with Google'}</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             <TouchableOpacity onPress={handleForgotPassword} style={s.forgotRow}>
               <Text style={[s.forgotText, { color: t.accent }]}>Forgot password?</Text>

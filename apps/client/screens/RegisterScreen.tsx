@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { signInWithGoogle } from '@queue/shared/lib/googleAuth'
+import { haptics } from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { linkDependent } from '@queue/shared/lib/api'
 import { DateOfBirthSelect } from '@queue/shared/components/ui/DateOfBirthSelect'
+import { ProfileFields, EMPTY_PROFILE, profileProblem, type ProfileValues } from '@queue/shared/components/ui/ProfileFields'
+import { PasswordInput, PasswordChecklist, TermsCheckbox, passwordProblem, cleanReferral } from '@queue/shared/components/ui/PasswordField'
 
 interface Props { navigation: any }
 
@@ -39,13 +41,18 @@ export function RegisterScreen({ navigation }: Props) {
   const { theme: t }              = useTheme()
   const { signUp }                = useAuth()
   const [fullName, setFullName]   = useState('')
-  const [dob,      setDob]        = useState('')
+  const [profile,  setProfile]    = useState<ProfileValues>(EMPTY_PROFILE)
+  const dob = profile.dob
   const [phone,    setPhone]      = useState('')
   const [email,    setEmail]      = useState('')
   const [pass,     setPass]       = useState('')
   const [confirm,  setConfirm]    = useState('')
   const [error,    setError]      = useState('')
+  useEffect(() => { if (error) haptics.error() }, [error])
   const [busy,     setBusy]       = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
+  const [referral, setReferral]   = useState('')
+  const [agreed,   setAgreed]     = useState(false)
 
   const [showCaretaker, setShowCaretaker]   = useState(false)
   const [caretakerCode, setCaretakerCode]   = useState('')
@@ -62,14 +69,19 @@ export function RegisterScreen({ navigation }: Props) {
 
   async function handleRegister() {
     if (!fullName.trim()) { setError('Enter your full name.'); return }
-    if (!dob)              { setError('Enter your date of birth.'); return }
+    const missing = profileProblem(profile)
+    if (missing)           { setError(missing); return }
     if (!phone.trim())    { setError('Enter your phone number.'); return }
     if (!email.trim())    { setError('Enter your email address.'); return }
-    if (pass.length < 6)  { setError('Password must be at least 6 characters.'); return }
+    const weak = passwordProblem(pass)
+    if (weak)             { setError(weak); return }
     if (pass !== confirm) { setError('Passwords do not match.'); return }
+    if (!agreed)          { setError('Please agree to the Terms of Service and Privacy Policy.'); return }
     if (caretakerCode.trim() && !caretakerRel) { setError('Select your relationship to your caretaker.'); return }
     setBusy(true); setError('')
-    const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), dob)
+    const err = await signUp(email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), dob, undefined,
+      { referralCode: referral ? cleanReferral(referral) : undefined, acceptedTermsAt: new Date().toISOString(),
+        title: profile.title, gender: profile.gender, country: profile.country, state: profile.state.trim() })
     if (err) { setBusy(false); setError(err); return }
 
     // Best-effort: the account is already created either way -- a bad caretaker
@@ -88,7 +100,7 @@ export function RegisterScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Back */}
@@ -122,15 +134,12 @@ export function RegisterScreen({ navigation }: Props) {
             ))}
 
             <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: t.textMuted }]}>Date of birth</Text>
-              <DateOfBirthSelect value={dob} onChange={setDob} maxYear={new Date().getFullYear()} />
+              <ProfileFields value={profile} onChange={setProfile} />
             </View>
 
             {[
               { label: 'Phone number',     value: phone,    onChange: setPhone,    placeholder: '+234 812 345 6789',  keyboardType: 'phone-pad',     autoCapitalize: 'none',   secure: false },
               { label: 'Email address',    value: email,    onChange: setEmail,    placeholder: 'you@email.com',      keyboardType: 'email-address', autoCapitalize: 'none',   secure: false },
-              { label: 'Password',         value: pass,     onChange: setPass,     placeholder: '••••••••',           keyboardType: 'default',       autoCapitalize: 'none',   secure: true  },
-              { label: 'Confirm password', value: confirm,  onChange: setConfirm,  placeholder: '••••••••',           keyboardType: 'default',       autoCapitalize: 'none',   secure: true  },
             ].map(f => (
               <View key={f.label} style={s.fieldWrap}>
                 <Text style={[s.label, { color: t.textMuted }]}>{f.label}</Text>
@@ -147,6 +156,23 @@ export function RegisterScreen({ navigation }: Props) {
                 />
               </View>
             ))}
+
+            <View style={s.fieldWrap}>
+              <Text style={[s.label, { color: t.textMuted }]}>Password</Text>
+              <PasswordInput value={pass} onChangeText={setPass} newPassword />
+              <PasswordChecklist password={pass} />
+            </View>
+            <View style={s.fieldWrap}>
+              <Text style={[s.label, { color: t.textMuted }]}>Confirm password</Text>
+              <PasswordInput value={confirm} onChangeText={setConfirm} accessibilityLabel="Confirm password" newPassword />
+              {!!confirm && confirm !== pass && <Text style={{ fontSize: 12, color: t.danger, marginTop: 6 }}>Passwords don't match yet</Text>}
+            </View>
+            <View style={s.fieldWrap}>
+              <Text style={[s.label, { color: t.textMuted }]}>Referral code (optional)</Text>
+              <TextInput value={referral} onChangeText={v => setReferral(cleanReferral(v))} placeholder="e.g. a friend's Patient ID or promo code"
+                placeholderTextColor={t.textMuted} autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Referral code"
+                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
+            </View>
 
             {isMinor && (
               <View style={[s.recommendBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
@@ -196,12 +222,29 @@ export function RegisterScreen({ navigation }: Props) {
             )}
 
             {!!error && (
-              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-                <Text style={s.errText}>{error}</Text>
+              <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
               </View>
             )}
 
-            <Button label="Create account" onPress={handleRegister} loading={busy} size="lg" style={{ marginTop: t.spacing.sm }} />
+            <TermsCheckbox checked={agreed} onChange={setAgreed} />
+
+            <Button label="Create account" onPress={handleRegister} loading={busy} disabled={!agreed} size="lg" style={{ marginTop: t.spacing.md }} />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: t.cardBorder }} />
+              <Text style={{ fontSize: 12, color: t.textMuted }}>or</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: t.cardBorder }} />
+            </View>
+            <TouchableOpacity onPress={async () => {
+                if (!agreed) { setError('Please agree to the Terms of Service and Privacy Policy first.'); return }
+                haptics.tap(); setGoogleBusy(true); setError(''); const e = await signInWithGoogle(); setGoogleBusy(false); if (e) setError(e) }}
+              disabled={googleBusy} accessibilityRole="button" accessibilityLabel="Sign up with Google"
+              style={{ marginTop: 14, minHeight: 52, borderRadius: 13, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <Ionicons name="logo-google" size={18} color="#EA4335" />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{googleBusy ? 'Opening Google…' : 'Sign up with Google'}</Text>
+            </TouchableOpacity>
 
           </View>
 

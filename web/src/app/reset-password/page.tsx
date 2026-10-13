@@ -58,18 +58,18 @@ export default function ResetPasswordPage() {
       flexDirection: 'column', justifyContent: 'space-between', padding: '48px 40px',
       position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
-        borderRadius: '50%', background: 'rgba(0,232,122,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+        borderRadius: '50%', background: 'rgba(15,118,110,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(0,232,122,0.1)',
-            border: '1px solid rgba(0,232,122,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(15,118,110,0.1)',
+            border: '1px solid rgba(15,118,110,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
-              <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2.5"/>
-              <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-              <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="30" cy="30" r="8" fill="#061208" stroke="#00E87A" strokeWidth="2.5"/>
-              <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
+              <rect x="6" y="8" width="28" height="24" rx="6" stroke="#0F766E" strokeWidth="2.5"/>
+              <line x1="13" y1="16" x2="27" y2="16" stroke="#0F766E" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="13" y1="20" x2="22" y2="20" stroke="#0F766E" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="30" cy="30" r="8" fill="#061208" stroke="#0F766E" strokeWidth="2.5"/>
+              <line x1="30" y1="26.5" x2="30" y2="30" stroke="#0F766E" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="30" cy="31.5" r="1" fill="#0F766E"/>
             </svg>
           </div>
           <div>
@@ -92,7 +92,7 @@ export default function ResetPasswordPage() {
 
   if (!ready) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "var(--font-jakarta), system-ui, sans-serif" }}>
         {leftPanel}
         <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center' }}>
@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "var(--font-jakarta), system-ui, sans-serif" }}>
       {leftPanel}
       <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center',
         justifyContent: 'center', padding: '40px 24px' }}>

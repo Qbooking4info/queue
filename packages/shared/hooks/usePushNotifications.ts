@@ -46,7 +46,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       sound:       'default',
       // Long repeating buzz — reads as a ring, not a notification blip.
       vibrationPattern: [0, 700, 400, 700, 400, 700],
-      lightColor:  '#00E87A',
+      lightColor:  '#0F766E',
       bypassDnd:   true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     })
@@ -90,6 +90,11 @@ async function routeFromNotificationData(data: Record<string, unknown> | undefin
     // jobs tab; the request id routes the patient to live tracking instead.
     if (data.offer_id) {
       navigateWhenReady('CrewHome')
+      return
+    }
+    // The sticky queue-position notification (lib/queueNotification).
+    if (data.screen === 'QueuePass' && data.appointmentId) {
+      navigateWhenReady('QueuePass', { appointmentId: String(data.appointmentId) })
       return
     }
     if (data.request_id) {

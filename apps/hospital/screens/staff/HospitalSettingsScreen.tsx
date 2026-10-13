@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, RefreshControl, TextInput } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, RefreshControl, KeyboardAvoidingView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -175,32 +177,26 @@ export function HospitalSettingsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary }]}>Settings</Text>
-        </View>
-        {saving && <ActivityIndicator color={t.accent} size="small" />}
-      </View>
-      {hospitalName ? <Text style={[s.subtitle, { color: t.textMuted }]}>{hospitalName}</Text> : null}
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Settings" subtitle={hospitalName ?? undefined} onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {saving && <ActivityIndicator color="#FFFFFF" size="small" />}
+      
+        </View>} />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={t.accent} />
         </View>
       ) : (
-        <ScrollView
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <ScrollView keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
           {/* Booking & approval */}
-          <Text style={[s.sectionLabel, { color: t.textMuted }]}>BOOKING</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Booking</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <ToggleRow label="Auto-approve bookings" sub="Instantly confirm bookings without review"
               value={settings?.approval_mode === 'auto'} disabled={saving}
@@ -216,7 +212,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           {/* Booking limits */}
           {isAdmin && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>BOOKING LIMITS</Text>
+              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Booking limits</Text>
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 14 }]}>
                 <FieldRow label="Daily booking limit" sub="Leave blank for no limit" theme={t}>
                   <TextInput value={dailyLimit} onChangeText={setDailyLimit} placeholder="No limit" placeholderTextColor={t.textMuted}
@@ -232,7 +228,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           )}
 
           {/* Hours */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>OPERATIONS</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Operations</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <ToggleRow label="24-hour service" sub="Hospital operates around the clock"
               value={settings?.is_24_hours ?? false} disabled={saving}
@@ -243,7 +239,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           </View>
 
           {/* Reminders */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>REMINDERS</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Reminders</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             <ToggleRow label="SMS reminders" sub="Send SMS reminders to patients"
               value={settings?.sms_reminders ?? false} disabled={saving}
@@ -256,7 +252,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           {/* Ambulance service */}
           {isAdmin && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>AMBULANCE SERVICE</Text>
+              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Ambulance service</Text>
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
                 <ToggleRow label="Private fleet only" sub="Only your own ambulances serve this hospital, not the shared network"
                   value={settings?.ambulance_private_fleet ?? true} disabled={saving}
@@ -278,7 +274,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           {/* Location */}
           {isAdmin && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>LOCATION</Text>
+              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Location</Text>
               <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 14 }]}>
                 {settings?.latitude != null && settings?.longitude != null && (
                   <Text style={[s.hintText, { color: t.textMuted, textAlign: 'left', marginBottom: 10 }]}>
@@ -301,7 +297,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           )}
 
           {/* Operating hours */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>OPERATING HOURS</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Operating hours</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             {editHours.map((h, i) => (
               <View key={h.day} style={[s.hoursEditRow, { borderTopColor: t.cardBorder, borderTopWidth: i === 0 ? 0 : 1 }]}>
@@ -330,6 +326,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
 
           {isAdmin && <PayoutAccountCard theme={t} />}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )
@@ -429,7 +426,7 @@ function PayoutAccountCard({ theme: t }: { theme: any }) {
 
   return (
     <>
-      <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>PAYOUT ACCOUNT</Text>
+      <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Payout account</Text>
       <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 14 }]}>
         {disabled ? (
           <Text style={[s.toggleSub, { color: t.textMuted }]}>Online payment is not enabled on this platform yet. Patients currently pay at your front desk.</Text>
@@ -485,7 +482,7 @@ const s = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 2 },
   title:       { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   subtitle:    { fontSize: 13, paddingHorizontal: 20, marginBottom: 16 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  sectionLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   card:        { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
   toggleRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   toggleLabel: { fontSize: 14, fontWeight: '600' },

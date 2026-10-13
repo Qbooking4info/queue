@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const CLINIC_PALETTE = [
-  { bg: 'rgba(0,232,122,0.14)',   text: '#00E87A' },
+  { bg: 'rgba(15,118,110,0.14)',   text: '#0F766E' },
   { bg: 'rgba(85,167,235,0.14)',  text: '#55A7EB' },
   { bg: 'rgba(180,156,240,0.14)', text: '#B49CF0' },
   { bg: 'rgba(239,159,39,0.14)',  text: '#EF9F27' },
@@ -66,9 +66,9 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
               {clinic.name}
             </div>
             <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-              background: clinic.is_active ? 'rgba(0,232,122,0.12)' : C.borderMed,
-              color: clinic.is_active ? '#00E87A' : C.textMuted,
-              border: `1px solid ${clinic.is_active ? 'rgba(0,232,122,0.25)' : C.border}` }}>
+              background: clinic.is_active ? 'rgba(15,118,110,0.12)' : C.borderMed,
+              color: clinic.is_active ? '#0F766E' : C.textMuted,
+              border: `1px solid ${clinic.is_active ? 'rgba(15,118,110,0.25)' : C.border}` }}>
               {clinic.is_active ? 'Active' : 'Inactive'}
             </span>
             {clinic.is_emergency && (
@@ -163,8 +163,8 @@ function ClinicCard({ clinic, idx, onManage, onToggleActive, onDelete }: {
           style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer',
             fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
             background: 'transparent',
-            border: `1px solid ${clinic.is_active ? C.border : 'rgba(0,232,122,0.3)'}`,
-            color: clinic.is_active ? C.textMuted : '#00E87A',
+            border: `1px solid ${clinic.is_active ? C.border : 'rgba(15,118,110,0.3)'}`,
+            color: clinic.is_active ? C.textMuted : '#0F766E',
             transition: 'all .15s' }}>
           {clinic.is_active ? 'Deactivate' : 'Reactivate'}
         </button>

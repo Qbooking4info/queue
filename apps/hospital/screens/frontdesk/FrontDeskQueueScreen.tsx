@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect, type ComponentProps } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, TextInput } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
+import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -293,34 +295,12 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const pendingCount   = appts.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={[s.headerTitle, { color: t.textPrimary }]}>Queue</Text>
-        <View style={[s.tabBar, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          {(['today', 'all'] as const).map(tb => (
-            <TouchableOpacity key={tb} onPress={() => setTab(tb)}
-              style={[s.tabBtn, tab === tb && { backgroundColor: t.accent }]}>
-              <Text style={[s.tabBtnText, { color: tab === tb ? '#fff' : t.textMuted }]}>
-                {tb === 'today' ? 'Today' : 'All'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Stats bar */}
-      {!loading && (
-        <View style={[s.statsBar, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.statsText, { color: t.textMuted }]}>
-            Today: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{appts.length}</Text>
-            {'  ·  '}
-            Checked in: <Text style={{ color: t.info, fontWeight: '700' }}>{checkedInCount}</Text>
-            {'  ·  '}
-            Pending: <Text style={{ color: t.statusBusy.text, fontWeight: '700' }}>{pendingCount}</Text>
-          </Text>
-        </View>
-      )}
+    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Live queue"
+        subtitle={loading ? 'Loading…' : `${appts.length} today · ${checkedInCount} checked in · ${pendingCount} pending`}>
+        <SegmentedControl<'today' | 'all'> onDark value={tab} onChange={setTab}
+          options={[{ value: 'today', label: 'Today' }, { value: 'all', label: 'All' }]} />
+      </Header>
 
       {/* Search */}
       {!loading && appts.length > 0 && (
@@ -349,24 +329,16 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
           {filtered.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="clipboard-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
-                {search ? 'No patients match your search' : 'No appointments yet'}
-              </Text>
-              <Text style={[s.emptySub, { color: t.textMuted }]}>
-                {search
-                  ? `No results for "${search}". Try a different name.`
-                  : tab === 'today'
-                    ? 'No appointments scheduled for today.\nWalk-in patients can be added from the web dashboard.'
-                    : 'No appointments found.'}
-              </Text>
-            </View>
+            <EmptyState icon="clipboard-outline" title={search ? 'No patients match your search' : 'No one in the queue yet'}
+              body={search ? `No results for "${search}". Try a different name.`
+                : tab === 'today' ? 'Bookings for today show up here. Add a walk-in from the Walk-in tab.' : 'No appointments found.'}
+              action={!search && tab === 'today' ? 'Add a walk-in' : undefined}
+              onAction={!search && tab === 'today' ? () => navigation.navigate('WalkInBooking') : undefined} />
           )}
 
           {active.length > 0 && (
             <>
-              <Text style={[s.groupLabel, { color: t.textMuted }]}>Active ({active.length})</Text>
+              <Text style={[s.groupLabel, { color: t.textPrimary }]}>Active ({active.length})</Text>
               {active.map(a => (
                 <ApptCard
                   key={a.id} appt={a} theme={t} actioning={actioning} today={today}
@@ -380,7 +352,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
 
           {done.length > 0 && (
             <>
-              <Text style={[s.groupLabel, { color: t.textMuted, marginTop: 16 }]}>Completed / Cancelled ({done.length})</Text>
+              <Text style={[s.groupLabel, { color: t.textPrimary, marginTop: 16 }]}>Completed / Cancelled ({done.length})</Text>
               {done.map(a => (
                 <ApptCard
                   key={a.id} appt={a} theme={t} actioning={actioning} today={today}
@@ -574,7 +546,7 @@ const s = StyleSheet.create({
   statsText:    { fontSize: 12 },
   searchWrap:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   searchInput:  { flex: 1, fontSize: 14, padding: 0 },
-  groupLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  groupLabel:   { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   card:         { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
   cardTop:      { flexDirection: 'row', gap: 10, padding: 14 },
   patientName:  { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },

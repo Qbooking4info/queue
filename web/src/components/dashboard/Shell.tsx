@@ -48,7 +48,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
         }
     return (
       <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', padding: 24, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+        justifyContent: 'center', padding: 24, fontFamily: "var(--font-jakarta), system-ui, sans-serif" }}>
         <div style={{ maxWidth: 420, textAlign: 'center', background: C.card, border: `1px solid ${C.border}`,
           borderRadius: 16, padding: '32px 28px' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>{copy.icon}</div>
@@ -70,7 +70,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: C.bg,
-      fontFamily: "'DM Sans', system-ui, sans-serif", transition: 'background .4s' }}>
+      fontFamily: "var(--font-jakarta), system-ui, sans-serif", transition: 'background .4s' }}>
 
       {/* Mobile backdrop */}
       {sidebarOpen && (

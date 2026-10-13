@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { getIndependentDoctorProfile, IndependentDoctorProfile, getHospitalById } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -30,7 +32,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
         <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
       </SafeAreaView>
     )
@@ -38,7 +40,7 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
 
   if (!doctor) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
         <View style={st.center}>
           <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '700' }}>Doctor not found</Text>
         </View>
@@ -49,12 +51,8 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
   const initials = doctor.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Doctor" onBack={() => navigation.goBack()} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={st.profileCard}>
           <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>

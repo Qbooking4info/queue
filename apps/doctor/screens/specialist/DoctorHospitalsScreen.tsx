@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
@@ -53,20 +54,8 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
   const activeHospitalName = doctorProfile?.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName
 
   return (
-      <ShellScroll>
-        {/* Hospitals is pushed as its own stack screen above the tab bar (not a tab
-            itself), so without this there is no way back to Dashboard at all --
-            no header, no tab bar, nothing but the browser's own back button, which
-            doesn't sync with this in-memory navigation stack on web. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Hospitals</Text>
-        </View>
-        <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
+      <ShellScroll title="Hospitals" subtitle="Your linked hospitals and Doctor ID" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
+        <Text style={{ fontSize: 13, color: t.textMuted, lineHeight: 19, marginBottom: 16 }}>
           Manage the hospitals and clinics you're linked to. Only one can be active at a time —
           that's the one whose queue and referrals you see.
         </Text>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import AgoraRTC, {
@@ -296,7 +297,7 @@ const st = StyleSheet.create({
   center:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
   waitingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   waitingText:      { fontSize: 14, color: '#4A6058', textAlign: 'center', paddingHorizontal: 32 },
-  errorTitle:       { fontSize: 18, fontWeight: '700', color: '#FF5C5C', marginBottom: 8, textAlign: 'center' },
+  errorTitle:       { fontSize: 18, fontWeight: '700', color: '#EF4444', marginBottom: 8, textAlign: 'center' },
   errorSub:         { fontSize: 13, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
   backCallBtn:      { marginTop: 20, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
   localPip: {

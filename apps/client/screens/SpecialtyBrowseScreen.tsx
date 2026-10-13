@@ -4,10 +4,12 @@
 // specialties.id, so results (hospitals or doctors) come from a real,
 // server-side ID filter rather than a fuzzy name/substring match.
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, TextInput } from 'react-native'
+import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
 import { haptics } from '@queue/shared/lib/haptics'
 
@@ -26,13 +28,8 @@ export function SpecialtyBrowseScreen({ navigation }: Props) {
   const filtered = specialties.filter(s => !q.trim() || s.name.toLowerCase().includes(q.trim().toLowerCase()))
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={{ marginRight: 10 }}>
-          <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>Browse by Specialty</Text>
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Browse by Specialty" onBack={() => navigation.goBack()} />
       <Text style={[st.sub, { color: t.textMuted }]}>
         Pick a specialty to see hospitals that offer it, or doctors who specialize in it.
       </Text>

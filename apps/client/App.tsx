@@ -16,8 +16,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { View, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { setStatusBarStyle } from 'expo-status-bar'
 
 import { ThemeProvider, useTheme }     from '@queue/shared/contexts/ThemeContext'
+import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
+import { AppLockGate } from '@queue/shared/components/AppLock'
 import { AlertProvider }               from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth }       from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }            from '@queue/shared/contexts/LocationContext'
@@ -51,6 +54,15 @@ import { PrescriptionsScreen }         from './screens/PrescriptionsScreen'
 import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
 import { InsuranceScreen }             from './screens/InsuranceScreen'
 import { SupportScreen }               from './screens/SupportScreen'
+import { QueuePassScreen }             from './screens/QueuePassScreen'
+import { SosScreen }                   from './screens/SosScreen'
+import { SosTriageScreen }             from './screens/SosTriageScreen'
+import { AmbulanceHomeScreen }         from './screens/AmbulanceHomeScreen'
+import { VirtualCareScreen }           from './screens/VirtualCareScreen'
+import { MyCareScreen }                from './screens/MyCareScreen'
+import { MessagesScreen }              from './screens/MessagesScreen'
+import { ChatScreen }                  from '@queue/shared/screens/ChatScreen'
+import { WalletScreen }                from './screens/WalletScreen'
 
 // Specialist screens
 // Migrated from the standalone doctors/ app when it was folded into this one.
@@ -90,6 +102,7 @@ function VideoCallScreen(props: any) {
 // TaskManager needs the task defined before the OS can deliver work to a
 // cold-started process, otherwise on-duty crews silently stop reporting.
 import '@queue/shared/lib/location-task'
+import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
 
 const Tab        = createBottomTabNavigator()
 const Stack      = createNativeStackNavigator()
@@ -109,28 +122,45 @@ function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof I
 // ── Patient navigator ─────────────────────────────────────────────────────────
 
 function MainTabs() {
+  const unread = useUnreadMessages('patient')
   const { theme: t } = useTheme()
   const insets = useSafeAreaInsets()
   return (
     <Tab.Navigator screenOptions={{
       headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
       tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
     }}>
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Search"       component={SearchScreen}       options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'search' : 'search-outline'} {...p} />,         tabBarLabel: 'Search' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Bookings' }} />
-      <Tab.Screen name="DependentsTab" component={DependentsScreen}  options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'people' : 'people-outline'} {...p} />,         tabBarLabel: 'Dependents' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Appointments' }} />
+      <Tab.Screen name="Messages"     component={MessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
       <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,         tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   )
 }
 
+// Almost every screen now sits under the teal v3.1 header (light status-bar icons).
+// These few have a light top edge instead, so they follow the theme. Set on focus so
+// going back restores the right style.
+const THEMED_STATUS_ROUTES = new Set(['Sos', 'Confirmation', 'EmergencyConfirmation', 'AmbulanceTracking'])
+
 function AppStack() {
+  const { theme: t } = useTheme()
+  const themeStyle = t.id === 'forest' ? 'light' : 'dark'
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenListeners={({ route }) => ({
+        focus: () => setStatusBarStyle(THEMED_STATUS_ROUTES.has(route.name) ? themeStyle : 'light', true),
+      })}>
       <Stack.Screen name="MainTabs"             component={MainTabs} />
+      <Stack.Screen name="Search"               component={SearchScreen} />
+      <Stack.Screen name="QueuePass"            component={QueuePassScreen as any} />
+      <Stack.Screen name="Sos"                  component={SosScreen} options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="SosTriage"            component={SosTriageScreen as any} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="AmbulanceHome"        component={AmbulanceHomeScreen} />
+      <Stack.Screen name="VirtualCare"          component={VirtualCareScreen} />
+      <Stack.Screen name="MyCare"               component={MyCareScreen} />
       <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
       <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
       <Stack.Screen name="DoctorSearch"         component={DoctorSearchScreen} />
@@ -141,6 +171,8 @@ function AppStack() {
       <Stack.Screen name="Confirmation"         component={ConfirmationScreen}         options={{ animation: 'fade' }} />
       <Stack.Screen name="Notifications"        component={NotificationsScreen} />
       <Stack.Screen name="AppointmentDetail"    component={AppointmentDetailScreen} />
+      <Stack.Screen name="Chat"                 component={ChatScreen as any} />
+      <Stack.Screen name="Wallet"               component={WalletScreen as any} />
       <Stack.Screen name="EmergencyBooking"     component={EmergencyBookingScreen} />
       <Stack.Screen name="EmergencyConfirmation" component={EmergencyConfirmationScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="AmbulanceTracking"     component={AmbulanceTrackingScreen} options={{ animation: 'fade', gestureEnabled: false }} />
@@ -169,8 +201,10 @@ function AppStack() {
 // ── Auth navigators ───────────────────────────────────────────────────────────
 
 function PatientAuthStack() {
+  const { theme: t } = useTheme()
   return (
-    <PatientNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <PatientNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
       <PatientNav.Screen name="Login"    component={LoginScreen} />
       <PatientNav.Screen name="Register" component={RegisterScreen} />
     </PatientNav.Navigator>
@@ -190,7 +224,7 @@ function RootAuthNavigator() {
 
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user, switchedInto } = useAuth()
+  const { session, loading, user, switchedInto, signOut } = useAuth()
   const { theme: t } = useTheme()
   // Suspended while switched into a dependent's account -- otherwise this device's
   // push token would silently overwrite the dependent's own push_token every time a
@@ -221,7 +255,9 @@ function AppNavigator() {
           <OfflineBanner />
           <SwitchedAccountBanner />
           <SafeAreaProvider style={{ flex: 1 }}>
-            <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+            <AppLockGate active={!!session} onUsePassword={() => { void signOut() }}>
+              <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>{content}</NavigationContainer>
+            </AppLockGate>
           </SafeAreaProvider>
           {ringNotif && <RingOverlay notif={ringNotif} onDismiss={dismissRing} />}
         </View>
@@ -258,6 +294,8 @@ function AppNavigator() {
 }
 
 function App() {
+  const fontsReady = useQueueFonts()
+  if (!fontsReady) return null
   return (
     <ThemeProvider>
       <AlertProvider>

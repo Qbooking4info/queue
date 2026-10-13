@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '../../contexts/ThemeContext'
 import { haptics } from '../../lib/haptics'
 import { recordVitals, type ConsultVitals } from '../../lib/api'
@@ -45,7 +46,7 @@ export function VitalsEntryModal({ appointmentId, patientName, onClose, onSaved 
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={st.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={st.overlay} behavior="padding">
         <View style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[st.title, { color: t.textPrimary }]}>Record Vitals</Text>
           <Text style={[st.sub, { color: t.textMuted }]}>{patientName}</Text>

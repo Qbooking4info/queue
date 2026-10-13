@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, Platform } from 'react-native'
+import { View, StyleSheet, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import MapView, { Marker, Callout } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import type { HospitalsMapProps, HospitalsMapMarker } from './HospitalsMap.types'

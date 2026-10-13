@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Alert, TextInput,
-  KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
@@ -41,7 +40,7 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 const AVAIL_META: Record<string, { label: string; color: string }> = {
-  on_duty:  { label: 'On duty',  color: '#00C265' },
+  on_duty:  { label: 'On duty',  color: '#15803D' },
   on_break: { label: 'On break', color: '#EF9F27' },
   off_duty: { label: 'Off duty', color: '#7A9089' },
 }
@@ -148,48 +147,31 @@ export function StaffManagementScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        {/* Staff is pushed as its own stack screen above the tab bar (not a tab
-            itself), so without this there is no way back to the dashboard at all --
-            no native header, no tab bar, nothing but the browser's own back button,
-            which doesn't sync with this in-memory navigation stack on web. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary }]}>Staff</Text>
-        </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Staff & doctors" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {tab === 'staff' ? (
           isHospitalAdmin ? (
-            <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
-              <Ionicons name="person-add-outline" size={14} color="#fff" />
-              <Text style={s.inviteBtnText}>Invite</Text>
+            <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
+              <Ionicons name="person-add-outline" size={14} color="#0F766E" />
+              <Text style={[s.inviteBtnText, { color: '#0F766E' }]}>Invite</Text>
             </TouchableOpacity>
           ) : null
         ) : (
           canAddDoctor ? (
-            <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: t.accent }]}>
-              <Ionicons name="link-outline" size={14} color="#fff" />
-              <Text style={s.inviteBtnText}>Link</Text>
+            <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
+              <Ionicons name="link-outline" size={14} color="#0F766E" />
+              <Text style={[s.inviteBtnText, { color: '#0F766E' }]}>Link</Text>
             </TouchableOpacity>
           ) : null
         )}
-      </View>
+      
+        </View>}>
+        <SegmentedControl<'staff' | 'doctors'> onDark value={tab} onChange={setTab}
+          options={[{ value: 'staff', label: `Admin & front desk (${staff.length})` }, { value: 'doctors', label: `Doctors (${doctors.length})` }]} />
+      </Header>
+      <View style={{ height: 14 }} />
 
-      {/* Tabs */}
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
-        {(['staff', 'doctors'] as const).map(tb => (
-          <TouchableOpacity key={tb} onPress={() => setTab(tb)}
-            style={[s.tab, { borderColor: tab === tb ? t.accent : t.cardBorder, backgroundColor: tab === tb ? `${t.accent}18` : t.cardBg }]}>
-            <Text style={[s.tabText, { color: tab === tb ? t.accent : t.textMuted }]}>
-              {tb === 'staff' ? `Admin/Front Desk (${staff.length})` : `Doctors (${doctors.length})`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -324,7 +306,7 @@ function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: st
 
   return (
     <View style={[s.overlay]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           {done ? (
             <>
@@ -444,11 +426,11 @@ function LinkDoctorModal({ theme: t, onClose, onDone }: { theme: any; onClose: (
 
   return (
     <View style={s.overlay}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           {done ? (
             <>
-              <Ionicons name="checkmark-circle" size={48} color="#00C265" style={{ alignSelf: 'center', marginBottom: 12 }} />
+              <Ionicons name="checkmark-circle" size={48} color={t.statusSuccess.text} style={{ alignSelf: 'center', marginBottom: 12 }} />
               <Text style={[s.modalTitle, { color: t.textPrimary, textAlign: 'center' }]}>Doctor linked!</Text>
               <Text style={[s.modalSub, { color: t.textMuted, textAlign: 'center', marginBottom: 20 }]}>
                 {fullName} now appears in your hospital's doctor list.
@@ -474,7 +456,7 @@ function LinkDoctorModal({ theme: t, onClose, onDone }: { theme: any; onClose: (
                       autoCapitalize="characters" maxLength={6} autoFocus />
                   </View>
 
-                  {error ? <Text style={[s.errorText, { color: '#FF5C5C', marginTop: 10 }]}>{error}</Text> : null}
+                  {error ? <Text style={[s.errorText, { color: t.danger, marginTop: 10 }]}>{error}</Text> : null}
 
                   <TouchableOpacity onPress={handleLookUp} disabled={loading}
                     style={[s.modalBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 14 }]}>
@@ -503,7 +485,7 @@ function LinkDoctorModal({ theme: t, onClose, onDone }: { theme: any; onClose: (
                     ))}
                   </ScrollView>
 
-                  {error ? <Text style={[s.errorText, { color: '#FF5C5C' }]}>{error}</Text> : null}
+                  {error ? <Text style={[s.errorText, { color: t.danger }]}>{error}</Text> : null}
 
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                     <TouchableOpacity onPress={() => { setStep('code'); setError('') }}

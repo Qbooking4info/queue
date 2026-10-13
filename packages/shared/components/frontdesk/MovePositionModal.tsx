@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { haptics } from '../../lib/haptics'

@@ -83,7 +83,15 @@ async function handleGET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireRole(['doctor'])
+  const res = await handlePATCH(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+// Mobile (Queue Doctor's On duty / Break / Off switch) sends a bearer token, so pass
+// req through -- without it requireRole is cookie-only and every app call 401'd.
+async function handlePATCH(req: NextRequest) {
+  const auth = await requireRole(['doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.doctorId) return Errors.forbidden()

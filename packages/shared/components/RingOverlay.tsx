@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useAudioPlayer } from 'expo-audio'
 import { useTheme } from '../contexts/ThemeContext'

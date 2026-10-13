@@ -6,5 +6,8 @@
 		}
 	],
 	"settings": {
+		"workbench.externalUriOpeners": {
+			"localhost:*": "simpleBrowser.open"
+		}
 	}
 }

@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -116,14 +118,8 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
   const history = requests.filter(r => !ACTIVE_STATUSES.includes(r.status))
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>Ambulances</Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Ambulance desk" subtitle="Inbound patients, scheduled trips, fleet" onBack={() => navigation.goBack()} />
 
       <View style={st.linkRow}>
         <TouchableOpacity onPress={() => navigation.navigate('AmbulanceAlerts')}

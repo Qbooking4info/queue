@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { supabase } from '@queue/shared/lib/supabase'
 
 interface Insurance {
@@ -65,15 +67,10 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={[styles.header, { borderBottomColor: t.cardBorder }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={[styles.backBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Ionicons name="arrow-back" size={18} color={t.accent} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: t.textPrimary }]}>Insurance Details</Text>
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Insurance Details" onBack={() => navigation.goBack()} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {loading ? (
           <Text style={[styles.placeholder, { color: t.textMuted }]}>Loading…</Text>

@@ -8,10 +8,12 @@ import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
+import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth, REGISTERED_VIA_DOCTOR } from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
@@ -31,6 +33,11 @@ import { PatientConsultScreen }     from './screens/specialist/PatientConsultScr
 import { ReferPatientScreen }       from './screens/specialist/ReferPatientScreen'
 import { DoctorHospitalsScreen }    from './screens/specialist/DoctorHospitalsScreen'
 import { DoctorSettingsScreen }     from './screens/specialist/DoctorSettingsScreen'
+import { DoctorMessagesScreen }     from './screens/specialist/DoctorMessagesScreen'
+import { ChatScreen }               from '@queue/shared/screens/ChatScreen'
+import { setStatusBarStyle } from 'expo-status-bar'
+import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
 
 // react-native-agora is a native module Expo Go cannot load, so the call screen is
 // lazy-loaded -- importing it eagerly would break the whole app under Expo Go, not
@@ -70,10 +77,12 @@ const LOGIN_PARAMS = {
 }
 
 function DoctorAuthStack({ initialRouteName }: { initialRouteName: string }) {
+  const { theme: t } = useTheme()
   return (
     <AuthStack.Navigator
       initialRouteName={initialRouteName}
-      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
       <AuthStack.Screen name="Login"          component={LoginScreen} initialParams={LOGIN_PARAMS} />
       <AuthStack.Screen name="DoctorRegister" component={DoctorRegisterScreen} />
     </AuthStack.Navigator>
@@ -84,25 +93,29 @@ function DoctorAuthStack({ initialRouteName }: { initialRouteName: string }) {
 // so no doctorProfile -- see DoctorOnboardingScreen for why that gap is structural.
 function DoctorOnboardingStack() {
   return (
-    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
       <OnboardStk.Screen name="DoctorOnboarding" component={DoctorOnboardingScreen} />
     </OnboardStk.Navigator>
   )
 }
 
 function SpecialistTabs() {
+  const unread = useUnreadMessages('doctor')
   const { theme: t } = useTheme()
   const insets = useSafeAreaInsets()
   return (
     <DocTab.Navigator screenOptions={{
       headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
       tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
     }}>
       <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
       <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
+      <DocTab.Screen name="Messages"          component={DoctorMessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
       <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}  options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,     tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
   )
@@ -110,11 +123,14 @@ function SpecialistTabs() {
 
 function SpecialistStack() {
   return (
-    <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
       <DocStack.Screen name="Hospitals"       component={DoctorHospitalsScreen as any} />
       <DocStack.Screen name="Settings"        component={DoctorSettingsScreen  as any} />
       <DocStack.Screen name="PatientConsult"  component={PatientConsultScreen  as any} />
+      <DocStack.Screen name="Chat"            component={ChatScreen            as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
     </DocStack.Navigator>
@@ -155,24 +171,9 @@ function AppNavigator() {
     // This app is only ever the doctor's. A staff or crew account signing in here has
     // no stack to land on, so say which app they want rather than showing an empty one.
     const content = doctorProfile ? <SpecialistStack /> : needsDoctorOnboarding ? <DoctorOnboardingStack /> : (
-      <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
-        <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
-        <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
-          This account is not a doctor
-        </Text>
-        <Text style={{ color: t.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
-          Queue Doctor is for doctors running consultations. Hospital staff should use
-          Queue Hospital, ambulance crews Queue Ambulance, and patients the Queue app.
-        </Text>
-        <TouchableOpacity
-          onPress={() => { void signOut() }}
-          activeOpacity={0.8}
-          style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 30, borderRadius: 14,
-                   borderWidth: 1, borderColor: t.cardBorder }}
-        >
-          <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600' }}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
+      <NoAccessScreen title="This account is not a doctor"
+        body="Queue Doctor is for doctors running consultations. Hospital staff should use Queue Hospital, ambulance crews Queue Ambulance, and patients the Queue app."
+        onSignOut={() => { void signOut() }} />
     )
     return <SafeAreaProvider>{content}<OfflineBanner /></SafeAreaProvider>
   }
@@ -217,6 +218,8 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const fontsReady = useQueueFonts()
+  if (!fontsReady) return null
   return (
     <ThemeProvider>
       <AlertProvider>

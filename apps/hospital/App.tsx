@@ -8,10 +8,12 @@ import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+import { View, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 
 import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
+import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth }   from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
@@ -41,6 +43,11 @@ import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScre
 import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
 import { AmbulanceFleetScreen }        from './screens/staff/AmbulanceFleetScreen'
 import { AmbulanceUnitScheduleScreen } from './screens/staff/AmbulanceUnitScheduleScreen'
+import { setStatusBarStyle } from 'expo-status-bar'
+import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
+import { HospitalMessagesScreen } from './screens/staff/HospitalMessagesScreen'
+import { StaffShiftsScreen } from './screens/staff/StaffShiftsScreen'
+import { ChatScreen } from '@queue/shared/screens/ChatScreen'
 
 const AuthStack   = createNativeStackNavigator()
 const StaffTab    = createBottomTabNavigator()
@@ -52,8 +59,10 @@ function TabIcon({ name, color, size }: any) {
 }
 
 function HospitalAuthStack() {
+  const { theme: t } = useTheme()
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
       {/* Staff sign in through HospitalAuthScreen, which passes surface 'hospital'. The
           shared patient LoginScreen used to be registered here too, unreachable and
           pinned to the 'patient' surface -- had anything ever routed to it, it would
@@ -70,9 +79,9 @@ function StaffTabs() {
   return (
     <StaffTab.Navigator screenOptions={{
       headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 4, paddingBottom: insets.bottom || 8, height: 52 + (insets.bottom || 0) },
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
       tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.3 },
+      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
     }}>
       <StaffTab.Screen name="AdminDashboard"    component={AdminDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,           tabBarLabel: 'Home' }} />
       <StaffTab.Screen name="FrontDeskQueue"    component={FrontDeskQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,           tabBarLabel: 'Queue' }} />
@@ -85,9 +94,14 @@ function StaffTabs() {
 
 function StaffStack() {
   return (
-    <StaffStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <StaffStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
       <StaffStackN.Screen name="StaffTabs"          component={StaffTabs} />
       <StaffStackN.Screen name="FrontDeskProfile"   component={FrontDeskProfileScreen as any} />
+      <StaffStackN.Screen name="HospitalMessages"   component={HospitalMessagesScreen as any} />
+      <StaffStackN.Screen name="StaffShifts"        component={StaffShiftsScreen as any} />
+      <StaffStackN.Screen name="Chat"               component={ChatScreen as any} />
       <StaffStackN.Screen name="StaffAnalytics"     component={StaffAnalyticsScreen   as any} />
       <StaffStackN.Screen name="StaffManagement"    component={StaffManagementScreen  as any} />
       <StaffStackN.Screen name="HospitalSettings"   component={HospitalSettingsScreen as any} />
@@ -110,7 +124,9 @@ function StaffStack() {
 // screen immediately after signing up, which is where registration used to dead-end.
 function HospitalOnboardingStack() {
   return (
-    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
       <OnboardStk.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </OnboardStk.Navigator>
   )
@@ -154,24 +170,9 @@ function AppNavigator() {
       content = <StaffStack />
     } else {
       content = (
-        <View style={{ flex: 1, backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
-          <Ionicons name="lock-closed-outline" size={44} color={t.textMuted} />
-          <Text style={{ color: t.textPrimary, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
-            No hospital access on this account
-          </Text>
-          <Text style={{ color: t.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
-            Queue Hospital is for hospital staff. Doctors should use Queue Doctor,
-            ambulance crews Queue Ambulance, and patients the Queue app.
-          </Text>
-          <TouchableOpacity
-            onPress={() => { void signOut() }}
-            activeOpacity={0.8}
-            style={{ marginTop: 18, paddingVertical: 13, paddingHorizontal: 30, borderRadius: 14,
-                     borderWidth: 1, borderColor: t.cardBorder }}
-          >
-            <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600' }}>Sign out</Text>
-          </TouchableOpacity>
-        </View>
+        <NoAccessScreen title="No hospital access on this account"
+          body="Queue Hospital is for hospital staff. Doctors should use Queue Doctor, ambulance crews Queue Ambulance, and patients the Queue app."
+          onSignOut={() => { void signOut() }} />
       )
     }
     return <SafeAreaProvider>{content}<OfflineBanner /></SafeAreaProvider>
@@ -217,6 +218,8 @@ function ThemedNav({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const fontsReady = useQueueFonts()
+  if (!fontsReady) return null
   return (
     <ThemeProvider>
       <AlertProvider>

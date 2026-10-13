@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getNotifications, markNotificationRead, markAllNotificationsRead, getAppointmentById } from '@queue/shared/lib/api'
 import { SkeletonRow } from '@queue/shared/components/ui/Skeleton'
@@ -13,16 +15,16 @@ type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescript
 
 const ACCENT: Record<string, string> = {
   reminder:    '#EF9F27',
-  confirmed:   '#00E87A',
-  cancelled:   '#FF5C5C',
+  confirmed:   '#0F766E',
+  cancelled:   '#EF4444',
   virtual:     '#5B9EFF',
   prescription:'#A78BFA',
   lab:         '#38BDF8',
-  payment:     '#00E87A',
+  payment:     '#0F766E',
   waitlist:    '#EF9F27',
   review:      '#FBBF24',
   system:      '#94A3B8',
-  no_show:     '#FF5C5C',
+  no_show:     '#EF4444',
   reschedule_prompt: '#EF9F27',
 }
 const ICON_BG: Record<string, string> = {
@@ -128,24 +130,14 @@ export function NotificationsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={[st.title, { color: t.textPrimary }]}>Notifications</Text>
-          {unreadCount > 0 && (
-            <Text style={[st.unreadCount, { color: t.textMuted }]}>{unreadCount} unread</Text>
-          )}
-        </View>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAll}
-            style={[st.markAllBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[st.markAllText, { color: t.accent }]}>Mark all read</Text>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Notifications" subtitle={unreadCount > 0 ? `${unreadCount} unread` : undefined} onBack={() => navigation.goBack()}
+        right={unreadCount > 0 ? (
+          <TouchableOpacity onPress={handleMarkAll} accessibilityRole="button"
+            style={{ minHeight: 40, paddingHorizontal: 12, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>Mark all read</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        ) : undefined} />
 
       {loading ? (
         <View style={{ paddingTop: 8 }}>
@@ -179,7 +171,8 @@ export function NotificationsScreen({ navigation }: Props) {
 
                 {groupItems.map(n => {
                   const accent = ACCENT[n.type] ?? '#94A3B8'
-                  const iconBg = ICON_BG[n.type] ?? '#1A1A1A'
+                  // A light tint of the type colour; the old ICON_BG table was dark-theme only.
+                  const iconBg = `${accent}1F`
                   const icon   = ICONS[n.type]   ?? 'notifications-outline'
                   return (
                     <TouchableOpacity key={n.id} onPress={() => { haptics.tap(); handleTap(n) }} activeOpacity={0.7}

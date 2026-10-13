@@ -89,6 +89,6 @@ export function signalFromQuality(tx: number, rx: number): SignalLevel {
       return { bars: 1, label: 'Poor connection', color: '#fb923c', degraded: true }
     default:
       // 5 (very bad) and 6 (down) both mean the call is effectively failing.
-      return { bars: 0, label: 'Reconnecting…', color: '#FF5C5C', degraded: true }
+      return { bars: 0, label: 'Reconnecting…', color: '#EF4444', degraded: true }
   }
 }

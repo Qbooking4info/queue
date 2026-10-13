@@ -18,7 +18,8 @@ module.exports = function withAbiSplits(config) {
 
     const splitsBlock = `    splits {
         abi {
-            enable true
+            // Off when building the Play App Bundle (-PnoAbiSplits): AGP can't do both.
+            enable !project.hasProperty('noAbiSplits')
             reset()
             include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
             universalApk true

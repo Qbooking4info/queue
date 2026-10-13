@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput,
-  KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -9,6 +8,8 @@ import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { ProfileFields, EMPTY_PROFILE, profileProblem, type ProfileValues } from '@queue/shared/components/ui/ProfileFields'
+import { PasswordInput, PasswordChecklist, TermsCheckbox, passwordProblem, cleanReferral } from '@queue/shared/components/ui/PasswordField'
 
 interface Props { navigation: any }
 
@@ -30,6 +31,9 @@ export function HospitalRegisterScreen({ navigation }: Props) {
   const [email,     setEmail]     = useState('')
   const [password,  setPassword]  = useState('')
   const [showPass,  setShowPass]  = useState(false)
+  const [referral,  setReferral]  = useState('')
+  const [profile,   setProfile]   = useState<ProfileValues>(EMPTY_PROFILE)
+  const [agreed,    setAgreed]    = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -37,7 +41,11 @@ export function HospitalRegisterScreen({ navigation }: Props) {
   function validate() {
     if (!fullName.trim())  { setError('Enter your full name.'); return false }
     if (!email.trim())     { setError('Enter your work email.'); return false }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return false }
+    const missing = profileProblem(profile)
+    if (missing) { setError(missing); return false }
+    const weak = passwordProblem(password)
+    if (weak) { setError(weak); return false }
+    if (!agreed) { setError('Please agree to the Terms of Service and Privacy Policy.'); return false }
     return true
   }
 
@@ -55,7 +63,11 @@ export function HospitalRegisterScreen({ navigation }: Props) {
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
-        options: { data: { full_name: fullName.trim(), registered_via: 'hospital_onboarding' } },
+        options: { data: {
+          full_name: fullName.trim(), registered_via: 'hospital_onboarding', accepted_terms_at: new Date().toISOString(),
+          title: profile.title, gender: profile.gender, date_of_birth: profile.dob, country: profile.country, state: profile.state.trim(),
+          ...(referral ? { referral_code: cleanReferral(referral) } : {}),
+        } },
       })
       if (signUpErr) throw new Error(signUpErr.message)
       if (!signUpData.session) throw new Error('Account created — please check your email to confirm, then sign in.')
@@ -74,7 +86,7 @@ export function HospitalRegisterScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top','left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
 
           <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={s.back}>
@@ -97,20 +109,13 @@ export function HospitalRegisterScreen({ navigation }: Props) {
 
             <Field icon="person-outline" placeholder="Full name" value={fullName} onChange={setFullName} t={t} />
             <Field icon="mail-outline"   placeholder="Work email" value={email} onChange={setEmail} t={t} keyboard="email-address" />
-            <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={t.textMuted} />
-              <TextInput
-                value={password} onChangeText={setPassword}
-                placeholder="Password (min 8 chars)" placeholderTextColor={t.textMuted}
-                secureTextEntry={!showPass}
-                style={[s.inputText, { color: t.textPrimary, flex: 1 }]}
-              />
-              <TouchableOpacity onPress={() => setShowPass(v => !v)} accessibilityLabel={showPass ? 'Hide password' : 'Show password'} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={16} color={t.textMuted} />
-              </TouchableOpacity>
-            </View>
+            <View style={{ marginBottom: 14 }}><ProfileFields value={profile} onChange={setProfile} /></View>
+            <PasswordInput value={password} onChangeText={setPassword} placeholder="Password" newPassword style={{ marginBottom: 4 }} />
+            <PasswordChecklist password={password} />
+            <Field icon="gift-outline" placeholder="Referral code (optional)" value={referral} onChange={v => setReferral(cleanReferral(v))} t={t} />
+            <TermsCheckbox checked={agreed} onChange={setAgreed} />
 
-            <Button label="Continue" onPress={handleSubmit} loading={loading} style={{ marginTop: t.spacing.sm }} />
+            <Button label="Continue" onPress={handleSubmit} loading={loading} disabled={!agreed} style={{ marginTop: t.spacing.md }} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -142,7 +147,7 @@ const s = StyleSheet.create({
   title:       { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
   sub:         { fontSize: 13, lineHeight: 19, marginBottom: 20 },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 13, color: '#FF5C5C', flex: 1 },
+  errorText:   { fontSize: 13, color: '#B91C1C', flex: 1 },
   input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
   inputText:   { fontSize: 14, flex: 1 },
 })

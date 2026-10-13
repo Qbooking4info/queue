@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Switch } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, ScrollView, TouchableOpacity, Clipboard } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
-import { Button } from '@queue/shared/components/ui/Button'
+import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton, KpiCard } from '@queue/shared/components/ui/v3'
+import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 
 interface Props { navigation?: any }
 
@@ -34,7 +35,7 @@ interface Stats {
 
 export function SpecialistProfileScreen({ navigation }: Props) {
   const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, doctorProfile, signOut, setStaffMode } = useAuth()
+  const { user, doctorProfile, signOut } = useAuth()
   const [doctor,       setDoctor]       = useState<DoctorDetails | null>(null)
   const [stats,        setStats]        = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
   const [loading,      setLoading]      = useState(true)
@@ -82,178 +83,110 @@ export function SpecialistProfileScreen({ navigation }: Props) {
     ?? user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     ?? '?'
 
-  if (loading) {
-    return (
-      <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
-      </SafeAreaView>
-    )
+  const [copied, setCopied] = useState(false)
+  function copyCode() {
+    if (!user?.doctor_code) return
+    Clipboard.setString(user.doctor_code)
+    haptics.success(); setCopied(true); setTimeout(() => setCopied(false), 1500)
   }
+  const value = (v: string, accent?: boolean) =>
+    <Text style={{ fontSize: 14, fontWeight: '600', color: accent ? t.accent : t.textPrimary }}>{v}</Text>
 
+  // v3.1 Doctor Profile & Earnings (d-me): identity + Doctor ID in the teal header,
+  // the same grouped-row layout as the patient Profile.
   return (
-    <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={[st.title, { color: t.textPrimary }]}>Profile</Text>
-
-        {/* Doctor Card */}
-        <View style={[st.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[st.avatarText, { color: t.accent }]}>{initials}</Text>
+    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Header>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <ProfileAvatar size={68} editable name={doctor?.full_name ?? user?.full_name} />
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>
+              {doctor?.full_name ?? user?.full_name ?? 'Your profile'}
+            </Text>
+            <Text numberOfLines={1} style={{ color: '#CCFBF1', fontSize: 13 }}>
+              {[doctor?.specialty ? (doctor.specialty as any).name : null, doctor?.qualification].filter(Boolean).join(' · ') || 'Doctor'}
+            </Text>
+            {user?.doctor_code && (
+              <TouchableOpacity onPress={copyCode} accessibilityRole="button" accessibilityLabel={`Doctor ID ${user.doctor_code}. Copy`}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}>
+                <Text style={{ color: '#CCFBF1', fontSize: 13 }}>Doctor ID {user.doctor_code}</Text>
+                <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color="#CCFBF1" />
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={[st.docName, { color: t.textPrimary }]}>{doctor?.full_name ?? user?.full_name ?? '—'}</Text>
-          {user?.doctor_code && (
-            <View style={[st.idPill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Ionicons name="key-outline" size={11} color={t.accent} />
-              <Text selectable style={[st.idPillText, { color: t.accent }]}>{user.doctor_code}</Text>
-            </View>
-          )}
-          {doctor?.specialty && (
-            <Text style={[st.specialty, { color: t.accent }]}>{(doctor.specialty as any).name}</Text>
-          )}
-          {doctor?.qualification && (
-            <Text style={[st.qual, { color: t.textMuted }]}>{doctor.qualification}</Text>
-          )}
-          {user?.email && (
-            <Text style={[st.email, { color: t.textMuted }]}>{user.email}</Text>
-          )}
+        </View>
+      </Header>
+
+      {loading ? (
+        <View style={{ padding: 20, gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
+      ) : (
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ padding: 20, gap: 14 }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <KpiCard label="Today" value={stats.today} onPress={navigation ? () => navigation.navigate('Queue') : undefined} />
+            <KpiCard label="This month" value={stats.thisMonth} />
+            <KpiCard label="Completed" value={stats.completed} />
+          </View>
 
           {(doctor?.avg_rating ?? 0) > 0 && (
-            <View style={st.ratingRow}>
+            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {[0, 1, 2, 3, 4].map(i => (
-                <Ionicons key={i} name="star" size={16} color={i < Math.round(doctor!.avg_rating!) ? t.statusBusy.text : t.textMuted} />
+                <Ionicons key={i} name="star" size={18} color={i < Math.round(doctor!.avg_rating!) ? t.starColor : t.cardBorder} />
               ))}
-              <Text style={[st.ratingNum, { color: t.textMuted }]}>
-                {doctor!.avg_rating!.toFixed(1)} ({doctor!.review_count ?? 0} reviews)
+              <Text style={{ fontSize: 14, color: t.textSecondary, marginLeft: 4 }}>
+                {doctor!.avg_rating!.toFixed(1)} · {doctor!.review_count ?? 0} reviews
               </Text>
-            </View>
+            </Card>
           )}
-        </View>
 
-        {/* Stats */}
-        <View style={[st.statsRow, { marginHorizontal: 16, marginBottom: 12 }]}>
-          {[
-            { label: 'Today',      value: stats.today },
-            { label: 'This month', value: stats.thisMonth },
-            { label: 'All-time',   value: stats.completed },
-          ].map(s => (
-            <View key={s.label} style={[st.statBox, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.statNum, { color: t.textPrimary }]}>{s.value}</Text>
-              <Text style={[st.statLabel, { color: t.textMuted }]}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
+          <SectionTitle title="Practice" />
+          <Card style={{ paddingVertical: 0 }}>
+            <ListRow icon="briefcase-outline" title="Experience" trailing={value(doctor?.years_experience ? `${doctor.years_experience} years` : '—')} />
+            <ListRow icon="cash-outline" title="Consultation fee" trailing={value(doctor?.consultation_fee ? `₦${doctor.consultation_fee.toLocaleString()}` : '—')} />
+            {doctor?.accepts_virtual && (
+              <ListRow icon="videocam-outline" title="Virtual fee" trailing={value(doctor?.virtual_fee ? `₦${doctor.virtual_fee.toLocaleString()}` : '—')} />
+            )}
+            <ListRow icon="globe-outline" title="Virtual consultations" last trailing={value(doctor?.accepts_virtual ? 'On' : 'Off', !!doctor?.accepts_virtual)} />
+          </Card>
 
-        {/* Today's schedule quick link */}
-        {navigation && (
-          <TouchableOpacity
-            style={[st.scheduleBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}
-            onPress={() => {
-              haptics.tap()
-              navigation.navigate('Queue')
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="calendar-outline" size={14} color={t.accent} /><Text style={[st.scheduleBtnText, { color: t.accent }]}>View Today's Schedule</Text></View>
-          </TouchableOpacity>
-        )}
-
-        {/* Practice info */}
-        <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
-          <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>PRACTICE INFO</Text>
-          <Row label="Experience" value={doctor?.years_experience ? `${doctor.years_experience} years` : '—'} theme={t} />
-          <Row label="Consultation fee" value={doctor?.consultation_fee ? `₦${doctor.consultation_fee.toLocaleString()}` : '—'} theme={t} />
-          {doctor?.accepts_virtual && (
-            <Row label="Virtual fee" value={doctor?.virtual_fee ? `₦${doctor.virtual_fee.toLocaleString()}` : '—'} theme={t} />
+          {doctor?.bio && (
+            <Card style={{ gap: 6 }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>About</Text>
+              <Text style={{ fontSize: 14, lineHeight: 20, color: t.textSecondary }}>{doctor.bio}</Text>
+            </Card>
           )}
-          <Row label="Virtual consultations" value={doctor?.accepts_virtual ? 'Enabled' : 'Disabled'} theme={t} accent={doctor?.accepts_virtual ?? false} />
+
+          <Card style={{ paddingVertical: 0 }}>
+            {navigation && <ListRow icon="business-outline" title="Hospitals & Doctor ID" subtitle="Linked hospitals and your QR" onPress={() => navigation.navigate('Hospitals')} />}
+            {navigation && <ListRow icon="settings-outline" title="Settings & fees" subtitle="Availability, fees, virtual care" last onPress={() => navigation.navigate('Settings')} />}
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
+            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
+              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
+              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          </Card>
+
+          {!confirmVisible ? (
+            <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }} accessibilityRole="button"
+              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
+            </TouchableOpacity>
+          ) : (
+            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirmVisible(false)} /></View>
+                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={handleSignOut} /></View>
+              </View>
+            </Card>
+          )}
+
+          <DeleteAccount what="your doctor profile, photo and sign-in, and removes you from hospital rosters" />
         </View>
-
-        {/* Bio */}
-        {doctor?.bio && (
-          <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
-            <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>BIO</Text>
-            <Text style={[st.bio, { color: t.textSecondary }]}>{doctor.bio}</Text>
-          </View>
-        )}
-
-        {/* Switch to Patient Mode */}
-        <TouchableOpacity onPress={() => { haptics.tap(); setStaffMode(false) }}
-          style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14 }]}>
-          <Ionicons name="swap-horizontal-outline" size={18} color={t.info} />
-          <View style={{ flex: 1 }}>
-            <Text style={[st.rowLabel, { color: t.textPrimary }]}>Switch to Patient Mode</Text>
-            <Text style={[{ fontSize: 11, color: t.textMuted, marginTop: 1 }]}>Book appointments as a patient</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-        </TouchableOpacity>
-
-        {/* Settings */}
-        <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginHorizontal: 16, marginBottom: 12 }]}>
-          <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
-          <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
-              <Text style={[st.rowLabel, { color: t.textPrimary }]}>
-                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
-              </Text>
-            </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        </View>
-
-        {/* Sign out */}
-        {confirmVisible ? (
-          <View style={[st.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, marginHorizontal: 16, marginBottom: 12 }]}>
-            <Text style={[st.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
-            <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
-              <Button
-                label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
-                loading={signingOut} variant="danger" style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        ) : (
-          <Button label="Sign out" onPress={() => setConfirmVisible(true)} variant="danger" style={{ marginHorizontal: 16 }} />
-        )}
       </ScrollView>
-    </SafeAreaView>
-  )
-}
-
-function Row({ label, value, theme: t, accent }: { label: string; value: string; theme: any; accent?: boolean }) {
-  return (
-    <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
-      <Text style={[st.rowLabel, { color: t.textMuted }]}>{label}</Text>
-      <Text style={[st.rowValue, { color: accent ? t.accent : t.textPrimary }]}>{value}</Text>
+      )}
     </View>
   )
 }
-
-const st = StyleSheet.create({
-  safe:            { flex: 1 },
-  center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title:           { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:     { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:          { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:      { fontSize: 26, fontWeight: '800' },
-  docName:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  idPill:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 99, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
-  idPillText:      { fontSize: 12, fontWeight: '800', fontFamily: 'monospace', letterSpacing: 1.5 },
-  specialty:       { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:            { fontSize: 12, marginTop: 3, textAlign: 'center' },
-  email:           { fontSize: 11, marginTop: 6 },
-  ratingRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingNum:       { fontSize: 12, marginLeft: 4 },
-  statsRow:        { flexDirection: 'row', gap: 8 },
-  statBox:         { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  statNum:         { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  statLabel:       { fontSize: 10, fontWeight: '600', marginTop: 3 },
-  scheduleBtn:     { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1 },
-  scheduleBtnText: { fontSize: 14, fontWeight: '700' },
-  section:         { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle:    { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  row:             { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  rowLabel:        { fontSize: 13 },
-  rowValue:        { fontSize: 13, fontWeight: '600' },
-  bio:             { padding: 14, fontSize: 13, lineHeight: 20 },
-})

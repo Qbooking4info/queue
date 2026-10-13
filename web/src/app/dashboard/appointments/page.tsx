@@ -993,7 +993,7 @@ export default function AppointmentsPage() {
                         {!isDoctor && needsApproval && (
                           <>
                             <button onClick={() => handleApprove(a)} disabled={isPending}
-                              style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                              style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(15,118,110,0.3)', background: 'rgba(15,118,110,0.1)', color: '#0F766E' }}>
                               {isPending ? '…' : 'Approve'}
                             </button>
                             <button onClick={() => setRejectAppt(a)} disabled={isPending}
@@ -1029,7 +1029,7 @@ export default function AppointmentsPage() {
                         {/* End Consultation */}
                         {a.status === 'in_progress' && (
                           <button onClick={() => handleEndConsult(a)} disabled={isPending}
-                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                            style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(15,118,110,0.3)', background: 'rgba(15,118,110,0.1)', color: '#0F766E' }}>
                             {isPending ? '…' : '■ End'}
                           </button>
                         )}
@@ -1141,7 +1141,7 @@ export default function AppointmentsPage() {
                 {!isDoctor && needsApproval && (
                   <>
                     <button onClick={() => handleApprove(a)} disabled={isPending}
-                      style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                      style={{ ...btnBase, border: '1px solid rgba(15,118,110,0.3)', background: 'rgba(15,118,110,0.1)', color: '#0F766E' }}>
                       {isPending ? '…' : 'Approve'}
                     </button>
                     <button onClick={() => setRejectAppt(a)} disabled={isPending}
@@ -1172,7 +1172,7 @@ export default function AppointmentsPage() {
                 )}
                 {a.status === 'in_progress' && (
                   <button onClick={() => handleEndConsult(a)} disabled={isPending}
-                    style={{ ...btnBase, border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)', color: '#00E87A' }}>
+                    style={{ ...btnBase, border: '1px solid rgba(15,118,110,0.3)', background: 'rgba(15,118,110,0.1)', color: '#0F766E' }}>
                     {isPending ? '…' : '■ End'}
                   </button>
                 )}

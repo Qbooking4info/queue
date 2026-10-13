@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView,
-  Platform, ScrollView } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -38,7 +36,7 @@ export function HospitalAuthScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top','left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
 
           {/* Back */}
@@ -48,8 +46,8 @@ export function HospitalAuthScreen({ navigation }: Props) {
 
           <View style={s.content}>
             {/* Header */}
-            <View style={[s.iconWrap, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: t.infoBorder }]}>
-              <Ionicons name="business-outline" size={30} color={t.info} />
+            <View style={[s.iconWrap, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+              <Ionicons name="business-outline" size={30} color={t.accent} />
             </View>
             <Text style={[s.title, { color: t.textPrimary }]}>Staff Portal</Text>
             {/* Crew are no longer signed in here -- they have their own app, and the
@@ -90,10 +88,10 @@ export function HospitalAuthScreen({ navigation }: Props) {
             </View>
 
             <TouchableOpacity onPress={handleLogin} disabled={loading}
-              style={[s.loginBtn, { backgroundColor: loading ? 'rgba(91,158,255,0.6)' : t.info }]}>
+              style={[s.loginBtn, { backgroundColor: t.accent, opacity: loading ? 0.6 : 1 }]}>
               {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.loginBtnText}>Sign in to Portal</Text>}
+                ? <ActivityIndicator color={t.id === 'forest' ? '#081416' : '#FFFFFF'} />
+                : <Text style={[s.loginBtnText, { color: t.id === 'forest' ? '#081416' : '#FFFFFF' }]}>Sign in</Text>}
             </TouchableOpacity>
 
             {/* Divider */}
@@ -135,7 +133,7 @@ const s = StyleSheet.create({
   title:        { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
   sub:          { fontSize: 14, lineHeight: 20, marginBottom: 24 },
   errorBanner:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:    { fontSize: 13, color: '#FF5C5C', flex: 1 },
+  errorText:    { fontSize: 13, color: '#B91C1C', flex: 1 },
   input:        { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
   inputText:    { fontSize: 14, flex: 1 },
   loginBtn:     { borderRadius: 14, padding: 15, alignItems: 'center', marginTop: 4, marginBottom: 24 },

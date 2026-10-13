@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, TextInput } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header, EmptyState } from '@queue/shared/components/ui/v3'
+import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -184,17 +187,16 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
   ]
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Appointments</Text>
-      </View>
+    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Appointments" subtitle={staffProfile?.name ?? undefined} />
 
       {/* Tab filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabContent}>
         {TABS.map(tb => (
           <TouchableOpacity key={tb.key} onPress={() => setTab(tb.key)}
-            style={[s.tab, tab === tb.key && { backgroundColor: t.accent, borderColor: t.accent }, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-            <Text style={[s.tabText, { color: tab === tb.key ? '#fff' : t.textMuted }]}>{tb.label}</Text>
+            accessibilityRole="button" accessibilityState={{ selected: tab === tb.key }}
+            style={[s.tab, tab === tb.key ? { backgroundColor: t.accent, borderColor: t.accent } : { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
+            <Text style={[s.tabText, { color: tab === tb.key ? (t.id === 'forest' ? '#081416' : '#FFFFFF') : t.textSecondary }]}>{tb.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -222,15 +224,8 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
           {filtered.length === 0 ? (
-            <View style={s.empty}>
-              <Ionicons name="calendar-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>
-                {search ? 'No matches' : tab === 'pending' ? 'No pending approvals' : 'No appointments'}
-              </Text>
-              <Text style={[s.emptySub, { color: t.textMuted }]}>
-                {search ? `No results for "${search}"` : tab === 'pending' ? 'All bookings are up to date.' : 'Nothing here yet.'}
-              </Text>
-            </View>
+            <EmptyState icon="calendar-outline" title={search ? 'No matches' : tab === 'pending' ? 'No pending approvals' : 'No appointments'}
+              body={search ? `No results for "${search}"` : tab === 'pending' ? 'All bookings are up to date.' : 'Nothing here yet.'} />
           ) : filtered.map(appt => {
             const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
             const meta = STATUS_META[dispStatus] ?? { label: dispStatus, color: sc.no_show.text, bg: sc.no_show.bg }
@@ -260,6 +255,19 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                       </View>
                     )}
                     {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
+                    {!!appt.patient?.id && (
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Message ${appt.patient.full_name ?? 'patient'}`}
+                        onPress={async () => {
+                          haptics.tap()
+                          const r = await startConversation('patient', appt.patient!.id, appt.id)
+                          if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+                          else Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error)
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: 99, backgroundColor: t.accentBg }}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={14} color={t.accent} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Message</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
                 {canApprove && (
@@ -285,9 +293,9 @@ const s = StyleSheet.create({
   header:     { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
   title:      { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   tabScroll:  { flexGrow: 0 },
-  tabContent: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
-  tab:        { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  tabText:    { fontSize: 12, fontWeight: '700' },
+  tabContent: { paddingHorizontal: 16, gap: 8, paddingTop: 14, paddingBottom: 8 },
+  tab:        { paddingHorizontal: 16, minHeight: 40, justifyContent: 'center', borderRadius: 99, borderWidth: 1 },
+  tabText:    { fontSize: 13, fontWeight: '700' },
   searchWrap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   card:       { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },

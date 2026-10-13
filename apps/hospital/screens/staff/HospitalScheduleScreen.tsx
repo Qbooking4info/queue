@@ -1,11 +1,10 @@
 import { useState, useCallback, useMemo } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, TextInput, Switch,
-  KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -15,7 +14,7 @@ import { fmtLocalDate } from '@queue/shared/lib/format'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const DOCTOR_COLORS = ['#5B9EFF', '#00E87A', '#A78BFA', '#EF9F27', '#FF8C42', '#F07070']
+const DOCTOR_COLORS = ['#5B9EFF', '#0F766E', '#A78BFA', '#EF9F27', '#FF8C42', '#F07070']
 
 interface ScheduleSlot { id: string; date: string; time: string; doc: string; patient: string; type: string; status: string; urgency: string }
 interface DoctorLite { id: string; full_name: string }
@@ -121,21 +120,15 @@ export function HospitalScheduleScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary }]}>Schedule</Text>
-        </View>
-        <TouchableOpacity onPress={() => setShowSetSchedule(true)} style={[s.addBtn, { backgroundColor: t.accent }]}>
-          <Ionicons name="calendar-outline" size={14} color="#fff" />
-          <Text style={s.addBtnText}>Set Schedule</Text>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Doctor schedule" subtitle="Shifts by week" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity onPress={() => setShowSetSchedule(true)} style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
+          <Ionicons name="calendar-outline" size={14} color="#0F766E" />
+          <Text style={[s.addBtnText, { color: '#0F766E' }]}>Set Schedule</Text>
         </TouchableOpacity>
-      </View>
+      
+        </View>} />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 10 }}>
         <TouchableOpacity onPress={() => shiftWeek(-1)} accessibilityLabel="Previous week" hitSlop={8}><Ionicons name="chevron-back" size={20} color={t.textPrimary} /></TouchableOpacity>
@@ -203,7 +196,7 @@ export function HospitalScheduleScreen({ navigation }: Props) {
                       <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}><Text style={[s.badgeText, { color: t.accent }]}>{slot.type}</Text></View>
                       <View style={[s.badge, { backgroundColor: 'rgba(122,144,137,0.14)' }]}><Text style={[s.badgeText, { color: t.textMuted }]}>{slot.status}</Text></View>
                       {slot.urgency === 'emergency' && (
-                        <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)' }]}><Text style={[s.badgeText, { color: '#FF5C5C' }]}>EMERGENCY</Text></View>
+                        <View style={[s.badge, { backgroundColor: t.dangerBg }]}><Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text></View>
                       )}
                     </View>
                   )}
@@ -309,12 +302,12 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
 
   return (
     <View style={s.overlay}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 560 }}>
             {result ? (
               <>
-                <Ionicons name="checkmark-circle" size={48} color="#00C265" style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <Ionicons name="checkmark-circle" size={48} color={t.statusSuccess.text} style={{ alignSelf: 'center', marginBottom: 12 }} />
                 <Text style={[s.modalTitle, { color: t.textPrimary, textAlign: 'center' }]}>Schedule generated</Text>
                 <Text style={{ fontSize: 13, color: t.textMuted, textAlign: 'center', marginTop: 6, marginBottom: 20 }}>
                   {result.inserted} slot(s) created{result.skippedForHours > 0 ? `, ${result.skippedForHours} day(s) skipped (outside operating hours)` : ''}.
@@ -390,7 +383,7 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
                   <Switch value={acceptsVirtual} onValueChange={setAcceptsVirtual} trackColor={{ true: t.accent }} />
                 </View>
 
-                {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+                {error ? <Text style={{ fontSize: 12, color: t.danger, marginBottom: 8 }}>{error}</Text> : null}
 
                 <TouchableOpacity onPress={handleGenerate} disabled={loading}
                   style={[s.smallBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, paddingVertical: 14 }]}>
@@ -398,7 +391,7 @@ function SetScheduleModal({ theme: t, doctors, onClose, onDone }: {
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleClear} disabled={loading || !doctorId} style={{ marginTop: 12, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Clear upcoming unbooked slots</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Clear upcoming unbooked slots</Text>
                 </TouchableOpacity>
               </>
             )}

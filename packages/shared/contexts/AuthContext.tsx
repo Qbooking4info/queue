@@ -4,6 +4,7 @@ import { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { requestDependentSwitchToken } from '../lib/api'
 import type { User } from '../types/database'
+import { resetChatIdentity } from '../lib/chat'
 
 // Stashes the caretaker's own session while switched into a dependent's account (see
 // switchToDependent/switchBackToCaretaker below) -- a separate SecureStore key from
@@ -64,6 +65,11 @@ export interface CrewProfile {
   crewTier:     string
 }
 
+export interface SignUpExtra {
+  referralCode?: string; acceptedTermsAt?: string
+  title?: string; gender?: string; country?: string; state?: string
+}
+
 interface AuthState {
   session:       Session       | null
   user:          User          | null
@@ -71,8 +77,6 @@ interface AuthState {
   staffProfile:  StaffProfile  | null
   crewProfile:   CrewProfile   | null
   loading:       boolean
-  staffMode:     boolean
-  setStaffMode:  (v: boolean) => void
   // Switches which linked hospital is "active" -- persisted to users.active_hospital_id
   // (RLS only allows pointing it at a hospital this account actually has an active
   // doctors-row link to, see 20260816000001_doctor_independent_accounts.sql).
@@ -90,7 +94,7 @@ interface AuthState {
   pendingDoctorOnboarding:      boolean
   setPendingDoctorOnboarding:   (v: boolean) => void
   signIn:        (email: string, password: string, surface: AuthSurface) => Promise<string | null>
-  signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string, registeredVia?: string) => Promise<string | null>
+  signUp:        (email: string, password: string, fullName: string, phone: string, dateOfBirth: string, registeredVia?: string, extra?: SignUpExtra) => Promise<string | null>
   signOut:       () => Promise<void>
   refreshProfile: () => Promise<void>
   // Set while a caretaker has switched their live session into a dependent's account
@@ -111,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [staffProfile,  setStaffProfile]  = useState<StaffProfile  | null>(null)
   const [crewProfile,   setCrewProfile]   = useState<CrewProfile   | null>(null)
   const [loading,       setLoading]       = useState(true)
-  const [staffMode,     setStaffMode]     = useState(false)
   const [pendingHospitalOnboarding, setPendingHospitalOnboarding] = useState(false)
   const [pendingDoctorOnboarding,   setPendingDoctorOnboarding]   = useState(false)
   const [switchedInto,  setSwitchedInto]  = useState<{ fullName: string } | null>(null)
@@ -249,24 +252,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const staffRole = await fetchStaffProfile(data?.full_name ?? '', seq)
       if (!staffRole) {
         const isCrew = await fetchCrewProfile(seq)
-        // Auto-enable staff mode on first login for staff/crew accounts with no patient booking history
-        if (isCrew && current()) setStaffMode(true)
         return { isDoctor: false, staffRole: null, isCrew }
       } else {
         if (current()) {
           setCrewProfile(null)
-          setStaffMode(true)
         }
         return { isDoctor: false, staffRole, isCrew: false }
       }
     } else {
       if (current()) {
-        // Doctors auto-enter specialist mode. staffProfile is cleared explicitly
+        // staffProfile is cleared explicitly
         // here because the staff lookup is skipped on this branch, so a profile
         // left over from a previously signed-in staff account would survive.
         setStaffProfile(null)
         setCrewProfile(null)
-        setStaffMode(true)
       }
       return { isDoctor: true, staffRole: null, isCrew: false }
     }
@@ -352,13 +351,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(
     email: string, password: string, fullName: string, phone: string, dateOfBirth: string,
-    registeredVia?: string
+    registeredVia?: string, extra?: SignUpExtra
   ): Promise<string | null> {
     const { data, error } = await supabase.auth.signUp({
       email, password,
       // registered_via lives on the auth user (not the `users` row) so it survives a
       // restart and is readable straight off the session, before any profile fetch.
-      options: { data: { full_name: fullName, ...(registeredVia ? { registered_via: registeredVia } : {}) } },
+      // Same place for the referral code and when the terms were accepted.
+      options: { data: {
+        full_name: fullName,
+        ...(registeredVia ? { registered_via: registeredVia } : {}),
+        ...(extra?.referralCode ? { referral_code: extra.referralCode } : {}),
+        ...(extra?.acceptedTermsAt ? { accepted_terms_at: extra.acceptedTermsAt } : {}),
+      } },
     })
     if (error) return error.message
     // With email confirmation on, signUp returns a user but no session. The `users`
@@ -377,7 +382,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Doctors sign up without a date of birth; '' is not a valid date literal, so
         // an empty value has to go in as NULL rather than being passed straight through.
         date_of_birth: dateOfBirth || null,
-      })
+        ...(extra?.title   ? { title: extra.title }     : {}),
+        ...(extra?.gender  ? { gender: extra.gender }   : {}),
+        ...(extra?.country ? { country: extra.country } : {}),
+        ...(extra?.state   ? { state: extra.state }     : {}),
+      } as any)
       if (profileError) {
         // auth.signUp() above already created a real auth account -- it's never
         // rolled back just because this insert failed (a column-grant mismatch
@@ -408,13 +417,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // otherwise it resolves after this and repopulates user/staffProfile for
     // the account that just signed out.
     profileSeq.current++
-    setStaffMode(false)
     setPendingHospitalOnboarding(false)
     setPendingDoctorOnboarding(false)
     setDoctorProfile(null)
     setStaffProfile(null)
     setCrewProfile(null)
     setSwitchedInto(null)
+    resetChatIdentity()
     // An explicit, final logout should never leave an orphaned stashed session
     // behind for someone to accidentally switch back into later.
     await SecureStore.deleteItemAsync(CARETAKER_STASH_KEY).catch(() => {})
@@ -473,7 +482,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, user, doctorProfile, staffProfile, crewProfile, loading,
-      staffMode, setStaffMode,
       switchHospital,
       pendingHospitalOnboarding, setPendingHospitalOnboarding,
       pendingDoctorOnboarding,   setPendingDoctorOnboarding,

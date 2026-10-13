@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 
 // Every call screen (patient/doctor, web/native) wraps its actual call UI in
