@@ -64,3 +64,41 @@ describe('getFreshFix', () => {
     expect(L.getCurrentPositionAsync).not.toHaveBeenCalled()
   })
 })
+
+describe('geocodePickup (typed-address fallback when GPS is unavailable)', () => {
+  // Imported lazily so the module-level API_URL picks up this env value.
+  function load() {
+    process.env.EXPO_PUBLIC_API_URL = 'https://api.example.test/'
+    let mod: typeof import('../fresh-location')
+    jest.isolateModules(() => { mod = require('../fresh-location') })
+    return mod!
+  }
+  afterEach(() => jest.restoreAllMocks())
+
+  it('looks the address up in Nigeria through the authenticated geocode route', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({ lat: '6.6018', lon: '3.3515' })))
+
+    expect(await load().geocodePickup('Ikeja City Mall', 'jwt')).toEqual({ latitude: 6.6018, longitude: 3.3515 })
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe('https://api.example.test/api/geocode?q=Ikeja%20City%20Mall%2C%20Nigeria')
+    expect((init as RequestInit).headers).toEqual({ Authorization: 'Bearer jwt' })
+  })
+
+  it('returns null when nothing matches, the server fails, or the network drops', async () => {
+    const m = load()
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(new Response('null'))
+      .mockResolvedValueOnce(new Response('<html>502</html>', { status: 502 }))
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+
+    expect(await m.geocodePickup('nowhere at all', 'jwt')).toBeNull()
+    expect(await m.geocodePickup('Lekki Phase 1', 'jwt')).toBeNull()
+    expect(await m.geocodePickup('Yaba', 'jwt')).toBeNull()
+  })
+
+  it('does not look up a blank or two-letter entry', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch')
+    expect(await load().geocodePickup('  ab ', 'jwt')).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})

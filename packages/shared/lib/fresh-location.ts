@@ -72,3 +72,41 @@ export async function getFreshFix(timeoutMs = FRESH_FIX_TIMEOUT_MS): Promise<Fre
 
   return { ok: false, reason: 'unavailable' }
 }
+
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+export const GEOCODE_TIMEOUT_MS = 10_000
+
+/**
+ * Fallback pickup point when GPS can't give one: look up an address or landmark the
+ * caller typed. Coarse by nature — the caller's own words go to the crew as the pickup
+ * address alongside it. Biased to Nigeria, where every hospital on Queue is, so
+ * "Ikeja City Mall" doesn't resolve to somewhere abroad. null = not found / failed.
+ */
+export async function geocodePickup(
+  query: string,
+  accessToken: string,
+  timeoutMs = GEOCODE_TIMEOUT_MS,
+): Promise<{ latitude: number; longitude: number } | null> {
+  const text = query.trim()
+  if (text.length < 3) return null
+  const q = /nigeria/i.test(text) ? text : `${text}, Nigeria`
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${API_URL}/api/geocode?q=${encodeURIComponent(q)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const hit = await res.json().catch(() => null) as { lat?: string; lon?: string } | null
+    const latitude = Number(hit?.lat)
+    const longitude = Number(hit?.lon)
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+    return { latitude, longitude }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
