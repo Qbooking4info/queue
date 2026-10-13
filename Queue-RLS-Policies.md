@@ -151,6 +151,7 @@ Web API routes use `createAdminClient()` (service role key) and are **not affect
 |---|---|---|
 | Users can read own notifications | SELECT | `user_id = (SELECT id FROM users WHERE auth_id = auth.uid())` |
 | Users can mark own notifications read | UPDATE | same |
+| notifications_insert_own | INSERT | authenticated only, `user_id = (SELECT id FROM users WHERE auth_id = auth.uid())` — replaced the `WITH CHECK (true)` anon/authenticated policy (20261013000008); server code writes with the service role |
 
 ---
 
