@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as TaskManager from 'expo-task-manager'
 import * as ExpoLocation from 'expo-location'
 import { sendLocationPing } from './crew-api'
+import { checkOffersInBackground } from './offerAlerts'
 
 /**
  * Background position reporting for on-duty ambulance crews.
@@ -91,6 +92,9 @@ TaskManager.defineTask(CREW_LOCATION_TASK, async ({ data, error }) => {
     // of dispatch permanently rather than for one missed interval.
     console.warn('[crew] background ping failed', err)
   }
+  // Same wake-up doubles as the offer check, so a crew with a locked phone still
+  // hears about a job within one location batch.
+  await checkOffersInBackground()
 })
 
 /**
@@ -122,7 +126,10 @@ export async function startBackgroundLocation(ambulanceId: string): Promise<Star
       // Comfortably inside the 120s staleness window, so a unit stays
       // dispatchable even if one interval is missed.
       timeInterval: 30_000,
-      distanceInterval: 50,
+      // 0, not 50: on Android a distance filter suppresses updates entirely while the
+      // phone is still, so an ambulance parked at base (most of a shift) stopped
+      // reporting and went stale -- invisible to dispatch after 120s.
+      distanceInterval: 0,
       pausesUpdatesAutomatically: false,
       // Android requires a visible notification for background location. It is
       // also honest: a crew should be able to see that the app is tracking them
@@ -130,7 +137,7 @@ export async function startBackgroundLocation(ambulanceId: string): Promise<Star
       foregroundService: {
         notificationTitle: 'Queue — on duty',
         notificationBody: 'Reporting your position so dispatch can send you jobs.',
-        notificationColor: '#FF5C5C',
+        notificationColor: '#EF4444',
       },
     })
     return { ok: true }

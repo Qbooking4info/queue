@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
+import { View, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
-import { HospitalsMap } from '../map/HospitalsMap'
+import { LiveTrackMap } from '../map/LiveTrackMap'
 import { fetchJobPatientLocation, subscribeToPatientLocation, formatEta } from '../../lib/ambulance-api'
 
 /**
@@ -31,9 +32,11 @@ interface Props {
   /** Where the crew's own unit is, when known. */
   unitPos?: { lat: number; lng: number } | null
   label?: string
+  /** Opens the full-screen tracking view. */
+  onExpand?: () => void
 }
 
-export function JobPatientMap({ requestId, pickup, etaSeconds, unitPos, label = 'Patient' }: Props) {
+export function JobPatientMap({ requestId, pickup, etaSeconds, unitPos, label = 'Patient', onExpand }: Props) {
   const { theme: t } = useTheme()
   const [live, setLive] = useState<{ lat: number; lng: number; recordedAt: string } | null>(null)
   const channelRef = useRef<{ unsubscribe: () => void } | null>(null)
@@ -88,16 +91,15 @@ export function JobPatientMap({ requestId, pickup, etaSeconds, unitPos, label = 
         )}
       </View>
 
-      <HospitalsMap
-        style={st.map}
-        markers={markers}
-        initialRegion={{
-          latitude: target.lat,
-          longitude: target.lng,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        }}
-      />
+      <TouchableOpacity activeOpacity={0.9} onPress={onExpand} disabled={!onExpand} accessibilityRole="button" accessibilityLabel="Open full-screen tracking">
+        <LiveTrackMap style={st.map} data={{ patient: { lat: target.lat, lng: target.lng, live: !!live, label }, unit: unitPos ?? null }} />
+        {onExpand && (
+          <View style={[st.expand, { backgroundColor: t.cardBg }]}>
+            <Ionicons name="expand-outline" size={16} color={t.accent} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Full map</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={openDirections} style={[st.navBtn, { borderColor: t.cardBorder }]}>
         <Ionicons name="navigate-outline" size={16} color={t.textPrimary} />
@@ -112,7 +114,8 @@ const st = StyleSheet.create({
   headRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headText:   { fontSize: 12, fontWeight: '600', flex: 1 },
   eta:        { fontSize: 12.5, fontWeight: '800' },
-  map:        { height: 170, borderRadius: 14, marginTop: 8, overflow: 'hidden' },
+  map:        { height: 200, borderRadius: 14, marginTop: 8, overflow: 'hidden' },
+  expand:     { position: 'absolute', right: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
   navBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
                 borderWidth: 1, borderRadius: 12, paddingVertical: 11, marginTop: 10 },
   navBtnText: { fontSize: 14, fontWeight: '700' },

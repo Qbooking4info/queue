@@ -53,6 +53,7 @@ export interface CreateTransportInput {
   destinationHospitalId?: string | null
   scheduledFor?: string
   paymentMethod?: string
+  requesterRelationship?: 'self' | 'relative' | 'bystander' | 'facility'
 }
 
 /**
@@ -104,14 +105,14 @@ export async function requestAmbulance(input: CreateTransportInput) {
 }
 
 export async function cancelTransport(requestId: string, reason: string) {
-  const { error } = await supabase
-    .from('transport_requests')
-    .update({
-      status: 'cancelled_by_requester',
-      cancellation_reason: reason,
-    })
-    .eq('id', requestId)
+  // Through the RPC: there is no requester UPDATE policy, so a direct update
+  // matched zero rows and "succeeded" while the crew kept driving.
+  const { data, error } = await supabase.rpc('cancel_my_transport', {
+    p_request_id: requestId,
+    p_reason: reason,
+  })
   if (error) throw error
+  if (!data) throw new Error('This request can no longer be cancelled.')
 }
 
 export async function getActiveTransport(): Promise<TransportRequestRow | null> {
@@ -337,4 +338,11 @@ export const TRANSPORT_STATUS_LABEL: Record<TransportStatus, string> = {
   cancelled_by_requester: 'Cancelled',
   cancelled_by_provider: 'Cancelled by provider',
   no_unit_available: 'No ambulance available',
+}
+
+/** Answers to the SOS questions asked while a crew is being found (raise-only triage). */
+export async function submitSosTriage(input: {
+  requestId: string; breathingNormally?: boolean | null; awake?: boolean | null; heavyBleeding?: boolean | null
+}) {
+  return authedFetch('/api/transport/triage', input) as Promise<{ ok: boolean; triageLevel: number }>
 }

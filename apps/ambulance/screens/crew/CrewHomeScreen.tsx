@@ -1,20 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, RefreshControl } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, RefreshControl, Modal, Vibration } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import { Header, HeaderTail, Card, SectionTitle, PrimaryButton, EmptyState } from '@queue/shared/components/ui/v3'
+import { haptics } from '@queue/shared/lib/haptics'
+import { startConversation } from '@queue/shared/lib/chat'
 import {
-  getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus,
+  getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus, completeJob,
   sendLocationPing, nextJobStatus, CREW_STATUS_LABEL,
   getMyUnits, setUnitDuty,
-  type PendingOffer, type ActiveJob, type MyUnit,
+  type PendingOffer, type ActiveJob, type MyUnit, type CrewDisposition,
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
 import { JobPatientMap } from '@queue/shared/components/emergency/JobPatientMap'
+import { alertNewOffers } from '@queue/shared/lib/offerAlerts'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 
 // Foreground pings. These are now a supplement, not the only source: while on
 // duty, lib/location-task.ts reports position via a TaskManager background task
@@ -30,12 +35,13 @@ function countdown(expiresAt: string, now: number): number {
 
 function triageColor(level: number | null): string {
   if (level == null) return '#7A9089'
-  if (level <= 2) return '#FF5C5C'
-  if (level === 3) return '#FFB547'
+  if (level <= 2) return '#B91C1C'
+  if (level === 3) return '#B45309'
   return '#7A9089'
 }
 
 export function CrewHomeScreen() {
+  const navigation = useNavigation<any>()
   const { theme: t } = useTheme()
   const [activeJob, setActiveJob]     = useState<ActiveJob | null>(null)
   const [offers,    setOffers]        = useState<PendingOffer[]>([])
@@ -59,7 +65,9 @@ export function CrewHomeScreen() {
       const [job, myUnits] = await Promise.all([getMyActiveJob(), getMyUnits().catch(() => [])])
       setActiveJob(job)
       setUnits(myUnits)
-      setOffers(job ? [] : await getMyPendingOffers())
+      const pending = job ? [] : await getMyPendingOffers()
+      setOffers(pending)
+      alertNewOffers(pending).catch(() => {})
     } catch (err) {
       console.warn('[crew] load failed', err)
     } finally {
@@ -219,112 +227,185 @@ export function CrewHomeScreen() {
     }
   }
 
+  async function finishJob(disposition: CrewDisposition) {
+    if (!activeJob) return
+    setUpdatingStatus(true)
+    try {
+      const ok = await completeJob(activeJob.request_id, disposition)
+      if (!ok) Alert.alert('Could not complete job', 'This job may no longer be assigned to your unit.')
+      await load()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not complete the job.')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  function confirmHandover() {
+    Alert.alert('Complete handover?', 'Confirm the patient has been handed over to the receiving facility.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Complete', onPress: () => finishJob('transported') },
+    ])
+  }
+
+  function endWithoutTransport() {
+    Alert.alert('End job without transport', 'What happened on scene?', [
+      { text: 'Treated on scene', onPress: () => finishJob('treated_not_transported') },
+      { text: 'Patient refused', onPress: () => finishJob('patient_refused') },
+      { text: 'No patient found', onPress: () => finishJob('no_patient_found') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
   function callPatient() {
     if (!activeJob?.contact_phone) return
     Linking.openURL(`tel:${activeJob.contact_phone}`).catch(() => Alert.alert('Error', 'Could not start a call.'))
   }
 
+  // Full-screen incoming offer (handoff c-offer): the first live offer takes over the
+  // screen and the phone keeps vibrating until the crew accepts, declines or it expires.
+  const incoming = offers.find(o => countdown(o.expires_at, now) > 0) ?? null
+  const incomingId = incoming?.offer_id
+  useEffect(() => {
+    if (!incomingId) { Vibration.cancel(); return }
+    Vibration.vibrate([0, 700, 500], true)
+    return () => Vibration.cancel()
+  }, [incomingId])
+
+  const onDuty     = units.some(u => u.on_duty)
+  const dispatchable = units.some(u => u.visible_to_dispatch)
+  const headerSub  = activeJob ? 'On a job' : dispatchable ? 'On duty · visible to dispatch' : onDuty ? 'On duty · not dispatchable' : 'Off duty'
+
   if (loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <Header title="Duty" subtitle="Loading…" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={t.accent} /></View>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Modal visible={!!incoming && !activeJob} animationType="fade" onRequestClose={() => {}} statusBarTranslucent>
+        {incoming && (() => {
+          const secs = countdown(incoming.expires_at, now)
+          const busy = respondingId === incoming.offer_id
+          const severe = incoming.triage_level != null && incoming.triage_level <= 2
+          return (
+            <View style={{ flex: 1, backgroundColor: severe ? '#7F1D1D' : '#134E4A', padding: 24, paddingTop: 64, justifyContent: 'space-between' }}>
+              <View style={{ alignItems: 'center', gap: 14 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1.5 }}>{severe ? 'EMERGENCY JOB' : 'INCOMING JOB'}</Text>
+                <View style={{ width: 168, height: 168, borderRadius: 99, borderWidth: 10, borderColor: secs <= 10 ? '#FCA5A5' : 'rgba(255,255,255,0.85)',
+                  alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={`${secs} seconds to accept`}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 56, fontWeight: '800' }}>{secs}</Text>
+                  <Text style={{ color: '#CCFBF1', fontSize: 13 }}>seconds</Text>
+                </View>
+                <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800', textAlign: 'center' }}>{incoming.symptom_description ?? 'Patient needs an ambulance'}</Text>
+                {!!incoming.pickup_address && <Text style={{ color: '#CCFBF1', fontSize: 15, textAlign: 'center' }}>{incoming.pickup_address}</Text>}
+                <Text style={{ color: '#CCFBF1', fontSize: 15 }}>
+                  {incoming.triage_level ? `Triage ${incoming.triage_level} · ` : ''}ETA ~{Math.round((incoming.eta_seconds ?? 0) / 60)} min
+                </Text>
+              </View>
+              <View style={{ gap: 12 }}>
+                <TouchableOpacity disabled={busy} onPress={() => { Vibration.cancel(); haptics.success(); handleRespond(incoming.offer_id, 'accept') }}
+                  accessibilityRole="button" accessibilityLabel="Accept job"
+                  style={{ minHeight: 72, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+                  {busy ? <ActivityIndicator color="#134E4A" /> : <Text style={{ fontSize: 20, fontWeight: '800', color: severe ? '#7F1D1D' : '#134E4A' }}>Accept</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity disabled={busy} onPress={() => { Vibration.cancel(); handleRespond(incoming.offer_id, 'decline') }}
+                  accessibilityRole="button" accessibilityLabel="Decline job"
+                  style={{ minHeight: 64, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: '#FFFFFF' }}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
+        })()}
+      </Modal>
+      <Header title={activeJob ? 'Active job' : 'Duty'} subtitle={headerSub}
+        right={<ProfileAvatar size={44} onPress={() => navigation.navigate('CrewProfile')} />} />
       <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: 40, gap: 14 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
       >
+        <HeaderTail />
         {/* Duty. Above everything else because an off-duty unit receives no
             offers at all — if this is off, the empty offer list below is not a
             quiet night, it's the crew being invisible. */}
         {units.map(unit => {
-          const stale = unit.on_duty && !unit.visible_to_dispatch
+          // A unit on a job is deliberately hidden from dispatch; that isn't stale GPS.
+          const onJob = !!activeJob && activeJob.assigned_unit_id === unit.ambulance_id
+          const stale = unit.on_duty && !unit.visible_to_dispatch && !onJob
+          const busy  = dutyBusy === unit.ambulance_id
+          const chip  = unit.visible_to_dispatch || onJob ? t.statusSuccess : stale ? t.statusBusy : t.statusNeutral
           return (
-            <View key={unit.ambulance_id} style={[s.card, {
-              backgroundColor: t.cardBg,
-              borderColor: unit.on_duty ? (stale ? '#FFB547' : t.accentDark) : t.cardBorder,
-              borderWidth: unit.on_duty ? 1.5 : 1,
-            }]}>
-              <View style={[s.row, { alignItems: 'center' }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.statusLabel, { color: t.textPrimary }]}>
-                    {unit.call_sign ?? unit.plate_number}
-                  </Text>
-                  <Text style={[s.detailText, { color: t.textMuted, marginTop: 2 }]}>
-                    {unit.vehicle_tier} · {unit.provider_name}
-                  </Text>
+            <Card key={unit.ambulance_id} style={{ gap: 12, borderColor: unit.on_duty ? (stale ? t.statusBusy.border : t.accentBorder) : t.cardBorder }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="car-outline" size={22} color={t.accent} />
                 </View>
-                <TouchableOpacity
-                  onPress={() => handleToggleDuty(unit)}
-                  disabled={dutyBusy === unit.ambulance_id}
-                  style={[s.secondaryBtn, {
-                    borderColor: unit.on_duty ? '#FF5C5C55' : '#00C26555',
-                    backgroundColor: unit.on_duty ? '#FF5C5C14' : '#00C26514',
-                    opacity: dutyBusy === unit.ambulance_id ? 0.5 : 1,
-                    paddingHorizontal: 16,
-                  }]}
-                >
-                  {dutyBusy === unit.ambulance_id
-                    ? <ActivityIndicator size="small" color={t.textMuted} />
-                    : <Text style={{ fontSize: 13, fontWeight: '800', color: unit.on_duty ? t.danger : t.accentDark }}>
-                        {unit.on_duty ? 'Go off duty' : 'Go on duty'}
-                      </Text>}
-                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>{unit.call_sign ?? unit.plate_number}</Text>
+                  <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>{unit.vehicle_tier} · {unit.provider_name}</Text>
+                </View>
               </View>
 
               {/* On duty and dispatchable are different things, and the crew has
                   to be told which one they actually are. */}
-              <View style={[s.detailRow, { marginTop: 10 }]}>
-                <Ionicons
-                  name={unit.visible_to_dispatch ? 'radio-outline' : unit.on_duty ? 'warning-outline' : 'moon-outline'}
-                  size={14}
-                  color={unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted}
-                />
-                <Text style={[s.detailText, {
-                  color: unit.visible_to_dispatch ? t.accentDark : stale ? '#FFB547' : t.textMuted, flex: 1,
-                }]}>
-                  {unit.visible_to_dispatch
-                    ? 'Visible to dispatch — you can receive jobs'
-                    : stale
-                      ? locationDenied
-                        ? 'On duty, but location is off. Dispatch cannot see you.'
-                        : 'On duty, but your position is stale. Keep this screen open to stay dispatchable.'
-                      : 'Off duty — you will not receive any jobs'}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7,
+                borderRadius: 99, backgroundColor: chip.bg, borderWidth: 1, borderColor: chip.border }}>
+                <Ionicons name={onJob ? 'medkit-outline' : unit.visible_to_dispatch ? 'radio-outline' : stale ? 'warning-outline' : 'moon-outline'} size={14} color={chip.text} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: chip.text }}>
+                  {onJob ? 'On a job' : unit.visible_to_dispatch ? 'Visible to dispatch' : stale ? (locationDenied ? 'Location off' : 'GPS stale') : 'Off duty'}
                 </Text>
               </View>
-            </View>
+              <Text style={{ fontSize: 13, color: t.textSecondary, lineHeight: 19 }}>
+                {onJob
+                  ? 'No new offers until this job is completed.'
+                  : unit.visible_to_dispatch
+                  ? 'You can receive jobs.'
+                  : stale
+                    ? locationDenied
+                      ? 'You are on duty, but location is off. Dispatch cannot see you.'
+                      : 'You are on duty, but your position is stale. Keep this screen open to stay dispatchable.'
+                    : 'You will not receive any jobs.'}
+              </Text>
+
+              <PrimaryButton height={64} variant={unit.on_duty ? 'ghost' : 'primary'} loading={busy}
+                icon={unit.on_duty ? 'moon-outline' : 'power-outline'}
+                label={unit.on_duty ? 'Go off duty' : 'Go on duty'} onPress={() => handleToggleDuty(unit)} />
+            </Card>
           )
         })}
 
-        <Text style={[s.title, { color: t.textPrimary }]}>{activeJob ? 'Active Job' : 'Pending Offers'}</Text>
+        <SectionTitle title={activeJob ? 'Current job' : 'Incoming offers'} />
 
         {activeJob ? (
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={s.row}>
+          <Card style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={[s.triageBadge, { backgroundColor: `${triageColor(activeJob.triage_level)}18`, borderColor: `${triageColor(activeJob.triage_level)}40` }]}>
                 <Text style={[s.triageBadgeText, { color: triageColor(activeJob.triage_level) }]}>
                   {activeJob.triage_level ? `Triage ${activeJob.triage_level}` : 'Scheduled'}
                 </Text>
               </View>
-              <Text style={[s.bookingRef, { color: t.textMuted }]}>{activeJob.booking_ref}</Text>
+              <Text style={{ fontSize: 12, color: t.textMuted }}>{activeJob.booking_ref}</Text>
             </View>
 
-            <Text style={[s.statusLabel, { color: t.accent }]}>{TRANSPORT_STATUS_LABEL[activeJob.status as TransportStatus] ?? activeJob.status}</Text>
-            <Text style={[s.symptom, { color: t.textPrimary }]}>{activeJob.symptom_description ?? 'No condition details provided'}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: t.accent }}>
+              {TRANSPORT_STATUS_LABEL[activeJob.status as TransportStatus] ?? activeJob.status}
+            </Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{activeJob.symptom_description ?? 'No condition details provided'}</Text>
 
             {activeJob.pickup_address && (
               <View style={s.detailRow}>
-                <Ionicons name="location-outline" size={14} color={t.textMuted} />
+                <Ionicons name="location-outline" size={16} color={t.accent} />
                 <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.pickup_address}</Text>
               </View>
             )}
             {activeJob.destination_hospital_name && (
               <View style={s.detailRow}>
-                <Ionicons name="business-outline" size={14} color={t.textMuted} />
+                <Ionicons name="business-outline" size={16} color={t.accent} />
                 <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.destination_hospital_name}</Text>
               </View>
             )}
@@ -337,93 +418,83 @@ export function CrewHomeScreen() {
               pickup={activeJob.pickup_lat != null && activeJob.pickup_lng != null
                 ? { lat: activeJob.pickup_lat, lng: activeJob.pickup_lng }
                 : null}
-              etaSeconds={activeJob.eta_seconds}
+              etaSeconds={['matched', 'en_route_to_patient'].includes(activeJob.status) ? activeJob.eta_seconds : null}
+              onExpand={() => navigation.navigate('Track')}
             />
 
-            <Button label="Call patient" onPress={callPatient} variant="outline" icon="call-outline" style={{ marginTop: 14 }} />
+            <PrimaryButton height={64} variant="ghost" icon="call-outline" label="Call patient" onPress={callPatient} />
+            {!!activeJob.destination_hospital_id && (
+              <PrimaryButton height={64} variant="ghost" icon="chatbubble-ellipses-outline" label="Message hospital"
+                onPress={async () => {
+                  const r = await startConversation('hospital', activeJob.destination_hospital_id!)
+                  if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+                  else Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error)
+                }} />
+            )}
 
             {nextJobStatus(activeJob.status) ? (
-              <Button
-                label={`Mark: ${CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}`}
-                onPress={handleAdvanceStatus} loading={updatingStatus} style={{ marginTop: 14 }}
-              />
-            ) : (
-              <View style={[s.noteBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.noteText, { color: t.accent }]}>
-                  Arrived — the receiving facility completes handover from here.
-                </Text>
-              </View>
+              <PrimaryButton height={64} label={`Mark: ${CREW_STATUS_LABEL[nextJobStatus(activeJob.status)!]}`}
+                onPress={handleAdvanceStatus} loading={updatingStatus} />
+            ) : activeJob.status === 'arrived_at_destination' ? (
+              <PrimaryButton height={64} icon="checkmark-done-outline" label="Complete handover"
+                onPress={confirmHandover} loading={updatingStatus} />
+            ) : null}
+            {activeJob.status === 'on_scene' && (
+              <PrimaryButton variant="ghost" label="End without transport"
+                onPress={endWithoutTransport} disabled={updatingStatus} />
             )}
-          </View>
+          </Card>
         ) : offers.length === 0 ? (
-          <View style={[s.emptyBox, { borderColor: t.cardBorder }]}>
-            <Ionicons name="checkmark-done-outline" size={32} color={t.textMuted} style={{ marginBottom: 8 }} />
-            <Text style={[s.emptyText, { color: t.textMuted }]}>No pending offers right now</Text>
-          </View>
+          <EmptyState icon="checkmark-done-outline" title="No offers right now"
+            body={dispatchable ? 'New jobs ring here. Keep the app open or in the background.' : 'Go on duty to start receiving jobs.'} />
         ) : (
           offers.map(o => {
             const secs = countdown(o.expires_at, now)
             const busy = respondingId === o.offer_id
             return (
-              <View key={o.offer_id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={s.row}>
+              <Card key={o.offer_id} style={{ gap: 10, borderColor: t.dangerBorder }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={[s.triageBadge, { backgroundColor: `${triageColor(o.triage_level)}18`, borderColor: `${triageColor(o.triage_level)}40` }]}>
                     <Text style={[s.triageBadgeText, { color: triageColor(o.triage_level) }]}>
                       {o.triage_level ? `Triage ${o.triage_level}` : '—'}
                     </Text>
                   </View>
-                  <Text style={[s.countdown, { color: secs <= 10 ? t.danger : t.textMuted }]}>{secs}s</Text>
+                  <View style={{ width: 52, height: 52, borderRadius: 99, borderWidth: 3, borderColor: secs <= 10 ? t.danger : t.accent, alignItems: 'center', justifyContent: 'center' }}
+                    accessibilityLabel={`${secs} seconds left`}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: secs <= 10 ? t.danger : t.textPrimary }}>{secs}</Text>
+                  </View>
                 </View>
-                <Text style={[s.symptom, { color: t.textPrimary }]}>{o.symptom_description ?? 'No condition details provided'}</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{o.symptom_description ?? 'No condition details provided'}</Text>
                 {o.pickup_address && (
                   <View style={s.detailRow}>
-                    <Ionicons name="location-outline" size={14} color={t.textMuted} />
+                    <Ionicons name="location-outline" size={16} color={t.accent} />
                     <Text style={[s.detailText, { color: t.textSecondary }]}>{o.pickup_address}</Text>
                   </View>
                 )}
                 <View style={s.detailRow}>
-                  <Ionicons name="time-outline" size={14} color={t.textMuted} />
+                  <Ionicons name="time-outline" size={16} color={t.accent} />
                   <Text style={[s.detailText, { color: t.textSecondary }]}>ETA ~{Math.round((o.eta_seconds ?? 0) / 60)} min</Text>
                 </View>
-                <View style={s.offerActions}>
-                  <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'decline')} disabled={busy}
-                    style={[s.secondaryBtn, { flex: 1, borderColor: t.cardBorder, opacity: busy ? 0.6 : 1 }]}>
-                    <Text style={[s.secondaryBtnText, { color: t.textPrimary }]}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRespond(o.offer_id, 'accept')} disabled={busy}
-                    style={[s.primaryBtn, { flex: 1, backgroundColor: t.danger, opacity: busy ? 0.6 : 1 }]}>
-                    {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>Accept</Text>}
-                  </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <View style={{ flex: 1 }}>
+                    <PrimaryButton height={64} variant="ghost" label="Decline" disabled={busy} onPress={() => handleRespond(o.offer_id, 'decline')} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <PrimaryButton height={64} variant="danger" label="Accept" loading={busy} onPress={() => { haptics.success(); handleRespond(o.offer_id, 'accept') }} />
+                  </View>
                 </View>
-              </View>
+              </Card>
             )
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const s = StyleSheet.create({
-  safe:  { flex: 1 },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
-  card:  { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
-  row:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  triageBadgeText: { fontSize: 11, fontWeight: '800' },
-  bookingRef: { fontSize: 11 },
-  countdown:  { fontSize: 16, fontWeight: '800' },
-  statusLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  symptom:    { fontSize: 15, fontWeight: '600', marginBottom: 8 },
-  detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  detailText: { fontSize: 12 },
-  offerActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  primaryBtn:   { padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  primaryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  secondaryBtn: { flexDirection: 'row', gap: 6, padding: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700' },
-  noteBox:  { borderRadius: 12, padding: 13, borderWidth: 1, marginTop: 14 },
-  noteText: { fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  emptyBox: { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText: { fontSize: 13 },
+  triageBadgeText: { fontSize: 12, fontWeight: '800' },
+  detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailText: { fontSize: 14, flex: 1 },
 })

@@ -128,6 +128,20 @@ export async function updateJobStatus(requestId: string, status: CrewJobStatus):
   return !!data
 }
 
+export type CrewDisposition =
+  | 'transported' | 'treated_not_transported' | 'patient_refused' | 'no_patient_found' | 'deceased_on_scene'
+
+// Closes the job: 'transported' once arrived at the destination, or one of the
+// other outcomes from on_scene. The unit goes back to available server-side.
+export async function completeJob(requestId: string, disposition: CrewDisposition): Promise<boolean> {
+  const { data, error } = await supabase.rpc('crew_complete_job', {
+    p_request_id: requestId,
+    p_disposition: disposition,
+  })
+  if (error) throw error
+  return !!data
+}
+
 export async function sendLocationPing(
   ambulanceId: string,
   pings: Array<{ lat: number; lng: number; heading?: number; speedKmh?: number; accuracyM?: number; recordedAt: string }>,
