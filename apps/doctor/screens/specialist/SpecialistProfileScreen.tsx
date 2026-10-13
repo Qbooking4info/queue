@@ -158,6 +158,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
           <Card style={{ paddingVertical: 0 }}>
             {navigation && <ListRow icon="business-outline" title="Hospitals & Doctor ID" subtitle="Linked hospitals and your QR" onPress={() => navigation.navigate('Hospitals')} />}
+            {navigation && <ListRow icon="bar-chart-outline" title="My analytics" subtitle="Visits, wait times, ratings" onPress={() => navigation.navigate('DoctorAnalytics')} />}
             {navigation && <ListRow icon="settings-outline" title="Settings & fees" subtitle="Availability, fees, virtual care" last onPress={() => navigation.navigate('Settings')} />}
           </Card>
 
