@@ -86,7 +86,7 @@ listed in STATUS.md.
 - **Verification:** `web/src/app/api/transport/request/route.test.ts` (4 tests) PASS. Index NOT applied; migration aborts if prod already has a requester with two live emergency requests.
 - **Status:** `fixed_pending_verification`
 
-### REP-017 · P1 · No-unit / deadline dispatcher alerts likely seen by nobody — SUSPECTED — **being worked by the concurrent session** (uncommitted `dispatcher-alerts.ts`, migration `20261013200002`) at 16:15; don't duplicate
+### REP-017 · P1 · No-unit / deadline dispatcher alerts likely seen by nobody — **fixed by the concurrent audit session**: commit 8e509c8 (`web/src/lib/dispatcher-alerts.ts`, alerts route + page), migration `20261013200002_dispatcher_alerts_visibility` applied to prod. `fixed_pending_verification` (web not yet deployed; not independently re-tested by this session)
 Emergency requests have no `destination_hospital_id` until a crew sets one, but both alert readers filter on it (`api/ambulances/alerts/route.ts:53`, `dashboard/ambulances/alerts/page.tsx:34`); `expire_overdue_searches()` only inserts rows; relay needs `DISPATCH_ALERT_*` env vars. Needs a product decision on who the dispatcher is. `open`
 
 ### REP-018 · P1 · Re-dispatch after a decline ran as a floating promise (Vercel may freeze it)

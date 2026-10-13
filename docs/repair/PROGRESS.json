@@ -297,7 +297,7 @@
       "severity": "P1",
       "component": "web/ambulance",
       "title": "Dispatcher alerts with no destination seen by nobody (suspected)",
-      "status": "open",
+      "status": "fixed_pending_verification",
       "details": "docs/repair/ISSUES.md#rep-017"
     },
     {
@@ -793,7 +793,8 @@
     "Interim: caretakers may link only minors by code; adults link themselves (REP-041)",
     "No production DB reads/writes this session; SQL verified from migrations + parser only",
     "Concurrent session (branch fix/audit-2026-10-13) owns 20261013000007/000008; duplicate revokes removed from 20261013100001",
-    "2026-10-13 ~16:05 WAT: user applied 20261013100001 + 20261013300001 to production and repaired migration history (the agent was blocked from running the apply itself)"
+    "2026-10-13 ~16:05 WAT: the concurrent audit session applied 20261013100001 + 20261013300001 to production and repaired migration history (the agent was blocked from running the apply itself)",
+    "Ownership split with concurrent session (queue-85): it takes SOS no-GPS fallback (SosScreen, fresh-location, ambulance-api) and the queue wait-estimate double count (renumber_doctor_queue); this session keeps REP-019/020 and P3s"
   ],
   "next_actions": [
     "User: apply 20261013300002..300005 (scratchpad apply_*.sql) + migration repair",
