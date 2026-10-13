@@ -68,15 +68,18 @@ export async function POST(req: NextRequest) {
     return Errors.validation(`Cannot pay for a ${appt.status} appointment`)
   }
 
-  // Don't start a second transaction for an appointment already paid.
-  const { data: existing } = await db
+  // Don't start a second transaction for an appointment already paid. Success rows
+  // only: mixing in pending rows made .maybeSingle() error as soon as a second row
+  // existed, which returned null and skipped this check entirely. (A charge that
+  // still lands twice is credited to the wallet by the webhook.)
+  const { data: paid } = await db
     .from('payments')
-    .select('id, status, paystack_ref')
+    .select('id')
     .eq('appointment_id', appointmentId)
-    .in('status', ['success', 'pending'])
-    .maybeSingle()
+    .eq('status', 'success')
+    .limit(1)
 
-  if (existing?.status === 'success') {
+  if (paid?.length) {
     return NextResponse.json({ alreadyPaid: true })
   }
 
