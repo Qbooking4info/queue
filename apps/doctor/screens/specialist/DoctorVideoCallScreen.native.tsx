@@ -241,7 +241,11 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       // silent catch meant a failed session-end was undiagnosable.
       console.warn('[video] failed to end session on leave', err)
     }
-    navigation.goBack()
+    // Straight into the summary rather than back to the queue: this is the one
+    // moment the consultation is still fresh, and the plan is what the patient
+    // actually sees. replace(), not navigate(), so Back does not reopen a call
+    // that has already ended. Skipping is one tap away on that screen.
+    navigation.replace('ConsultationPlan', { appointmentId, patientName })
   }
 
   function handleEndSession() {

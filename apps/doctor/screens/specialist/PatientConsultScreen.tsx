@@ -5,7 +5,7 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { Header, EmptyState, HeaderIconButton } from '@queue/shared/components/ui/v3'
+import { Header, EmptyState, HeaderIconButton, PrimaryButton } from '@queue/shared/components/ui/v3'
 import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -396,6 +396,23 @@ export function PatientConsultScreen({ navigation, route }: Props) {
             <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
               <Ionicons name="checkmark-circle" size={20} color={t.accent} />
               <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+            </View>
+          )}
+
+          {/* The call-end flow already offers this, but a doctor who skipped it
+              then -- or whose call dropped and left the visit stuck -- still needs
+              a way in. Virtual only: in-person visits keep the plain notes field. */}
+          {isDone && isVirtual && (
+            <View style={st.pad}>
+              <PrimaryButton
+                label="Consultation summary"
+                variant="ghost"
+                icon="document-text-outline"
+                onPress={() => navigation.navigate('ConsultationPlan', {
+                  appointmentId,
+                  patientName: patient?.full_name,
+                })}
+              />
             </View>
           )}
 
