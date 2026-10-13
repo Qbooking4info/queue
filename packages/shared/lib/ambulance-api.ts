@@ -153,12 +153,16 @@ export async function getActiveTransport(): Promise<TransportRequestRow | null> 
   return (data as TransportRequestRow | null) ?? null
 }
 
+// Throws on a failed read so the caller can tell "network/server error" (retry)
+// from "no such request" (null) — they used to look identical, and the tracking
+// screen treated both as "still loading" forever.
 export async function getTransportRequestById(requestId: string): Promise<TransportRequestRow | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('transport_requests')
     .select('*')
     .eq('id', requestId)
     .maybeSingle()
+  if (error) throw error
 
   return (data as TransportRequestRow | null) ?? null
 }

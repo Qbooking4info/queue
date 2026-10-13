@@ -10,12 +10,13 @@ import { Button } from '@queue/shared/components/ui/Button'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { FallbackPanel } from '@queue/shared/components/emergency/FallbackPanel'
 import {
-  getTransportRequestById, getRequestPickupPoint, getUnitLocation,
+  getRequestPickupPoint, getUnitLocation,
   subscribeToTransport, subscribeToUnitLocation, cancelTransport,
   sharePatientLocation, formatEta, TRANSPORT_STATUS_LABEL,
   getTransportDetails, DISPOSITION_LABEL,
   type TransportRequestRow, type TransportStatus, type TransportDetails,
 } from '@queue/shared/lib/ambulance-api'
+import { startTransportSync, TRANSPORT_POLL_MS } from '@queue/shared/lib/transport-sync'
 
 interface Props { navigation: any; route: any }
 
@@ -67,22 +68,32 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
   const [loading,    setLoading]  = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [elapsedMs,  setElapsedMs] = useState(0)
+  const [syncKey,    setSyncKey]  = useState(0)
 
   const unitChannelRef = useRef<{ unsubscribe: () => void } | null>(null)
 
-  // Initial fetch: the row itself plus its pickup point (not included in the
-  // realtime payload's select, and rarely needed elsewhere, so it's a
-  // separate one-time read rather than part of TransportRequestRow).
+  // The row, kept current by polling and on app resume as well as realtime (below):
+  // a dropped websocket reports nothing, so realtime alone could leave the status
+  // frozen. A failed first read ends loading and shows a retry, never a spinner
+  // that waits forever. The pickup point is a separate one-time read — it isn't
+  // in the realtime payload and never changes.
   useEffect(() => {
     let cancelled = false
-    Promise.all([getTransportRequestById(requestId), getRequestPickupPoint(requestId)]).then(([req, pt]) => {
-      if (cancelled) return
-      setRequest(req)
-      setPickup(pt)
-      setLoading(false)
+    getRequestPickupPoint(requestId).then(pt => { if (!cancelled) setPickup(pt) }).catch(() => {})
+    const stop = startTransportSync(requestId, {
+      onRow: row => {
+        if (cancelled) return
+        if (row) setRequest(row)
+        setLoading(false)
+      },
+      onError: err => {
+        if (cancelled) return
+        console.warn('[tracking] failed to load request', err)
+        setLoading(false)
+      },
     })
-    return () => { cancelled = true }
-  }, [requestId])
+    return () => { cancelled = true; stop() }
+  }, [requestId, syncKey])
 
   // Unit, operator and destination. Re-read on every status change and when the
   // crew picks or changes the hospital, which the realtime row tells us about.
@@ -110,11 +121,14 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
     if (!unitId) return
 
     let cancelled = false
-    getUnitLocation(unitId).then(pos => { if (!cancelled) setUnitPos(pos) })
+    const refresh = () => getUnitLocation(unitId).then(pos => { if (!cancelled && pos) setUnitPos(pos) }).catch(() => {})
+    refresh()
+    // Same reason as the request poll: realtime alone goes quiet on a dropped socket.
+    const poll = setInterval(refresh, TRANSPORT_POLL_MS)
     const channel = subscribeToUnitLocation(unitId, setUnitPos)
     unitChannelRef.current = channel
 
-    return () => { cancelled = true; channel.unsubscribe() }
+    return () => { cancelled = true; clearInterval(poll); channel.unsubscribe() }
   }, [request?.assigned_unit_id])
 
   // ── Share position with the crew driving to us ────────────────────────────
@@ -216,10 +230,26 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Home' } }] })
   }
 
-  if (loading || !request) {
+  if (!request && loading) {
     return (
       <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={t.danger} />
+      </SafeAreaView>
+    )
+  }
+
+  if (!request) {
+    return (
+      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+          <Text accessibilityRole="alert" style={[s.statusText, { color: t.textPrimary }]}>We couldn't load your ambulance request</Text>
+          <Text style={{ color: t.textMuted, fontSize: 14, lineHeight: 20 }}>
+            Your request may still be active. Check your connection and try again — and if this is life-threatening, call an emergency number now.
+          </Text>
+          <Button label="Try again" onPress={() => { setLoading(true); setSyncKey(k => k + 1) }} />
+          <FallbackPanel variant="urgent" />
+          <Button label="Back to home" variant="outline" onPress={backToHome} />
+        </ScrollView>
       </SafeAreaView>
     )
   }
