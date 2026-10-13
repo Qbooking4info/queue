@@ -65,7 +65,6 @@ export function StaffManagementScreen({ navigation }: Props) {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [tab,        setTab]        = useState<'staff' | 'doctors'>('staff')
-  const [showInvite, setShowInvite] = useState(false)
   const [showLinkDoctor, setShowLinkDoctor] = useState(false)
 
   const hospitalId = staffProfile?.hospitalId
@@ -152,7 +151,13 @@ export function StaffManagementScreen({ navigation }: Props) {
         right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {tab === 'staff' ? (
           isHospitalAdmin ? (
-            <TouchableOpacity onPress={() => setShowInvite(true)} style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
+            // Staff logins are created per clinic (POST /api/clinic-staff needs a clinic,
+            // name and temporary password); that form lives on the clinic's page. The
+            // email-only invite that used to open here could never succeed.
+            <TouchableOpacity onPress={() => Alert.alert('Add staff from a clinic',
+              'Front desk and clinic admin logins belong to a clinic. Open the clinic and tap + Add Staff Member.',
+              [{ text: 'Cancel', style: 'cancel' }, { text: 'Open clinics', onPress: () => navigation.navigate('HospitalClinics') }])}
+              style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
               <Ionicons name="person-add-outline" size={14} color="#0F766E" />
               <Text style={[s.inviteBtnText, { color: '#0F766E' }]}>Invite</Text>
             </TouchableOpacity>
@@ -258,100 +263,10 @@ export function StaffManagementScreen({ navigation }: Props) {
         </ScrollView>
       )}
 
-      {/* Invite modal */}
-      {showInvite && <InviteModal hospitalId={hospitalId ?? ''} theme={t} onClose={() => setShowInvite(false)} onDone={() => { setShowInvite(false); load(true) }} />}
 
       {/* Link doctor modal */}
       {showLinkDoctor && <LinkDoctorModal theme={t} onClose={() => setShowLinkDoctor(false)} onDone={() => { setShowLinkDoctor(false); load(true) }} />}
     </SafeAreaView>
-  )
-}
-
-function InviteModal({ hospitalId, theme: t, onClose, onDone }: { hospitalId: string; theme: any; onClose: () => void; onDone: () => void }) {
-  const [email,    setEmail]    = useState('')
-  const [role,     setRole]     = useState<'front_desk' | 'clinic_admin' | 'hospital_admin'>('front_desk')
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState('')
-  const [done,     setDone]     = useState(false)
-
-  const ROLES = [
-    { key: 'front_desk' as const,     label: 'Front Desk' },
-    { key: 'clinic_admin' as const,   label: 'Clinic Admin' },
-    { key: 'hospital_admin' as const, label: 'Hospital Admin' },
-  ]
-
-  async function handleInvite() {
-    if (!email.trim()) { setError('Email is required.'); return }
-    setLoading(true); setError('')
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const jwt = session?.access_token
-      if (!jwt) throw new Error('Not authenticated')
-      const res = await fetch(`${API_URL}/api/clinic-staff`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), role, hospitalId }),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body?.error ?? 'Invite failed')
-      haptics.success()
-      setDone(true)
-    } catch (e) {
-      haptics.error()
-      setError(e instanceof Error ? e.message : 'Invite failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <View style={[s.overlay]}>
-      <KeyboardAvoidingView behavior="padding">
-        <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          {done ? (
-            <>
-              <Ionicons name="checkmark-circle" size={48} color={t.accentDark} style={{ alignSelf: 'center', marginBottom: 12 }} />
-              <Text style={[s.modalTitle, { color: t.textPrimary, textAlign: 'center' }]}>Invite sent!</Text>
-              <Text style={[s.modalSub, { color: t.textMuted, textAlign: 'center', marginBottom: 20 }]}>
-                {email} will receive an invitation email.
-              </Text>
-              <TouchableOpacity onPress={onDone} style={[s.modalBtn, { backgroundColor: t.accent }]}>
-                <Text style={s.modalBtnText}>Done</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={[s.modalTitle, { color: t.textPrimary }]}>Invite staff member</Text>
-                <TouchableOpacity onPress={onClose} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
-              </View>
-
-              <Text style={[s.modalLabel, { color: t.textMuted }]}>EMAIL</Text>
-              <View style={[s.modalInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                <TextInput value={email} onChangeText={setEmail}
-                  placeholder="staff@hospital.com" placeholderTextColor={t.textMuted}
-                  style={{ color: t.textPrimary, fontSize: 14 }}
-                  keyboardType="email-address" autoCapitalize="none" autoFocus />
-              </View>
-
-              <Text style={[s.modalLabel, { color: t.textMuted, marginTop: 14 }]}>ROLE</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-                {ROLES.map(r => (
-                  <TouchableOpacity key={r.key} onPress={() => setRole(r.key)}
-                    style={[s.roleChip, { borderColor: role === r.key ? t.accent : t.cardBorder, backgroundColor: role === r.key ? `${t.accent}18` : 'transparent' }]}>
-                    <Text style={[s.roleChipText, { color: role === r.key ? t.accent : t.textMuted }]}>{r.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {error ? <Text style={[s.errorText, { color: t.danger }]}>{error}</Text> : null}
-
-              <Button label="Send Invite" onPress={handleInvite} loading={loading} />
-            </>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </View>
   )
 }
 
