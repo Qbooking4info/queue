@@ -23,4 +23,27 @@ config.resolver.nodeModulesPaths = [
 // errors that look nothing like a resolution problem.
 config.resolver.disableHierarchicalLookup = true
 
+// Keep the file crawl off everything Metro will never bundle. watchFolders above
+// is the whole workspace (needed for packages/shared), which otherwise drags in
+// the legacy mobile/ and doctors/ copies, the Next.js app and its .next output,
+// .git, and the audit/docs/supabase trees.
+//
+// On Windows there is no watchman, so metro-file-map falls back to a recursive
+// Node crawl with a hardcoded 240s start-up timeout (see MAX_WAIT_TIME in
+// @expo/metro-file-map/build/Watcher.js). Once the crawl overruns it the watcher
+// rejects with "Failed to start watch mode", the dependency graph is never built,
+// and every bundle request 500s with "Cannot read properties of undefined
+// (reading 'get')" -- while /status still answers 200, so the server looks up.
+const IGNORED_AT_ROOT = ['mobile', 'doctors', 'audit', 'docs', 'patches', 'supabase', '.git']
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const underRoot = (...segments) =>
+  new RegExp('^' + escapeRe(path.join(workspaceRoot, ...segments)) + escapeRe(path.sep) + '.*')
+
+config.resolver.blockList = [
+  ...IGNORED_AT_ROOT.map((d) => underRoot(d)),
+  underRoot('web', '.next'),
+  underRoot('web', 'node_modules'),
+]
+
 module.exports = config
