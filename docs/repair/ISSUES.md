@@ -163,11 +163,37 @@ Emergency requests have no `destination_hospital_id` until a crew sets one, but 
 ### REP-043 · P2 · Clinic admin could reset passwords of staff in another clinic of the same hospital (`clinic-staff/reset-password`)
 - **Fix + test:** clinic check added; `reset-password/route.test.ts` (3) PASS. **Status:** `verified_fixed` (not deployed)
 
-### REP-044 · P2 · One booking can be paid twice (card + wallet, or two checkouts); no unique success per appointment, no refund path. `open` (needs migration + webhook change)
-### REP-045 · P2 · Any non-owner hospital admin can swap the payout bank account (`payments/subaccount`). `open` (needs owner role in `CallerInfo`)
+### REP-044 · P2 · One booking can be paid twice (card + wallet, or two checkouts)
+- **Fix (code):** webhook credits a second successful charge for an already-paid booking to the payer's wallet (`wallet_apply` keyed on the Paystack ref, so retries can't double-credit), records it `refunded`, notifies; never marks a real charge failed. `initialize` and `wallet/pay` no longer use `.maybeSingle()` over multiple rows (it errored → null → the "already paid" check was skipped).
+- **Backstop migration:** `20261013300002` unique index one success per appointment (pre-flight: 0 duplicates; dry run OK). NOT applied.
+- **Tests:** `payments/webhook/route.test.ts` (5) PASS; 4 fail on the original. **Status:** `fixed_pending_verification` (deploy + index)
+### REP-045 · P2 · Any non-owner hospital admin can swap the payout bank account
+- **Fix:** `CallerInfo.hospitalRole`; POST/DELETE `/api/payments/subaccount` owner-only, falling back to admins only when the hospital has no active owner (1 of 5 in prod). Remove now shows its error in web + hospital app.
+- **Tests:** `payments/subaccount/route.test.ts` (3) PASS. **Status:** `fixed_pending_verification` (deploy). See REP-058: the DB let anyone bypass this until `20261013300004`.
 ### REP-046 · P3 · `removeStaff` let an admin remove the owner — fixed (owner-only). `fixed_pending_verification` (no test)
 ### REP-047 · P3 · Onboarding accepts any `planId` with a 90-day trial; `GET /api/clear-session` is cross-site triggerable; several routes return raw DB/Paystack error text. `open`
 ### REP-048 · P2 · SUSPECTED: doctor linking by code without consent (`doctors/link`); self-declared `doctor_profiles`; `getUserRole` maps unknown roles to `hospital_admin`. `open`
+
+---
+
+### REP-058 · P0 · Clients could write the `hospitals` table directly (prod-only policies)
+- `hospitals_admin_update`: ANY `hospital_admins` row (crew, front desk, deactivated) could UPDATE every column — set `paystack_subaccount_code` (redirect payouts) or `is_verified=true`. `hospitals_auth_insert`: any signed-in user could insert a hospital, verified.
+- **Proved in prod (rolled back):** BEFORE both ALLOWED; AFTER `20261013300004` both 42501; service-role updates and staff reads still work. No app writes `hospitals` directly; rating/counter functions are SECURITY DEFINER. **Status:** `fixed_pending_verification` (apply)
+
+### REP-059 · P0 · Staff could rewrite their own `hospital_admins` row (prod-only `admins_update_own`)
+- Front desk → `role='owner'` proved ALLOWED in prod (rolled back). **Fix:** `20261013300005` drops it, revokes client writes; AFTER → 42501. **Status:** `fixed_pending_verification` (apply)
+
+### REP-060 · P1 · `is_hospital_admin()` admitted crew and deactivated staff (gates doctors/services/slots/images/hours/emr/documents/payouts)
+- **Fix:** requires `is_active`, excludes `ambulance_crew` (`20261013300005`); dry run: crew/deactivated false, front desk true. **Status:** `fixed_pending_verification` (apply)
+
+### REP-061 · P1 · Any signed-in user could write `hospital_subscriptions`/`hospital_operating_hours`/`hospital_specialties` of any hospital; any staff could edit any review
+- **Fix:** policies dropped + client writes revoked (`20261013300005`); all real writes are server-side. **Status:** `fixed_pending_verification` (apply)
+
+### REP-062 · P0 · Account takeover: editable profile email + dependent switch
+- `users_update_own` (no WITH CHECK) let a user set `users.email` to anyone's; `/api/dependents/switch` minted the magic link from `users.email` → a session for the victim (a self-declared "minor" account + link + email swap).
+- **Fix:** switch now uses the dependent's **auth** email and checks the link resolves to that auth user (`dependents/switch/route.test.ts` fails on the original, passes now); staff password reset also judges by auth email; DB trigger `guard_user_identity_columns` blocks changing `auth_id` and changing `email` to anything but the login email (`20261013300005`; dry run: victim email blocked, push token still saves). Not a policy drop: 7/98 users' profile email differs from their login and would have been locked out. **Status:** `fixed_pending_verification` (deploy + apply)
+
+### REP-063 · P2 · Unverified hospitals are publicly readable (`Public can view active hospitals`, `is_active` only — 4 of 5 hospitals are active+unverified). Hiding them changes what patients see → **product decision**, not changed. `open`
 
 ---
 
@@ -176,7 +202,9 @@ Emergency requests have no `destination_hospital_id` until a crew sets one, but 
 ### REP-050 · P1 · Hospital app "Invite staff" always failed (sent `{email, role, hospitalId}` to a route that needs clinic, name and temp password; offered a role the route rejects)
 - **Fix:** button now explains and opens Clinics, where the working "+ Add Staff Member" form lives; dead modal removed. `apps/hospital/screens/staff/StaffManagementScreen.tsx`. hospital `tsc` PASS. **Status:** `fixed_pending_verification` (not device-tested)
 
-### REP-051 · P2 · Hospital/ambulance apps read `hospitals` directly; the only SELECT policy requires `is_verified`, so unverified hospitals lose the Clinics menu, clinic filter and hospital names. Needs an RPC (`get_my_hospital`). `open`
+### REP-051 · P3 (downgraded) · Staff reads of their own unverified hospital
+- **Prod check:** `hospitals_admin_read` (prod-only) already covers hospital_admins — NOT reproduced for them (TEST admin reads TEST Hospital). Only `clinic_admins`-only staff are uncovered.
+- **Fix anyway (robust, per project RPC rule):** `get_my_hospital(p_hospital_id)` (`20261013300003`, dry run PASS: own row yes, other hospital no, anon 42501) + `getMyHospital()` in `packages/shared/lib/admin-api.ts` (falls back to the direct read until the RPC exists); 5 screens switched. **Status:** `fixed_pending_verification`
 ### REP-052 · P2 · Care-plan ticks between 00:00–01:00 WAT saved against yesterday (DB `current_date` is UTC) — fixed: client sends `done_on: today`. `fixed_pending_verification`
 ### REP-053 · P2 · Booking "notifications" never saved (anon client insert, error ignored)
 - Concurrent session commit 688540e: `notifications_insert_own` policy (`20261013000008`) + `addNotification` now uses the authenticated client. Old installed builds still write nothing. **Status:** `fixed_pending_verification` (not this session's change)

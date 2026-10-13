@@ -89,3 +89,19 @@ NOT_RUN · NOT_APPLICABLE. Times are WAT (Africa/Lagos, UTC+1).
 | `vercel --prod` from that worktree | BLOCKED — denied by the auto-mode safety classifier ("Production Deploy"); user to run |
 | Realtime: patient (e2e TEST account) receives session start with `guest_token`, no `host_token`; app select works; `ended` delivered; temp rows deleted | PASS (5/5) |
 | Real Agora audio/video call on devices | BLOCKED — needs two devices and new client/doctor builds |
+
+## Batch 3 — 2026-10-13 16:40–17:10 WAT
+
+| Check | Result |
+|---|---|
+| `payments/webhook/route.test.ts` (5) — duplicate charge → wallet credit, retry-safe, 23505 path | PASS; 4 FAIL on original |
+| `payments/subaccount/route.test.ts` (3) — owner-only payout changes | PASS |
+| `dependents/switch/route.test.ts` (1) — link minted for auth email, not profile email | PASS; FAIL on original |
+| `dashboard/staff/actions.test.ts` (5) after auth-email change | PASS |
+| web full suite | PASS — 23 files / 149 tests |
+| app typechecks (4) | PASS — 0 errors |
+| Prod dry run 300002 (index) | PASS (creates; gone after rollback); pre-flight 0 duplicate successes |
+| Prod dry run 300003 (`get_my_hospital`) as TEST hospital admin | PASS — own row, other hospital 0, anon 42501 |
+| Prod dry run 300004 (hospitals writes) | BEFORE exploit ALLOWED ×2 → AFTER 42501 ×2; service update + staff read OK |
+| Prod dry run 300005 (escalation) | BEFORE owner-promotion + victim email ALLOWED → AFTER 42501; crew/deactivated is_hospital_admin false; push token still saves |
+| Production unchanged after all dry runs | PASS |

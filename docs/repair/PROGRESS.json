@@ -1,6 +1,6 @@
 {
   "project": "Queue \u2014 hospital management and digital healthcare platform",
-  "last_updated": "2026-10-13T16:35:00+01:00",
+  "last_updated": "2026-10-13T17:10:00+01:00",
   "overall_status": "in_progress",
   "current_phase": "batch_2_db_applied_awaiting_deploy_and_commit",
   "current_batch": 2,
@@ -465,7 +465,7 @@
       "severity": "P2",
       "component": "web/payments",
       "title": "Double payment for one booking",
-      "status": "open",
+      "status": "fixed_pending_verification",
       "details": "docs/repair/ISSUES.md#rep-044"
     },
     {
@@ -473,7 +473,7 @@
       "severity": "P2",
       "component": "web/payments",
       "title": "Non-owner admin can swap payout account",
-      "status": "open",
+      "status": "fixed_pending_verification",
       "details": "docs/repair/ISSUES.md#rep-045"
     },
     {
@@ -510,10 +510,10 @@
     },
     {
       "id": "REP-051",
-      "severity": "P2",
+      "severity": "P3",
       "component": "hospital,ambulance",
       "title": "Unverified hospitals can't read own hospital row",
-      "status": "open",
+      "status": "fixed_pending_verification",
       "details": "docs/repair/ISSUES.md#rep-051"
     },
     {
@@ -579,6 +579,54 @@
       "title": "README documents removed mobile/ layout",
       "status": "open",
       "details": "docs/repair/ISSUES.md#rep-091"
+    },
+    {
+      "id": "REP-058",
+      "severity": "P0",
+      "component": "db/hospitals",
+      "title": "Clients could write hospitals (payout swap, self-verify)",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-058"
+    },
+    {
+      "id": "REP-059",
+      "severity": "P0",
+      "component": "db/hospital_admins",
+      "title": "Staff could make themselves owner",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-059"
+    },
+    {
+      "id": "REP-060",
+      "severity": "P1",
+      "component": "db",
+      "title": "is_hospital_admin admitted crew/deactivated",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-060"
+    },
+    {
+      "id": "REP-061",
+      "severity": "P1",
+      "component": "db",
+      "title": "Any user could write subscriptions/hours/specialties; staff edit reviews",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-061"
+    },
+    {
+      "id": "REP-062",
+      "severity": "P0",
+      "component": "web+db",
+      "title": "Takeover via profile email + dependent switch",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-062"
+    },
+    {
+      "id": "REP-063",
+      "severity": "P2",
+      "component": "db/hospitals",
+      "title": "Unverified hospitals publicly readable (product decision)",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-063"
     }
   ],
   "test_runs": [
@@ -712,6 +760,30 @@
       "dir": "prod",
       "result": "PASS",
       "detail": "start event with guest_token, no host_token; app query ok; ended event delivered; 0 rows left"
+    },
+    {
+      "id": "T-PROD-6",
+      "at": "2026-10-13T16:50:00+01:00",
+      "command": "read-only sweep of all 73 write policies in prod",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "found REP-058..063"
+    },
+    {
+      "id": "T-PROD-7",
+      "at": "2026-10-13T16:55:00+01:00",
+      "command": "rolled-back before/after dry runs of 300002/300003/300004/300005",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "exploits ALLOWED before, 42501 after; legit paths ok; prod unchanged"
+    },
+    {
+      "id": "T-B3-1",
+      "at": "2026-10-13T17:05:00+01:00",
+      "command": "npx vitest run",
+      "dir": "web",
+      "result": "PASS",
+      "detail": "23 files / 149 tests"
     }
   ],
   "decisions": [
@@ -724,9 +796,9 @@
     "2026-10-13 ~16:05 WAT: user applied 20261013100001 + 20261013300001 to production and repaired migration history (the agent was blocked from running the apply itself)"
   ],
   "next_actions": [
-    "User: deploy web from the clean worktree (see STATUS.md)",
-    "User: decide on the one adult sibling dependent link (2026-08-31) and the consent model for child accounts",
-    "Device test of a real Agora call needs two devices + new builds (BLOCKED)",
-    "Code: REP-044 double payment, REP-045 payout swap, REP-051 get_my_hospital RPC (check the concurrent session is not on them first; it took REP-017)"
+    "User: apply 20261013300002..300005 (scratchpad apply_*.sql) + migration repair",
+    "User: deploy web from the refreshed clean worktree",
+    "User: decide REP-063 (hide unverified hospitals from public), REP-041 consent model, the adult sibling link",
+    "Next code: REP-019/020 stranded jobs + crew hand-back, REP-035..038 appointment P3s, REP-047"
   ]
 }
