@@ -4,7 +4,7 @@ import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
-import { useLocation } from '@queue/shared/contexts/LocationContext'
+import { getFreshFix } from '@queue/shared/lib/fresh-location'
 import { requestAmbulance } from '@queue/shared/lib/ambulance-api'
 import { haptics } from '@queue/shared/lib/haptics'
 import { HoldButton } from '@queue/shared/components/ui/v3'
@@ -22,21 +22,29 @@ interface Props { navigation: any }
 
 export function SosScreen({ navigation }: Props) {
   const { user } = useAuth()
-  const { coords, request } = useLocation()
   const [who, setWho] = useState<typeof WHO[number]>('Me')
-  const [state, setState] = useState<'idle' | 'sending' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'locating' | 'sending' | 'error'>('idle')
+  const [needsSettings, setNeedsSettings] = useState(false)
   const [error, setError] = useState('')
   const [holdKey, setHoldKey] = useState(0)
 
   async function send() {
     haptics.heavy()
-    if (!coords) {
+    setNeedsSettings(false)
+    // A reading taken now, not LocationContext's: that one is captured once when
+    // the app opens and could put the pickup kilometres from the patient.
+    setState('locating')
+    const located = await getFreshFix()
+    if (!located.ok) {
       setState('error')
-      setError('We need your location to send a crew. Turn on location, or call 112 or 767 now.')
-      request?.()
+      setNeedsSettings(located.reason === 'permission_denied')
+      setError(located.reason === 'permission_denied'
+        ? 'Queue needs location permission to send a crew to you. Allow it in Settings, or call 112 or 767 now.'
+        : "We couldn't get your location. Turn on location (GPS) and try again, or call 112 or 767 now.")
       setHoldKey(k => k + 1)
       return
     }
+    const coords = located.fix
     setState('sending')
     try {
       const { request: req } = await requestAmbulance({
@@ -85,10 +93,10 @@ export function SosScreen({ navigation }: Props) {
         </View>
 
         <View style={{ alignItems: 'center', gap: 12, marginTop: 8 }}>
-          {state === 'sending' ? (
+          {state === 'locating' || state === 'sending' ? (
             <View style={{ alignItems: 'center', gap: 10, paddingVertical: 60 }}>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: RED_DEEP }}>Sending SOS…</Text>
-              <Text style={{ fontSize: 14, color: RED_DEEP }}>Sharing your location with nearby crews</Text>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: RED_DEEP }}>{state === 'locating' ? 'Finding your location…' : 'Sending SOS…'}</Text>
+              <Text style={{ fontSize: 14, color: RED_DEEP }}>{state === 'locating' ? 'This takes a few seconds' : 'Sharing your location with nearby crews'}</Text>
             </View>
           ) : (
             <HoldButton key={holdKey} label="SOS" onComplete={send} />
@@ -99,6 +107,11 @@ export function SosScreen({ navigation }: Props) {
           {state === 'error' && (
             <View accessibilityRole="alert" style={{ alignSelf: 'stretch', backgroundColor: '#FEE2E2', borderRadius: 12, padding: 12 }}>
               <Text style={{ fontSize: 14, color: RED_DEEP, lineHeight: 20 }}>{error}</Text>
+              {needsSettings && (
+                <TouchableOpacity onPress={() => Linking.openSettings()} accessibilityRole="button" style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: RED_DEEP, textDecorationLine: 'underline' }}>Open settings</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
