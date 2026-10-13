@@ -113,6 +113,31 @@ describe('POST /api/virtual/token', () => {
     expect(doctorName).toBe('Dr. Emeka Obi')
   })
 
+  // The doctor's host token used to be stored in virtual_sessions, where the patient
+  // and every staff member at the hospital could read it and join as uid 1.
+  it('stores only the guest token, never the host token', async () => {
+    process.env.AGORA_APP_ID = 'test-app-id'
+    process.env.AGORA_APP_CERTIFICATE = 'test-cert'
+    getServerUserMock.mockResolvedValue({ id: 'AUTH_THE_REAL_DOCTOR' })
+    dbMock.current = mockDb({
+      appointments: {
+        data: { id: 'appt-1', type: 'virtual', status: 'confirmed', doctor_id: 'DOC_1', patient_id: 'PAT_1' },
+      },
+      doctors: { data: { id: 'DOC_1', auth_user_id: 'AUTH_THE_REAL_DOCTOR', user_id: null } },
+      virtual_sessions: { data: null, error: null },
+    })
+
+    const res = await POST(makeRequest({ appointmentId: 'appt-1' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).token).toBe('fake-token')
+
+    const sessionCalls = dbMock.current.from.mock.results
+      .filter((_r, i) => dbMock.current.from.mock.calls[i][0] === 'virtual_sessions')
+    const upsertRow = sessionCalls[0].value.upsert.mock.calls[0][0]
+    expect(upsertRow.host_token).toBeNull()
+    expect(upsertRow.guest_token).toBe('fake-token')
+  })
+
   // A misconfigured deploy must not hand out a token signed with an empty app id.
   it('refuses to build a token when Agora credentials are missing', async () => {
     delete process.env.AGORA_APP_ID
