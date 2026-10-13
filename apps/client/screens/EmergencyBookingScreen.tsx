@@ -422,7 +422,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             <>
               <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Text style={[s.noteText, { color: t.danger }]}>
-                  An ambulance will be dispatched to your current location immediately after you confirm.
+                  We start looking for the nearest available ambulance as soon as you confirm, and show you when a crew accepts.
                   The nearest available crew decides the receiving hospital based on your condition and
                   bed capacity — a preference below is used only when it doesn't conflict with that.
                 </Text>
