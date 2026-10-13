@@ -5,6 +5,9 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 
 export async function updateHospitalProfile(formData: FormData) {
   const { adminRecord } = await getHospitalContext()
+  // Public contact details: admin/owner only (crew or front desk changing the phone
+  // number patients call is a phishing vector).
+  if (adminRecord.role !== 'admin' && adminRecord.role !== 'owner') throw new Error('Unauthorized')
   const db = createAdminClient()
 
   const allVirtual = formData.getAll('accepts_virtual')
@@ -28,6 +31,7 @@ export async function updateHospitalProfile(formData: FormData) {
 export async function upsertOperatingHours(hospitalId: string, day: number, open: string, close: string, closed: boolean) {
   const { adminRecord } = await getHospitalContext()
   if (adminRecord.hospital_id !== hospitalId) throw new Error('Unauthorized')
+  if (adminRecord.role !== 'admin' && adminRecord.role !== 'owner') throw new Error('Unauthorized')
   const db = createAdminClient()
 
   if (closed) {

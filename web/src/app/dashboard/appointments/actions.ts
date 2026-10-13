@@ -5,6 +5,13 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 import { notifyPatient } from '@/lib/notify-patient'
 import { checkInAppointment } from '@/lib/appointment-checkin'
 
+// getHospitalContext admits every hospital_admins role, including specialists and
+// ambulance crew; changing appointment state is front-desk / admin work.
+const APPOINTMENT_STAFF_ROLES = ['admin', 'owner', 'front_desk']
+function assertAppointmentStaff(role: string | null) {
+  if (!role || !APPOINTMENT_STAFF_ROLES.includes(role)) throw new Error('Unauthorized')
+}
+
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending:     ['confirmed', 'cancelled'],
   confirmed:   ['checked_in', 'cancelled'],
@@ -17,6 +24,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 export async function updateAppointmentStatus(appointmentId: string, newStatus: string) {
   const { adminRecord } = await getHospitalContext()
+  assertAppointmentStaff(adminRecord.role)
   const db = createAdminClient()
 
   const { data: appt, error: fetchErr } = await db
@@ -60,6 +68,7 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
 // since this page updates via a server action rather than that route.
 export async function approvePendingApprovalAppointment(appointmentId: string) {
   const { adminRecord } = await getHospitalContext()
+  assertAppointmentStaff(adminRecord.role)
   const db = createAdminClient()
 
   const { data: appt, error: fetchErr } = await db
@@ -101,6 +110,7 @@ export async function approvePendingApprovalAppointment(appointmentId: string) {
 // Used by FrontDeskActions to cancel a pending_approval appointment via the reject flow
 export async function rejectPendingApprovalAppointment(appointmentId: string) {
   const { adminRecord } = await getHospitalContext()
+  assertAppointmentStaff(adminRecord.role)
   const db = createAdminClient()
 
   const { data: appt, error: fetchErr } = await db
