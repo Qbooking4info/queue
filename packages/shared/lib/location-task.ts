@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager'
 import * as ExpoLocation from 'expo-location'
 import { sendLocationPing } from './crew-api'
 import { checkOffersInBackground } from './offerAlerts'
+import { MOCK_LOCATION } from './mock-location'
 
 /**
  * Background position reporting for on-duty ambulance crews.
@@ -109,6 +110,14 @@ export type StartResult =
   | { ok: false; reason: 'foreground_denied' | 'background_denied' | 'unavailable' }
 
 export async function startBackgroundLocation(ambulanceId: string): Promise<StartResult> {
+  // Testing switch: no permission prompt, no OS location service. CrewHomeScreen's
+  // foreground ping loop reports a mock position while the app is open, which is
+  // all that's needed to stay dispatchable during testing.
+  if (MOCK_LOCATION) {
+    setBackgroundUnit(ambulanceId)
+    return { ok: true }
+  }
+
   const fg = await ExpoLocation.requestForegroundPermissionsAsync()
   if (fg.status !== 'granted') return { ok: false, reason: 'foreground_denied' }
 

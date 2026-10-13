@@ -20,7 +20,7 @@ import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 const EDITABLE_FIELDS = [
   'title', 'specialty_id', 'level', 'bio', 'qualification', 'years_experience',
   'virtual_fee', 'home_visit_fee', 'accepts_direct_virtual',
-  'accepts_direct_home_visit', 'show_phone_to_patients',
+  'accepts_direct_home_visit', 'show_phone_to_patients', 'is_paused',
 ] as const
 
 export async function OPTIONS() {
