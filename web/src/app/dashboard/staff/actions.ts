@@ -7,6 +7,10 @@ import { getHospitalContext } from '@/lib/getHospitalContext'
 const VALID_ROLES = ['specialist', 'front_desk', 'admin']
 const VALID_CREW_ROLES = ['driver', 'emt', 'paramedic', 'nurse', 'doctor', 'dispatcher']
 const VALID_CREW_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
+// Logins this portal generates itself (front desk, crew) -- the only accounts whose
+// password a hospital admin may reset and see.
+const PORTAL_EMAIL_DOMAIN = '@portal.queueapp.co'
+const SYSTEM_LOGIN_ROLES = ['specialist', 'front_desk', 'ambulance_crew']
 
 const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
 function genPassword() {
@@ -25,9 +29,24 @@ export async function resetStaffPassword(
   const userId = formData.get('user_id') as string
   const db = createAdminClient()
 
+  // The target must be a system-login staff member of THIS hospital. Without this,
+  // any hospital admin (and anyone can onboard a hospital) could pass any users.id
+  // and be handed a working password for that account -- another hospital's owner,
+  // a patient, a super admin. Real-email accounts use the normal reset-email flow.
+  const { data: membership } = await db
+    .from('hospital_admins').select('role')
+    .eq('hospital_id', adminRecord.hospital_id)
+    .eq('user_id', userId)
+    .in('role', SYSTEM_LOGIN_ROLES)
+    .maybeSingle()
+  if (!membership) return { error: 'User not found' }
+
   const { data: userRow } = await db
     .from('users').select('email, auth_id').eq('id', userId).single()
   if (!userRow?.auth_id) return { error: 'User not found' }
+  if (!userRow.email?.toLowerCase().endsWith(PORTAL_EMAIL_DOMAIN)) {
+    return { error: 'This person signs in with their own email. Ask them to use "Forgot password".' }
+  }
 
   const newPassword = genPassword()
   const { error } = await db.auth.admin.updateUserById(userRow.auth_id, { password: newPassword })
@@ -249,6 +268,8 @@ export async function removeStaff(formData: FormData) {
     .eq('id', staffId).single()
 
   if (!member || member.hospital_id !== adminRecord.hospital_id) return
+  // Only an owner can remove an owner; otherwise an admin could lock the owner out.
+  if (member.role === 'owner' && adminRecord.role !== 'owner') return
 
   // If removing a specialist, unlink them from any doctor record in this hospital
   if (member.role === 'specialist') {
