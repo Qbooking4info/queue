@@ -38,6 +38,9 @@ import { HospitalClinicsScreen }       from './screens/staff/HospitalClinicsScre
 import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetailScreen'
 import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
+import { PatientsScreen } from './screens/staff/PatientsScreen'
+import { VirtualCareScreen } from './screens/staff/VirtualCareScreen'
+import { HospitalCarePlansScreen, CarePlanNewScreen, CarePlanDetailScreen } from './screens/staff/HospitalCarePlansScreen'
 import { AmbulanceRequestsScreen }     from './screens/staff/AmbulanceRequestsScreen'
 import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScreen'
 import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
@@ -110,6 +113,11 @@ function StaffStack() {
       <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
       <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
       <StaffStackN.Screen name="AmbulanceRequests"     component={AmbulanceRequestsScreen as any} />
+      <StaffStackN.Screen name="Patients"              component={PatientsScreen as any} />
+      <StaffStackN.Screen name="VirtualCare"           component={VirtualCareScreen as any} />
+      <StaffStackN.Screen name="HospitalCarePlans"     component={HospitalCarePlansScreen as any} />
+      <StaffStackN.Screen name="CarePlanNew"           component={CarePlanNewScreen as any} />
+      <StaffStackN.Screen name="CarePlanDetail"        component={CarePlanDetailScreen as any} />
       <StaffStackN.Screen name="AmbulanceAlerts"       component={AmbulanceAlertsScreen as any} />
       <StaffStackN.Screen name="AmbulanceCoverage"     component={AmbulanceCoverageScreen as any} />
       <StaffStackN.Screen name="AmbulanceFleet"        component={AmbulanceFleetScreen as any} />

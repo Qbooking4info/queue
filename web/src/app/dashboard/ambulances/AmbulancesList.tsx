@@ -124,15 +124,11 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 880, margin: '0 auto', width: '100%' }}>
+    <div style={{ width: '100%' }}>
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8, color: C.text }}>
-            <Ambulance size={22} color={C.red} /> Ambulance Desk
-          </h1>
-          <p style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            Patients being brought to this hospital, and every job your own fleet is running.
-          </p>
+          <div style={{ fontSize: 13, color: C.textMuted }}>Patients being brought here, and every job your own fleet is running</div>
+          <h1 className="dash-greeting-title" style={{ margin: 0, color: C.text }}>Ambulance</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {/* Alerts first: dispatcher_alerts records every request that found no

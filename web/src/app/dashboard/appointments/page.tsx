@@ -748,8 +748,7 @@ export default function AppointmentsPage() {
       {/* Header */}
       <div className="appt-header" style={{ marginBottom: SPACE.lg }}>
         <div>
-          <div className="dash-greeting-title" style={{ color: C.text }}>Appointments</div>
-          <div style={{ ...T.body, color: C.textSub, marginTop: SPACE.xs }}>
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 2 }}>
             {appts.length} record{appts.length !== 1 ? 's' : ''}
             {!isDoctor && ' · all clinics'}
             {!isDoctor && pendingApproval > 0 && (
@@ -760,18 +759,9 @@ export default function AppointmentsPage() {
               </span>
             )}
           </div>
+          <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>Appointments</h1>
         </div>
         <div className="appt-header-btns">
-          {!isDoctor && (
-            <button onClick={() => setShowWalkIn(true)}
-              style={{ background: C.bgAlt, color: C.text, border: `1px solid ${C.border}`,
-                borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
-                transition: 'opacity 0.15s', whiteSpace: 'nowrap' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-              + Walk-in
-            </button>
-          )}
           <button onClick={load}
             style={{ background: C.accent, color: C.id === 'forest' ? '#061208' : '#fff',
               border: 'none', borderRadius: 10, padding: '10px 18px', ...T.body, fontWeight: 700, cursor: 'pointer',
@@ -784,8 +774,7 @@ export default function AppointmentsPage() {
       </div>
 
       {/* Date filter */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
-        padding: '12px 16px', marginBottom: 14 }}>
+      <div style={{ marginBottom: 14 }}>
         <DateFilter value={range} onChange={(key, b) => { setRange(key); setBounds(b) }} label="Period" />
       </div>
 

@@ -111,16 +111,13 @@ export default function AnalyticsPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>Analytics</div>
-        <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-          Performance overview · {new Date().getFullYear()}
-        </div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: C.textMuted }}>Performance overview · {new Date().getFullYear()}</div>
+        <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>Reports</h1>
       </div>
 
       {/* Date filter */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
-        padding: '12px 16px', marginBottom: 20 }}>
+      <div style={{ marginBottom: 18 }}>
         <DateFilter value={range} onChange={handleRangeChange} label="Period" />
       </div>
 

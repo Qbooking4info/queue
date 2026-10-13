@@ -42,7 +42,12 @@ export function StaffMoreScreen({ navigation }: Props) {
   }
 
   const menuItems = [
+    { icon: 'people-circle-outline', label: 'Patients', sub: 'Everyone who has visited', onPress: () => navigation.navigate('Patients') },
     { icon: 'chatbubbles-outline', label: 'Messages', sub: 'Patients, doctors, crews', onPress: () => navigation.navigate('HospitalMessages') },
+    ...(isAdmin || isClinicAdmin ? [
+      { icon: 'videocam-outline', label: 'Virtual Care', sub: 'Video consultations', onPress: () => navigation.navigate('VirtualCare') },
+      { icon: 'checkbox-outline', label: 'Care Plans', sub: 'Plans and adherence', onPress: () => navigation.navigate('HospitalCarePlans') },
+    ] : []),
     { icon: 'time-outline', label: 'Staff shifts', sub: isAdmin ? 'Plan the weekly rota' : 'Your shifts and the rota', onPress: () => navigation.navigate('StaffShifts') },
     // Staff Management also holds doctor-linking (see StaffManagementScreen's
     // own role check for what a sub-admin can and can't do once inside it) --

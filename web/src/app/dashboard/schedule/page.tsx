@@ -179,10 +179,10 @@ function ScheduleContent() {
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div className="dash-greeting-title" style={{ color: C.text }}>Schedule</div>
-          <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: C.textMuted }}>
             Week of {monday.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
+          <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>Schedule</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {isMulti && clinics.length > 0 && (

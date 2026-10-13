@@ -336,17 +336,17 @@ export default function ServicesPage() {
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
+          <div style={{ fontSize: 13, color: C.textMuted }}>
+            {isScopedToClinic ? 'Services for your clinic' : 'What your hospital offers on Queue'}
+          </div>
+          <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>
             {isScopedToClinic ? 'Clinic Services' : 'Services & Specialties'}
-          </div>
-          <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            {isScopedToClinic ? 'Manage services for your clinic' : 'Manage what your hospital offers on Queue'}
-          </div>
+          </h1>
         </div>
         <button
           onClick={() => tab === 'services' ? setShowAddService(true) : setShowAddSpecialty(true)}
-          style={{ background: C.accent, color: '#fff', border: 'none', borderRadius: 10,
-            padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          style={{ background: C.accent, color: C.id === 'forest' ? '#04201D' : '#fff', border: 'none', borderRadius: 13,
+            height: 44, padding: '0 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
           {tab === 'services' ? '+ Add Service' : '+ Add Specialty'}
         </button>
       </div>

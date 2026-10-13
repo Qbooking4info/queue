@@ -1,4 +1,5 @@
 'use client'
+import { StatCard } from '@/components/dashboard/StatCard'
 import { useState, useEffect, useCallback } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
@@ -167,10 +168,10 @@ export default function QueuePage() {
         }
       `}</style>
       <div style={{ marginBottom: 16 }}>
-        <div className="dash-greeting-title" style={{ color: C.text }}>Live Queue</div>
-        <div style={{ fontSize: 13, color: C.textMuted, marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: C.textMuted }}>
           {new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
+        <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>Live Queue</h1>
       </div>
 
       {canManageBedSpace && hospital && (
@@ -184,17 +185,11 @@ export default function QueuePage() {
       {/* Summary chips */}
       <div className="queue-chips">
         {[
-          { label: 'Waiting',     value: waiting,    color: 'rgba(255,255,255,0.55)' },
-          { label: 'In Progress', value: inProgress, color: C.amber },
-          { label: 'Completed',   value: completed,  color: '#4ade80' },
-          { label: 'Total Today', value: appts.length, color: C.accent },
-        ].map(chip => (
-          <div key={chip.label} style={{ padding: 'clamp(12px,2.5vw,16px) clamp(14px,2.5vw,20px)', borderRadius: 14,
-            background: C.card, border: `1px solid ${C.border}` }}>
-            <div className="dash-stat-value" style={{ color: chip.color }}>{chip.value}</div>
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{chip.label}</div>
-          </div>
-        ))}
+          { label: 'Waiting',     value: waiting },
+          { label: 'In progress', value: inProgress },
+          { label: 'Completed',   value: completed },
+          { label: 'Total today', value: appts.length },
+        ].map(chip => <StatCard key={chip.label} label={chip.label} value={chip.value} />)}
       </div>
 
       {actionError && (

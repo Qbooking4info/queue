@@ -17,7 +17,8 @@ import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-const DONE = new Set(['completed', 'cancelled', 'arrived_at_destination', 'no_unit_found', 'expired'])
+// Same rule as the web banner (useInboundAmbulances): heading to this hospital and still live.
+const LIVE = new Set(['matched', 'en_route_to_patient', 'on_scene', 'transporting', 'arrived_at_destination'])
 
 // Inbound ambulances for this hospital, via the same route the Ambulance desk uses.
 // Fails quietly (returns 0) for roles that route doesn't serve.
@@ -28,7 +29,7 @@ async function countInbound(): Promise<number> {
     const res = await fetch(`${API_URL}/api/ambulances`, { headers: { Authorization: `Bearer ${session.access_token}` } })
     if (!res.ok) return 0
     const body = await res.json()
-    return ((body.requests ?? []) as { status: string }[]).filter(r => !DONE.has(r.status)).length
+    return ((body.requests ?? []) as { status: string; is_inbound?: boolean }[]).filter(r => r.is_inbound && LIVE.has(r.status)).length
   } catch { return 0 }
 }
 
@@ -117,7 +118,7 @@ export function AdminDashboardScreen({ navigation }: { navigation: any }) {
             <View style={{ gap: 10, marginBottom: 14 }}>
               {inbound > 0 && (
                 <Card onPress={() => navigation.navigate('AmbulanceRequests')} accessibilityLabel={`${inbound} ambulances inbound`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }}>
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.cardBg, borderColor: t.dangerBorder, borderWidth: 1.5 }}>
                   <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.danger, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="medical" size={20} color="#FFFFFF" />
                   </View>

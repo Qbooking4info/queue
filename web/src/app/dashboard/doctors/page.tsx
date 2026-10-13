@@ -5,7 +5,6 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import { Star, Check, X } from 'lucide-react'
 import type { AdminDoctor, DoctorAvailabilityStatus } from '@/lib/admin-api'
-import { Button } from '@/components/ui/button'
 import { LinkDoctorModal } from '@/components/dashboard/LinkDoctorModal'
 
 const AVAIL: Record<DoctorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
@@ -63,16 +62,20 @@ export default function DoctorsPage() {
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '-.03em' }}>
-            {isFrontDesk ? 'Doctor Availability' : 'Doctors & Staff'}
-          </div>
-          <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: C.textMuted }}>
             {stats.activeDoctors} practitioner{stats.activeDoctors !== 1 ? 's' : ''} registered
           </div>
+          <h1 className="dash-greeting-title" style={{ color: C.text, margin: 0 }}>
+            {isFrontDesk ? 'Doctor Availability' : 'Doctors'}
+          </h1>
         </div>
         {canAddDoctor && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button onClick={() => setLinking(true)}>+ Add Doctor by ID</Button>
+            <button type="button" onClick={() => setLinking(true)}
+              style={{ height: 44, padding: '0 18px', borderRadius: 13, border: 'none', background: C.accent,
+                color: C.id === 'forest' ? '#04201D' : '#FFFFFF', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              + Add doctor by ID
+            </button>
           </div>
         )}
       </div>
@@ -92,11 +95,11 @@ export default function DoctorsPage() {
             const avail = AVAIL[d.availability_status] ?? AVAIL.on_duty
             return (
               <div key={d.id} style={{ background: C.card, border: `1px solid ${C.border}`,
-                borderRadius: 16, padding: 20, transition: 'background .3s' }}>
+                borderRadius: 14, padding: 16 }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 14, background: d.color,
+                  <div style={{ width: 52, height: 52, borderRadius: 99, background: C.accentLight,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, fontWeight: 800, color: '#a0e8c0', flexShrink: 0 }}>
+                    fontSize: 16, fontWeight: 800, color: C.accent, flexShrink: 0 }}>
                     {d.avatar}
                   </div>
                   <div style={{ flex: 1 }}>
