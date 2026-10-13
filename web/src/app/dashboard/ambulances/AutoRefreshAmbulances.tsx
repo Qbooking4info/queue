@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 // Subscribes to Supabase Realtime for live inbound-ambulance updates.
-// Falls back to 30s polling in case Realtime is not enabled on transport_requests.
+// Falls back to 15s polling (also how own-fleet jobs bound elsewhere refresh) in case Realtime is not enabled on transport_requests.
 export function AutoRefreshAmbulances({ hospitalId }: { hospitalId: string }) {
   const router = useRouter()
 
@@ -20,7 +20,7 @@ export function AutoRefreshAmbulances({ hospitalId }: { hospitalId: string }) {
       )
       .subscribe()
 
-    const fallback = setInterval(() => router.refresh(), 30_000)
+    const fallback = setInterval(() => router.refresh(), 15_000)
 
     return () => {
       supabase.removeChannel(channel)

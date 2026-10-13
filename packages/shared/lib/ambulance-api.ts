@@ -151,6 +151,35 @@ export async function getRequestPickupPoint(requestId: string): Promise<{ lat: n
   return typeof raw === 'string' ? parsePoint(raw) : null
 }
 
+export interface TransportDetails {
+  plate_number: string | null
+  call_sign: string | null
+  vehicle_tier: string | null
+  provider_name: string | null
+  provider_phone: string | null
+  destination_name: string | null
+  destination_address: string | null
+  destination_phone: string | null
+  disposition: string | null
+  completed_at: string | null
+}
+
+// The unit, its operator and the destination hospital, for the requester only.
+export async function getTransportDetails(requestId: string): Promise<TransportDetails | null> {
+  const { data, error } = await supabase.rpc('get_my_transport_details', { p_request_id: requestId })
+  if (error) throw error
+  return ((data ?? []) as TransportDetails[])[0] ?? null
+}
+
+export const DISPOSITION_LABEL: Record<string, string> = {
+  transported:             'Taken to hospital',
+  treated_not_transported: 'Treated on scene',
+  patient_refused:         'Transport declined',
+  no_patient_found:        'Patient not found at pickup',
+  deceased_on_scene:       'Closed on scene',
+  cancelled:               'Cancelled',
+}
+
 export async function getUnitLocation(ambulanceId: string): Promise<{ lat: number; lng: number; recordedAt: string } | null> {
   const { data } = await supabase
     .from('ambulance_current_location')

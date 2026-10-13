@@ -10,10 +10,10 @@ import { Header, HeaderTail, Card, SectionTitle, PrimaryButton, EmptyState } fro
 import { haptics } from '@queue/shared/lib/haptics'
 import { startConversation } from '@queue/shared/lib/chat'
 import {
-  getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus, completeJob,
+  getMyPendingOffers, getMyActiveJob, respondToOffer, updateJobStatus, completeJob, getDestinationOptions, setDestination,
   sendLocationPing, nextJobStatus, CREW_STATUS_LABEL,
   getMyUnits, setUnitDuty,
-  type PendingOffer, type ActiveJob, type MyUnit, type CrewDisposition,
+  type PendingOffer, type ActiveJob, type MyUnit, type CrewDisposition, type DestinationOption,
 } from '@queue/shared/lib/crew-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startBackgroundLocation, stopBackgroundLocation, setBackgroundUnit } from '@queue/shared/lib/location-task'
@@ -49,6 +49,11 @@ export function CrewHomeScreen() {
   const [refreshing, setRefreshing]   = useState(false)
   const [respondingId, setRespondingId] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  // Destination picker. advanceAfterPick: the crew tapped "Transporting" with no
+  // hospital chosen, so the pick continues straight into that status change.
+  const [destOpen, setDestOpen]         = useState(false)
+  const [destOptions, setDestOptions]   = useState<DestinationOption[] | null>(null)
+  const [advanceAfterPick, setAdvanceAfterPick] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [units, setUnits] = useState<MyUnit[]>([])
   const [dutyBusy, setDutyBusy] = useState<string | null>(null)
@@ -211,7 +216,43 @@ export function CrewHomeScreen() {
     }
   }
 
+  async function openDestinationPicker(thenAdvance = false) {
+    if (!activeJob) return
+    setAdvanceAfterPick(thenAdvance)
+    setDestOptions(null)
+    setDestOpen(true)
+    try {
+      setDestOptions(await getDestinationOptions(activeJob.request_id))
+    } catch (err) {
+      setDestOpen(false)
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not load hospitals.')
+    }
+  }
+
+  async function pickDestination(hospitalId: string) {
+    if (!activeJob) return
+    setDestOpen(false)
+    try {
+      const ok = await setDestination(activeJob.request_id, hospitalId)
+      if (!ok) Alert.alert('Could not set hospital', 'This job may no longer be assigned to your unit.')
+      await load()
+      if (ok && advanceAfterPick) await advanceStatus()
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Could not set the destination.')
+    }
+  }
+
   async function handleAdvanceStatus() {
+    if (!activeJob) return
+    // The receiving hospital only sees the patient coming once a destination is set.
+    if (nextJobStatus(activeJob.status) === 'transporting' && !activeJob.destination_hospital_id) {
+      openDestinationPicker(true)
+      return
+    }
+    await advanceStatus()
+  }
+
+  async function advanceStatus() {
     if (!activeJob) return
     const next = nextJobStatus(activeJob.status)
     if (!next) return
@@ -287,6 +328,42 @@ export function CrewHomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Modal visible={destOpen} animationType="slide" transparent onRequestClose={() => setDestOpen(false)}>
+        <View style={s.sheetBackdrop}>
+          <View style={[s.sheet, { backgroundColor: t.canvasBg }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: t.textPrimary }}>Take patient to</Text>
+              <TouchableOpacity onPress={() => setDestOpen(false)} accessibilityLabel="Close" hitSlop={12}>
+                <Ionicons name="close" size={24} color={t.textMuted} />
+              </TouchableOpacity>
+            </View>
+            {destOptions == null ? (
+              <ActivityIndicator color={t.accent} style={{ marginVertical: 32 }} />
+            ) : destOptions.length === 0 ? (
+              <Text style={{ color: t.textSecondary, marginVertical: 24, textAlign: 'center' }}>No hospitals available.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 460 }}>
+                {destOptions.map(h => (
+                  <TouchableOpacity key={h.hospital_id} onPress={() => pickDestination(h.hospital_id)}
+                    style={[s.destOption, { borderColor: h.is_current ? t.accentBorder : t.cardBorder, backgroundColor: h.is_current ? t.accentBg : t.cardBg }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{h.name}</Text>
+                      <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }} numberOfLines={1}>
+                        {[h.distance_m != null ? `${(h.distance_m / 1000).toFixed(1)} km` : null,
+                          h.is_24_hours ? '24 hours' : null,
+                          h.bed_space_status ? `Beds: ${h.bed_space_status}` : null,
+                          h.address].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    {h.is_current && <Ionicons name="checkmark-circle" size={20} color={t.accent} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={!!incoming && !activeJob} animationType="fade" onRequestClose={() => {}} statusBarTranslucent>
         {incoming && (() => {
           const secs = countdown(incoming.expires_at, now)
@@ -403,12 +480,25 @@ export function CrewHomeScreen() {
                 <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.pickup_address}</Text>
               </View>
             )}
-            {activeJob.destination_hospital_name && (
-              <View style={s.detailRow}>
-                <Ionicons name="business-outline" size={16} color={t.accent} />
-                <Text style={[s.detailText, { color: t.textSecondary }]}>{activeJob.destination_hospital_name}</Text>
+            {/* Destination: tappable until arrival, so the crew can change their mind en route. */}
+            <TouchableOpacity
+              disabled={activeJob.status === 'arrived_at_destination'}
+              onPress={() => openDestinationPicker(false)}
+              accessibilityRole="button"
+              accessibilityLabel={activeJob.destination_hospital_name ? `Destination ${activeJob.destination_hospital_name}. Change` : 'Choose destination hospital'}
+              style={[s.destRow, { borderColor: activeJob.destination_hospital_id ? t.cardBorder : t.statusBusy.border,
+                backgroundColor: activeJob.destination_hospital_id ? t.cardBg : t.statusBusy.bg }]}>
+              <Ionicons name="business-outline" size={18} color={activeJob.destination_hospital_id ? t.accent : t.statusBusy.text} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, letterSpacing: 0.4 }}>DESTINATION</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: activeJob.destination_hospital_id ? t.textPrimary : t.statusBusy.text }}>
+                  {activeJob.destination_hospital_name ?? 'Choose hospital'}
+                </Text>
               </View>
-            )}
+              {activeJob.status !== 'arrived_at_destination' && (
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>{activeJob.destination_hospital_id ? 'Change' : 'Choose'}</Text>
+              )}
+            </TouchableOpacity>
 
             {/* Where the patient actually is, and how long until we're there.
                 Both come from the server, so the crew and the patient are
@@ -423,6 +513,10 @@ export function CrewHomeScreen() {
             />
 
             <PrimaryButton height={64} variant="ghost" icon="call-outline" label="Call patient" onPress={callPatient} />
+            {!!activeJob.destination_hospital_phone && ['on_scene', 'transporting'].includes(activeJob.status) && (
+              <PrimaryButton height={64} variant="ghost" icon="business-outline" label="Call hospital ahead"
+                onPress={() => Linking.openURL(`tel:${activeJob.destination_hospital_phone}`).catch(() => Alert.alert('Error', 'Could not start a call.'))} />
+            )}
             {!!activeJob.destination_hospital_id && (
               <PrimaryButton height={64} variant="ghost" icon="chatbubble-ellipses-outline" label="Message hospital"
                 onPress={async () => {
@@ -493,6 +587,10 @@ export function CrewHomeScreen() {
 }
 
 const s = StyleSheet.create({
+  destRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, padding: 12 },
+  destOption:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 8 },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet:         { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   triageBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
   triageBadgeText: { fontSize: 12, fontWeight: '800' },
   detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },

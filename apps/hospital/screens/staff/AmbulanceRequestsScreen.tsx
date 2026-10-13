@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { Alert } from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -24,6 +25,15 @@ interface TransportRequest {
   patient: { full_name: string } | null
   dependent: { full_name: string } | null
   unit: { plate_number: string; call_sign: string | null; vehicle_tier: string; provider: { name: string } | null } | null
+  destination: { name: string } | null
+  disposition: string | null
+  is_inbound: boolean
+  is_own_fleet: boolean
+}
+
+const DISPOSITION_LABEL: Record<string, string> = {
+  transported: 'Transported', treated_not_transported: 'Treated on scene', patient_refused: 'Patient refused',
+  no_patient_found: 'No patient found', deceased_on_scene: 'Closed on scene', cancelled: 'Cancelled',
 }
 
 interface Props { navigation: any }
@@ -114,12 +124,39 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
     return () => { supabase.removeChannel(channel); clearInterval(fallback) }
   }, [hospitalId, load]))
 
+  const [receiving, setReceiving] = useState<string | null>(null)
+
+  // Completes the trip as transported and frees the ambulance.
+  function confirmReceived(r: TransportRequest) {
+    Alert.alert('Patient received?', `Confirm ${r.booking_ref} has been handed over to your team.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: async () => {
+        setReceiving(r.id)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const res = await fetch(`${API_URL}/api/ambulances/receive`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+            body: JSON.stringify({ requestId: r.id }),
+          })
+          const body = await res.json().catch(() => ({}))
+          if (!res.ok) Alert.alert('Could not confirm', body.error ?? 'Please try again.')
+          await load()
+        } catch {
+          Alert.alert('Could not confirm', 'Check your connection and try again.')
+        } finally {
+          setReceiving(null)
+        }
+      } },
+    ])
+  }
+
   const active = requests.filter(r => ACTIVE_STATUSES.includes(r.status))
   const history = requests.filter(r => !ACTIVE_STATUSES.includes(r.status))
 
   return (
     <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Ambulance desk" subtitle="Inbound patients, scheduled trips, fleet" onBack={() => navigation.goBack()} />
+      <Header title="Ambulance desk" subtitle="Inbound patients and your fleet's jobs" onBack={() => navigation.goBack()} />
 
       <View style={st.linkRow}>
         <TouchableOpacity onPress={() => navigation.navigate('AmbulanceAlerts')}
@@ -150,7 +187,7 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
           {!active.length ? (
             <View style={[st.empty, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
               <Ionicons name="medical-outline" size={32} color={t.textMuted} />
-              <Text style={[st.emptyText, { color: t.textSecondary }]}>No ambulances inbound right now</Text>
+              <Text style={[st.emptyText, { color: t.textSecondary }]}>No active ambulance jobs right now</Text>
             </View>
           ) : (
             <View style={{ gap: 8, marginBottom: active.length ? 24 : 0 }}>
@@ -170,6 +207,16 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
                           {r.triage_level != null && (
                             <View style={[st.badge, { borderColor: r.triage_level <= 2 ? t.dangerBorder : t.statusBusy.border, backgroundColor: r.triage_level <= 2 ? t.dangerSubtle : t.statusBusy.bg }]}>
                               <Text style={[st.badgeText, { color: r.triage_level <= 2 ? t.danger : t.statusBusy.text }]}>Triage {r.triage_level}</Text>
+                            </View>
+                          )}
+                          {r.is_inbound && (
+                            <View style={[st.badge, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
+                              <Text style={[st.badgeText, { color: t.accent }]}>Inbound</Text>
+                            </View>
+                          )}
+                          {r.is_own_fleet && (
+                            <View style={[st.badge, { borderColor: t.statusVirtual.border, backgroundColor: t.statusVirtual.bg }]}>
+                              <Text style={[st.badgeText, { color: t.statusVirtual.text }]}>Your fleet</Text>
                             </View>
                           )}
                           {isCritical && (
@@ -194,12 +241,26 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
                             {r.unit.provider?.name ?? 'Ambulance'} · {r.unit.call_sign ?? r.unit.plate_number} · {r.unit.vehicle_tier}
                           </Text>
                         )}
+                        <View style={st.metaItem}>
+                          <Ionicons name="business-outline" size={11} color={r.destination ? t.textMuted : t.statusBusy.text} />
+                          <Text style={[st.metaText, { color: r.destination ? t.textMuted : t.statusBusy.text }]} numberOfLines={1}>
+                            {r.destination?.name ?? 'Destination not chosen yet'}
+                          </Text>
+                        </View>
                       </View>
                       <View style={[st.statusBadge, { borderColor: sc.border, backgroundColor: sc.bg }]}>
                         <Text style={[st.statusText, { color: sc.text }]}>{STATUS_LABEL[r.status] ?? r.status}</Text>
                       </View>
                     </View>
                     <Text style={[st.ref, { color: t.textMuted }]}>{r.booking_ref}</Text>
+                    {r.is_inbound && ['transporting', 'arrived_at_destination'].includes(r.status) && (
+                      <TouchableOpacity onPress={() => confirmReceived(r)} disabled={receiving === r.id}
+                        accessibilityRole="button" style={[st.receiveBtn, { backgroundColor: t.accent, opacity: receiving === r.id ? 0.6 : 1 }]}>
+                        {receiving === r.id
+                          ? <ActivityIndicator color="#fff" />
+                          : <><Ionicons name="checkmark-done" size={16} color="#fff" /><Text style={st.receiveText}>Patient received</Text></>}
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )
               })}
@@ -214,7 +275,9 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
                   const sc = statusTrio(t, r.status)
                   return (
                     <View key={r.id} style={[st.historyRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                      <Text style={[st.historyText, { color: t.textSecondary }]} numberOfLines={1}>{r.booking_ref} · {r.symptom_description ?? '—'}</Text>
+                      <Text style={[st.historyText, { color: t.textSecondary }]} numberOfLines={1}>
+                        {r.booking_ref} · {r.symptom_description ?? '—'}{r.disposition ? ` · ${DISPOSITION_LABEL[r.disposition] ?? r.disposition}` : ''}
+                      </Text>
                       <View style={[st.statusBadge, { borderColor: sc.border, backgroundColor: sc.bg }]}>
                         <Text style={[st.statusText, { color: sc.text }]}>{STATUS_LABEL[r.status] ?? r.status}</Text>
                       </View>
@@ -257,4 +320,6 @@ const st = StyleSheet.create({
   ref: { fontSize: 11, marginTop: 8 },
   historyRow: { borderRadius: 14, padding: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   historyText: { fontSize: 13, flex: 1 },
+  receiveBtn: { marginTop: 10, height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  receiveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 })

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as ExpoLocation from 'expo-location'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,7 +13,8 @@ import {
   getTransportRequestById, getRequestPickupPoint, getUnitLocation,
   subscribeToTransport, subscribeToUnitLocation, cancelTransport,
   sharePatientLocation, formatEta, TRANSPORT_STATUS_LABEL,
-  type TransportRequestRow, type TransportStatus,
+  getTransportDetails, DISPOSITION_LABEL,
+  type TransportRequestRow, type TransportStatus, type TransportDetails,
 } from '@queue/shared/lib/ambulance-api'
 
 interface Props { navigation: any; route: any }
@@ -82,6 +83,16 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
     })
     return () => { cancelled = true }
   }, [requestId])
+
+  // Unit, operator and destination. Re-read on every status change and when the
+  // crew picks or changes the hospital, which the realtime row tells us about.
+  const [details, setDetails] = useState<TransportDetails | null>(null)
+  useEffect(() => {
+    if (!request?.assigned_unit_id) return
+    let cancelled = false
+    getTransportDetails(requestId).then(d => { if (!cancelled) setDetails(d) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [requestId, request?.assigned_unit_id, request?.status, request?.destination_hospital_id])
 
   useEffect(() => {
     const channel = subscribeToTransport(requestId, setRequest)
@@ -282,10 +293,43 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
           />
         )}
 
+        {status === 'completed' && (
+          <View style={[s.noteBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
+            <Text style={[s.noteText, { color: t.accent }]}>
+              {details?.disposition ? DISPOSITION_LABEL[details.disposition] ?? 'Trip completed' : 'Trip completed'}
+              {details?.disposition === 'transported' && details.destination_name ? ` — ${details.destination_name}` : ''}.
+              {' '}Thank you for using Queue. Take care.
+            </Text>
+          </View>
+        )}
+
+        {/* Who is coming. Shown from the moment a crew accepts, so the patient can
+            recognise the vehicle and reach the operator without searching for a number. */}
+        {details?.plate_number && !isTerminal && (
+          <View style={[s.detailCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 16, gap: 12 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.dangerSubtle, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="medkit" size={22} color={t.danger} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>{details.call_sign ?? details.plate_number}</Text>
+                <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
+                  {[details.plate_number !== details.call_sign ? details.plate_number : null, details.vehicle_tier, details.provider_name].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+            </View>
+            {!!details.provider_phone && (
+              <Button label="Call ambulance" variant="outline"
+                onPress={() => Linking.openURL(`tel:${details.provider_phone}`).catch(() => Alert.alert('Error', 'Could not start a call.'))} />
+            )}
+          </View>
+        )}
+
         <View style={[s.detailCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           {[
             { label: 'Condition', value: request.symptom_description ?? '—' },
             { label: 'Pickup',    value: request.pickup_address ?? 'Current location' },
+            ...(details?.destination_name ? [{ label: 'Hospital', value: details.destination_name }] : []),
           ].map(row => (
             <View key={row.label} style={[s.detailRow, { borderBottomColor: t.cardBorder }]}>
               <Text style={[s.detailLabel, { color: t.textMuted }]}>{row.label}</Text>
