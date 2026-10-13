@@ -53,6 +53,10 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       const { error } = await db.from('appointments')
         .update({ status: 'confirmed', approval_status: 'approved' })
         .eq('id', id)
+      // appointments_direct_doctor_slot_live: another booking already holds this slot.
+      if (error?.code === '23505') {
+        return Errors.conflict('You already have a confirmed booking at this date and time. Reject this one or ask the patient to reschedule.')
+      }
       if (error) return Errors.internal(error.message)
       return NextResponse.json({ success: true })
     }

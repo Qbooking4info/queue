@@ -10,6 +10,7 @@ export type ApiErrorCode =
   | 'PLAN_LIMIT_DOCTORS'
   | 'STATUS_TERMINAL'
   | 'APPROVAL_TERMINAL'
+  | 'CONFLICT'
   | 'INTERNAL'
 
 export interface ApiError {
@@ -32,6 +33,7 @@ export const Errors = {
   forbidden: (msg = 'Forbidden') => apiError(msg, 'FORBIDDEN', 403),
   notFound: (resource = 'Resource') => apiError(`${resource} not found`, 'NOT_FOUND', 404),
   validation: (msg: string) => apiError(msg, 'VALIDATION', 400),
+  conflict: (msg: string) => apiError(msg, 'CONFLICT', 409),
   planLimitDoctors: (max: number) =>
     apiError(`Your plan allows up to ${max} doctors. Upgrade to add more.`, 'PLAN_LIMIT_DOCTORS', 403),
   planLimitMonthly: (max: number) =>
