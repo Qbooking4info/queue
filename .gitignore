@@ -50,3 +50,6 @@ apks/
 # Local build outputs — must never enter the eas project archive
 *.tar.gz
 queue-*.apk
+
+# Supabase CLI scratch state (created when the CLI runs from a subfolder)
+**/supabase/.temp/
