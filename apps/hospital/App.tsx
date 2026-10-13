@@ -45,6 +45,7 @@ import { AmbulanceRequestsScreen }     from './screens/staff/AmbulanceRequestsSc
 import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScreen'
 import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
 import { AmbulanceFleetScreen }        from './screens/staff/AmbulanceFleetScreen'
+import { RequestAmbulanceScreen } from './screens/staff/RequestAmbulanceScreen'
 import { AmbulanceUnitScheduleScreen } from './screens/staff/AmbulanceUnitScheduleScreen'
 import { setStatusBarStyle } from 'expo-status-bar'
 import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
@@ -122,6 +123,7 @@ function StaffStack() {
       <StaffStackN.Screen name="AmbulanceCoverage"     component={AmbulanceCoverageScreen as any} />
       <StaffStackN.Screen name="AmbulanceFleet"        component={AmbulanceFleetScreen as any} />
       <StaffStackN.Screen name="AmbulanceUnitSchedule" component={AmbulanceUnitScheduleScreen as any} />
+      <StaffStackN.Screen name="RequestAmbulance"      component={RequestAmbulanceScreen as any} />
       <StaffStackN.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </StaffStackN.Navigator>
   )

@@ -63,6 +63,7 @@ export function StaffMoreScreen({ navigation }: Props) {
     // here separately.
     ...(isAdmin || staffProfile?.role === 'front_desk' ? [
       { icon: 'medical-outline', label: 'Ambulance desk', sub: 'Inbound, fleet, alerts', onPress: () => navigation.navigate('AmbulanceRequests') },
+      { icon: 'medkit-outline', label: 'Request ambulance', sub: 'Dispatch for a patient here', onPress: () => navigation.navigate('RequestAmbulance') },
     ] : []),
     ...(isAdmin ? [
       { icon: 'analytics-outline', label: 'Analytics', sub: 'Trends and revenue', onPress: () => navigation.navigate('StaffAnalytics') },

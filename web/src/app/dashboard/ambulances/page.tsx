@@ -18,6 +18,7 @@ export default async function AmbulancesPage() {
       <AutoRefreshAmbulances hospitalId={adminRecord.hospital_id} />
       <AmbulancesList
         requests={requests}
+        hospitalId={adminRecord.hospital_id}
         canManageFleet={adminRecord.role === 'admin' || adminRecord.role === 'owner'}
       />
     </>

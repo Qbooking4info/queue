@@ -327,6 +327,20 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Emergency transfer -- a doctor mid-consult realising the patient
+                  needs moving somewhere with more capability than a referral
+                  note implies. */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RequestAmbulance', {
+                  patientId: appt.patient_id,
+                  patientName: patient?.full_name ?? 'Patient',
+                  patientPhone: patient?.phone ?? null,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                <Ionicons name="medkit-outline" size={15} color={t.danger} />
+                <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>Request Ambulance</Text>
+              </TouchableOpacity>
             </View>
           )}
 

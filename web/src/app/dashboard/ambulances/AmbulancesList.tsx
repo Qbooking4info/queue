@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Ambulance, Phone, Clock, MapPin, AlertTriangle, Building2, CheckCircle2 } from 'lucide-react'
+import { RequestAmbulanceModal } from './RequestAmbulanceModal'
 import { useTheme } from '@/contexts/ThemeContext'
 import { safePatientName } from '@/lib/dashboard-utils'
 
@@ -76,9 +77,12 @@ function formatEta(seconds: number | null): string {
   return `~${mins} min`
 }
 
-export function AmbulancesList({ requests, canManageFleet }: { requests: TransportRow[]; canManageFleet: boolean }) {
+export function AmbulancesList({ requests, hospitalId, canManageFleet }: {
+  requests: TransportRow[]; hospitalId: string; canManageFleet: boolean
+}) {
   const { theme: C } = useTheme()
   const router = useRouter()
+  const [requesting, setRequesting] = useState(false)
   const [receiving, setReceiving] = useState<string | null>(null)
   const [receiveError, setReceiveError] = useState<string | null>(null)
 
@@ -133,7 +137,11 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {/* Alerts first: dispatcher_alerts records every request that found no
               ambulance, and until now nothing surfaced it. */}
-          <Link href="/dashboard/ambulances/alerts"
+<button onClick={() => setRequesting(true)}
+            style={{ padding: '10px 16px', background: C.accent, border: `1px solid ${C.accent}`, fontSize: 13, fontWeight: 700, borderRadius: 12, color: '#FFFFFF', cursor: 'pointer' }}>
+            Request ambulance
+          </button>
+                    <Link href="/dashboard/ambulances/alerts"
             style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
             Alerts
           </Link>
@@ -251,6 +259,14 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
             })}
           </div>
         </>
+      )}
+
+      {requesting && (
+        <RequestAmbulanceModal
+          C={C}
+          hospitalId={hospitalId}
+          onClose={bookingRef => { setRequesting(false); if (bookingRef) router.refresh() }}
+        />
       )}
     </div>
   )
