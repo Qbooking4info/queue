@@ -116,6 +116,18 @@ export async function POST(req: NextRequest) {
     .select('id, booking_ref, status')
     .single()
 
+  // A second tap that raced past the read above hits one_live_emergency_per_requester
+  // (migration 20261013100001). Answer it exactly like the guard does.
+  if (error?.code === '23505' && requestType === 'emergency') {
+    const { data: live } = await db.from('transport_requests')
+      .select('id, booking_ref, status')
+      .eq('requester_id', caller.id)
+      .eq('request_type', 'emergency')
+      .in('status', ['requested', 'searching', 'matched', 'en_route_to_patient', 'on_scene', 'transporting'])
+      .limit(1)
+    if (live?.length) return NextResponse.json({ request: live[0], duplicate: true }, { status: 200 })
+  }
+
   if (error) {
     console.error('[transport] create failed', error)
     return Errors.internal('Could not create transport request')
