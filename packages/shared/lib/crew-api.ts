@@ -48,6 +48,33 @@ export interface ActiveJob {
    *  server-side on every location ping. Same number the patient is shown. */
   eta_seconds: number | null
   eta_updated_at: string | null
+  destination_hospital_phone: string | null
+}
+
+export interface DestinationOption {
+  hospital_id: string
+  name: string
+  address: string | null
+  phone: string | null
+  distance_m: number | null
+  is_24_hours: boolean | null
+  bed_space_status: string | null
+  is_current: boolean
+}
+
+// Hospitals the crew can take this patient to: current pick first, then the
+// unit's own hospital, then nearest to the pickup point.
+export async function getDestinationOptions(requestId: string): Promise<DestinationOption[]> {
+  const { data, error } = await supabase.rpc('crew_destination_options', { p_request_id: requestId })
+  if (error) throw error
+  return (data ?? []) as DestinationOption[]
+}
+
+// Setting it is what puts the job on that hospital's inbound ambulance desk.
+export async function setDestination(requestId: string, hospitalId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('crew_set_destination', { p_request_id: requestId, p_hospital_id: hospitalId })
+  if (error) throw error
+  return !!data
 }
 
 /** Crew-drivable subset of the state machine — arrived_at_destination -> completed
@@ -123,6 +150,20 @@ export async function updateJobStatus(requestId: string, status: CrewJobStatus):
   const { data, error } = await supabase.rpc('crew_update_job_status', {
     p_request_id: requestId,
     p_new_status: status,
+  })
+  if (error) throw error
+  return !!data
+}
+
+export type CrewDisposition =
+  | 'transported' | 'treated_not_transported' | 'patient_refused' | 'no_patient_found' | 'deceased_on_scene'
+
+// Closes the job: 'transported' once arrived at the destination, or one of the
+// other outcomes from on_scene. The unit goes back to available server-side.
+export async function completeJob(requestId: string, disposition: CrewDisposition): Promise<boolean> {
+  const { data, error } = await supabase.rpc('crew_complete_job', {
+    p_request_id: requestId,
+    p_disposition: disposition,
   })
   if (error) throw error
   return !!data

@@ -115,9 +115,9 @@ export default function DoctorSchedulePage() {
                 <button key={i} type="button" onClick={() => toggleDay(i)}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
                   style={{
-                    borderColor: workingDays.includes(i) ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.1)',
-                    background:  workingDays.includes(i) ? 'rgba(0,232,122,0.1)' : 'rgba(255,255,255,0.03)',
-                    color:       workingDays.includes(i) ? '#00E87A' : '#7A9089',
+                    borderColor: workingDays.includes(i) ? 'rgba(15,118,110,0.5)' : 'rgba(255,255,255,0.1)',
+                    background:  workingDays.includes(i) ? 'rgba(15,118,110,0.1)' : 'rgba(255,255,255,0.03)',
+                    color:       workingDays.includes(i) ? '#0F766E' : '#7A9089',
                   }}>
                   {day}
                 </button>
@@ -147,9 +147,9 @@ export default function DoctorSchedulePage() {
                 <button key={d} type="button" onClick={() => setDuration(d)}
                   className="flex-1 py-2 rounded-lg text-xs font-bold border transition-all"
                   style={{
-                    borderColor: slotDuration === d ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.1)',
-                    background:  slotDuration === d ? 'rgba(0,232,122,0.1)' : 'rgba(255,255,255,0.03)',
-                    color:       slotDuration === d ? '#00E87A' : '#7A9089',
+                    borderColor: slotDuration === d ? 'rgba(15,118,110,0.5)' : 'rgba(255,255,255,0.1)',
+                    background:  slotDuration === d ? 'rgba(15,118,110,0.1)' : 'rgba(255,255,255,0.03)',
+                    color:       slotDuration === d ? '#0F766E' : '#7A9089',
                   }}>
                   {d}m
                 </button>
@@ -165,9 +165,9 @@ export default function DoctorSchedulePage() {
                 <button key={d} type="button" onClick={() => setDaysAhead(d)}
                   className="flex-1 py-2 rounded-lg text-xs font-bold border transition-all"
                   style={{
-                    borderColor: daysAhead === d ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.1)',
-                    background:  daysAhead === d ? 'rgba(0,232,122,0.1)' : 'rgba(255,255,255,0.03)',
-                    color:       daysAhead === d ? '#00E87A' : '#7A9089',
+                    borderColor: daysAhead === d ? 'rgba(15,118,110,0.5)' : 'rgba(255,255,255,0.1)',
+                    background:  daysAhead === d ? 'rgba(15,118,110,0.1)' : 'rgba(255,255,255,0.03)',
+                    color:       daysAhead === d ? '#0F766E' : '#7A9089',
                   }}>
                   {d}d
                 </button>
@@ -184,7 +184,7 @@ export default function DoctorSchedulePage() {
               <label key={key} className="flex items-center gap-3 cursor-pointer">
                 <div onClick={() => set(!value)}
                   className="w-9 h-5 rounded-full relative transition-colors shrink-0"
-                  style={{ background: value ? '#00E87A' : 'rgba(255,255,255,0.1)' }}>
+                  style={{ background: value ? '#0F766E' : 'rgba(255,255,255,0.1)' }}>
                   <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
                     style={{ left: value ? 20 : 2 }} />
                 </div>

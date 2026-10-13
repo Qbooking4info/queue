@@ -4,12 +4,14 @@
 // accent-highlighted active item, same logo/user-chip/sign-out layout), and
 // a compact bottom tab bar on an actual phone-width screen. One shared nav
 // item list drives both, so there's no risk of the two layouts drifting.
-import { View, Text, TouchableOpacity, useWindowDimensions, ScrollView } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, TouchableOpacity, useWindowDimensions, ScrollView, KeyboardAvoidingView } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
+import { Header } from './ui/v3'
 
 const WIDE_BREAKPOINT = 820
 
@@ -130,8 +132,26 @@ export function AppShell({ active, navigation, children }: {
   )
 }
 
-export function ShellScroll({ children }: { children: React.ReactNode }) {
+/** Tab-root page: v3.1 teal header (when `title` is given) over a themed scroll body. */
+export function ShellScroll({ children, title, subtitle, onBack, right, headerContent }: {
+  children: React.ReactNode; title?: string; subtitle?: string; onBack?: () => void
+  right?: React.ReactNode; headerContent?: React.ReactNode
+}) {
   const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  if (title || headerContent) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <Header title={title} subtitle={subtitle} onBack={onBack} right={right}>{headerContent}</Header>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: t.canvasBg }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 + insets.bottom }} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    )
+  }
   return (
     // A bare ScrollView has no background of its own, so on Android it falls through to
     // the window's light default while everything drawn inside it is dark-themed -- the

@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0A0F0D;
-  --foreground: #F0F5F2;
-  --accent: #00E87A;
-  --accent-muted: rgba(0,232,122,0.12);
-  --accent-border: rgba(0,232,122,0.25);
-  --card: #111915;
-  --card-alt: #161D19;
-  --border: rgba(255,255,255,0.07);
-  --border-med: rgba(255,255,255,0.12);
-  --text-sub: #7A9089;
-  --text-muted: #4A6058;
+  --background: #F8FAFC;
+  --foreground: #0B1B1E;
+  --accent: #0F766E;
+  --accent-muted: #E6F4F2;
+  --accent-border: rgba(15,118,110,0.30);
+  --card: #FFFFFF;
+  --card-alt: #F8FAFC;
+  --border: #E3ECEB;
+  --border-med: #CFDDDB;
+  --text-sub: #33464A;
+  --text-muted: #4B5B5E;
   /* Skeleton shimmer — dark (default) */
   --skeleton-a: rgba(255,255,255,0.05);
   --skeleton-b: rgba(255,255,255,0.10);
@@ -19,7 +19,7 @@
      dashboard's default theme is the light one, where a green ring measures 1.64:1
      against a white card -- under WCAG 1.4.11's 3:1 floor for focus indicators.
      Each theme rings in its own accent instead (clinical 4.33:1, forest 10.93:1). */
-  --focus-ring: #1A7FC1;
+  --focus-ring: #0F766E;
 }
 
 @media (prefers-color-scheme: light) {
@@ -36,13 +36,24 @@
 :root[data-theme="light"] {
   --skeleton-a: rgba(0,0,0,0.06);
   --skeleton-b: rgba(0,0,0,0.12);
-  --focus-ring: #1A7FC1;
+  --focus-ring: #0F766E;
 }
 
 :root[data-theme="dark"] {
+  --background: #081416;
+  --foreground: #E8F1F0;
+  --accent: #2DD4BF;
+  --accent-muted: rgba(45,212,191,0.14);
+  --accent-border: rgba(45,212,191,0.30);
+  --card: #0F2326;
+  --card-alt: #132B2E;
+  --border: rgba(232,241,240,0.08);
+  --border-med: rgba(232,241,240,0.12);
+  --text-sub: #B8C7C9;
+  --text-muted: #94A3A6;
   --skeleton-a: rgba(255,255,255,0.05);
   --skeleton-b: rgba(255,255,255,0.10);
-  --focus-ring: #00E87A;
+  --focus-ring: #2DD4BF;
 }
 
 @keyframes shimmer {
@@ -53,7 +64,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

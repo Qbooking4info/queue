@@ -14,7 +14,7 @@ export function statusBadgeColors(t: Theme) {
     confirmed: t.statusOpen,
     checked_in: t.statusVirtual,
     in_progress: t.statusProgress,
-    completed: t.statusNeutral,
+    completed: t.statusSuccess,
     cancelled: t.statusCancelled,
     no_show: t.statusNeutral,
   } as const

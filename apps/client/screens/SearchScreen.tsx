@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
@@ -11,6 +12,7 @@ import { getHospitals } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Header } from '@queue/shared/components/ui/v3'
 
 const FILTERS = ['All', 'Virtual', 'Open Now', 'HMO Accepted', 'Emergency']
 
@@ -75,9 +77,9 @@ export function SearchScreen({ navigation }: Props) {
       : { latitude: 6.5244, longitude: 3.3792 } // Lagos default
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['left','right','bottom']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Find care" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
       <View style={[styles.container, { backgroundColor: t.canvasBg }]}>
-        <Text style={[styles.title, { color: t.textPrimary }]}>Find care</Text>
 
         <View style={[styles.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
           <Ionicons name="search-outline" size={15} color={t.textMuted} />

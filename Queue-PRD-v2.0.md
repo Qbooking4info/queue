@@ -1,6 +1,6 @@
 # Queue — Product Requirements Document
-**Version:** 2.1  
-**Updated:** August 2026  
+**Version:** 2.3  
+**Updated:** October 2026  
 **Market:** Nigeria (₦ / WAT)  
 **Status:** Live
 
@@ -8,31 +8,35 @@
 
 ## 01 · Product Overview
 
-Queue is a two-sided healthcare booking platform designed for the Nigerian market. It connects patients with hospitals and clinics through a mobile app, while giving healthcare providers a full-featured management dashboard on the web.
+Queue is a two-sided healthcare booking platform designed for the Nigerian market. It connects patients with hospitals and clinics through a mobile app, while giving healthcare providers a full-featured management dashboard on the web — and, increasingly, on mobile too.
 
 The platform handles the complete appointment lifecycle — from search and booking on the patient side, through queue management and vitals capture at the front desk, to analytics and revenue tracking for hospital administrators.
 
 | Surface | Description |
 |---|---|
-| Web Dashboard | Next.js 16 (App Router) — multi-role hospital management: admins, clinic staff, doctors, front desk |
-| Mobile App | React Native / Expo SDK 56 — patient-facing: search, book, track, maps, notifications |
+| Web Dashboard | Next.js 16 (App Router) — multi-role hospital management: super-admin, hospital admin, clinic staff, doctors, front desk |
+| Queue (patient app) | React Native / Expo SDK 56 — patient-facing: search, book, track, maps, notifications |
+| Queue Hospital (staff app) | React Native / Expo SDK 56 — hospital admin / clinic admin / front desk: dashboard, queue, walk-in, appointments, staff & doctor management, clinics, services, schedule, settings, analytics, ambulance operations. Near-parity with the web dashboard's per-hospital modules (see §04b) |
+| Queue Doctor (doctor app) | React Native / Expo SDK 56 — a doctor's own day: live queue, appointments, consultation (incl. telehealth video), refer-patient, hospital links, settings |
+| Queue Ambulance (crew app) | React Native / Expo SDK 56 — ambulance crew: on/off duty, assigned job, patient location map |
 | Backend | Supabase — PostgreSQL, Auth, Row-Level Security, real-time subscriptions |
-| Deployment | Web → Vercel · Mobile → Expo EAS (Android APK + App Bundle) |
+| Deployment | Web → Vercel · Mobile → Expo EAS (Android APK + App Bundle), four separate apps sharing one `packages/shared` |
 
 ---
 
 ## 02 · User Roles
 
-Access is enforced at the database level via Supabase Row-Level Security. Each role maps to a distinct set of dashboard views and API permissions.
+Access is enforced at the database level via Supabase Row-Level Security. Each role maps to a distinct set of views and API permissions — the same role now drives what's shown on the web dashboard and, for hospital roles, in the Queue Hospital app.
 
-| Role | Scope | Description |
-|---|---|---|
-| `super_admin` | Platform-wide | All hospitals, global analytics, onboarding oversight |
-| `hospital_admin` | Hospital | Full control — doctors, staff, settings, analytics, billing |
-| `clinic_admin` | Clinic | Scoped to one clinic within a multi-clinic hospital |
-| `front_desk` | Clinic | Walk-in registration, queue management, check-in, vitals |
-| `doctor` | Self | Own appointments, availability toggle, consultation duration |
-| `patient` (mobile) | Self | Search, book, manage appointments, dependents, medical history |
+| Role | Scope | Surface | Description |
+|---|---|---|---|
+| `super_admin` | Platform-wide | Web only | All hospitals, global analytics, onboarding oversight |
+| `hospital_admin` | Hospital | Web + Queue Hospital | Full control — doctors, staff, settings, analytics, billing |
+| `clinic_admin` | Clinic | Web + Queue Hospital | Scoped to one clinic within a multi-clinic hospital |
+| `front_desk` | Clinic | Web + Queue Hospital | Walk-in registration, queue management, check-in, vitals |
+| `doctor` | Self | Web + Queue Doctor | Own appointments, availability toggle, consultation, referrals |
+| `ambulance_crew` | Self | Queue Ambulance | On/off duty, assigned job, patient location |
+| `patient` | Self | Queue (patient app) | Search, book, manage appointments, dependents, medical history |
 
 ---
 
@@ -66,8 +70,11 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 | Feature | Detail |
 |---|---|
 | Roster | List per hospital/clinic; specialty, availability, rating, bookings |
-| Add doctor | Name, specialty, MDCN licence number, years of experience, login credentials, clinic assignment |
-| Schedule | Per-doctor calendar with slot availability; daily/weekly view |
+| Add doctor | Link an existing self-registered doctor account by its short Doctor ID; assign to a clinic |
+| Multi-clinic assignment | A doctor can be assigned to several clinics in the same hospital but is **active in only one at a time** — the clinic whose queue, appointments and schedule they work. Either the doctor or hospital staff can switch the active clinic; assigning a new clinic never moves them out of their current one |
+| Profile ownership | Doctors own their accounts. Hospital staff can only add, remove and activate/deactivate a doctor; they cannot edit the doctor's profile, fees, sign-in email or password (`PATCH /api/doctors/[id]` accepts only `is_active`) |
+| Activate / deactivate | Per-hospital lever — a deactivated doctor drops out of that hospital's booking and queue flows until reactivated; nothing is deleted. Available on web and in the Queue Hospital app |
+| Schedule | Per-doctor calendar with slot availability; daily/weekly view; bulk slot generator |
 
 ### Clinics (multi-clinic model)
 | Feature | Detail |
@@ -102,7 +109,7 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 
 ---
 
-## 04 · Mobile App Modules
+## 04 · Queue — Patient App Modules
 
 ### Auth
 - Email + password registration
@@ -137,9 +144,11 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Booking confirmation screen
 
 ### Emergency Booking
-- Separate fast-track flow
-- Only hospitals flagged as 24/7 emergency shown
-- No slot selection — walk-in intent
+- Separate fast-track flow in three steps: Triage (symptom) → Hospital → Review & payment method
+- Arrival choice: Now (walk-in), 15 / 30 / 45 min, 1 hr, or **"I need an ambulance"**
+- Only hospitals flagged as 24/7 emergency shown; a doctor is assigned by front desk on arrival
+- No slot selection — walk-in intent; emergencies go to the front of the doctor's queue
+- "I need an ambulance" takes the patient's location, derives triage level and vehicle tier from the symptom (the patient never sets triage), and opens live Ambulance Tracking (see §06b)
 - Emergency confirmation screen
 
 ### Appointments
@@ -147,11 +156,21 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Detail: doctor, time, location, status
 - Reschedule appointment
 - Cancel at any time (nothing is charged at booking — see §06)
+- Live queue position and estimated wait once checked in
+- "You're next" push when the patient reaches position 2, and a full-screen ring alert when the doctor calls them in (shown on any tab)
+- Join, or rejoin, a virtual consultation in progress; either party can end the call
+
+### Dependents (linked accounts)
+- A dependent has their own registered Queue account and a short **Patient ID**
+- The caretaker links them by Patient ID and relationship from the Dependents tab
+- A dependent can have only one active caretaker at a time (enforced in the database)
+- The caretaker can book for the dependent, or switch into the dependent's account; a banner shows while switched in, and push registration pauses so the dependent's own phone keeps its notifications
+- The older profile-only dependents (no login) are kept for historical rows only
+- Ambulance requests for a dependent are not yet on the linked-account model
 
 ### Profile
 - Medical history
 - Prescriptions
-- Dependents management
 - Insurance / HMO card
 - Privacy & security
 - Support & help
@@ -161,6 +180,108 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 - Booking confirmation, reminder, status updates
 - Hospital-specific notification channel
 - Notification history screen
+
+---
+
+## 04b · Queue Hospital — Staff App Modules
+
+The staff app (`apps/hospital`, package `com.qbooking.hospital`) serves `hospital_admin`,
+`clinic_admin`, and `front_desk` from one navigation stack — role differences are enforced
+inside each screen, not by separate stacks. It targets the web dashboard's **per-hospital**
+modules (not the platform-wide super-admin views). Reads go through the same Next.js API
+routes and `SECURITY DEFINER` RPCs the web app uses; nothing queries RLS-protected tables
+directly.
+
+### Dashboard
+| Feature | Detail |
+|---|---|
+| Today at a glance | Stat cards, doctors on duty (with on-duty/on-break toggle), today's queue |
+
+### Queue & Front Desk
+| Feature | Detail |
+|---|---|
+| Live queue | Today / all; auto-refresh + realtime. Check-in, approve/reject pending bookings, ring patient, record vitals, move queue position |
+| Walk-in intake | Register an unbooked patient and assign a doctor |
+
+### Appointments
+| Feature | Detail |
+|---|---|
+| Filtered list | Pending / today / upcoming / past; approve or reject; status badges from the shared status palette |
+
+### Staff Management
+| Feature | Detail |
+|---|---|
+| Roster | Staff (sub-admins, front desk) and linked doctors |
+| Invite staff | `hospital_admin` only — email invite with assigned role |
+| Link doctor | Enter a doctor's short Doctor ID to link them to the hospital (`hospital_admin` / `clinic_admin`) |
+| Doctor activate / deactivate | `hospital_admin` / `clinic_admin` — deactivate confirms first; a `clinic_admin` may only toggle doctors in their own clinic (enforced by `PATCH /api/doctors/[id]`) |
+
+### Clinics (multi-clinic model)
+| Feature | Detail |
+|---|---|
+| Clinic list | Create, activate, delete; assign a sub-admin per clinic |
+| Clinic detail | Five sections mirroring web's tabs: overview & hours, doctors (assign / unassign / Set Active), **staff** (add / edit / reset password / remove — temp password shown once), **appointments** (today/week/month + pending-approval banner), **analytics** (KPIs, top specialties, visit-type split) |
+
+### Services
+| Feature | Detail |
+|---|---|
+| Services & specialties | CRUD hospital services (price, active) and the specialty tag list |
+
+### Schedule
+| Feature | Detail |
+|---|---|
+| Weekly view | Per-day slot grid, doctor/clinic filters; bulk slot generator (working days + hours → generate / clear) |
+
+### Settings
+| Feature | Detail |
+|---|---|
+| Booking policies | Approval mode, referral requirement, virtual consultations, 24/7 emergency, patient reminders |
+| Operating hours | Per-day open/close |
+| Hospital location | Address geocode + lat/lng |
+| Volume & fees | Daily booking limit, OPD fee |
+| Ambulance service | Enable + search radius |
+| Payout account | Paystack subaccount — bank + account number, account-name resolved before save |
+
+### Analytics
+| Feature | Detail |
+|---|---|
+| KPIs | Total / completed / cancelled / show-up %, avg wait time, avg consultation time |
+| Breakdowns | Top specialties, visit-type split, monthly bookings YTD bar chart |
+| Per-doctor | Wait and consultation time averaged per doctor |
+
+### Ambulance Operations
+| Feature | Detail |
+|---|---|
+| Requests inbox | Inbound transport requests — status, triage, ETA, assigned unit; realtime + poll fallback |
+| Dispatcher alerts | Dispatch-failure / critical alerts; acknowledge |
+| Fleet | Fleet setup, add units (with geocoded home base), crew shift scheduling and assignment, on/off-duty toggle |
+| Coverage | 30-day dispatch-attempt analysis — coverage vs adoption vs capacity gap (see migrations `20260828000002` / `20260828000004`) |
+
+---
+
+## 04c · Queue Doctor — Doctor App Modules
+
+The doctor app (`apps/doctor`) is for the doctor's own day. Doctors register themselves; the app stays on an onboarding screen showing their **Doctor ID** until a hospital admin links that ID.
+
+| Module | Detail |
+|---|---|
+| Dashboard | Today's summary and availability status |
+| Queue | Live list of checked-in patients in order; call patient in (rings the patient) |
+| Appointments | Upcoming and past |
+| Patient Consult | Start consultation, see vitals and history, write notes, end consultation |
+| Refer Patient | Refer to another doctor or specialty |
+| Video Call | Telehealth for virtual appointments (Agora) |
+| Hospitals | Linked hospitals; choose the active clinic where assigned to several |
+| Profile & Settings | Doctor ID shown under the name; own profile, fees and credentials |
+
+## 04d · Queue Ambulance — Crew App Modules
+
+| Module | Detail |
+|---|---|
+| Duty | Go on / off duty; location keeps reporting in the background, including after Android reclaims the process |
+| Offers | Incoming job offer with a countdown — Accept or Decline; "Already covered" if another crew accepted first |
+| Active job | Patient location map and status buttons: en route → on scene → transporting → arrived |
+| Profile | Crew account and sign-out |
 
 ---
 
@@ -190,6 +311,7 @@ Access is enforced at the database level via Supabase Row-Level Security. Each r
 | **Refunds** | **Not applicable while Queue takes no money.** `appointments.refund_pct` is still computed and stored for when payment is integrated, but no refund can be issued and the app no longer promises one |
 | No-show | Patient has 48 hours to reschedule at no extra charge |
 | Cancellation | Free at any time — nothing has been charged |
+| **Ambulance fees** | The emergency flow tells patients ambulance fees are "billed after the trip completes" and asks for a payment method. **No billing is implemented** — `transport_invoices` is schema only and nothing is charged. This copy should change, or billing be built, before real dispatches happen |
 
 ---
 
@@ -203,12 +325,13 @@ pg_cron jobs.
 |---|---|
 | Promise | "We find you an ambulance, and if we can't, we tell you instantly and hand you the numbers that will" |
 | Supply model | Two supplier types — hospital fleets and independent certified operators. Both are organisations; there is no gig supply |
-| Duty state | `set_unit_duty()` puts a unit on duty by writing an `ambulance_shifts` row and setting `status='available'`. On duty ≠ dispatchable: a position fresher than 120s is also required |
+| Duty state | `set_unit_duty()` puts a unit on duty by writing an `ambulance_shifts` row and setting `status='available'`. On duty ≠ dispatchable: a recent-enough GPS fix is also required (freshness gate reworked in `20260828000001`, made clock-skew-tolerant in `20260828000004`) |
 | Matching | Pure scoring in `web/src/lib/dispatch/matching.ts` — effective tier is `least(vehicle, crew)`, plus capability fit, shift headroom, road ETA |
 | 60s deadline | Three independent layers: pure-SQL pg_cron (no HTTP dependency), the `/api/transport/sweep` endpoint driven by pg_net, and a client-side timer in the app |
 | Fallback directory | `emergency_directory` with enforced verification and a 90-day decay window. **Currently empty — patients see no numbers on failure** |
 | Instrumentation | `dispatch_attempts` records nearest-unit distance even when nothing was dispatchable, which distinguishes a coverage gap from an adoption gap from a capacity gap |
-| Status | Dispatch works end-to-end. **No real ambulance is on duty**, so there is no supply to dispatch |
+| Hospital operator console | On web (`/dashboard/ambulances/*`) **and in the Queue Hospital app** (§04b · Ambulance Operations): requests inbox, dispatcher alerts, fleet setup + shift scheduling, 30-day coverage analysis |
+| Status | Dispatch works end-to-end. **No real ambulance is on duty**, so there is no supply to dispatch — this is an adoption gap (no rota), not an engine bug (see `20260828000002`) |
 
 ---
 
@@ -250,6 +373,16 @@ pg_cron jobs.
 | Access guard | No-role accounts signed out and redirected to `/login` via `window.location.href` |
 | Sign-out | Clears Supabase auth cookies; hard redirect to /login |
 
+## 09b · Accessibility & Theming
+
+| Feature | Detail |
+|---|---|
+| Contrast | Muted and semantic colour tokens meet WCAG AA; focus ring restored on web |
+| Motion | Looping animations (ring pulse, live-consult pulse, emergency pulse) stop under the OS reduce-motion setting; web honours `prefers-reduced-motion` |
+| Screen readers | The shared alert dialog announces itself and is marked modal; status badges, touch targets and labels restored |
+| Layout | Web dashboard grids reflow at phone width; auth pages usable on phones |
+| Theme | One token-based theme (light and dark) shared across web and all four apps, including a shared Button component |
+
 ---
 
 ## 10 · Build Status & Roadmap
@@ -267,11 +400,20 @@ pg_cron jobs.
 - Date filter with 14 ranges including future dates
 - Subscription plan selection during onboarding
 - Server-side role API (RLS-safe login on Vercel)
+- Four separate mobile apps (Queue, Queue Hospital, Queue Doctor, Queue Ambulance) sharing `packages/shared`
+- Queue Hospital near-parity with the web dashboard, including ambulance operations, clinics, services, schedule and analytics (Sept 2026)
+- Doctor activate/deactivate per hospital, on web and mobile (Sept 2026)
+- Doctors in multiple clinics, active in one at a time (Sept 2026)
+- Linked-account dependents by Patient ID (Aug 2026)
+- Ambulance dispatch engine, crew app and operator console (no live supply yet — see §06b)
+- Accessibility pass to WCAG AA (Sept 2026)
 
 ### In Progress ⚙
 - HMO / insurance verification flow *(the Search filter chip described in §04 is not built)*
 - In-app payment integration (₦) — **nothing is collected today; see §06**
 - EMR integration (Growth+ plans)
+- Ambulance billing (`transport_invoices`) and the scheduled-transport promotion cron
+- Ambulance dispatch for linked-account dependents
 - Hospital coordinate population — **0 of 2 live hospitals have lat/lng**, which
   silently degrades distance sorting, map pins and ambulance dispatch ranking
 
@@ -286,5 +428,5 @@ pg_cron jobs.
 
 ---
 
-*Queue · Product Requirements Document · v2.1 · August 2026*  
+*Queue · Product Requirements Document · v2.3 · October 2026*  
 *Confidential — Internal Use Only*

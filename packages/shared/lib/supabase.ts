@@ -71,7 +71,22 @@ const WebStorageAdapter = {
 
 // Auth client — session stored encrypted in the device keychain/keystore on native,
 // localStorage on web.
+// Retry reads on a dropped connection (common on mobile data): up to 2 more tries with
+// short backoff. Only GET/HEAD -- a write that failed in flight may already have
+// landed, and replaying it could double-book or double-charge.
+async function retryingFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const tries = method === 'GET' || method === 'HEAD' ? 3 : 1
+  let lastErr: unknown
+  for (let i = 0; i < tries; i++) {
+    try { return await fetch(input as any, init) }
+    catch (e) { lastErr = e; if (i < tries - 1) await new Promise(r => setTimeout(r, 400 * (i + 1))) }
+  }
+  throw lastErr
+}
+
 export const supabase = createClient(supabaseUrl, supabaseClientKey, {
+  global: { fetch: retryingFetch },
   auth: {
     storage: Platform.OS === 'web' ? WebStorageAdapter : SecureStoreAdapter,
     autoRefreshToken: true,
@@ -82,5 +97,6 @@ export const supabase = createClient(supabaseUrl, supabaseClientKey, {
 
 // Public read-only client — no session needed
 export const publicDb = createClient(supabaseUrl, supabaseClientKey, {
+  global: { fetch: retryingFetch },
   auth: { persistSession: false, autoRefreshToken: false },
 })

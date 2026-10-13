@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Modal, Pressable } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Pressable, KeyboardAvoidingView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -130,25 +132,9 @@ export function DependentsScreen({ navigation }: Props) {
   const canSelfUnlink = myAge !== null && myAge >= 18
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
-      <View style={s.header}>
-        {/* No back-button target when reached via the footer tab (no screen to pop to) --
-            still reachable via Profile's "Manage dependents" menu item, which does push
-            a real stack entry, so this stays conditional rather than always hidden. */}
-        {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 22 }} />
-        )}
-        <Text style={[s.title, { color: t.textPrimary }]}>Dependents</Text>
-        <TouchableOpacity onPress={() => openLink('caretaker')}
-          style={[s.addBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-          <Text style={[s.addBtnText, { color: t.accent }]}>+ Link by ID</Text>
-        </TouchableOpacity>
-      </View>
+      <Header title="Dependents" onBack={() => navigation.goBack()} />
 
       {/* Link-by-ID Modal */}
       <Modal visible={linkOpen} animationType="slide" transparent onRequestClose={() => setLinkOpen(false)}>
@@ -216,7 +202,9 @@ export function DependentsScreen({ navigation }: Props) {
       {loading ? (
         <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           {/* Managed by -- shown only when this account is itself a linked dependent */}
           {managedBy && (
             <View style={[s.managedByCard, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
@@ -288,6 +276,7 @@ export function DependentsScreen({ navigation }: Props) {
             </>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )
@@ -324,7 +313,7 @@ const s = StyleSheet.create({
   depAvatar:      { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   depName:        { fontSize: 14, fontWeight: '700' },
   depMeta:        { fontSize: 11, marginTop: 2, textTransform: 'capitalize' },
-  unlinkLink:     { fontSize: 12, fontWeight: '700', color: '#FF5C5C' },
+  unlinkLink:     { fontSize: 12, fontWeight: '700', color: '#EF4444' },
   switchLink:     { fontSize: 12, fontWeight: '700' },
   managedByCard:  { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 20 },
   managedByLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },

@@ -1,18 +1,38 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { Header, KpiCard, EmptyState, Card, HeaderTail } from '@queue/shared/components/ui/v3'
 import {
   getRangeStats, getTodayAppointments, getDoctorsOnDuty, fmtLocalDate,
   type RangeStats, type AdminAppointmentRow, type AdminDoctorRow } from '@queue/shared/lib/admin-api'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { supabase } from '@queue/shared/lib/supabase'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
 
-export function AdminDashboardScreen() {
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+const DONE = new Set(['completed', 'cancelled', 'arrived_at_destination', 'no_unit_found', 'expired'])
+
+// Inbound ambulances for this hospital, via the same route the Ambulance desk uses.
+// Fails quietly (returns 0) for roles that route doesn't serve.
+async function countInbound(): Promise<number> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return 0
+    const res = await fetch(`${API_URL}/api/ambulances`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+    if (!res.ok) return 0
+    const body = await res.json()
+    return ((body.requests ?? []) as { status: string }[]).filter(r => !DONE.has(r.status)).length
+  } catch { return 0 }
+}
+
+export function AdminDashboardScreen({ navigation }: { navigation: any }) {
   const { theme: t } = useTheme()
   const { staffProfile } = useAuth()
   const sc = statusBadgeColors(t)
@@ -41,6 +61,9 @@ export function AdminDashboardScreen() {
   const [doctors,    setDoctors]    = useState<AdminDoctorRow[]>([])
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [inbound,    setInbound]    = useState(0)
+  const [approvals,  setApprovals]  = useState(0)
+  const unreadMessages = useUnreadMessages('hospital')
 
   const hospitalId = staffProfile?.hospitalId
   const clinicId   = staffProfile?.clinicId ?? null
@@ -50,11 +73,18 @@ export function AdminDashboardScreen() {
     if (!hospitalId) return
     if (!silent) setLoading(true)
     const today = fmtLocalDate(new Date())
-    const [s, a, d] = await Promise.all([
+    let approvalsQ = supabase.from('appointments').select('id', { count: 'exact', head: true })
+      .eq('hospital_id', hospitalId).eq('approval_status', 'pending_approval')
+    if (isClinicScoped && clinicId) approvalsQ = approvalsQ.eq('clinic_id', clinicId)
+    const [s, a, d, inb, appr] = await Promise.all([
       getRangeStats(hospitalId, today, today, isClinicScoped ? clinicId : null),
       getTodayAppointments(hospitalId, isClinicScoped ? clinicId : null),
       getDoctorsOnDuty(hospitalId, isClinicScoped ? clinicId : null),
+      countInbound(),
+      approvalsQ,
     ])
+    setInbound(inb)
+    setApprovals(appr.count ?? 0)
     setStats(s)
     setAppts(a)
     setDoctors(d)
@@ -67,13 +97,9 @@ export function AdminDashboardScreen() {
   const onDutyCount = doctors.filter(d => d.availability_status === 'on_duty').length
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <Text style={[s.greeting, { color: t.textMuted }]}>
-          {isClinicScoped ? 'Clinic overview' : 'Hospital overview'}
-        </Text>
-        <Text style={[s.headerTitle, { color: t.textPrimary }]}>{staffProfile?.name ?? 'Dashboard'}</Text>
-      </View>
+    <SafeAreaView edges={['left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Today" subtitle={`${isClinicScoped ? 'Clinic' : 'Hospital'} overview · ${staffProfile?.name ?? ''}`}
+        right={<ProfileAvatar size={44} name={staffProfile?.name} onPress={() => navigation.navigate('StaffMore')} />} />
 
       {loading ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
@@ -81,34 +107,76 @@ export function AdminDashboardScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
+          <HeaderTail />
           {/* Stats grid */}
-          <View style={s.statGrid}>
-            {[
-              { label: "Today's appts", value: stats?.total ?? 0,     color: t.accent },
-              { label: 'Completed',     value: stats?.completed ?? 0, color: t.accentDark },
-              { label: 'Pending',       value: stats?.pending ?? 0,   color: t.statusBusy.text },
-              { label: 'Doctors on duty', value: onDutyCount,         color: t.info },
-            ].map(stat => (
-              <View key={stat.label} style={[s.statCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={[s.statLabel, { color: t.textMuted }]}>{stat.label}</Text>
-              </View>
-            ))}
+          {(inbound > 0 || approvals > 0 || unreadMessages > 0) && (
+            <View style={{ gap: 10, marginBottom: 14 }}>
+              {inbound > 0 && (
+                <Card onPress={() => navigation.navigate('AmbulanceRequests')} accessibilityLabel={`${inbound} ambulances inbound`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.danger, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="medical" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{inbound} ambulance{inbound === 1 ? '' : 's'} inbound</Text>
+                    <Text style={{ fontSize: 13, color: t.textMuted }}>See ETA and triage, assign a doctor</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+                </Card>
+              )}
+              {unreadMessages > 0 && (
+                <Card onPress={() => navigation.navigate('HospitalMessages')} accessibilityLabel={`${unreadMessages} unread messages`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.accentBg, borderColor: t.accentBorder }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="chatbubbles" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{unreadMessages} unread message{unreadMessages === 1 ? '' : 's'}</Text>
+                    <Text style={{ fontSize: 13, color: t.textMuted }}>From patients, doctors or crews</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+                </Card>
+              )}
+              {approvals > 0 && (
+                <Card onPress={() => navigation.navigate('StaffAppointments')} accessibilityLabel={`${approvals} bookings awaiting approval`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.statusBusy.text, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="hourglass" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{approvals} booking{approvals === 1 ? '' : 's'} awaiting approval</Text>
+                    <Text style={{ fontSize: 13, color: t.textMuted }}>Approve or decline so patients aren't left waiting</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+                </Card>
+              )}
+            </View>
+          )}
+
+          <View style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <KpiCard icon="calendar-outline" label="Today's appts" value={stats?.total ?? 0} />
+              <KpiCard icon="checkmark-done-outline" label="Completed" value={stats?.completed ?? 0} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <KpiCard icon="hourglass-outline" label="Pending" value={stats?.pending ?? 0} highlight={(stats?.pending ?? 0) > 0} />
+              <KpiCard icon="medkit-outline" label="Doctors on duty" value={onDutyCount} />
+            </View>
           </View>
 
           {/* Doctors on duty */}
-          <Text style={[s.sectionTitle, { color: t.textMuted }]}>Doctors ({doctors.length})</Text>
+          <Text style={[s.sectionTitle, { color: t.textPrimary }]}>Doctors ({doctors.length})</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
             {doctors.length === 0 ? (
               <Text style={[s.emptyText, { color: t.textMuted }]}>No doctors found.</Text>
-            ) : doctors.map(d => {
+            ) : doctors.map((d, i) => {
               const av = AVAILABILITY_META[d.availability_status] ?? AVAILABILITY_META.on_duty
               return (
-                <View key={d.id} style={[s.doctorRow, { borderTopColor: t.cardBorder }]}>
+                <View key={d.id} style={[s.doctorRow, { borderTopColor: t.cardBorder, borderTopWidth: i === 0 ? 0 : 1 }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.doctorName, { color: t.textPrimary }]}>{[d.title, d.full_name].filter(Boolean).join(' ')}</Text>
                     {d.specialty_name && <Text style={[s.doctorSpec, { color: t.textMuted }]}>{d.specialty_name}</Text>}
@@ -123,12 +191,9 @@ export function AdminDashboardScreen() {
           </View>
 
           {/* Today's queue */}
-          <Text style={[s.sectionTitle, { color: t.textMuted, marginTop: 16 }]}>Today's queue ({appts.length})</Text>
+          <Text style={[s.sectionTitle, { color: t.textPrimary, marginTop: 16 }]}>Today's queue ({appts.length})</Text>
           {appts.length === 0 ? (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, alignItems: 'center', paddingVertical: 28 }]}>
-              <Ionicons name="clipboard-outline" size={36} color={t.textMuted} style={{ marginBottom: 10, opacity: 0.3 }} />
-              <Text style={[s.emptyText, { color: t.textMuted }]}>No appointments scheduled for today.</Text>
-            </View>
+            <EmptyState icon="clipboard-outline" title="No appointments today" body="Bookings and walk-ins for today show up here." />
           ) : appts.map(a => {
             const meta = STATUS_META[a.status] ?? { label: a.status, color: sc.no_show.text, bg: sc.no_show.bg }
             return (
@@ -160,7 +225,7 @@ const s = StyleSheet.create({
   statCard:      { flexBasis: '47%', flexGrow: 1, borderRadius: 16, borderWidth: 1, padding: 14 },
   statValue:     { fontSize: 22, fontWeight: '800' },
   statLabel:     { fontSize: 11, marginTop: 2 },
-  sectionTitle:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginTop: 18 },
+  sectionTitle:  { fontSize: 16, fontWeight: '700', marginBottom: 8, marginTop: 18 },
   card:          { borderRadius: 16, borderWidth: 1, padding: 4 },
   emptyText:     { fontSize: 12.5, textAlign: 'center', paddingVertical: 10 },
   doctorRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 10, borderTopWidth: 1 },

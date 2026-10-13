@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getCompletedAppointments, updateUserProfile, getMedicalHistory, updateMedicalHistory } from '@queue/shared/lib/api'
@@ -119,14 +121,8 @@ export function MedicalHistoryScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <Text style={[s.title, { color: t.textPrimary }]}>Medical History</Text>
-        <View style={{ width: 28 }} />
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Medical History" onBack={() => navigation.goBack()} />
 
       {/* Tabs */}
       <View style={[s.tabBar, { borderBottomColor: t.cardBorder }]}>
@@ -145,7 +141,7 @@ export function MedicalHistoryScreen({ navigation }: Props) {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}

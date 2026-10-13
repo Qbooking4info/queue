@@ -5,10 +5,12 @@
 // one specialty-scoped view, per the user's ask: pick a specialty, see
 // hospitals, optionally toggle to doctors instead.
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useLocation, distanceKm, formatDistance } from '@queue/shared/contexts/LocationContext'
 import { getHospitals, searchIndependentDoctors, IndependentDoctor } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
@@ -52,13 +54,8 @@ export function SpecialtyResultsScreen({ navigation, route }: Props) {
   })
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={{ marginRight: 10 }}>
-          <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>{specialtyName}</Text>
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title={specialtyName} onBack={() => navigation.goBack()} />
 
       <View style={[st.toggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
         {(['hospitals', 'doctors'] as Mode[]).map(m => (

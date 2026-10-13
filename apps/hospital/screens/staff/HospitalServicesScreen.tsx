@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, TextInput, Switch,
-  KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Switch, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -121,23 +120,17 @@ export function HospitalServicesScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary }]}>Services</Text>
-        </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Services" subtitle="Specialties, services and prices" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TouchableOpacity
           onPress={() => tab === 'services' ? setEditing('new') : setAddingSpecialty(true)}
-          style={[s.addBtn, { backgroundColor: t.accent }]}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={s.addBtnText}>{tab === 'services' ? 'Add Service' : 'Add Specialty'}</Text>
+          style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
+          <Ionicons name="add" size={16} color="#0F766E" />
+          <Text style={[s.addBtnText, { color: '#0F766E' }]}>{tab === 'services' ? 'Add Service' : 'Add Specialty'}</Text>
         </TouchableOpacity>
-      </View>
+      
+        </View>} />
 
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
         {(['services', 'specialties'] as const).map(tb => (
@@ -181,7 +174,7 @@ export function HospitalServicesScreen({ navigation }: Props) {
                     <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}><Text style={[s.badgeText, { color: t.accent }]}>In-person ₦{svc.base_price.toLocaleString()}</Text></View>
                   )}
                   {svc.virtual_price != null && (
-                    <View style={[s.badge, { backgroundColor: 'rgba(91,158,255,0.14)' }]}><Text style={[s.badgeText, { color: '#5B9EFF' }]}>Virtual ₦{svc.virtual_price.toLocaleString()}</Text></View>
+                    <View style={[s.badge, { backgroundColor: t.statusVirtual.bg }]}><Text style={[s.badgeText, { color: t.statusVirtual.text }]}>Virtual ₦{svc.virtual_price.toLocaleString()}</Text></View>
                   )}
                   {svc.duration_mins != null && (
                     <View style={[s.badge, { backgroundColor: 'rgba(122,144,137,0.14)' }]}><Text style={[s.badgeText, { color: t.textMuted }]}>{svc.duration_mins} min</Text></View>
@@ -191,8 +184,8 @@ export function HospitalServicesScreen({ navigation }: Props) {
                   <TouchableOpacity onPress={() => setEditing(svc)} style={[s.smallBtn, { flex: 1, borderColor: t.cardBorder }]}>
                     <Text style={[s.smallBtnText, { color: t.textPrimary }]}>Edit</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmDeleteService(svc)} style={[s.smallBtn, { flex: 1, borderColor: 'rgba(255,92,92,0.3)' }]}>
-                    <Text style={[s.smallBtnText, { color: '#FF5C5C' }]}>Delete</Text>
+                  <TouchableOpacity onPress={() => setConfirmDeleteService(svc)} style={[s.smallBtn, { flex: 1, borderColor: 'rgba(239,68,68,0.3)' }]}>
+                    <Text style={[s.smallBtnText, { color: t.danger }]}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -208,7 +201,7 @@ export function HospitalServicesScreen({ navigation }: Props) {
                 <Ionicons name="medical-outline" size={18} color={t.accent} style={{ marginRight: 10 }} />
                 <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{sp.name}</Text>
                 <TouchableOpacity onPress={() => setConfirmRemoveSpecialty(sp)} disabled={busy}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Remove</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Remove</Text>
                 </TouchableOpacity>
               </View>
             ))
@@ -269,14 +262,14 @@ function ConfirmDialog({ theme: t, title, message, confirmLabel, onCancel, onCon
   return (
     <View style={s.overlay}>
       <View style={[s.confirmCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-        <Ionicons name="warning-outline" size={32} color="#FF5C5C" style={{ marginBottom: 10 }} />
+        <Ionicons name="warning-outline" size={32} color={t.danger} style={{ marginBottom: 10 }} />
         <Text style={[s.modalTitle, { color: t.textPrimary }]}>{title}</Text>
         <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 6, marginBottom: 18, lineHeight: 19 }}>{message}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity onPress={onCancel} style={[s.smallBtn, { flex: 1, borderColor: t.cardBorder }]}>
             <Text style={[s.smallBtnText, { color: t.textPrimary }]}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onConfirm} style={[s.smallBtn, { flex: 1, backgroundColor: '#FF5C5C' }]}>
+          <TouchableOpacity onPress={onConfirm} style={[s.smallBtn, { flex: 1, backgroundColor: t.danger }]}>
             <Text style={[s.smallBtnText, { color: '#fff' }]}>{confirmLabel}</Text>
           </TouchableOpacity>
         </View>
@@ -329,7 +322,7 @@ function ServiceModal({ theme: t, service, specialties, onClose, onDone }: {
 
   return (
     <View style={s.overlay}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -382,7 +375,7 @@ function ServiceModal({ theme: t, service, specialties, onClose, onDone }: {
               </View>
             </View>
 
-            {error ? <Text style={[s.errorText, { color: '#FF5C5C', marginTop: 10 }]}>{error}</Text> : null}
+            {error ? <Text style={[s.errorText, { color: t.danger, marginTop: 10 }]}>{error}</Text> : null}
 
             <TouchableOpacity onPress={handleSave} disabled={loading}
               style={[s.smallBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, paddingVertical: 14, marginTop: 14 }]}>

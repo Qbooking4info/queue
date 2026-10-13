@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '../../contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -45,9 +46,19 @@ export function FallbackPanel({ variant = 'calm', state, title }: Props) {
     return (
       <View style={[s.card, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
         <Text style={[s.emptyText, { color: t.textMuted }]}>
-          No verified emergency numbers are listed for your area yet. If this is
-          life-threatening, call your local emergency service directly.
+          No verified private ambulance numbers are listed for your area yet. If this is
+          life-threatening, call the public emergency line now.
         </Text>
+        {/* Public lines are always shown, so this path is never a dead end. */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+          {[['112', 'Call 112'], ['767', 'Lagos 767']].map(([num, label]) => (
+            <TouchableOpacity key={num} onPress={() => Linking.openURL(`tel:${num}`)} accessibilityRole="button"
+              accessibilityLabel={label}
+              style={{ flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1.5, borderColor: t.danger, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '800' }}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     )
   }

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, StyleSheet, Switch } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, ScrollView, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
+import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton } from '@queue/shared/components/ui/v3'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 
 const ROLE_LABEL: Record<string, string> = {
   driver:     'Driver',
@@ -16,18 +18,22 @@ const ROLE_LABEL: Record<string, string> = {
   dispatcher: 'Dispatcher',
 }
 
+// v3.1 Crew Profile (c-me). Same layout as the patient Profile: identity in the teal
+// header, grouped rows, appearance, then sign out with a confirm step.
 export function CrewProfileScreen() {
   const { theme: t, themeId, toggleTheme } = useTheme()
   const { crewProfile, staffProfile, user, signOut } = useAuth()
-  const [confirmVisible, setConfirmVisible] = useState(false)
-  const [signingOut,     setSigningOut]     = useState(false)
-  const [hospitalName,   setHospitalName]   = useState<string | null>(null)
+  const [confirm,      setConfirm]      = useState(false)
+  const [signingOut,   setSigningOut]   = useState(false)
+  const [hospitalName, setHospitalName] = useState<string | null>(null)
+  const [shifts, setShifts] = useState<{ id: string; role_label: string; starts_at: string; ends_at: string }[]>([])
 
   // Hospital-fleet crew resolve through staffProfile, not crewProfile (that's
   // third-party only) — same organisation display either way, different source.
   const isHospitalFleet = !crewProfile && staffProfile?.role === 'ambulance_crew'
   const crewRole = crewProfile?.crewRole ?? staffProfile?.crewRole
   const crewTier = crewProfile?.crewTier ?? staffProfile?.crewTier
+  const org = crewProfile?.providerName ?? hospitalName
 
   const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
 
@@ -37,89 +43,79 @@ export function CrewProfileScreen() {
       .then(({ data }: { data: { name: string } | null }) => { if (data) setHospitalName(data.name) })
   }, [isHospitalFleet, staffProfile?.hospitalId])
 
-  async function handleSignOut() {
+  // Next 7 days of rota shifts (hospital-fleet crews are rostered in Queue Hospital).
+  useEffect(() => {
+    if (!user?.id) return
+    const now = new Date(), week = new Date(now.getTime() + 7 * 86400_000)
+    supabase.from('staff_shifts').select('id, role_label, starts_at, ends_at').eq('user_id', user.id)
+      .gte('ends_at', now.toISOString()).lt('starts_at', week.toISOString()).order('starts_at').limit(14)
+      .then(({ data }: { data: any[] | null }) => setShifts(data ?? []))
+  }, [user?.id])
+
+  async function doSignOut() {
     setSigningOut(true)
     await signOut()
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
-
-        <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[s.avatar, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.avatarText, { color: t.accent }]}>{initials}</Text>
-          </View>
-          <Text style={[s.name, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
-          <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.roleBadgeText, { color: t.accent }]}>
-              {ROLE_LABEL[crewRole ?? ''] ?? crewRole ?? 'Crew'}
+    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Header>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <ProfileAvatar size={68} editable />
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{user?.full_name ?? 'Crew member'}</Text>
+            <Text style={{ color: '#CCFBF1', fontSize: 13, marginTop: 2 }}>
+              {ROLE_LABEL[crewRole ?? ''] ?? crewRole ?? 'Crew'}{org ? ` · ${org}` : ''}
             </Text>
           </View>
-          {(crewProfile?.providerName ?? hospitalName) && (
-            <Text style={[s.providerName, { color: t.textMuted }]}>{crewProfile?.providerName ?? hospitalName}</Text>
+        </View>
+      </Header>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ padding: 20, gap: 14 }}>
+          <SectionTitle title="Details" />
+          <Card style={{ paddingVertical: 0 }}>
+            <ListRow icon="ribbon-outline" title="Care tier" trailing={<Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }}>{crewTier ?? '—'}</Text>} />
+            <ListRow icon="call-outline" title="Phone" last trailing={<Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }}>{user?.phone ?? '—'}</Text>} />
+          </Card>
+
+          {shifts.length > 0 && (
+            <>
+              <SectionTitle title="My shifts" />
+              <Card style={{ paddingVertical: 0 }}>
+                {shifts.map((sh, i) => (
+                  <ListRow key={sh.id} icon="time-outline" last={i === shifts.length - 1}
+                    title={new Date(sh.starts_at).toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })}
+                    subtitle={`${sh.role_label} · ${new Date(sh.starts_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}–${new Date(sh.ends_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}`} />
+                ))}
+              </Card>
+            </>
           )}
-        </View>
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DETAILS</Text>
-          <Row label="Care tier"  value={crewTier ?? '—'} theme={t} />
-          <Row label="Phone"     value={user?.phone ?? '—'} theme={t} last />
-        </View>
+          <Card style={{ gap: 10 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
+            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
+              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
+              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          </Card>
 
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
-          <View style={[s.row, { borderBottomWidth: 0 }]}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
-            </Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
-              trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        </View>
+          {!confirm ? (
+            <TouchableOpacity onPress={() => { haptics.tap(); setConfirm(true) }} accessibilityRole="button"
+              style={{ minHeight: 64, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: t.danger, fontSize: 16, fontWeight: '700' }}>Sign out</Text>
+            </TouchableOpacity>
+          ) : (
+            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out? You won't receive job offers until you sign back in.</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={64} onPress={() => setConfirm(false)} /></View>
+                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={64} loading={signingOut} onPress={doSignOut} /></View>
+              </View>
+            </Card>
+          )}
 
-        {confirmVisible ? (
-          <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={[s.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
-            <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
-              <Button
-                label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
-                loading={signingOut} variant="danger" style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        ) : (
-          <Button label="Sign out" onPress={() => setConfirmVisible(true)} variant="danger" style={{ marginHorizontal: 16 }} />
-        )}
+          <DeleteAccount what="your crew profile, photo and sign-in" />
+        </View>
       </ScrollView>
-    </SafeAreaView>
-  )
-}
-
-function Row({ label, value, theme: t, last }: { label: string; value: string; theme: any; last?: boolean }) {
-  return (
-    <View style={[s.row, { borderBottomColor: t.cardBorder, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-      <Text style={[s.rowLabel, { color: t.textMuted }]}>{label}</Text>
-      <Text style={[s.rowValue, { color: t.textPrimary }]}>{value}</Text>
     </View>
   )
 }
-
-const s = StyleSheet.create({
-  safe:          { flex: 1 },
-  title:         { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:   { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:        { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:    { fontSize: 26, fontWeight: '800' },
-  name:          { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  roleBadge:     { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  roleBadgeText: { fontSize: 12, fontWeight: '700' },
-  providerName:  { marginTop: 8, fontSize: 13, fontWeight: '600' },
-  section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 },
-  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14 },
-  rowLabel:      { fontSize: 13 },
-  rowValue:      { fontSize: 13, fontWeight: '600' },
-})

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import { Header, EmptyState, HeaderIconButton } from '@queue/shared/components/ui/v3'
+import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -188,7 +191,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+        <Header title="Consultation" onBack={() => navigation.goBack()} />
         <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
       </SafeAreaView>
     )
@@ -196,10 +200,9 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   if (!appt) {
     return (
-      <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={st.center}>
-          <Text style={{ color: t.textMuted }}>Appointment not found</Text>
-        </View>
+      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+        <Header title="Consultation" onBack={() => navigation.goBack()} />
+        <EmptyState icon="document-outline" title="Appointment not found" body="It may have been cancelled or moved." action="Go back" onAction={() => navigation.goBack()} />
       </SafeAreaView>
     )
   }
@@ -222,37 +225,26 @@ export function PatientConsultScreen({ navigation, route }: Props) {
     : appt.urgency === 'urgent' ? t.statusBusy.text : t.accent
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        {/* Header */}
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-          </TouchableOpacity>
-          <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>
-            {patient?.full_name ?? 'Patient'}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {isEmergency && (
-              <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
-                <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
-                <Text style={[st.statusText, { color: t.danger }]}>EMERGENCY</Text>
-              </View>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+        <Header title={patient?.full_name ?? 'Patient'} subtitle={`Consultation · ${fmt12(appt.start_time)}`} onBack={() => navigation.goBack()}
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {!!patient?.id && (
+              <HeaderIconButton icon="chatbubble-ellipses-outline" label="Message patient" onPress={async () => {
+                const r = await startConversation('patient', patient.id, appt.id)
+                if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+                else { haptics.error(); Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error) }
+              }} />
             )}
-            {isInProgress ? (
-              <View style={[st.statusBadge, { backgroundColor: 'rgba(255,140,66,0.14)', flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-                <InProgressPulse />
-                <Text style={[st.statusText, { color: '#FF8C42' }]}>In Progress</Text>
-              </View>
-            ) : !isEmergency && (
-              <View style={[st.statusBadge, { backgroundColor: urgencyBg }]}>
-                <Text style={[st.statusText, { color: urgencyCol }]}>
-                  {appt.urgency ?? 'routine'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
+            <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFFFFF' }]}>
+              {isEmergency ? <Ionicons name="alert-circle" size={12} color={t.danger} /> : isInProgress ? <InProgressPulse /> : null}
+              <Text style={[st.statusText, { color: isEmergency ? '#B91C1C' : '#0F766E' }]}>
+                {isEmergency ? 'Emergency' : isInProgress ? 'In progress' : (appt.urgency ?? 'routine')}
+              </Text>
+            </View>
+            </View>
+          } />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           {/* Patient Hero Card */}

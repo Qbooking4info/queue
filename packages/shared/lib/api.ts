@@ -1368,3 +1368,22 @@ export async function uploadQualificationDocument(
   if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'Upload failed' }
   return null
 }
+
+// ── Doctor availability (v3.1 doctor Today: On duty / Break / Off) ────────────
+export type DoctorAvailability = 'on_duty' | 'on_break' | 'off_duty'
+
+/** Hospital-affiliated doctors only (PATCH /api/doctors/me needs caller.doctorId). */
+export async function setMyAvailability(status: DoctorAvailability): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  try {
+    const res = await fetch(`${API_URL}/api/doctors/me`, {
+      method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ availability_status: status }),
+    })
+    if (!res.ok) { const b = await res.json().catch(() => ({})); return b?.error ?? 'Could not update availability' }
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Network error'
+  }
+}

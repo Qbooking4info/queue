@@ -72,12 +72,12 @@ function StepBar({ current, total }: { current: number; total: number }) {
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
         {Array.from({ length: total }).map((_, i) => (
           <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, transition: 'background .3s',
-            background: i < current ? '#1A7FC1' : i === current ? 'rgba(26,127,193,0.35)' : '#DDE8F5' }} />
+            background: i < current ? '#0F766E' : i === current ? 'rgba(15,118,110,0.35)' : '#DDE8F5' }} />
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 12, color: '#6A8FAA' }}>Step {current + 1} of {total}</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#1A7FC1' }}>{STEP_LABELS[current]}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#0F766E' }}>{STEP_LABELS[current]}</span>
       </div>
     </div>
   )
@@ -87,7 +87,7 @@ function StepBar({ current, total }: { current: number; total: number }) {
 
 const lightInput: React.CSSProperties = {
   width: '100%', background: '#FFFFFF', border: '1.5px solid #DDE8F5',
-  borderRadius: 10, padding: '11px 14px', fontSize: 14, color: '#0C2A4A',
+  borderRadius: 10, padding: '11px 14px', fontSize: 14, color: '#134E4A',
   outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
 }
 const lightLabel: React.CSSProperties = {
@@ -99,7 +99,7 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Tell us about your hospital</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Tell us about your hospital</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>This is how patients will find and recognise you</p>
       </div>
       <div>
@@ -112,10 +112,10 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {HOSPITAL_TYPES.map(t => (
             <button key={t.value} type="button" onClick={() => onChange({ type: t.value })}
-              style={{ textAlign: 'left', padding: 12, borderRadius: 12, border: `1.5px solid ${data.type === t.value ? '#1A7FC1' : '#DDE8F5'}`,
+              style={{ textAlign: 'left', padding: 12, borderRadius: 12, border: `1.5px solid ${data.type === t.value ? '#0F766E' : '#DDE8F5'}`,
                 background: data.type === t.value ? '#EAF4FC' : '#FAFCFF', cursor: 'pointer', transition: 'all .15s' }}>
-              <span style={{ display: 'block', marginBottom: 4, color: data.type === t.value ? '#1A7FC1' : '#6A8FAA' }}>{t.icon}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, display: 'block', color: data.type === t.value ? '#1A7FC1' : '#0C2A4A' }}>{t.label}</span>
+              <span style={{ display: 'block', marginBottom: 4, color: data.type === t.value ? '#0F766E' : '#6A8FAA' }}>{t.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, display: 'block', color: data.type === t.value ? '#0F766E' : '#134E4A' }}>{t.label}</span>
               <span style={{ fontSize: 11, color: '#6A8FAA' }}>{t.desc}</span>
             </button>
           ))}
@@ -131,9 +131,9 @@ function StepBasics({ data, onChange }: { data: FormData; onChange: (d: Partial<
                 onClick={() => onChange({ ownership: active ? null : o.value })}
                 style={{ padding: '8px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   fontFamily: 'inherit', transition: 'all .15s',
-                  border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`,
+                  border: `1.5px solid ${active ? '#0F766E' : '#DDE8F5'}`,
                   background: active ? '#EAF4FC' : '#FAFCFF',
-                  color: active ? '#1A7FC1' : '#6A8FAA' }}>
+                  color: active ? '#0F766E' : '#6A8FAA' }}>
                 {o.label}
               </button>
             )
@@ -158,7 +158,7 @@ function StepVerification({ data, onChange }: { data: FormData; onChange: (d: Pa
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Verify your facility</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Verify your facility</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>These credentials are used to verify your hospital before patients can book appointments</p>
       </div>
 
@@ -198,7 +198,7 @@ function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partia
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Contact & Location</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Contact & Location</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>Patients will use this to find and reach you</p>
       </div>
       <div>
@@ -215,7 +215,7 @@ function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partia
         <div>
           <label style={lightLabel}>State *</label>
           <select value={data.state} onChange={e => onChange({ state: e.target.value })}
-            style={{ ...lightInput, color: data.state ? '#0C2A4A' : '#6A8FAA', appearance: 'auto' } as React.CSSProperties}>
+            style={{ ...lightInput, color: data.state ? '#134E4A' : '#6A8FAA', appearance: 'auto' } as React.CSSProperties}>
             <option value="">Select state</option>
             {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -260,9 +260,9 @@ function StepLocation({ data, onChange }: { data: FormData; onChange: (d: Partia
           disabled={geoBusy}
           style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px',
             borderRadius: 10, cursor: geoBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: 14,
-            border: `1.5px solid ${data.latitude != null ? '#1A7FC1' : '#DDE8F5'}`,
+            border: `1.5px solid ${data.latitude != null ? '#0F766E' : '#DDE8F5'}`,
             background: data.latitude != null ? '#EAF4FC' : '#FAFCFF',
-            color: data.latitude != null ? '#1A7FC1' : '#2A5070' }}>
+            color: data.latitude != null ? '#0F766E' : '#2A5070' }}>
           {data.latitude != null ? <Check size={16} /> : <MapPin size={16} />}
           {geoBusy ? 'Getting location…' : data.latitude != null ? 'Location captured' : 'Use my current location'}
         </button>
@@ -293,48 +293,48 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
 
   const modelBtn = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'flex-start', gap: 14, padding: 16, borderRadius: 12, textAlign: 'left',
-    border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
+    border: `1.5px solid ${active ? '#0F766E' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
     cursor: 'pointer', width: '100%', transition: 'all .15s',
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>How is your facility organised?</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>How is your facility organised?</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>This determines how you manage bookings, doctors, and front desk</p>
       </div>
 
       <button type="button" onClick={() => onChange({ clinicModel: 'single' })} style={modelBtn(data.clinicModel === 'single')}>
         <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: data.clinicModel === 'single' ? 'rgba(26,127,193,0.12)' : '#F0F5FF', color: data.clinicModel === 'single' ? '#1A7FC1' : '#6A8FAA' }}>
+          background: data.clinicModel === 'single' ? 'rgba(15,118,110,0.12)' : '#F0F5FF', color: data.clinicModel === 'single' ? '#0F766E' : '#6A8FAA' }}>
           <Building2 size={20} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'single' ? '#1A7FC1' : '#0C2A4A', marginBottom: 3 }}>Single Clinic</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'single' ? '#0F766E' : '#134E4A', marginBottom: 3 }}>Single Clinic</div>
           <div style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>One operation — manage all doctors, queues, and appointments from one dashboard. Best for standalone clinics.</div>
         </div>
-        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'single' ? '#1A7FC1' : '#DDE8F5'}`,
+        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'single' ? '#0F766E' : '#DDE8F5'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-          {data.clinicModel === 'single' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
+          {data.clinicModel === 'single' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0F766E' }} />}
         </div>
       </button>
 
       <button type="button" onClick={() => onChange({ clinicModel: 'multi', clinics: data.clinics.length > 0 ? data.clinics : [newClinic()] })}
         style={modelBtn(data.clinicModel === 'multi')}>
         <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: data.clinicModel === 'multi' ? 'rgba(26,127,193,0.12)' : '#F0F5FF', color: data.clinicModel === 'multi' ? '#1A7FC1' : '#6A8FAA' }}>
+          background: data.clinicModel === 'multi' ? 'rgba(15,118,110,0.12)' : '#F0F5FF', color: data.clinicModel === 'multi' ? '#0F766E' : '#6A8FAA' }}>
           <Building size={20} />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'multi' ? '#1A7FC1' : '#0C2A4A' }}>Multiple Clinics / Departments</span>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(26,127,193,0.1)', color: '#1A7FC1', border: '1px solid rgba(26,127,193,0.2)' }}>Growth+</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: data.clinicModel === 'multi' ? '#0F766E' : '#134E4A' }}>Multiple Clinics / Departments</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(15,118,110,0.1)', color: '#0F766E', border: '1px solid rgba(15,118,110,0.2)' }}>Growth+</span>
           </div>
           <div style={{ fontSize: 12, color: '#6A8FAA', lineHeight: 1.6 }}>Several departments (OPD, Surgery, Cardiology…) each with their own sub-admin and queue.</div>
         </div>
-        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'multi' ? '#1A7FC1' : '#DDE8F5'}`,
+        <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${data.clinicModel === 'multi' ? '#0F766E' : '#DDE8F5'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-          {data.clinicModel === 'multi' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
+          {data.clinicModel === 'multi' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0F766E' }} />}
         </div>
       </button>
 
@@ -342,12 +342,12 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#0C2A4A' }}>Define your clinics / departments</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#134E4A' }}>Define your clinics / departments</div>
               <div style={{ fontSize: 11, color: '#6A8FAA' }}>You can rename these later from your dashboard</div>
             </div>
             <button type="button" onClick={addClinic}
               style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 8,
-                background: '#EAF4FC', color: '#1A7FC1', border: '1px solid rgba(26,127,193,0.25)', cursor: 'pointer' }}>
+                background: '#EAF4FC', color: '#0F766E', border: '1px solid rgba(15,118,110,0.25)', cursor: 'pointer' }}>
               + Add
             </button>
           </div>
@@ -364,14 +364,14 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
             {data.clinics.map((clinic, idx) => (
               <div key={clinic.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-                borderRadius: 10, border: `1.5px solid ${clinic.name ? 'rgba(26,127,193,0.25)' : '#DDE8F5'}`, background: '#FAFCFF' }}>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#EAF4FC', color: '#1A7FC1',
+                borderRadius: 10, border: `1.5px solid ${clinic.name ? 'rgba(15,118,110,0.25)' : '#DDE8F5'}`, background: '#FAFCFF' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#EAF4FC', color: '#0F766E',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                   {idx + 1}
                 </div>
                 <input value={clinic.name} onChange={e => updateClinic(clinic.id, 'name', e.target.value)}
                   placeholder="e.g. OPD Clinic…"
-                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: '#0C2A4A' }} />
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: '#134E4A' }} />
                 <button type="button" onClick={() => removeClinic(clinic.id)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6A8FAA', display: 'flex', padding: 0 }}>
                   <X size={14} />
@@ -383,7 +383,7 @@ function StepClinicStructure({ data, onChange }: { data: FormData; onChange: (d:
             <p style={{ fontSize: 12, color: '#D97706' }}>Add at least one clinic name to continue</p>
           )}
           {data.clinics.filter(c => c.name.trim()).length > 0 && (
-            <p style={{ fontSize: 12, color: '#1A7FC1' }}>{data.clinics.filter(c => c.name.trim()).length} clinic(s) defined</p>
+            <p style={{ fontSize: 12, color: '#0F766E' }}>{data.clinics.filter(c => c.name.trim()).length} clinic(s) defined</p>
           )}
         </div>
       )}
@@ -401,7 +401,7 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>What do you specialise in?</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>What do you specialise in?</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>Select all that apply — patients filter by specialty</p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
@@ -410,17 +410,17 @@ function StepSpecialties({ data, onChange, specialties }: { data: FormData; onCh
           return (
             <button key={s.id} type="button" onClick={() => toggle(s.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
-                border: `1.5px solid ${selected ? '#1A7FC1' : '#DDE8F5'}`,
+                border: `1.5px solid ${selected ? '#0F766E' : '#DDE8F5'}`,
                 background: selected ? '#EAF4FC' : '#FAFCFF', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' }}>
               <span style={{ fontSize: 18 }}>{s.icon}</span>
-              <span style={{ fontSize: 13, fontWeight: 500, flex: 1, color: selected ? '#1A7FC1' : '#0C2A4A' }}>{s.name}</span>
-              {selected && <Check size={13} style={{ color: '#1A7FC1', flexShrink: 0 }} />}
+              <span style={{ fontSize: 13, fontWeight: 500, flex: 1, color: selected ? '#0F766E' : '#134E4A' }}>{s.name}</span>
+              {selected && <Check size={13} style={{ color: '#0F766E', flexShrink: 0 }} />}
             </button>
           )
         })}
       </div>
       {data.specialtyIds.length > 0 && (
-        <p style={{ fontSize: 13, color: '#1A7FC1', fontWeight: 600 }}>{data.specialtyIds.length} specialty selected</p>
+        <p style={{ fontSize: 13, color: '#0F766E', fontWeight: 600 }}>{data.specialtyIds.length} specialty selected</p>
       )}
     </div>
   )
@@ -437,7 +437,7 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Additional Features</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Additional Features</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>Let patients know what you offer beyond in-person visits</p>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -446,15 +446,15 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
           return (
             <button key={f.key} type="button" onClick={() => onChange({ [f.key]: !enabled })}
               style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 12, textAlign: 'left',
-                border: `1.5px solid ${enabled ? '#1A7FC1' : '#DDE8F5'}`, background: enabled ? '#EAF4FC' : '#FAFCFF',
+                border: `1.5px solid ${enabled ? '#0F766E' : '#DDE8F5'}`, background: enabled ? '#EAF4FC' : '#FAFCFF',
                 cursor: 'pointer', transition: 'all .15s', width: '100%' }}>
-              <span style={{ color: enabled ? '#1A7FC1' : '#6A8FAA' }}>{f.icon}</span>
+              <span style={{ color: enabled ? '#0F766E' : '#6A8FAA' }}>{f.icon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: enabled ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{f.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: enabled ? '#0F766E' : '#134E4A', marginBottom: 2 }}>{f.label}</div>
                 <div style={{ fontSize: 12, color: '#6A8FAA' }}>{f.desc}</div>
               </div>
               <div style={{ width: 40, height: 22, borderRadius: 11, position: 'relative', flexShrink: 0,
-                background: enabled ? '#1A7FC1' : '#DDE8F5', transition: 'background .2s' }}>
+                background: enabled ? '#0F766E' : '#DDE8F5', transition: 'background .2s' }}>
                 <div style={{ position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%',
                   background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left .2s',
                   left: enabled ? 21 : 3 }} />
@@ -477,15 +477,15 @@ function StepFeatures({ data, onChange }: { data: FormData; onChange: (d: Partia
             return (
               <button key={m.value} type="button" onClick={() => onChange({ approvalMode: m.value })}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, textAlign: 'left',
-                  border: `1.5px solid ${active ? '#1A7FC1' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
+                  border: `1.5px solid ${active ? '#0F766E' : '#DDE8F5'}`, background: active ? '#EAF4FC' : '#FAFCFF',
                   cursor: 'pointer', transition: 'all .15s', width: '100%' }}>
                 <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                  border: `2px solid ${active ? '#1A7FC1' : '#DDE8F5'}`,
+                  border: `2px solid ${active ? '#0F766E' : '#DDE8F5'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A7FC1' }} />}
+                  {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0F766E' }} />}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: active ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: active ? '#0F766E' : '#134E4A', marginBottom: 2 }}>{m.label}</div>
                   <div style={{ fontSize: 12, color: '#6A8FAA' }}>{m.desc}</div>
                 </div>
               </button>
@@ -513,14 +513,14 @@ function StepHours({ data, onChange }: { data: FormData; onChange: (d: Partial<F
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Operating Hours</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Operating Hours</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>Set when patients can book appointments</p>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {data.hours.map(h => (
           <div key={h.day} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
             borderRadius: 10, border: '1.5px solid #DDE8F5', background: h.closed ? '#F8FAFC' : '#FFFFFF' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, width: 36, flexShrink: 0, color: h.closed ? '#6A8FAA' : '#0C2A4A' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, width: 36, flexShrink: 0, color: h.closed ? '#6A8FAA' : '#134E4A' }}>
               {DAYS[h.day].slice(0, 3)}
             </span>
             {h.closed ? (
@@ -528,16 +528,16 @@ function StepHours({ data, onChange }: { data: FormData; onChange: (d: Partial<F
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
                 <input type="time" value={h.open} onChange={e => updateHour(h.day, 'open', e.target.value)}
-                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#0C2A4A', outline: 'none' }} />
+                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#134E4A', outline: 'none' }} />
                 <span style={{ fontSize: 12, color: '#6A8FAA' }}>to</span>
                 <input type="time" value={h.close} onChange={e => updateHour(h.day, 'close', e.target.value)}
-                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#0C2A4A', outline: 'none' }} />
+                  style={{ background: '#F4F8FC', border: '1px solid #DDE8F5', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: '#134E4A', outline: 'none' }} />
               </div>
             )}
             <button type="button" onClick={() => updateHour(h.day, 'closed', !h.closed)}
               style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, flexShrink: 0,
-                border: `1px solid ${h.closed ? 'rgba(26,127,193,0.3)' : '#DDE8F5'}`,
-                color: h.closed ? '#1A7FC1' : '#6A8FAA', background: h.closed ? '#EAF4FC' : '#F4F8FC', cursor: 'pointer' }}>
+                border: `1px solid ${h.closed ? 'rgba(15,118,110,0.3)' : '#DDE8F5'}`,
+                color: h.closed ? '#0F766E' : '#6A8FAA', background: h.closed ? '#EAF4FC' : '#F4F8FC', cursor: 'pointer' }}>
               {h.closed ? 'Open' : 'Close'}
             </button>
           </div>
@@ -553,7 +553,7 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0C2A4A', marginBottom: 4 }}>Choose your plan</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#134E4A', marginBottom: 4 }}>Choose your plan</h2>
         <p style={{ fontSize: 13, color: '#6A8FAA' }}>Start free for 3 months — upgrade or cancel anytime</p>
       </div>
 
@@ -580,12 +580,12 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
               onClick={() => !lockedForMulti && onChange({ planId: plan.id })}
               disabled={lockedForMulti}
               style={{ textAlign: 'left', padding: 16, borderRadius: 12, position: 'relative',
-                border: `1.5px solid ${selected ? '#1A7FC1' : isGrowth ? 'rgba(26,127,193,0.25)' : '#DDE8F5'}`,
+                border: `1.5px solid ${selected ? '#0F766E' : isGrowth ? 'rgba(15,118,110,0.25)' : '#DDE8F5'}`,
                 background: selected ? '#EAF4FC' : isGrowth ? '#F0F7FD' : '#FAFCFF',
                 opacity: lockedForMulti ? 0.45 : 1, cursor: lockedForMulti ? 'not-allowed' : 'pointer', transition: 'all .15s' }}>
               {isGrowth && !selected && (
                 <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, fontWeight: 700,
-                  color: '#1A7FC1', background: '#EAF4FC', border: '1px solid rgba(26,127,193,0.25)', padding: '2px 8px', borderRadius: 20 }}>Popular</span>
+                  color: '#0F766E', background: '#EAF4FC', border: '1px solid rgba(15,118,110,0.25)', padding: '2px 8px', borderRadius: 20 }}>Popular</span>
               )}
               {lockedForMulti && (
                 <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 10, fontWeight: 700,
@@ -593,24 +593,24 @@ function StepPlan({ data, onChange, plans, clinicModel }: { data: FormData; onCh
               )}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: selected ? '#1A7FC1' : '#0C2A4A', marginBottom: 2 }}>{plan.display_name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: selected ? '#0F766E' : '#134E4A', marginBottom: 2 }}>{plan.display_name}</div>
                   <div style={{ fontSize: 11, color: '#6A8FAA' }}>
                     {plan.max_doctors ? `Up to ${plan.max_doctors} doctors` : 'Unlimited doctors'} · {plan.max_monthly_bookings ? `${plan.max_monthly_bookings.toLocaleString()} bookings/mo` : 'Unlimited bookings'}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: selected ? '#1A7FC1' : '#0C2A4A' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: selected ? '#0F766E' : '#134E4A' }}>
                     ₦{plan.price_monthly.toLocaleString()}<span style={{ fontWeight: 400, color: '#6A8FAA', fontSize: 12 }}>/mo</span>
                   </div>
                   {plan.price_annual && (
-                    <div style={{ fontSize: 11, color: '#1A7FC1' }}>₦{plan.price_annual.toLocaleString()} annually</div>
+                    <div style={{ fontSize: 11, color: '#0F766E' }}>₦{plan.price_annual.toLocaleString()} annually</div>
                   )}
                 </div>
               </div>
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {features.map(f => (
                   <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6A8FAA' }}>
-                    <Check size={11} style={{ color: '#1A7FC1', flexShrink: 0 }} /> {f}
+                    <Check size={11} style={{ color: '#0F766E', flexShrink: 0 }} /> {f}
                   </li>
                 ))}
               </ul>
@@ -725,25 +725,25 @@ export default function OnboardingPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "var(--font-jakarta), system-ui, sans-serif" }}>
       {/* Left panel — branding */}
       <div style={{ width: 300, flexShrink: 0, background: '#061208', display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between', padding: '48px 36px',
         position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -80, left: -80, width: 320, height: 320,
-          borderRadius: '50%', background: 'rgba(0,232,122,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+          borderRadius: '50%', background: 'rgba(15,118,110,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
 
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,232,122,0.1)',
-              border: '1px solid rgba(0,232,122,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(15,118,110,0.1)',
+              border: '1px solid rgba(15,118,110,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
-                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#00E87A" strokeWidth="2.5"/>
-                <line x1="13" y1="16" x2="27" y2="16" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="13" y1="20" x2="22" y2="20" stroke="#00E87A" strokeWidth="2.5" strokeLinecap="round"/>
-                <circle cx="30" cy="30" r="8" fill="#061208" stroke="#00E87A" strokeWidth="2.5"/>
-                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#00E87A" strokeWidth="2" strokeLinecap="round"/>
-                <circle cx="30" cy="31.5" r="1" fill="#00E87A"/>
+                <rect x="6" y="8" width="28" height="24" rx="6" stroke="#0F766E" strokeWidth="2.5"/>
+                <line x1="13" y1="16" x2="27" y2="16" stroke="#0F766E" strokeWidth="2.5" strokeLinecap="round"/>
+                <line x1="13" y1="20" x2="22" y2="20" stroke="#0F766E" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="30" cy="30" r="8" fill="#061208" stroke="#0F766E" strokeWidth="2.5"/>
+                <line x1="30" y1="26.5" x2="30" y2="30" stroke="#0F766E" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="30" cy="31.5" r="1" fill="#0F766E"/>
               </svg>
             </div>
             <div>
@@ -767,16 +767,16 @@ export default function OnboardingPage() {
               return (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: done || current ? 1 : 0.3 }}>
                   <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                    background: done ? '#00E87A' : current ? 'rgba(0,232,122,0.15)' : 'rgba(255,255,255,0.06)',
-                    border: `1.5px solid ${done ? '#00E87A' : current ? 'rgba(0,232,122,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                    background: done ? '#0F766E' : current ? 'rgba(15,118,110,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: `1.5px solid ${done ? '#0F766E' : current ? 'rgba(15,118,110,0.5)' : 'rgba(255,255,255,0.12)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {done
                       ? <Check size={12} color="#061208" strokeWidth={3} />
-                      : <span style={{ fontSize: 10, fontWeight: 700, color: current ? '#00E87A' : 'rgba(255,255,255,0.3)' }}>{i + 1}</span>
+                      : <span style={{ fontSize: 10, fontWeight: 700, color: current ? '#0F766E' : 'rgba(255,255,255,0.3)' }}>{i + 1}</span>
                     }
                   </div>
                   <span style={{ fontSize: 12, fontWeight: current ? 700 : 500,
-                    color: done ? '#00E87A' : current ? '#FFFFFF' : 'rgba(255,255,255,0.4)' }}>
+                    color: done ? '#0F766E' : current ? '#FFFFFF' : 'rgba(255,255,255,0.4)' }}>
                     {label}
                   </span>
                 </div>
@@ -816,7 +816,7 @@ export default function OnboardingPage() {
               )}
               {step < TOTAL_STEPS - 1 ? (
                 <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
-                  style={{ flex: 1, background: canProceed() ? '#1A7FC1' : '#A0BDD4', color: '#FFFFFF', border: 'none',
+                  style={{ flex: 1, background: canProceed() ? '#0F766E' : '#A0BDD4', color: '#FFFFFF', border: 'none',
                     borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 700,
                     cursor: canProceed() ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -824,7 +824,7 @@ export default function OnboardingPage() {
                 </button>
               ) : (
                 <button type="button" onClick={handleSubmit} disabled={loading || !canProceed()}
-                  style={{ flex: 1, background: canProceed() && !loading ? '#1A7FC1' : '#A0BDD4', color: '#FFFFFF', border: 'none',
+                  style={{ flex: 1, background: canProceed() && !loading ? '#0F766E' : '#A0BDD4', color: '#FFFFFF', border: 'none',
                     borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 700,
                     cursor: canProceed() && !loading ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

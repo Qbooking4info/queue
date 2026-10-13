@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet, Platform } from 'react-native'
+import { View, TouchableOpacity, Modal, Pressable, StyleSheet, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Picker } from '@react-native-picker/picker'
 import { useTheme } from '../../contexts/ThemeContext'
 

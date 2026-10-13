@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import {
@@ -273,7 +274,7 @@ export function DoctorVideoCallScreen({ navigation, route }: Props) {
       <View style={st.container}>
         <StatusBar barStyle="light-content" backgroundColor="#050d09" />
         <View style={st.center}>
-          <ActivityIndicator color="#00E87A" size="large" />
+          <ActivityIndicator color="#0F766E" size="large" />
           <Text style={st.loadingText}>
             {phase === 'loading' ? 'Generating secure call token…' : 'Joining room…'}
           </Text>
@@ -378,7 +379,7 @@ const st = StyleSheet.create({
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
   waitingText:  { fontSize: 14, color: '#4A6058', textAlign: 'center' },
   loadingText:  { fontSize: 13, color: '#4A6058', marginTop: 14, textAlign: 'center' },
-  errorTitle:   { fontSize: 18, fontWeight: '700', color: '#FF5C5C', marginBottom: 8, textAlign: 'center' },
+  errorTitle:   { fontSize: 18, fontWeight: '700', color: '#EF4444', marginBottom: 8, textAlign: 'center' },
   errorSub:     { fontSize: 13, color: '#7A9089', textAlign: 'center', lineHeight: 20 },
   backCallBtn:  { marginTop: 20, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
   localPip: {

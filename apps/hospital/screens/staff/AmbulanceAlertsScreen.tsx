@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Linking } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -109,15 +111,8 @@ export function AmbulanceAlertsScreen({ navigation }: Props) {
   const openCritical = sorted.filter(a => !a.acknowledged_at && a.severity === 'critical').length
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>Dispatcher Alerts</Text>
-        <View style={{ width: 22 }} />
-      </View>
-      <Text style={[st.subtitle, { color: t.textSecondary }]}>Raised when a search finds no ambulance, or an assigned crew stops reporting its position.</Text>
+    <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Dispatcher alerts" subtitle="No-unit searches and crews that stop reporting" onBack={() => navigation.goBack()} />
 
       {loading ? (
         <View style={st.center}><ActivityIndicator color={t.accent} /></View>

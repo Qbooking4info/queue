@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Dimensions } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Dimensions } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
 import { useTheme }  from '@queue/shared/contexts/ThemeContext'
 import { useAuth }   from '@queue/shared/contexts/AuthContext'
 import { supabase }  from '@queue/shared/lib/supabase'
@@ -29,7 +29,7 @@ function fmtMinutes(m: number | null): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
-const SPEC_COLORS = ['#00E87A','#5B9EFF','#A78BFA','#EF9F27','#FF8C42']
+const SPEC_COLORS = ['#0F766E','#5B9EFF','#A78BFA','#EF9F27','#FF8C42']
 
 interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean } }
 
@@ -134,29 +134,11 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
   ]
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={[s.header, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-        {/* Analytics is pushed as its own stack screen above the tab bar (not a tab
-            itself), so without this there is no way back to the dashboard at all --
-            no native header, no tab bar, nothing but the browser's own back button,
-            which doesn't sync with this in-memory navigation stack on web. */}
-        {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-          </TouchableOpacity>
-        ) : null}
-        <Text style={[s.title, { color: t.textPrimary }]}>Analytics</Text>
-      </View>
-
-      {/* Range selector */}
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16 }}>
-        {RANGES.map(r => (
-          <TouchableOpacity key={r.key} onPress={() => setRange(r.key)}
-            style={[s.rangeBtn, { borderColor: range === r.key ? t.accent : t.cardBorder, backgroundColor: range === r.key ? `${t.accent}18` : t.cardBg }]}>
-            <Text style={[s.rangeBtnText, { color: range === r.key ? t.accent : t.textMuted }]}>{r.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Analytics" subtitle="Appointments, revenue and trends" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
+        <SegmentedControl<Range> onDark value={range} onChange={setRange}
+          options={RANGES.map(r => ({ value: r.key, label: r.label }))} />
+      </Header>
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

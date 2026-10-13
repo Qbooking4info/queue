@@ -8,9 +8,12 @@
 # `scripts/` would also match web/scripts/, which the build needs -- package.json
 # runs `prebuild: node scripts/check-env-safety.mjs` from inside web/.
 
-# Sibling apps -- not part of the web build
+# Sibling apps -- not part of the web build. Native build trees change while Gradle runs,
+# which made the upload fail with ENOENT mid-scan.
 /mobile/
 /doctors/
+/apps/*/android/
+/apps/*/ios/
 
 # Backend, docs and root-level tooling
 /supabase/

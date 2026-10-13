@@ -16,7 +16,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 const DOC_PALETTE = [
-  { dark: '#1A4A32', light: '#E6F4EC', accent: 'rgba(0,232,122,0.15)'   },
+  { dark: '#1A4A32', light: '#E6F4EC', accent: 'rgba(15,118,110,0.15)'   },
   { dark: '#1A2A4A', light: '#E6ECF4', accent: 'rgba(55,138,221,0.15)'  },
   { dark: '#3A1A4A', light: '#EEE6F4', accent: 'rgba(140,100,240,0.15)' },
   { dark: '#4A2A1A', light: '#F4ECE6', accent: 'rgba(239,159,39,0.15)'  },
@@ -281,7 +281,7 @@ function ScheduleContent() {
                         cursor: count > 0 ? 'pointer' : 'default',
                         background: !dayOpenNow
                           ? (isDark ? 'rgba(255,255,255,0.02)' : 'repeating-linear-gradient(45deg, #f4f4f4, #f4f4f4 6px, #ececec 6px, #ececec 12px)')
-                          : isToday ? (isDark ? 'rgba(0,232,122,0.03)' : '#F9FDF9') : 'transparent' }}>
+                          : isToday ? (isDark ? 'rgba(15,118,110,0.03)' : '#F9FDF9') : 'transparent' }}>
                       {count > 0 && (() => {
                         const pal = docPal(slots[0].doc)
                         const bg = isDark ? pal.accent : pal.light

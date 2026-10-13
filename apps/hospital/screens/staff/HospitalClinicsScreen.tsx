@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, TextInput,
-  KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -105,21 +104,15 @@ export function HospitalClinicsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary }]}>Clinics</Text>
-        </View>
-        <TouchableOpacity onPress={() => setShowCreate(true)} style={[s.addBtn, { backgroundColor: t.accent }]}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={s.addBtnText}>New Clinic</Text>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Clinics" subtitle="Departments and their admins" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity onPress={() => setShowCreate(true)} style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
+          <Ionicons name="add" size={16} color="#0F766E" />
+          <Text style={[s.addBtnText, { color: '#0F766E' }]}>New Clinic</Text>
         </TouchableOpacity>
-      </View>
+      
+        </View>} />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -151,11 +144,11 @@ export function HospitalClinicsScreen({ navigation }: Props) {
                   <Text style={[s.clinicName, { color: t.textPrimary }]}>{clinic.name}</Text>
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                     <View style={[s.badge, { backgroundColor: clinic.is_active ? 'rgba(0,194,101,0.14)' : 'rgba(122,144,137,0.14)' }]}>
-                      <Text style={[s.badgeText, { color: clinic.is_active ? '#00C265' : t.textMuted }]}>{clinic.is_active ? 'Active' : 'Inactive'}</Text>
+                      <Text style={[s.badgeText, { color: clinic.is_active ? t.statusSuccess.text : t.textMuted }]}>{clinic.is_active ? 'Active' : 'Inactive'}</Text>
                     </View>
                     {clinic.is_emergency && (
-                      <View style={[s.badge, { backgroundColor: 'rgba(255,92,92,0.14)' }]}>
-                        <Text style={[s.badgeText, { color: '#FF5C5C' }]}>Emergency Dept</Text>
+                      <View style={[s.badge, { backgroundColor: t.dangerBg }]}>
+                        <Text style={[s.badgeText, { color: t.danger }]}>Emergency Dept</Text>
                       </View>
                     )}
                     <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}>
@@ -177,8 +170,8 @@ export function HospitalClinicsScreen({ navigation }: Props) {
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setConfirmDeleteId(clinic.id)} disabled={busyId === clinic.id}
-                  style={[s.smallBtn, { borderColor: 'rgba(255,92,92,0.3)', flex: 1 }]}>
-                  <Text style={[s.smallBtnText, { color: '#FF5C5C' }]}>Delete</Text>
+                  style={[s.smallBtn, { borderColor: 'rgba(239,68,68,0.3)', flex: 1 }]}>
+                  <Text style={[s.smallBtnText, { color: t.danger }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -197,7 +190,7 @@ export function HospitalClinicsScreen({ navigation }: Props) {
       {confirmDeleteId && (
         <View style={s.overlay}>
           <View style={[s.confirmCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Ionicons name="warning-outline" size={32} color="#FF5C5C" style={{ marginBottom: 10 }} />
+            <Ionicons name="warning-outline" size={32} color={t.danger} style={{ marginBottom: 10 }} />
             <Text style={[s.modalTitle, { color: t.textPrimary }]}>Delete this clinic?</Text>
             <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 6, marginBottom: 18, lineHeight: 19 }}>
               Doctors assigned to this clinic will remain in the hospital pool — this only removes the clinic itself.
@@ -206,7 +199,7 @@ export function HospitalClinicsScreen({ navigation }: Props) {
               <TouchableOpacity onPress={() => setConfirmDeleteId(null)} style={[s.smallBtn, { flex: 1, borderColor: t.cardBorder }]}>
                 <Text style={[s.smallBtnText, { color: t.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(confirmDeleteId)} style={[s.smallBtn, { flex: 1, backgroundColor: '#FF5C5C' }]}>
+              <TouchableOpacity onPress={() => handleDelete(confirmDeleteId)} style={[s.smallBtn, { flex: 1, backgroundColor: t.danger }]}>
                 <Text style={[s.smallBtnText, { color: '#fff' }]}>Yes, Delete</Text>
               </TouchableOpacity>
             </View>
@@ -255,7 +248,7 @@ function CreateClinicModal({ hospitalId, theme: t, onClose, onDone }: { hospital
 
   return (
     <View style={s.overlay}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior="padding">
         <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Text style={[s.modalTitle, { color: t.textPrimary }]}>New Clinic</Text>
@@ -279,7 +272,7 @@ function CreateClinicModal({ hospitalId, theme: t, onClose, onDone }: { hospital
             ))}
           </View>
 
-          {error ? <Text style={[s.errorText, { color: '#FF5C5C' }]}>{error}</Text> : null}
+          {error ? <Text style={[s.errorText, { color: t.danger }]}>{error}</Text> : null}
 
           <TouchableOpacity onPress={handleCreate} disabled={loading}
             style={[s.smallBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, paddingVertical: 14 }]}>

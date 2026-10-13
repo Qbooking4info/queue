@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
@@ -139,7 +141,8 @@ export function WalkInBookingScreen({ navigation }: Props) {
 
   if (submitted) {
     return (
-      <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+        <Header title="Walk-in" subtitle="Patient added to the queue" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View style={[s.successIcon, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
             <Ionicons name="checkmark-circle" size={56} color={t.accentDark} />
@@ -161,14 +164,13 @@ export function WalkInBookingScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-          <Text style={[s.title, { color: t.textPrimary }]}>Walk-in</Text>
-          <Text style={[s.sub, { color: t.textMuted }]}>Register a walk-in patient to the queue.</Text>
+    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Walk-in intake" subtitle="Register a walk-in patient to the queue" />
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Patient lookup */}
-          <Text style={[s.sectionLabel, { color: t.textMuted }]}>PATIENT LOOKUP (OPTIONAL)</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Patient lookup (optional)</Text>
           <View style={[s.lookupRow]}>
             <View style={[s.input, { flex: 1, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
               <TextInput value={patientNumber} onChangeText={setPatientNumber}
@@ -187,14 +189,14 @@ export function WalkInBookingScreen({ navigation }: Props) {
               keyboardType="phone-pad" style={[s.inputText, { color: t.textPrimary }]} />
           </View>
           {foundPatient && (
-            <View style={[s.foundBanner, { backgroundColor: 'rgba(0,194,101,0.1)', borderColor: 'rgba(0,194,101,0.3)' }]}>
+            <View style={[s.foundBanner, { backgroundColor: t.statusSuccess.bg, borderColor: t.statusSuccess.border }]}>
               <Ionicons name="person-circle-outline" size={18} color={t.accentDark} />
               <Text style={[s.foundText, { color: t.accentDark }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
             </View>
           )}
 
           {/* Patient info */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>PATIENT INFO</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Patient info</Text>
           <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
             <TextInput value={patientName} onChangeText={setPatientName}
               placeholder="Full name *" placeholderTextColor={t.textMuted}
@@ -207,7 +209,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
 
           {/* Visit reason */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>{apptType === 'virtual' ? 'CONSULTATION REASON *' : 'VISIT REASON *'}</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>{apptType === 'virtual' ? 'Consultation reason *' : 'Visit reason *'}</Text>
           <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, height: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
             <TextInput value={reason} onChangeText={setReason}
               placeholder={apptType === 'virtual' ? 'Reason for consultation…' : 'Reason for visit…'} placeholderTextColor={t.textMuted} multiline
@@ -215,7 +217,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
 
           {/* Urgency */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>URGENCY</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Urgency</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['routine', 'urgent', 'emergency'] as const).map(u => {
               const colors = { routine: t.accent, urgent: t.statusBusy.text, emergency: t.danger }
@@ -231,7 +233,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           </View>
 
           {/* Visit type */}
-          <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>VISIT TYPE</Text>
+          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Visit type</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['in-person', 'virtual'] as const).map(tp => {
               const active = apptType === tp
@@ -247,7 +249,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           {/* Assign doctor (optional) */}
           {doctors.length > 0 && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 20 }]}>ASSIGN DOCTOR (OPTIONAL)</Text>
+              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Assign doctor (optional)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity onPress={() => setDoctorId(null)}
@@ -272,7 +274,7 @@ export function WalkInBookingScreen({ navigation }: Props) {
           {/* Assign clinic (optional) */}
           {clinics.length > 0 && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 16 }]}>ASSIGN CLINIC (OPTIONAL)</Text>
+              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 16 }]}>Assign clinic (optional)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity onPress={() => setClinicId(null)}
@@ -308,7 +310,7 @@ const s = StyleSheet.create({
   safe:        { flex: 1 },
   title:       { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginBottom: 4 },
   sub:         { fontSize: 13, marginBottom: 20 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  sectionLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   lookupRow:   { flexDirection: 'row', gap: 8 },
   lookupBtn:   { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   input:       { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' },

@@ -26,7 +26,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       md: 'px-4 py-2.5 text-sm',
       lg: 'px-6 py-3.5 text-base',
     }
-    // forest's accent (#00E87A) is bright enough that white text on it reads worse
+    // forest's accent (#0F766E) is bright enough that white text on it reads worse
     // than near-black -- LinkDoctorModal and others had already independently
     // hand-wrote the same `C.id === 'forest' ? '#061208' : '#fff'` check (matching
     // the identical convention found on the mobile side of this same fix).

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { verifyWebhookSignature, verifyTransaction, paystackConfigured } from '@/lib/paystack'
 import { notifyPatient } from '@/lib/notify-patient'
+import { isWalletRef, settleWalletTopup } from '@/lib/wallet'
 
 /**
  * POST /api/payments/webhook — Paystack charge notifications.
@@ -69,6 +70,18 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createAdminClient()
+
+  // Wallet top-ups (WAL- references) settle into the patient's wallet instead.
+  if (isWalletRef(reference)) {
+    try {
+      const result = await settleWalletTopup(db, reference)
+      if (result === 'mismatch') console.error('[wallet] AMOUNT MISMATCH', reference)
+      return NextResponse.json({ wallet: result })
+    } catch (err) {
+      console.error('[wallet] settle failed', reference, err)
+      return NextResponse.json({ error: 'wallet settle failed' }, { status: 500 })
+    }
+  }
 
   const { data: payment } = await db
     .from('payments')

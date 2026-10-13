@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
+import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
 import {
   getHospitals, getHospitalById, getClinicsForHospital, createReferral,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
@@ -252,27 +254,14 @@ export function ReferPatientScreen({ navigation, route }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-          </TouchableOpacity>
-          <Text style={[st.headerTitle, { color: t.textPrimary }]} numberOfLines={1}>Refer {patientName}</Text>
-        </View>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+        <Header title={`Refer ${patientName}`} subtitle="Same hospital or another hospital" onBack={() => navigation.goBack()}>
+          <SegmentedControl<'same' | 'other'> onDark value={mode} onChange={switchMode}
+            options={[{ value: 'same', label: 'Same hospital' }, { value: 'other', label: 'Other hospital' }]} />
+        </Header>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-            <TouchableOpacity onPress={() => switchMode('same')}
-              style={[st.modeBtn, { borderColor: mode === 'same' ? t.accent : t.cardBorder, backgroundColor: mode === 'same' ? t.accentBg : t.cardBg }]}>
-              <Text style={{ color: mode === 'same' ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>Same Hospital</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => switchMode('other')}
-              style={[st.modeBtn, { borderColor: mode === 'other' ? t.accent : t.cardBorder, backgroundColor: mode === 'other' ? t.accentBg : t.cardBg }]}>
-              <Text style={{ color: mode === 'other' ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>Different Hospital</Text>
-            </TouchableOpacity>
-          </View>
-
           {mode === 'other' && (
             <>
               <Text style={[st.label, { color: t.textMuted }]}>Receiving hospital</Text>

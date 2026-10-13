@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation } from '@queue/shared/contexts/LocationContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getLinkedDependents, findEmergencyClinic, type LinkedDependent } from '@queue/shared/lib/api'
@@ -27,7 +27,7 @@ const STEPS = ['Triage', 'Hospital', 'Payment']
 // there) for the same emergency booking.
 const EMERGENCY_TIER = {
   id: 'emergency' as const, label: 'Emergency',
-  multiplier: EMERGENCY_FEE_MULTIPLIER, badge: `${EMERGENCY_FEE_MULTIPLIER}× fee`, color: '#FF5C5C',
+  multiplier: EMERGENCY_FEE_MULTIPLIER, badge: `${EMERGENCY_FEE_MULTIPLIER}× fee`, color: '#EF4444',
 }
 
 function fmtLocalDate(d: Date): string {
@@ -40,7 +40,7 @@ const BED_SPACE_META: Partial<Record<string, { icon: 'checkmark-circle-outline' 
   enough:       { icon: 'checkmark-circle-outline', label: 'Bed space: Enough',       color: '#00C265' },
   limited:      { icon: 'alert-circle-outline',      label: 'Bed space: Limited',      color: '#FFB547' },
   very_limited: { icon: 'alert-circle-outline',      label: 'Bed space: Very limited', color: '#FF8C42' },
-  none:         { icon: 'close-circle-outline',       label: 'Bed space: None',         color: '#FF5C5C' },
+  none:         { icon: 'close-circle-outline',       label: 'Bed space: None',         color: '#EF4444' },
 }
 
 // Branches to requestAmbulance() in handleConfirm instead of createHospitalAppointment.
@@ -299,20 +299,9 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} accessibilityLabel="Go back" style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <View style={s.headerTitleRow}>
-            <Ionicons name="alert-circle-outline" size={18} color={t.danger} />
-            <Text style={[s.headerTitle, { color: t.danger }]}>Emergency Booking</Text>
-          </View>
-          <Text style={[s.headerSub, { color: t.textMuted }]}>Skip the queue · Immediate attention</Text>
-        </View>
-      </View>
+      <Header title="Emergency booking" subtitle="Skip the queue · immediate attention" onBack={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} />
 
       {/* Progress */}
       <View style={s.progressRow}>
@@ -326,10 +315,10 @@ export function EmergencyBookingScreen({ navigation }: Props) {
         ))}
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       {/* ── Step 0: Triage ───────────────────────────────────── */}
       {step === 0 && (
-        <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <View style={[s.alertBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
             <Ionicons name="alert-circle-outline" size={20} color={t.statusBusy.text} />
             <Text style={[s.alertText, { color: t.danger }]}>
@@ -527,7 +516,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                       <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                      {h.verified && <Ionicons name="checkmark-circle" size={13} color="#00E87A" />}
+                      {h.verified && <Ionicons name="checkmark-circle" size={13} color="#0F766E" />}
                     </View>
                     <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
                   </View>
@@ -735,7 +724,7 @@ const s = StyleSheet.create({
   hospitalCard:      { borderRadius: 18, padding: 14, borderWidth: 1.5, marginBottom: 10 },
   hospitalTop:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   hospitalAvatar:    { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  hospitalAvatarText:{ fontSize: 12, fontWeight: '800', color: '#00E87A' },
+  hospitalAvatarText:{ fontSize: 12, fontWeight: '800', color: '#0F766E' },
   hospitalName:      { fontSize: 14, fontWeight: '700' },
   hospitalSpec:      { fontSize: 11, marginTop: 1 },
   selectedCheck:     { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },

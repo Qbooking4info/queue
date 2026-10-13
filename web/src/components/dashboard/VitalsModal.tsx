@@ -13,7 +13,7 @@ function bmiOf(weightKg: number | null, heightCm: number | null): number | null 
 
 function bmiCategory(bmi: number): { label: string; color: string } {
   if (bmi < 18.5) return { label: 'Underweight', color: '#55A7EB' }
-  if (bmi < 25)   return { label: 'Normal', color: '#00E87A' }
+  if (bmi < 25)   return { label: 'Normal', color: '#0F766E' }
   if (bmi < 30)   return { label: 'Overweight', color: '#EF9F27' }
   return { label: 'Obese', color: '#f07070' }
 }

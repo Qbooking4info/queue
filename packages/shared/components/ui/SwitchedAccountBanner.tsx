@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'

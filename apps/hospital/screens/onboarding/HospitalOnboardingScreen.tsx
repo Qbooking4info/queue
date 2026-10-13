@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
@@ -231,7 +233,7 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
 
   if (done) {
     return (
-      <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <Ionicons name="checkmark-circle" size={72} color={t.accentDark} style={{ marginBottom: 20 }} />
           <Text style={[s.doneTitle, { color: t.textPrimary }]}>Hospital registered!</Text>
@@ -249,22 +251,16 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={goBack} accessibilityLabel="Go back" hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[s.stepLabel, { color: t.textMuted }]}>Step {step + 1} of {STEPS.length} · {STEPS[step]}</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      <Header title="Register your hospital" subtitle={`Step ${step + 1} of ${STEPS.length} · ${STEPS[step]}`} onBack={goBack} />
 
       {/* Progress bar */}
       <View style={[s.progressTrack, { backgroundColor: t.cardBorder }]}>
         <View style={[s.progressFill, { backgroundColor: t.accent, width: `${((step + 1) / STEPS.length) * 100}%` }]} />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           {/* ── STEP 0: Basics ── */}
           {step === 0 && (

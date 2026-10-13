@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Button } from '@queue/shared/components/ui/Button'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -55,12 +57,10 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Hospital" onBack={() => navigation.goBack()} />
       {/* Hero */}
-      <View style={[styles.hero, { backgroundColor: t.canvasBg }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
+      <View style={[styles.hero, { backgroundColor: t.canvasBg, paddingTop: 16 }]}>
         <View style={styles.heroRow}>
           <Avatar initials={hospital.avatar} bg={hospital.avatarBg} size={58} />
           <View style={{ flex: 1 }}>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
@@ -9,6 +9,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
+import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 
@@ -116,59 +117,27 @@ export function SpecialistQueueScreen({ navigation }: Props) {
   const done   = appts.filter(a => a.status === 'completed')
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <View style={st.header}>
-        <View>
-          <Text style={[st.greeting, { color: t.textMuted }]}>{greeting}</Text>
-          <Text style={[st.name, { color: t.textPrimary }]}>Dr. {doctorProfile?.fullName?.split(' ').slice(-1)[0] ?? '—'}</Text>
-        </View>
-        <View style={[st.statBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-          <Text style={[st.statNum, { color: t.accent }]}>{active.length}</Text>
-          <Text style={[st.statLabel, { color: t.accent }]}>pending</Text>
-        </View>
-      </View>
-
-      {/* Stats bar */}
-      {!loading && tab === 'today' && (
-        <View style={[st.statsBar, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[st.statsBarText, { color: t.textMuted }]}>
-            Today: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{appts.length}</Text> patients
-            {'  ·  '}
-            Completed: <Text style={{ color: t.textPrimary, fontWeight: '700' }}>{done.length}</Text>
-          </Text>
-        </View>
-      )}
-
-      {/* Tabs */}
-      <View style={[st.tabRow, { borderBottomColor: t.cardBorder }]}>
-        {(['today', 'upcoming'] as Tab[]).map(item => (
-          <TouchableOpacity
-            key={item}
-            onPress={() => setTab(item)}
-            style={[st.tab, tab === item && { borderBottomColor: t.accent, borderBottomWidth: 2 }]}
-          >
-            <Text style={[st.tabText, { color: tab === item ? t.accent : t.textMuted }]}>
-              {item === 'today' ? "Today's Queue" : 'Upcoming'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    <SafeAreaView edges={['left','right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="My queue" subtitle={loading ? `${greeting}, Dr. ${doctorProfile?.fullName?.split(' ').slice(-1)[0] ?? ''}`
+          : `${appts.length} ${tab === 'today' ? 'today' : 'upcoming'} · ${done.length} completed`}
+        right={
+          <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: '#FFFFFF', alignItems: 'center' }}
+            accessibilityLabel={`${active.length} waiting`}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F766E' }}>{active.length}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0F766E' }}>waiting</Text>
+          </View>
+        }>
+        <SegmentedControl<Tab> onDark value={tab} onChange={setTab}
+          options={[{ value: 'today', label: "Today's queue" }, { value: 'upcoming', label: 'Upcoming' }]} />
+      </Header>
 
       {loading ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
           {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
         </View>
       ) : appts.length === 0 ? (
-        <View style={st.center}>
-          <Ionicons name="medical-outline" size={52} color={t.textMuted} style={{ marginBottom: 16, opacity: 0.3 }} />
-          <Text style={[st.emptyTitle, { color: t.textPrimary }]}>
-            {tab === 'today' ? 'No patients scheduled for today' : 'No upcoming appointments'}
-          </Text>
-          <Text style={[st.emptySub, { color: t.textMuted }]}>
-            {tab === 'today' ? 'Your schedule is clear. Enjoy the calm!' : 'Nothing scheduled beyond today.'}
-          </Text>
-        </View>
+        <EmptyState icon="people-outline" title={tab === 'today' ? 'No patients scheduled for today' : 'No upcoming appointments'}
+          body={tab === 'today' ? 'Your schedule is clear. Enjoy the calm!' : 'Nothing scheduled beyond today.'} />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -178,7 +147,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
           {/* Active / waiting */}
           {active.length > 0 && (
             <View style={st.group}>
-              <Text style={[st.groupLabel, { color: t.textMuted }]}>WAITING / ACTIVE</Text>
+              <Text style={[st.groupLabel, { color: t.textPrimary }]}>Waiting / active</Text>
               {active.map(appt => (
                 <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
               ))}
@@ -188,7 +157,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
           {/* Completed */}
           {done.length > 0 && (
             <View style={st.group}>
-              <Text style={[st.groupLabel, { color: t.textMuted }]}>COMPLETED</Text>
+              <Text style={[st.groupLabel, { color: t.textPrimary }]}>Completed</Text>
               {done.map(appt => (
                 <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
               ))}
@@ -311,7 +280,7 @@ const st = StyleSheet.create({
   emptyTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 8, textAlign: 'center', paddingHorizontal: 32 },
   emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   group:       { paddingHorizontal: 16, marginBottom: 4 },
-  groupLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 4, paddingVertical: 10 },
+  groupLabel:  { fontSize: 16, fontWeight: '700', paddingHorizontal: 4, paddingVertical: 10 },
   card:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 8 },
   avatar:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatarText:  { fontSize: 15, fontWeight: '800' },

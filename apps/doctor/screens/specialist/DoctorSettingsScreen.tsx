@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, Linking, Modal, ScrollView } from 'react-native'
+import { View, TouchableOpacity, Switch, ActivityIndicator, Linking, Modal, ScrollView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useFocusEffect } from '@react-navigation/native'
@@ -95,22 +96,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 
   return (
     <>
-      <ShellScroll>
-        {/* Settings is pushed as its own stack screen above the tab bar (not a tab
-            itself), so without this there is no way back to Dashboard at all --
-            no header, no tab bar, nothing but the browser's own back button, which
-            doesn't sync with this in-memory navigation stack on web. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          {navigation.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Settings</Text>
-        </View>
-        <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
-          Your independent, hospital-agnostic profile — what patients see when booking you directly.
-        </Text>
+      <ShellScroll title="Settings" subtitle="What patients see when booking you directly" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
 
         <Section theme={t} title="Direct bookings">
           <ToggleRow theme={t} label="Accept virtual consults" sub="Patients can book a video call with you directly"
@@ -240,8 +226,8 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 
 function Section({ theme: t, title, children }: { theme: any; title: string; children: React.ReactNode }) {
   return (
-    <View style={{ marginBottom: 20 }}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{title}</Text>
+    <View style={{ marginBottom: 20, gap: 6 }}>
+      <Text accessibilityRole="header" style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{title}</Text>
       <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 14, overflow: 'hidden' }}>
         {children}
       </View>

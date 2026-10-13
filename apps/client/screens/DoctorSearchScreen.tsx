@@ -8,10 +8,12 @@
 // Optionally entered pre-filtered to one specialty (from SpecialtyResultsScreen's
 // toggle) via route.params.
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { searchIndependentDoctors, IndependentDoctor } from '@queue/shared/lib/api'
 import { DoctorListItem } from '@queue/shared/components/doctor/DoctorListItem'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -26,7 +28,7 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
   const specialtyName: string | undefined = route?.params?.specialtyName
 
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<VisitFilter>('all')
+  const [filter, setFilter] = useState<VisitFilter>(route?.params?.initialFilter ?? 'all')
   const [doctors, setDoctors] = useState<IndependentDoctor[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,13 +49,9 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
   }, [load])
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={{ marginRight: 10 }}>
-          <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>{specialtyName ? `${specialtyName} Doctors` : 'Find a Doctor'}</Text>
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title={specialtyName ? `${specialtyName} doctors` : 'Find a doctor'} onBack={() => navigation.goBack()} />
+      <View style={{ height: 12 }} />
 
       <View style={[st.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
         <Ionicons name="search-outline" size={15} color={t.textMuted} />

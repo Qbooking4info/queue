@@ -49,7 +49,13 @@ async function handlePOST(req: NextRequest) {
     if (!profile) {
       const { data: np, error: pErr } = await db
         .from('users')
-        .insert({ auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '' } as never)
+        .insert({
+          auth_id: user.id, full_name: user.user_metadata?.full_name ?? 'Admin', email: user.email ?? '',
+          // Personal details captured on the app's sign-up screen (stored on the auth user).
+          title: user.user_metadata?.title ?? null, gender: user.user_metadata?.gender ?? null,
+          date_of_birth: user.user_metadata?.date_of_birth || null,
+          country: user.user_metadata?.country ?? null, state: user.user_metadata?.state ?? null,
+        } as never)
         .select('id').single()
       if (pErr) return Errors.internal(pErr.message)
       profile = np

@@ -43,7 +43,7 @@ function fmtEligibility(clinic: Pick<ClinicDetail, 'min_age' | 'max_age' | 'gend
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CLINIC_PALETTE = [
-  { bg: 'rgba(0,232,122,0.14)',   text: '#00E87A' },
+  { bg: 'rgba(15,118,110,0.14)',   text: '#0F766E' },
   { bg: 'rgba(85,167,235,0.14)',  text: '#55A7EB' },
   { bg: 'rgba(180,156,240,0.14)', text: '#B49CF0' },
   { bg: 'rgba(239,159,39,0.14)',  text: '#EF9F27' },
@@ -1021,9 +1021,9 @@ export default function ClinicDetailPage() {
             </div>
             {clinic && (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
-                background: clinic.is_active ? 'rgba(0,232,122,0.12)' : 'rgba(220,60,60,0.1)',
-                color: clinic.is_active ? '#00E87A' : '#f07070',
-                border: `1px solid ${clinic.is_active ? 'rgba(0,232,122,0.25)' : 'rgba(220,60,60,0.3)'}` }}>
+                background: clinic.is_active ? 'rgba(15,118,110,0.12)' : 'rgba(220,60,60,0.1)',
+                color: clinic.is_active ? '#0F766E' : '#f07070',
+                border: `1px solid ${clinic.is_active ? 'rgba(15,118,110,0.25)' : 'rgba(220,60,60,0.3)'}` }}>
                 {clinic.is_active ? 'Active' : 'Inactive'}
               </span>
             )}
@@ -1082,9 +1082,9 @@ export default function ClinicDetailPage() {
               <button onClick={handleToggleActive}
                 style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'inherit',
-                  background: clinic.is_active ? 'rgba(239,159,39,0.12)' : 'rgba(0,232,122,0.12)',
-                  border: `1px solid ${clinic.is_active ? 'rgba(239,159,39,0.3)' : 'rgba(0,232,122,0.3)'}`,
-                  color: clinic.is_active ? C.amber : '#00E87A' }}>
+                  background: clinic.is_active ? 'rgba(239,159,39,0.12)' : 'rgba(15,118,110,0.12)',
+                  border: `1px solid ${clinic.is_active ? 'rgba(239,159,39,0.3)' : 'rgba(15,118,110,0.3)'}`,
+                  color: clinic.is_active ? C.amber : '#0F766E' }}>
                 {clinic.is_active ? 'Deactivate' : 'Reactivate'}
               </button>
               <button onClick={handleToggleEmergency}
@@ -1772,8 +1772,8 @@ export default function ClinicDetailPage() {
                                 ? { ...x, approval_status: 'auto_approved', status: 'confirmed' } : x))
                             }}
                               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
-                                border: '1px solid rgba(0,232,122,0.3)', background: 'rgba(0,232,122,0.1)',
-                                color: '#00E87A', fontWeight: 700 }}>
+                                border: '1px solid rgba(15,118,110,0.3)', background: 'rgba(15,118,110,0.1)',
+                                color: '#0F766E', fontWeight: 700 }}>
                               Approve
                             </button>
                           )}

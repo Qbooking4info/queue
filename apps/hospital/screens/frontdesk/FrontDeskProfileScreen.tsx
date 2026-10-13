@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Switch } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ScrollView, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
+import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 
 interface Props { navigation?: any }
 
@@ -44,106 +43,57 @@ export function FrontDeskProfileScreen({ navigation }: Props) {
     await signOut()
   }
 
+  // Same profile layout as every other Queue app (patient, doctor, crew).
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Profile is pushed as its own stack screen above the tab bar (not a tab
-            itself, reached from StaffMore), so without this there is no way back to
-            the dashboard at all -- no native header, no tab bar, nothing but the
-            browser's own back button, which doesn't sync with this in-memory
-            navigation stack on web. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 16 }}>
-          {navigation?.canGoBack?.() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-              <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
+    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+      <Header onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <ProfileAvatar size={68} editable name={staffProfile?.name} />
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{staffProfile?.name ?? 'Staff'}</Text>
+            <Text numberOfLines={1} style={{ color: '#CCFBF1', fontSize: 13, marginTop: 2 }}>
+              {ROLE_LABEL[staffProfile?.role ?? ''] ?? staffProfile?.role ?? 'Staff'}{hospitalName ? ` · ${hospitalName}` : ''}
+            </Text>
+          </View>
+        </View>
+      </Header>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ padding: 20, gap: 14 }}>
+          <SectionTitle title="Details" />
+          <Card style={{ paddingVertical: 0 }}>
+            <ListRow icon="id-card-outline" title="Role" last={!staffProfile?.clinicId}
+              trailing={<Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? '—'}</Text>} />
+            {staffProfile?.clinicId && (
+              <ListRow icon="business-outline" title="Assigned clinic" last
+                trailing={<Text style={{ fontSize: 14, fontWeight: '600', color: t.textPrimary }} numberOfLines={1}>{staffProfile.clinicId}</Text>} />
+            )}
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
+            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
+              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
+              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          </Card>
+
+          {!confirmVisible ? (
+            <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }} accessibilityRole="button"
+              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
             </TouchableOpacity>
-          ) : null}
-          <Text style={[s.title, { color: t.textPrimary, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Profile</Text>
-        </View>
-
-        {/* Staff card */}
-        <View style={[s.profileCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[s.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[s.avatarText, { color: t.accent }]}>{initials}</Text>
-          </View>
-          <Text style={[s.name, { color: t.textPrimary }]}>{staffProfile?.name ?? '—'}</Text>
-          <View style={[s.roleBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.roleBadgeText, { color: t.accent }]}>{ROLE_LABEL[staffProfile?.role ?? ''] ?? staffProfile?.role ?? 'Staff'}</Text>
-          </View>
-          {hospitalName && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="business-outline" size={12} color={t.textMuted} /><Text style={[s.hospitalName, { color: t.textMuted }]}>{hospitalName}</Text></View>
+          ) : (
+            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirmVisible(false)} /></View>
+                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={handleSignOut} /></View>
+              </View>
+            </Card>
           )}
-        </View>
 
-        {/* Info */}
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>DETAILS</Text>
-          <Row label="Role"     value={ROLE_LABEL[staffProfile?.role ?? ''] ?? '—'} theme={t} />
-          {staffProfile?.clinicId && <Row label="Assigned clinic" value={staffProfile.clinicId} theme={t} />}
+          <DeleteAccount what="your staff profile, photo and sign-in (the hospital itself stays)" />
         </View>
-
-        {/* Settings */}
-        <View style={[s.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>SETTINGS</Text>
-          <View style={[s.row, { borderBottomColor: t.cardBorder }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
-              <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-                {themeId === 'forest' ? 'Dark theme' : 'Light theme'}
-              </Text>
-            </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme}
-              trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        </View>
-
-        {/* Sign out */}
-        {confirmVisible ? (
-          <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={[s.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
-            <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
-              <Button
-                label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }}
-                loading={signingOut} variant="danger" style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity style={[s.signOutBtn, { borderColor: t.dangerBorder }]}
-            onPress={() => setConfirmVisible(true)}>
-            <Text style={s.signOutTxt}>Sign out</Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
-    </SafeAreaView>
-  )
-}
-
-function Row({ label, value, theme: t }: { label: string; value: string; theme: any }) {
-  return (
-    <View style={[s.row, { borderBottomColor: t.cardBorder }]}>
-      <Text style={[s.rowLabel, { color: t.textMuted }]}>{label}</Text>
-      <Text style={[s.rowValue, { color: t.textPrimary }]}>{value}</Text>
     </View>
   )
 }
-
-const s = StyleSheet.create({
-  safe:          { flex: 1 },
-  title:         { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:   { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  avatar:        { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  avatarText:    { fontSize: 26, fontWeight: '800' },
-  name:          { fontSize: 20, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  roleBadge:     { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  roleBadgeText: { fontSize: 12, fontWeight: '700' },
-  hospitalName:  { marginTop: 8, fontSize: 13, fontWeight: '600' },
-  section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 },
-  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  rowLabel:      { fontSize: 13 },
-  rowValue:      { fontSize: 13, fontWeight: '600' },
-  signOutBtn:    { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,92,92,0.1)', marginHorizontal: 16 },
-  signOutTxt:    { fontSize: 14, fontWeight: '700', color: '#FF5C5C' },
-})

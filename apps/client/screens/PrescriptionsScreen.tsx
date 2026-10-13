@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getCompletedAppointments } from '@queue/shared/lib/api'
 import { fmtDate } from '@queue/shared/lib/format'
@@ -29,14 +29,8 @@ export function PrescriptionsScreen({ navigation }: Props) {
   useFocusEffect(useCallback(() => { load() }, [load]))
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <Text style={[s.title, { color: t.textPrimary }]}>Prescriptions & Labs</Text>
-        <View style={{ width: 28 }} />
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Prescriptions & Labs" onBack={() => navigation.goBack()} />
 
       <View style={[s.tabBar, { borderBottomColor: t.cardBorder }]}>
         {(['prescriptions', 'labs'] as const).map(tb => (

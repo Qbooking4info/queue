@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -10,6 +8,8 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { REGISTERED_VIA_DOCTOR } from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
+import { ProfileFields, EMPTY_PROFILE, profileProblem, type ProfileValues } from '@queue/shared/components/ui/ProfileFields'
+import { PasswordInput, PasswordChecklist, TermsCheckbox, passwordProblem, cleanReferral } from '@queue/shared/components/ui/PasswordField'
 
 interface Props { navigation: any }
 
@@ -28,7 +28,9 @@ export function DoctorRegisterScreen({ navigation }: Props) {
   const [phone,    setPhone]    = useState('')
   const [pass,     setPass]     = useState('')
   const [confirm,  setConfirm]  = useState('')
-  const [showPass, setShowPass] = useState(false)
+  const [referral, setReferral] = useState('')
+  const [profile,  setProfile]  = useState<ProfileValues>({ ...EMPTY_PROFILE, title: 'Dr' })
+  const [agreed,   setAgreed]   = useState(false)
   const [error,    setError]    = useState('')
   const [busy,     setBusy]     = useState(false)
 
@@ -36,8 +38,12 @@ export function DoctorRegisterScreen({ navigation }: Props) {
     if (!fullName.trim()) { setError('Enter your full name.');     return }
     if (!email.trim())    { setError('Enter your work email.');    return }
     if (!phone.trim())    { setError('Enter your phone number.');  return }
-    if (pass.length < 8)  { setError('Password must be at least 8 characters.'); return }
+    const missing = profileProblem(profile)
+    if (missing)          { setError(missing); return }
+    const weak = passwordProblem(pass)
+    if (weak)             { setError(weak); return }
     if (pass !== confirm) { setError('Passwords do not match.');   return }
+    if (!agreed)          { setError('Please agree to the Terms of Service and Privacy Policy.'); return }
 
     setBusy(true); setError('')
     // Set BEFORE signUp, not after -- signUp fires onAuthStateChange while we're still
@@ -47,7 +53,9 @@ export function DoctorRegisterScreen({ navigation }: Props) {
     setPendingDoctorOnboarding(true)
     // No date of birth: it's a patient-care field, not part of a clinician's identity.
     const err = await signUp(
-      email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), '', REGISTERED_VIA_DOCTOR,
+      email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), profile.dob, REGISTERED_VIA_DOCTOR,
+      { referralCode: referral ? cleanReferral(referral) : undefined, acceptedTermsAt: new Date().toISOString(),
+        title: profile.title, gender: profile.gender, country: profile.country, state: profile.state.trim() },
     )
     setBusy(false)
     if (err) {
@@ -69,7 +77,7 @@ export function DoctorRegisterScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {navigation?.canGoBack?.() && (
@@ -103,37 +111,37 @@ export function DoctorRegisterScreen({ navigation }: Props) {
             ))}
 
             <View style={s.fieldWrap}>
+              <ProfileFields value={profile} onChange={setProfile} />
+            </View>
+
+            <View style={s.fieldWrap}>
               <Text style={[s.label, { color: t.textMuted }]}>Password</Text>
-              <View style={[s.passRow, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                <TextInput
-                  value={pass} onChangeText={setPass}
-                  placeholder="At least 8 characters" placeholderTextColor={t.textMuted}
-                  secureTextEntry={!showPass} autoCapitalize="none" autoCorrect={false}
-                  style={[s.passInput, { color: t.textPrimary }]}
-                />
-                <TouchableOpacity onPress={() => setShowPass(v => !v)} accessibilityLabel={showPass ? 'Hide password' : 'Show password'} hitSlop={8}>
-                  <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={16} color={t.textMuted} />
-                </TouchableOpacity>
-              </View>
+              <PasswordInput value={pass} onChangeText={setPass} newPassword />
+              <PasswordChecklist password={pass} />
             </View>
 
             <View style={s.fieldWrap}>
               <Text style={[s.label, { color: t.textMuted }]}>Confirm password</Text>
-              <TextInput
-                value={confirm} onChangeText={setConfirm}
-                placeholder="••••••••" placeholderTextColor={t.textMuted}
-                secureTextEntry autoCapitalize="none" autoCorrect={false}
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-              />
+              <PasswordInput value={confirm} onChangeText={setConfirm} accessibilityLabel="Confirm password" newPassword />
+              {!!confirm && confirm !== pass && <Text style={{ fontSize: 12, color: t.danger, marginTop: 6 }}>Passwords don't match yet</Text>}
             </View>
 
+            <View style={s.fieldWrap}>
+              <Text style={[s.label, { color: t.textMuted }]}>Referral code (optional)</Text>
+              <TextInput value={referral} onChangeText={v => setReferral(cleanReferral(v))} placeholder="Who referred you to Queue?"
+                placeholderTextColor={t.textMuted} autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Referral code"
+                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
+            </View>
+
+            <TermsCheckbox checked={agreed} onChange={setAgreed} />
+
             {!!error && (
-              <View style={[s.errBox, { backgroundColor: '#3B1111', borderColor: '#7B2020' }]}>
-                <Text style={s.errText}>{error}</Text>
+              <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
+                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
               </View>
             )}
 
-            <Button label="Create account" onPress={handleRegister} loading={busy} size="lg" style={{ marginTop: t.spacing.sm }} />
+            <Button label="Create account" onPress={handleRegister} loading={busy} disabled={!agreed} size="lg" style={{ marginTop: t.spacing.md }} />
 
           </View>
 

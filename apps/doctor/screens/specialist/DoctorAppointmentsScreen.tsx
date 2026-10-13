@@ -3,7 +3,8 @@
 // active. A direct booking has no hospital at all, so it needs its own home
 // regardless of which hospital (if any) is active.
 import { useCallback, useState } from 'react'
-import { View, Text, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native'
+import { View, TouchableOpacity, ActivityIndicator, ScrollView, KeyboardAvoidingView, RefreshControl } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -12,7 +13,9 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
 import { reviewDirectAppointment } from '@queue/shared/lib/api'
+import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
 
 interface Props { navigation: any }
 
@@ -36,6 +39,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
   const [tab, setTab] = useState<FilterTab>('pending')
   const [appts, setAppts] = useState<DirectAppt[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -68,37 +72,30 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
     return ['completed', 'cancelled'].includes(a.status)
   })
 
-  return (
-      <View style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 }}>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.textPrimary, letterSpacing: -0.5 }}>Appointments</Text>
-          <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>Direct bookings from patients — virtual consults and home visits.</Text>
-        </View>
+  const pendingCount = appts.filter(a => a.status === 'pending').length
 
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 12 }}>
-          {(['pending', 'upcoming', 'past'] as FilterTab[]).map(item => (
-            <TouchableOpacity key={item} onPress={() => setTab(item)}
-              style={{
-                paddingVertical: 7, paddingHorizontal: 14, borderRadius: 99,
-                backgroundColor: tab === item ? t.accentBg : t.cardBg,
-                borderWidth: 1, borderColor: tab === item ? t.accentBorder : t.cardBorder,
-              }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: tab === item ? t.accent : t.textMuted, textTransform: 'capitalize' }}>
-                {item}{item === 'pending' && appts.some(a => a.status === 'pending') ? ` (${appts.filter(a => a.status === 'pending').length})` : ''}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+  return (
+      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
+        <Header title="Appointments" subtitle="Direct virtual consults and home visits">
+          <SegmentedControl<FilterTab> onDark value={tab} onChange={setTab}
+            options={[
+              { value: 'pending', label: `Pending${pendingCount ? ` (${pendingCount})` : ''}` },
+              { value: 'upcoming', label: 'Upcoming' },
+              { value: 'past', label: 'Past' },
+            ]} />
+        </Header>
+        <View style={{ height: 14 }} />
 
         {loading ? (
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-            <Ionicons name="calendar-outline" size={44} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary, textAlign: 'center' }}>No {tab} appointments</Text>
-          </View>
+          <EmptyState icon="calendar-outline" title={`No ${tab} appointments`}
+            body={tab === 'pending' ? 'New patient requests show up here for you to approve.' : undefined} />
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}
+            refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent}
+              onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />}>
             {filtered.map(a => (
               <ApptCard key={a.id} appt={a} theme={t} busy={busyId === a.id}
                 onApprove={() => act(a.id, { action: 'approve' })}
@@ -110,6 +107,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
               />
             ))}
           </ScrollView>
+          </KeyboardAvoidingView>
         )}
       </View>
   )
@@ -147,6 +145,19 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
       </View>
 
       {appt.reason && <Text style={{ fontSize: 12, color: t.textSecondary, marginBottom: 6 }}>{appt.reason}</Text>}
+      {['confirmed', 'in_progress'].includes(appt.status) && (
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
+          onPress={() => addToGoogleCalendar({
+            title: `${appt.type === 'virtual' ? 'Video consult' : 'Home visit'}: ${appt.patient?.full_name ?? 'Patient'}`,
+            date: appt.appointment_date, time: appt.start_time,
+            location: appt.type === 'home_visit' ? (appt.home_visit_address ?? undefined) : 'Queue Doctor (video)',
+            details: appt.reason ?? undefined,
+          }).catch(() => {})}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 10, borderRadius: 99, backgroundColor: t.accentBg, marginBottom: 8 }}>
+          <Ionicons name="calendar-outline" size={14} color={t.accent} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Add to Google Calendar</Text>
+        </TouchableOpacity>
+      )}
       {appt.type === 'home_visit' && appt.home_visit_address && (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
           <Ionicons name="location-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />

@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { getOrCreateConversation, startConversation } from '@queue/shared/lib/chat'
 import { haptics } from '@queue/shared/lib/haptics'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import { Stars } from '@queue/shared/components/ui/Stars'
 import { Button } from '@queue/shared/components/ui/Button'
 import { QueuePositionPicker } from '@queue/shared/components/QueuePositionPicker'
 import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
+import { getPaymentForAppointment, shareReceipt, type ReceiptPayment } from '@queue/shared/lib/receipt'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmtDate, fmt12 } from '@queue/shared/lib/format'
+import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
 
 interface Props { navigation: any; route: any }
 
@@ -51,6 +56,56 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const [cancelling,         setCancelling]         = useState(false)
   const [copied,             setCopied]             = useState(false)
   const [refundPct,          setRefundPct]          = useState(100)
+  const [payment,            setPayment]            = useState<ReceiptPayment | null>(null)
+  const [savingReceipt,      setSavingReceipt]      = useState(false)
+  useEffect(() => { getPaymentForAppointment(raw.id).then(setPayment).catch(() => {}) }, [raw.id])
+
+  async function downloadReceipt() {
+    if (!payment) return
+    setSavingReceipt(true)
+    haptics.tap()
+    try {
+      await shareReceipt({
+        payment, patientName: user?.full_name ?? 'Patient', patientCode: (user as any)?.patient_code,
+        doctorName: raw.doctor?.full_name, hospitalName: raw.hospital?.name,
+        visitDate: raw.appointment_date, visitTime: raw.start_time, visitType: raw.type,
+      })
+      haptics.success()
+    } catch {
+      haptics.error()
+      Alert.alert('Receipt', 'Could not create the receipt. Please try again.')
+    } finally { setSavingReceipt(false) }
+  }
+  const [openingChat,        setOpeningChat]        = useState(false)
+  const chatDoctorId: string | null = raw.doctor_id ?? raw.doctor?.id ?? null
+
+  async function messageDoctor() {
+    const patientId = (raw as any).patient_id ?? user?.id
+    if (!chatDoctorId || !patientId) return
+    setOpeningChat(true)
+    haptics.tap()
+    const r = await getOrCreateConversation({ patientId, doctorId: chatDoctorId, appointmentId: raw.id })
+    setOpeningChat(false)
+    if (r.ok) navigation.navigate('Chat', { conversationId: r.data.id, role: 'patient' })
+    else {
+      haptics.error()
+      Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error)
+    }
+  }
+
+  const chatHospitalId: string | null = raw.hospital_id ?? (raw.hospital?.id ? String(raw.hospital.id) : null)
+  async function messageHospital() {
+    if (!chatHospitalId) return
+    setOpeningChat(true)
+    haptics.tap()
+    const r = await startConversation('hospital', chatHospitalId, raw.id)
+    setOpeningChat(false)
+    if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+    else {
+      haptics.error()
+      Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error)
+    }
+  }
   const [rescheduleLoading,  setRescheduleLoading]  = useState(false)
   const [queuePosition,      setQueuePosition]      = useState<number | null>(raw.queue_position ?? null)
   const [showQueuePicker,    setShowQueuePicker]    = useState(false)
@@ -168,10 +223,21 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Show what is refundable *before* the patient confirms (v3.1: "cancel shows refund
+    // first"). Same policy as cancelAppointment(): >24 h before = 100 %, otherwise 50 %.
+    const { data: paid } = await supabase.from('payments').select('amount')
+      .eq('appointment_id', raw.id).eq('status', 'success').maybeSingle()
+    const hoursUntil = (new Date(`${raw.appointment_date}T${raw.start_time}`).getTime() - Date.now()) / 3.6e6
+    const pct = hoursUntil > 24 ? 100 : 50
+    const amount = Number((paid as any)?.amount ?? 0)
+    const message = amount > 0
+      ? `You paid ₦${amount.toLocaleString()}. Under the cancellation policy ₦${Math.round(amount * pct / 100).toLocaleString()} (${pct}%) is refundable` +
+        `${pct < 100 ? ' because the visit is less than 24 hours away' : ''}. Contact Queue Support from Profile to receive it.\n\nCancelling frees your slot for another patient.`
+      : 'Nothing has been charged for this booking, so there is nothing to refund.\n\nCancelling frees your slot for another patient.'
     Alert.alert(
       'Cancel appointment?',
-      'Nothing has been charged for this booking — payment is made at the hospital, so there is nothing to refund.\n\nCancelling frees your slot for another patient.',
+      message,
       [
         { text: 'Keep appointment', style: 'cancel' },
         {
@@ -185,6 +251,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             if (result.success) {
               setRefundPct(result.refundPct)
               setCancelled(true)
+              haptics.success()
             } else {
               Alert.alert('Cancel failed', result.error ?? 'Could not cancel appointment. Please try again.')
             }
@@ -215,17 +282,11 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={st.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <Text style={[st.headerTitle, { color: t.textPrimary }]}>Appointment</Text>
-        <View style={[st.statusBadge, { backgroundColor: displayStatusColor.bg, borderColor: displayStatusColor.border }]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Appointment" onBack={() => navigation.goBack()}
+        right={<View style={[st.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }]}>
           <Text style={[st.statusText, { color: displayStatusColor.text }]}>{displayStatus}</Text>
-        </View>
-      </View>
+        </View>} />
 
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
 
@@ -410,7 +471,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             <Ionicons name="alert-circle-outline" size={22} color={t.danger} />
             <View style={{ flex: 1 }}>
               <Text style={[st.joinTitle, { color: t.danger }]}>Emergency booking</Text>
-              <Text style={[st.joinSub, { color: 'rgba(255,92,92,0.7)' }]}>
+              <Text style={[st.joinSub, { color: 'rgba(239,68,68,0.7)' }]}>
                 {appt.status === 'checked_in' || appt.status === 'in_progress'
                   ? "You've been placed at the front of today's queue."
                   : 'You will be prioritized to the front of the queue once checked in.'}
@@ -433,7 +494,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Text style={[st.joinTitle, { color: t.statusVirtual.text }]}>Virtual consultation</Text>
               <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
             </View>
-            <View style={[st.joinBtn, { backgroundColor: '#1A7FC1' }]}>
+            <View style={[st.joinBtn, { backgroundColor: '#0F766E' }]}>
               <Text style={st.joinBtnText}>Join</Text>
             </View>
           </TouchableOpacity>
@@ -564,7 +625,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
 
           {/* Missed appointment (no_show) — reschedule once for free, or book fresh if already used */}
           {isMissed && (
-            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(255,92,92,0.2)', marginBottom: 12 }]}>
+            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(239,68,68,0.2)', marginBottom: 12 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: canReschedule || raw.hospital ? 10 : 0 }}>
                 <Ionicons name="alert-circle-outline" size={14} color={t.danger} style={{ marginTop: 1 }} />
                 <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
@@ -632,9 +693,74 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </View>
           )}
 
+          {chatDoctorId && !cancelled && raw.status !== 'cancelled' && (
+            <TouchableOpacity onPress={messageDoctor} disabled={openingChat} accessibilityRole="button"
+              accessibilityLabel="Message your doctor"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={t.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{openingChat ? 'Opening chat…' : 'Message doctor'}</Text>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>Ask about results, medicines or follow-up</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {chatHospitalId && !cancelled && (
+            <TouchableOpacity onPress={messageHospital} disabled={openingChat} accessibilityRole="button"
+              accessibilityLabel="Message the hospital"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="business-outline" size={20} color={t.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Message hospital</Text>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>Front desk: directions, payments, paperwork</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {!cancelled && !['cancelled', 'completed', 'no_show'].includes(raw.status) && !!raw.appointment_date && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
+              onPress={() => { haptics.tap(); addToGoogleCalendar({
+                title: `${raw.type === 'virtual' ? 'Video visit' : 'Hospital visit'}${raw.doctor?.full_name ? ` with ${raw.doctor.full_name}` : ''}`,
+                date: raw.appointment_date, time: raw.start_time,
+                location: raw.type === 'virtual' ? 'Queue app (video)' : (raw.hospital?.name ?? undefined),
+                details: `Booking ${(raw as any).booking_ref ?? ''} · Queue`,
+              }).catch(() => {}) }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="calendar-outline" size={20} color={t.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Add to Google Calendar</Text>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>Get a reminder on your phone</Text>
+              </View>
+              <Ionicons name="open-outline" size={18} color={t.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {payment && (
+            <TouchableOpacity onPress={downloadReceipt} disabled={savingReceipt} accessibilityRole="button"
+              accessibilityLabel="Download payment receipt"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="receipt-outline" size={20} color={t.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{savingReceipt ? 'Preparing receipt…' : 'Download receipt'}</Text>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>PDF · ₦{Number(payment.amount).toLocaleString()} paid</Text>
+              </View>
+              <Ionicons name="download-outline" size={20} color={t.accent} />
+            </TouchableOpacity>
+          )}
+
           {/* Cancelled refund note */}
           {cancelled && (
-            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(255,92,92,0.2)', flexDirection: 'row', alignItems: 'flex-start', gap: 6 }]}>
+            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(239,68,68,0.2)', flexDirection: 'row', alignItems: 'flex-start', gap: 6 }]}>
               <Ionicons name="checkmark-circle" size={14} color={t.danger} style={{ marginTop: 1 }} />
               <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
                 Appointment cancelled. Nothing was charged for this booking, so there is nothing to refund.

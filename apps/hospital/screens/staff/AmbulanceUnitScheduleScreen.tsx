@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, TextInput } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, KeyboardAvoidingView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -138,21 +140,16 @@ export function AmbulanceUnitScheduleScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[st.title, { color: t.textPrimary }]}>{label} · Shifts</Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title={`${label} · Shifts`} onBack={() => navigation.goBack()} />
 
       {loading ? (
         <View style={st.center}><ActivityIndicator color={t.accent} /></View>
       ) : !unit ? (
         <View style={st.center}><Text style={{ color: t.textMuted }}>Ambulance not found.</Text></View>
       ) : (
-        <ScrollView
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <ScrollView keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
@@ -208,6 +205,7 @@ export function AmbulanceUnitScheduleScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   )

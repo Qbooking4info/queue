@@ -4,10 +4,12 @@
 // 'pending' / 'pending_review', and the doctor confirms or reschedules it
 // themselves from the doctors app's Appointments screen.
 import { useState } from 'react'
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { createDirectAppointment, IndependentDoctorProfile } from '@queue/shared/lib/api'
@@ -79,16 +81,9 @@ export function DirectBookingScreen({ navigation, route }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-            <Ionicons name="arrow-back" size={20} color={t.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[st.title, { color: t.textPrimary }]}>
-            {visitType === 'virtual' ? 'Book Virtual Consult' : 'Book Home Visit'}
-          </Text>
-        </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <Header title={visitType === 'virtual' ? 'Book Virtual Consult' : 'Book Home Visit'} onBack={() => navigation.goBack()} />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={[st.doctorCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

@@ -1,6 +1,8 @@
-import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native'
+import { TouchableOpacity, ActivityIndicator, ViewStyle, TextStyle } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
+import { haptics } from '../../lib/haptics'
 
 interface Props {
   label: string
@@ -33,16 +35,18 @@ export function Button({
   const { theme: t } = useTheme()
   const isDisabled = disabled || loading
 
-  // forest's accent (#00E87A) is bright enough that white text on it reads worse than
+  // forest's accent (#0F766E) is bright enough that white text on it reads worse than
   // near-black -- six screens had already independently discovered this and hand-wrote
   // the same `t.id === 'forest' ? '#061208' : '#fff'` check. Centralizing it here so
   // every future primary button gets it for free instead of rediscovering it a seventh
   // time.
-  const onPrimary = t.id === 'forest' ? '#061208' : '#fff'
+  const onPrimary = t.id === 'forest' ? '#081416' : '#FFFFFF'
 
+  // v3.1 sizing, shared with PrimaryButton: 48 px touch target (52 for lg), 13 px radius.
   const containerStyles: ViewStyle = {
-    borderRadius: size === 'lg' ? t.radius.lg : size === 'sm' ? t.radius.sm : t.radius.md,
-    paddingVertical: size === 'lg' ? t.spacing.lg : size === 'sm' ? t.spacing.sm : t.spacing.md,
+    borderRadius: size === 'sm' ? t.radius.sm : 13,
+    minHeight: size === 'lg' ? 52 : size === 'sm' ? 36 : 48,
+    paddingVertical: size === 'sm' ? t.spacing.xs + 2 : t.spacing.sm + 2,
     paddingHorizontal: size === 'lg' ? t.spacing.xxl : size === 'sm' ? t.spacing.md : t.spacing.xl,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: t.spacing.sm,
     opacity: isDisabled ? 0.5 : 1,
@@ -61,7 +65,7 @@ export function Button({
   }
 
   const textStyle: TextStyle = {
-    fontSize: size === 'lg' ? t.font.lg : size === 'sm' ? t.font.sm : t.font.md,
+    fontSize: size === 'lg' ? t.font.lg : size === 'sm' ? t.font.base : 15,
     fontWeight: '700',
     color: variant === 'primary' ? onPrimary
       : variant === 'danger'  ? t.danger
@@ -78,7 +82,9 @@ export function Button({
     : null
 
   return (
-    <TouchableOpacity onPress={onPress} disabled={isDisabled} style={[containerStyles, style]} activeOpacity={0.75}>
+    <TouchableOpacity onPress={onPress ? () => { haptics.tap(); onPress() } : undefined} disabled={isDisabled}
+      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
+      style={[containerStyles, style]} activeOpacity={0.75}>
       {loading && <ActivityIndicator size="small" color={textStyle.color} />}
       {iconPosition === 'left' && iconEl}
       <Text style={textStyle}>{label}</Text>

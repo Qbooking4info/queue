@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -18,7 +20,9 @@ import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
 import { fmt12 } from '@queue/shared/lib/format'
 import { payForAppointment } from '@queue/shared/lib/payments'
+import { getWallet, payWithWallet, naira } from '@queue/shared/lib/wallet'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '@queue/shared/lib/fees'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Avatar } from '@queue/shared/components/ui/Avatar'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import type { Clinic, BookingResult, DayHours, LinkedDependent } from '@queue/shared/lib/api'
@@ -32,7 +36,6 @@ const STEP_DETAILS  = 2
 const STEP_SCHEDULE = 3
 const STEP_CONFIRM  = 4
 
-const STEP_LABELS = ['Type', 'Hospital', 'Details', 'Schedule', 'Confirm']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -98,6 +101,7 @@ function getAvailableOpdSlots(dateIso: string) {
 }
 
 const PAYMENT_OPTIONS = [
+  { id: 'wallet',   icon: 'wallet-outline'           as const, label: 'Queue wallet',         sub: 'Pay instantly from your balance' },
   { id: 'card',     icon: 'card-outline'             as const, label: 'Debit / Credit Card',  sub: 'Visa, Mastercard, Verve'   },
   { id: 'transfer', icon: 'business-outline'         as const, label: 'Bank Transfer',        sub: 'Direct bank payment'       },
   { id: 'ussd',     icon: 'phone-portrait-outline'   as const, label: 'USSD',                 sub: '*737#, *966#, *000#'       },
@@ -190,9 +194,16 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   const [checkingLim,  setCheckingLim]  = useState(false)
 
   // Step 4 — confirm
-  const [payMethod,   setPayMethod]   = useState('card')
+  const [payMethod,   setPayMethodState] = useState('card')
+  // Remember the last payment method so returning patients don't pick it again.
+  useEffect(() => { AsyncStorage.getItem('queue:lastPayMethod').then(v => { if (v) setPayMethodState(v) }).catch(() => {}) }, [])
+  const setPayMethod = (m: string) => { setPayMethodState(m); AsyncStorage.setItem('queue:lastPayMethod', m).catch(() => {}) }
+  const [walletKobo, setWalletKobo] = useState<number | null>(null)
+  useEffect(() => { getWallet().then(w => setWalletKobo(w.notReady ? null : w.balanceKobo)).catch(() => {}) }, [])
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState('')
+  // Buzz whenever a booking error appears, whichever path set it.
+  useEffect(() => { if (submitError) haptics.error() }, [submitError])
 
   // Multi-clinic selection
   const [clinics,        setClinics]        = useState<Clinic[]>([])
@@ -287,6 +298,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
     : (hospital?.opd_fee ?? 0)
   const emergencyExtra = isEmergency ? emergencyPremium(baseFee) : 0
   const totalFee       = totalBookingFee(baseFee, isEmergency)
+
+  // Pre-select the earliest open slot so most people can just tap Continue.
+  useEffect(() => {
+    if (step === STEP_SCHEDULE && !opdSlot && opdSlots.length > 0) setOpdSlot(opdSlots[0] as any)
+  }, [step, selectedDate, opdSlots.length])
 
   // Once emergency is flagged at a multi-clinic hospital, only the hospital's designated
   // Emergency Department clinic is selectable — every other clinic (specialist or OPD) is
@@ -533,8 +549,21 @@ export function BookingFlowScreen({ navigation, route }: Props) {
       // is unavailable or abandoned, the booking simply stays payable at the
       // hospital — which is what happens today for every booking.
       if (result.id) {
-        const outcome = await payForAppointment(result.id)
+        let useCard = payMethod !== 'wallet'
+        if (!useCard) {
+          const w = await payWithWallet(result.id)
+          if (w.status === 'success') haptics.success()
+          else {
+            useCard = await new Promise<boolean>(resolve => Alert.alert(
+              w.status === 'insufficient' ? 'Not enough in your wallet' : 'Wallet payment failed',
+              `${w.status === 'error' ? w.message + '\n\n' : ''}Pay by card instead? Your booking is held either way.`,
+              [{ text: 'Pay at hospital', style: 'cancel', onPress: () => resolve(false) }, { text: 'Pay by card', onPress: () => resolve(true) }],
+            ))
+          }
+        }
+        const outcome = useCard ? await payForAppointment(result.id) : { status: 'cancelled' as const }
         if (outcome.status === 'error') {
+          haptics.error()
           Alert.alert(
             'Payment could not be completed',
             `${outcome.message}\n\nYour booking is confirmed — you can pay at the hospital.`,
@@ -576,10 +605,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
           : `${result.bookingRef} · ${preferredDoc?.full_name ?? (bookingType === 'virtual' ? 'Virtual visit' : 'OPD visit')} · ${hospital.name}`,
         data: { appointment_id: result.id, booking_ref: result.bookingRef },
       })
+      haptics.success()
       navigation.navigate('Confirmation', {
         hospital, doctor: preferredDoc ?? null, selectedDate,
         urgency, bookingType,
-        bookingRef: result.bookingRef, approvalStatus: result.approvalStatus,
+        bookingRef: result.bookingRef, approvalStatus: result.approvalStatus, startTime: arrivalTime,
       })
     } else {
       setSubmitError(result && !result.ok ? `Booking failed: ${result.error}` : 'Booking failed. Please try again.')
@@ -588,44 +618,33 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   // ── Progress bar ──────────────────────────────────────────────────────────
 
-  const visibleLabels = STEP_LABELS.slice(startStep)
-  const visibleIndex  = step - startStep
+  const PHASES = ['What', 'When', 'Pay & confirm'] as const
+  const phase = step <= STEP_DETAILS ? 0 : step === STEP_SCHEDULE ? 1 : 2
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.container}>
-
-        {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={goBack} accessibilityLabel="Go back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-          </TouchableOpacity>
-          <Text style={[s.title, { color: t.textPrimary }]}>
-            {step === STEP_TYPE     && 'New Appointment'}
-            {step === STEP_HOSPITAL && 'Choose Hospital'}
-            {step === STEP_DETAILS  && (rescheduleCtx ? 'Reschedule Visit' : 'Tell Us More')}
-            {step === STEP_SCHEDULE && (rescheduleCtx ? 'Pick a New Time' : 'Pick a Time')}
-            {step === STEP_CONFIRM  && (rescheduleCtx ? 'Confirm New Date' : 'Review & Confirm')}
-          </Text>
-          <View style={{ width: 32 }} />
-        </View>
-
-        {/* Progress */}
-        <View style={s.progress}>
-          {visibleLabels.map((label, i) => (
-            <View key={label} style={{ flex: 1 }}>
-              <View style={[s.progressBar, { backgroundColor: i <= visibleIndex ? t.accent : t.cardBorder }]} />
-              <Text style={[s.progressLabel, {
-                color:      i <= visibleIndex ? t.accent : t.textMuted,
-                fontWeight: i === visibleIndex ? '700' : '400',
-              }]}>{label}</Text>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header onBack={goBack}
+        title={step === STEP_TYPE ? 'New appointment'
+          : step === STEP_HOSPITAL ? 'Choose a hospital'
+          : step === STEP_DETAILS ? (rescheduleCtx ? 'Reschedule visit' : 'About your visit')
+          : step === STEP_SCHEDULE ? (rescheduleCtx ? 'Pick a new time' : 'Pick a time')
+          : (rescheduleCtx ? 'Confirm new date' : 'Pay & confirm')}
+        right={<Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)' }}>{phase + 1} of 3</Text>}>
+        {/* v3.1: three phases -- What (type, hospital, details), When, Pay & confirm */}
+        <View style={{ flexDirection: 'row', gap: 6 }} accessibilityLabel={`Step ${phase + 1} of 3: ${PHASES[phase]}`}>
+          {PHASES.map((label, i) => (
+            <View key={label} style={{ flex: 1, gap: 4 }}>
+              <View style={{ height: 4, borderRadius: 99, backgroundColor: i <= phase ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }} />
+              <Text style={{ fontSize: 11, color: i === phase ? '#FFFFFF' : '#CCFBF1', fontWeight: i === phase ? '700' : '400' }}>{label}</Text>
             </View>
           ))}
         </View>
+      </Header>
+      <View style={[s.container, { paddingTop: 12 }]}>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
 
@@ -875,8 +894,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                   </Text>
 
                   {!isEmergency && (
-                    <View style={[s.noticeBox, { backgroundColor: 'rgba(26,127,193,0.08)', borderColor: 'rgba(26,127,193,0.25)', marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: '#1A7FC1', lineHeight: 18 }}>
+                    <View style={[s.noticeBox, { backgroundColor: 'rgba(15,118,110,0.08)', borderColor: 'rgba(15,118,110,0.25)', marginBottom: 12 }]}>
+                      <Text style={{ fontSize: 12, color: '#0F766E', lineHeight: 18 }}>
                         <Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
                       </Text>
                     </View>
@@ -1291,7 +1310,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                     <Ionicons name={p.icon} size={20} color={active ? t.accent : t.textSecondary} />
                     <View style={{ flex: 1 }}>
                       <Text style={[s.payLabel, { color: active ? t.accent : t.textPrimary }]}>{p.label}</Text>
-                      <Text style={[s.paySub,   { color: t.textMuted }]}>{p.sub}</Text>
+                      <Text style={[s.paySub,   { color: t.textMuted }]}>{p.id === 'wallet' && walletKobo != null ? `Balance ${naira(walletKobo)}` : p.sub}</Text>
                     </View>
                     <View style={[s.radio, {
                       borderColor:     active ? t.accent : t.cardBorder,
@@ -1317,11 +1336,11 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
         {/* CTA row */}
         <View style={[s.ctaWrap, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-          {step > startStep && step !== STEP_TYPE && (
-            <TouchableOpacity onPress={goBack}
-              style={[s.backStepBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-              <Text style={[s.backStepText, { color: t.textPrimary }]}>Back</Text>
-            </TouchableOpacity>
+          {step >= STEP_DETAILS && step < STEP_CONFIRM && totalFee > 0 && (
+            <View style={{ justifyContent: 'center', paddingRight: 4 }} accessibilityLabel={`Total ${totalFee} naira`}>
+              <Text style={{ fontSize: 11, color: t.textMuted }}>Total</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>₦{totalFee.toLocaleString()}</Text>
+            </View>
           )}
 
           {/* Type step: no CTA — tapping a card advances */}

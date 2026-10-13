@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, TextInput, Switch } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
+import { Header } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -296,25 +296,18 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
+      <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={t.accent} />
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView edges={['top','left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-          </TouchableOpacity>
-        ) : null}
-        <Text style={[s.title, { color: t.textPrimary }]} numberOfLines={1}>{clinic?.name ?? 'Clinic'}</Text>
-        {saving ? <ActivityIndicator color={t.accent} size="small" /> : <View style={{ width: 22 }} />}
-      </View>
+    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title={`${clinic?.name ?? 'Clinic'}`} onBack={() => navigation.goBack()} right={saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : undefined} />
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <Section theme={t} title="Details">
           <Field theme={t} label="Name" value={name} onChange={setName} />
           <Field theme={t} label="Description" value={description} onChange={setDescription} multiline />
@@ -391,7 +384,7 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => unassignDoctor(doc.id)} disabled={saving}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Unassign</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Unassign</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -542,6 +535,7 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
           })()}
         </Section>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {showAssign && (
         <View style={s.overlay}>
@@ -692,7 +686,7 @@ function LinkDoctorByIdForm({ theme: t, clinicId, onLinked }: { theme: any; clin
           style={{ color: t.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: 4, textAlign: 'center' }}
           autoCapitalize="characters" maxLength={6} />
       </View>
-      {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginTop: 8 }}>{error}</Text> : null}
+      {error ? <Text style={{ fontSize: 12, color: t.danger, marginTop: 8 }}>{error}</Text> : null}
       <TouchableOpacity onPress={handleLookUp} disabled={loading}
         style={[s.saveBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 14 }]}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Look Up</Text>}
@@ -716,7 +710,7 @@ function LinkDoctorByIdForm({ theme: t, clinicId, onLinked }: { theme: any; clin
           </TouchableOpacity>
         ))}
       </ScrollView>
-      {error ? <Text style={{ fontSize: 12, color: '#FF5C5C' }}>{error}</Text> : null}
+      {error ? <Text style={{ fontSize: 12, color: t.danger }}>{error}</Text> : null}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
         <TouchableOpacity onPress={() => { setStep('code'); setError('') }}
           style={[s.saveBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: t.cardBorder }]}>
@@ -897,7 +891,7 @@ function AddStaffModal({ theme: t, clinicId, hospitalId, existingSubAdmin, onClo
         <Field theme={t} label="Full name" value={name} onChange={setName} />
         <Field theme={t} label="Email" value={email} onChange={setEmail} />
 
-        {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+        {error ? <Text style={{ fontSize: 12, color: t.danger, marginBottom: 8 }}>{error}</Text> : null}
         <TouchableOpacity onPress={handleCreate} disabled={loading}
           style={[s.saveBtn, { backgroundColor: loading ? `${t.accent}88` : t.accent, marginTop: 6 }]}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Create Account</Text>}
@@ -972,7 +966,7 @@ function ManageStaffModal({ theme: t, member, onClose, onRemove, onSaveProfile, 
           <>
             <Field theme={t} label="Full name" value={name} onChange={setName} />
             <Field theme={t} label="Email" value={email} onChange={setEmail} />
-            {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+            {error ? <Text style={{ fontSize: 12, color: t.danger, marginBottom: 8 }}>{error}</Text> : null}
             {success ? <Text style={{ fontSize: 12, color: t.accent, marginBottom: 8 }}>{success}</Text> : null}
             <TouchableOpacity onPress={saveProfile} disabled={saving}
               style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent }]}>
@@ -982,7 +976,7 @@ function ManageStaffModal({ theme: t, member, onClose, onRemove, onSaveProfile, 
         ) : (
           <>
             <Field theme={t} label="New password (min 8 characters)" value={password} onChange={setPassword} />
-            {error ? <Text style={{ fontSize: 12, color: '#FF5C5C', marginBottom: 8 }}>{error}</Text> : null}
+            {error ? <Text style={{ fontSize: 12, color: t.danger, marginBottom: 8 }}>{error}</Text> : null}
             {success ? <Text style={{ fontSize: 12, color: t.accent, marginBottom: 8 }}>{success}</Text> : null}
             <TouchableOpacity onPress={savePassword} disabled={saving}
               style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent }]}>
@@ -992,7 +986,7 @@ function ManageStaffModal({ theme: t, member, onClose, onRemove, onSaveProfile, 
         )}
 
         <TouchableOpacity onPress={onRemove} style={{ marginTop: 16, alignItems: 'center' }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF5C5C' }}>Remove from clinic</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Remove from clinic</Text>
         </TouchableOpacity>
       </View>
     </View>

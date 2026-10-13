@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Linking } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, Animated, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'

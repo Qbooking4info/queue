@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, ReactNode } from 'react'
-import { AccessibilityInfo, Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { AccessibilityInfo, Modal, View, TouchableOpacity, StyleSheet } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from './ThemeContext'
 
 export interface AlertButton {

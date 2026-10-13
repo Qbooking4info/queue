@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
+import { View, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
 
 interface Props { navigation: any; route: any }
 
@@ -15,6 +17,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
     bookingRef,
     approvalStatus,  // 'auto_approved' | 'pending_approval'
     selectedDate,
+    startTime,
     urgency,
     bookingType,     // 'virtual' | 'physical' | 'home_visit'
     directBooking,   // true for a direct-to-doctor booking (no hospital involved)
@@ -178,6 +181,19 @@ export function ConfirmationScreen({ navigation, route }: Props) {
 
         {/* Actions */}
         <Animated.View style={[st.actions, { opacity }]}>
+          {!!selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
+              onPress={() => addToGoogleCalendar({
+                title: `${bookingType === 'virtual' ? 'Video visit' : 'Hospital visit'}${doctorName ? ` with ${doctorName}` : ''}`,
+                date: selectedDate, time: startTime ?? null,
+                location: bookingType === 'virtual' ? 'Queue app (video)' : hospital?.name,
+                details: `Booking ${bookingRef ?? ''} · Queue`,
+              }).catch(() => {})}
+              style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)', flexDirection: 'row', gap: 8, justifyContent: 'center' }]}>
+              <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+              <Text style={st.secondaryBtnText}>Add to Google Calendar</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={goBookings}
             style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' }]}>
             <Text style={st.secondaryBtnText}>View bookings</Text>

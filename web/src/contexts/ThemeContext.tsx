@@ -11,100 +11,83 @@ const scale = {
   font:    { xs: 11, sm: 12, base: 13, md: 14, lg: 16, xl: 18, title: 22, hero: 26 },
 }
 
+// v3.1 palette (docs/handoff/QUEUE_V3_1_HANDOFF.md, "Design tokens"). Ids stay
+// 'forest' (dark) and 'clinical' (light) so saved preferences and every page keep
+// working; mirrored by packages/shared/contexts/ThemeContext.tsx on mobile.
 export const themes = {
   forest: {
     id: 'forest' as const,
     ...scale,
-    bg:           '#0A0F0D',
-    bgAlt:        '#0D1410',
-    card:         '#111915',
-    cardAlt:      '#161D19',
-    border:       'rgba(255,255,255,0.07)',
-    borderMed:    'rgba(255,255,255,0.11)',
-    borderDark:   'rgba(255,255,255,0.16)',
-    sidebar:      '#061208',
-    sidebarHov:   '#0C1C10',
-    accent:       '#00E87A',
-    accentLight:  'rgba(0,232,122,0.14)',
-    // Mirrors mobile's accentDark. Button's `success` variant needs a text colour that
-    // clears AA on accentLight; here it measures 5.66:1 (the brand accent would too on
-    // this dark ground, but clinical's accent does not, so both use accentDark).
-    accentDark:   '#00C265',
-    accentMid:    'rgba(0,232,122,0.10)',
-    accentBorder: 'rgba(0,232,122,0.28)',
-    text:         '#E8F5EE',
-    textSub:      '#6AAE8A',
-    // #3D6050 was the worst contrast in the product at 2.44:1 against cardAlt -- barely
-    // above the 3:1 floor for *large* text, used for body-sized meta copy. #6A8D7D
-    // clears 4.5:1 on every surface it lands on (bg 5.26 ... cardAlt 4.67).
-    textMuted:    '#6A8D7D',
-    red:          '#F07070',
-    redLight:     'rgba(226,75,74,0.14)',
-    amber:        '#EF9F27',
-    amberLight:   'rgba(239,159,39,0.14)',
-    blue:         '#85B7EB',
-    blueLight:    'rgba(55,138,221,0.14)',
-    // Distinct from `blue` above -- pages reaching for a "confirmed/info" accent
-    // independently settled on this brighter shade rather than `blue`. Same value in
-    // both palettes: it was already used directly on a light dashboard card with no
-    // complaint, so there was never a real dark/light split for it to inherit, unlike
-    // amber/red/purple above which visibly needed a muted light-mode counterpart.
-    info:         '#5B9EFF',
-    // Same reasoning as mobile's dangerBg/Subtle/Border: real rgba(91,158,255,*)
-    // usage on both platforms clustered at these three opacities (0.14 already matches
-    // the amberLight/blueLight convention above; 0.12 and 0.3 are each cluster's
-    // dominant value). No `danger` equivalent here -- rgba(255,92,92,*) never actually
-    // appears on web, only on mobile.
-    infoBg:       'rgba(91,158,255,0.14)',
-    infoSubtle:   'rgba(91,158,255,0.12)',
-    infoBorder:   'rgba(91,158,255,0.3)',
-    purple:       '#B49CF0',
-    purpleLight:  'rgba(140,100,240,0.14)',
-    rowAlt:       '#131A16',
-    toggleTrack:  'rgba(0,232,122,0.20)',
-    toggleThumb:  '#00E87A',
+    bg:           '#081416',
+    bgAlt:        '#0B1A1C',
+    card:         '#0F2326',
+    cardAlt:      '#132B2E',
+    border:       'rgba(232,241,240,0.08)',
+    borderMed:    'rgba(232,241,240,0.12)',
+    borderDark:   'rgba(232,241,240,0.18)',
+    sidebar:      '#06100F',
+    sidebarHov:   '#0F2326',
+    accent:       '#2DD4BF',
+    accentLight:  'rgba(45,212,191,0.14)',
+    accentDark:   '#5EEAD4',
+    accentMid:    'rgba(45,212,191,0.10)',
+    accentBorder: 'rgba(45,212,191,0.30)',
+    text:         '#E8F1F0',
+    textSub:      '#B8C7C9',
+    textMuted:    '#94A3A6',
+    red:          '#F87171',
+    redLight:     'rgba(248,113,113,0.14)',
+    amber:        '#FBBF24',
+    amberLight:   'rgba(251,191,36,0.14)',
+    blue:         '#93C5FD',
+    blueLight:    'rgba(96,165,250,0.14)',
+    info:         '#60A5FA',
+    infoBg:       'rgba(96,165,250,0.14)',
+    infoSubtle:   'rgba(96,165,250,0.12)',
+    infoBorder:   'rgba(96,165,250,0.3)',
+    // v3.1 has no purple; pending_review now reads as warning. Kept as aliases of amber
+    // so existing pages compile and render in the warning colour.
+    purple:       '#FBBF24',
+    purpleLight:  'rgba(251,191,36,0.14)',
+    rowAlt:       '#0C1E21',
+    toggleTrack:  'rgba(45,212,191,0.25)',
+    toggleThumb:  '#2DD4BF',
   },
   clinical: {
     id: 'clinical' as const,
     ...scale,
-    bg:           '#F4F8FC',
-    bgAlt:        '#EEF4FA',
+    bg:           '#F8FAFC',
+    bgAlt:        '#F1F5F4',
     card:         '#FFFFFF',
-    cardAlt:      '#F4F8FC',
-    border:       '#DDE8F5',
-    borderMed:    '#C0D4E8',
-    borderDark:   '#A8C4E0',
-    sidebar:      '#0C2A4A',
-    sidebarHov:   '#13395E',
-    accent:       '#1A7FC1',
-    accentLight:  '#E6F1FB',
-    accentDark:   '#0E5A8A',
-    accentMid:    'rgba(26,127,193,0.12)',
-    accentBorder: 'rgba(26,127,193,0.30)',
-    text:         '#0C2A4A',
-    textSub:      '#2A5070',
-    // textMuted darkened to clear AA against the lightest surface it renders on (bgAlt),
-    // not just the card. red darkened because Button's `danger` variant paints it on
-    // redLight (#FEF0F0), where #E03E3E measured 3.84:1.
-    textMuted:    '#4C718C',
-    red:          '#D12F2F',
-    redLight:     '#FEF0F0',
-    amber:        '#C47F00',
-    amberLight:   '#FEF8E7',
-    blue:         '#1A5FAB',
-    blueLight:    '#EEF4FC',
-    // Darkened to match mobile's clinical `info` for the same reason: #5B9EFF measured
-    // 2.70:1 on a white card, and 2.42:1 on its own infoSubtle tint. Same value both
-    // platforms so an "info" pill reads identically in the app and the dashboard.
-    info:         '#2568C9',
-    infoBg:       'rgba(91,158,255,0.14)',
-    infoSubtle:   'rgba(91,158,255,0.12)',
-    infoBorder:   'rgba(91,158,255,0.3)',
-    purple:       '#5C35A8',
-    purpleLight:  '#F2EEFF',
-    rowAlt:       '#FAFCFB',
-    toggleTrack:  'rgba(26,127,193,0.20)',
-    toggleThumb:  '#1A7FC1',
+    cardAlt:      '#F8FAFC',
+    border:       '#E3ECEB',
+    borderMed:    '#CFDDDB',
+    borderDark:   '#B5C8C5',
+    sidebar:      '#134E4A',
+    sidebarHov:   '#0F766E',
+    accent:       '#0F766E',
+    accentLight:  '#E6F4F2',
+    accentDark:   '#134E4A',
+    accentMid:    'rgba(15,118,110,0.10)',
+    accentBorder: 'rgba(15,118,110,0.30)',
+    text:         '#0B1B1E',
+    textSub:      '#33464A',
+    textMuted:    '#4B5B5E',
+    red:          '#B91C1C',
+    redLight:     '#FEE2E2',
+    amber:        '#B45309',
+    amberLight:   '#FEF3C7',
+    blue:         '#1D4ED8',
+    blueLight:    '#DBEAFE',
+    info:         '#2563EB',
+    infoBg:       'rgba(37,99,235,0.12)',
+    infoSubtle:   'rgba(37,99,235,0.08)',
+    infoBorder:   'rgba(37,99,235,0.3)',
+    purple:       '#B45309',
+    purpleLight:  '#FEF3C7',
+    rowAlt:       '#FAFCFC',
+    toggleTrack:  'rgba(15,118,110,0.20)',
+    toggleThumb:  '#0F766E',
   },
 }
 

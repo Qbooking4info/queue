@@ -1,13 +1,17 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
+import { Header } from '@queue/shared/components/ui/v3'
 import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase }  from '@queue/shared/lib/supabase'
 import { deleteAccount } from '@queue/shared/lib/api'
+import { PasswordInput, PasswordChecklist, passwordProblem } from '@queue/shared/components/ui/PasswordField'
+import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -28,7 +32,8 @@ export function PrivacySecurityScreen({ navigation }: Props) {
   async function handleChangePassword() {
     setPwError(''); setPwSuccess(false)
     if (!currentPw)          { setPwError('Enter your current password.'); return }
-    if (newPw.length < 6)    { setPwError('New password must be at least 6 characters.'); return }
+    const weak = passwordProblem(newPw)
+    if (weak)                { setPwError(weak); return }
     if (newPw !== confirmPw) { setPwError('Passwords do not match.'); return }
     setSaving(true)
 
@@ -68,16 +73,10 @@ export function PrivacySecurityScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <Text style={[s.title, { color: t.textPrimary }]}>Privacy & Security</Text>
-        <View style={{ width: 28 }} />
-      </View>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+      <Header title="Privacy & Security" onBack={() => navigation.goBack()} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Account info */}
@@ -107,11 +106,8 @@ export function PrivacySecurityScreen({ navigation }: Props) {
           ].map(f => (
             <View key={f.label} style={s.fieldWrap}>
               <Text style={[s.fieldLabel, { color: t.textMuted }]}>{f.label}</Text>
-              <TextInput
-                value={f.value} onChangeText={f.set}
-                secureTextEntry placeholder="••••••••" placeholderTextColor={t.textMuted}
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-              />
+              <PasswordInput value={f.value} onChangeText={f.set} accessibilityLabel={f.label} newPassword={f.label !== 'Current password'} />
+              {f.label === 'New password' && <PasswordChecklist password={newPw} />}
             </View>
           ))}
 
@@ -127,10 +123,7 @@ export function PrivacySecurityScreen({ navigation }: Props) {
         <Text style={[s.sectionTitle, { color: t.textMuted }]}>Account</Text>
         {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
         <Button label="Sign out of all devices" onPress={() => signOut()} variant="danger" icon="log-out-outline" />
-        <TouchableOpacity onPress={handleDeleteAccount} style={[s.dangerBtn, { borderColor: 'rgba(255,92,92,0.2)', backgroundColor: 'transparent', marginTop: 6 }]}>
-          <Ionicons name="trash-outline" size={16} color="rgba(255,92,92,0.8)" />
-          <Text style={[s.dangerBtnText, { color: t.textMuted }]}>Delete my account</Text>
-        </TouchableOpacity>
+        <DeleteAccount what="your profile, photo, family links and sign-in" />
       </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

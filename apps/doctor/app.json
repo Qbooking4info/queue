@@ -22,7 +22,7 @@
     "android": {
       "package": "com.qbooking.doctor",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -54,8 +54,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#0070F3",
+          "icon": "./assets/notification-icon.png",
+          "color": "#0F766E",
           "defaultChannel": "queue-notifications",
           "androidMode": "default"
         }
@@ -88,7 +88,28 @@
         }
       ],
       "./plugins/withGradleHeap.js",
-      "./plugins/withReleaseSigning.js"
+      "./plugins/withReleaseSigning.js",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140,
+          "resizeMode": "contain",
+          "backgroundColor": "#F8FAFC",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#081416"
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Queue uses your photos so you can set a profile picture.",
+          "cameraPermission": "Queue uses your camera for video consultations and to take a profile picture."
+        }
+      ]
     ],
     "owner": "qbooking"
   }

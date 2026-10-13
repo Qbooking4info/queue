@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
-import { Ambulance, Phone, Clock, MapPin, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Ambulance, Phone, Clock, MapPin, AlertTriangle, Building2, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { safePatientName } from '@/lib/dashboard-utils'
 
@@ -14,6 +16,10 @@ interface TransportRow {
   pickup_address: string | null
   contact_phone: string
   caller_patient_name: string | null
+  disposition: string | null
+  is_inbound: boolean
+  is_own_fleet: boolean
+  destination: { name: string } | { name: string }[] | null
   patient: { full_name: string } | { full_name: string }[] | null
   dependent: { full_name: string } | { full_name: string }[] | null
   unit: { plate_number: string; call_sign: string | null; vehicle_tier: string; provider: { name: string } | { name: string }[] | null } | { plate_number: string; call_sign: string | null; vehicle_tier: string; provider: { name: string } | { name: string }[] | null }[] | null
@@ -49,6 +55,15 @@ const STATUS_LABEL: Record<string, string> = {
   no_unit_available:      'No unit available',
 }
 
+const DISPOSITION_LABEL: Record<string, string> = {
+  transported:             'Transported',
+  treated_not_transported: 'Treated on scene',
+  patient_refused:         'Patient refused',
+  no_patient_found:        'No patient found',
+  deceased_on_scene:       'Closed on scene',
+  cancelled:               'Cancelled',
+}
+
 const ACTIVE_STATUSES = [
   'requested', 'scheduled', 'searching', 'matched',
   'en_route_to_patient', 'on_scene', 'transporting', 'arrived_at_destination',
@@ -63,6 +78,32 @@ function formatEta(seconds: number | null): string {
 
 export function AmbulancesList({ requests, canManageFleet }: { requests: TransportRow[]; canManageFleet: boolean }) {
   const { theme: C } = useTheme()
+  const router = useRouter()
+  const [receiving, setReceiving] = useState<string | null>(null)
+  const [receiveError, setReceiveError] = useState<string | null>(null)
+
+  async function receive(id: string) {
+    setReceiving(id)
+    setReceiveError(null)
+    try {
+      const res = await fetch('/api/ambulances/receive', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: id }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) setReceiveError(body.error ?? 'Could not confirm handover.')
+      else router.refresh()
+    } finally {
+      setReceiving(null)
+    }
+  }
+
+  function pill(label: string, color: string) {
+    return (
+      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, border: `1px solid ${color}33`, background: `${color}1a`, color, flexShrink: 0 }}>
+        {label}
+      </span>
+    )
+  }
   const active = requests.filter(r => ACTIVE_STATUSES.includes(r.status))
   const history = requests.filter(r => !ACTIVE_STATUSES.includes(r.status))
 
@@ -87,10 +128,10 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8, color: C.text }}>
-            <Ambulance size={22} color={C.red} /> Inbound Ambulances
+            <Ambulance size={22} color={C.red} /> Ambulance Desk
           </h1>
           <p style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
-            Transport requests heading to this hospital, dispatched by Queue&apos;s ambulance network.
+            Patients being brought to this hospital, and every job your own fleet is running.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -115,10 +156,16 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
         </div>
       </div>
 
+      {receiveError && (
+        <div role="alert" style={{ marginBottom: 16, padding: 12, borderRadius: 12, border: `1px solid ${C.red}4d`, background: `${C.red}14`, color: C.red, fontSize: 13 }}>
+          {receiveError}
+        </div>
+      )}
+
       {!active.length ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 64, textAlign: 'center', color: C.textMuted, marginBottom: 32 }}>
           <Ambulance size={36} style={{ margin: '0 auto 12px' }} />
-          <div style={{ fontWeight: 600, color: C.textSub }}>No ambulances inbound right now</div>
+          <div style={{ fontWeight: 600, color: C.textSub }}>No active ambulance jobs right now</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
@@ -133,6 +180,8 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
             )
             const isCritical = (r.triage_level ?? 5) <= 2
             const sc = statusColors(r.status)
+            const destination = Array.isArray(r.destination) ? r.destination[0] : r.destination
+            const canReceive = r.is_inbound && ['transporting', 'arrived_at_destination'].includes(r.status)
             return (
               <div key={r.id} style={{
                 borderRadius: 16, padding: 16, border: `1px solid ${isCritical ? `${C.red}4d` : C.border}`,
@@ -143,6 +192,8 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <div style={{ fontWeight: 600, color: C.text }}>{name}</div>
                       {triageBadge(r.triage_level)}
+                      {r.is_inbound && pill('Inbound', C.accent)}
+                      {r.is_own_fleet && pill('Your fleet', C.blue)}
                       {isCritical && (
                         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: `${C.red}26`, border: `1px solid ${C.red}4d`, color: C.red, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           <AlertTriangle size={10} /> CRITICAL
@@ -160,12 +211,24 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
                         {provider?.name ?? 'Ambulance'} · {unit.call_sign ?? unit.plate_number} · {unit.vehicle_tier}
                       </div>
                     )}
+                    <div style={{ fontSize: 12, color: destination ? C.textMuted : C.amber, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Building2 size={11} /> {destination?.name ?? 'Destination not chosen yet'}
+                    </div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: `1px solid ${sc.border}`, background: sc.bg, color: sc.text, flexShrink: 0 }}>
                     {STATUS_LABEL[r.status] ?? r.status}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 8 }}>{r.booking_ref}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>{r.booking_ref}</div>
+                  {canReceive && (
+                    <button onClick={() => receive(r.id)} disabled={receiving === r.id}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none',
+                        background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: receiving === r.id ? 0.6 : 1 }}>
+                      <CheckCircle2 size={14} /> {receiving === r.id ? 'Confirming…' : 'Patient received'}
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -180,7 +243,10 @@ export function AmbulancesList({ requests, canManageFleet }: { requests: Transpo
               const sc = statusColors(r.status)
               return (
                 <div key={r.id} style={{ borderRadius: 16, padding: 12, border: `1px solid ${C.border}`, background: C.card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ fontSize: 13, color: C.textSub }}>{r.booking_ref} · {r.symptom_description ?? '—'}</div>
+                  <div style={{ fontSize: 13, color: C.textSub }}>
+                    {r.booking_ref} · {r.symptom_description ?? '—'}
+                    {r.disposition && <span style={{ color: C.textMuted }}> · {DISPOSITION_LABEL[r.disposition] ?? r.disposition}</span>}
+                  </div>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: `1px solid ${sc.border}`, background: sc.bg, color: sc.text, flexShrink: 0 }}>
                     {STATUS_LABEL[r.status] ?? r.status}
                   </span>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Linking } from 'react-native'
+import { View, TouchableOpacity, StyleSheet, StatusBar, Platform, PermissionsAndroid, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import {
@@ -434,7 +435,7 @@ const st = StyleSheet.create({
   waitingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   waitingIcon:      { fontSize: 52 },
   waitingText:      { fontSize: 14, color: '#4A6058', textAlign: 'center', paddingHorizontal: 32 },
-  errorText:        { fontSize: 12, color: '#FF5C5C', marginTop: 8, textAlign: 'center' },
+  errorText:        { fontSize: 12, color: '#EF4444', marginTop: 8, textAlign: 'center' },
   localPip: {
     position: 'absolute', top: 68, right: 16,
     width: 90, height: 120, borderRadius: 10,
