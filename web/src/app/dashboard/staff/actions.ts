@@ -44,7 +44,10 @@ export async function resetStaffPassword(
   const { data: userRow } = await db
     .from('users').select('email, auth_id').eq('id', userId).single()
   if (!userRow?.auth_id) return { error: 'User not found' }
-  if (!userRow.email?.toLowerCase().endsWith(PORTAL_EMAIL_DOMAIN)) {
+  // Judge by the auth account's email: users.email is an editable profile copy.
+  const { data: authUser } = await db.auth.admin.getUserById(userRow.auth_id)
+  const loginEmail = authUser?.user?.email ?? ''
+  if (!loginEmail.toLowerCase().endsWith(PORTAL_EMAIL_DOMAIN)) {
     return { error: 'This person signs in with their own email. Ask them to use "Forgot password".' }
   }
 
@@ -52,7 +55,7 @@ export async function resetStaffPassword(
   const { error } = await db.auth.admin.updateUserById(userRow.auth_id, { password: newPassword })
   if (error) return { error: error.message }
 
-  return { email: userRow.email ?? '', password: newPassword }
+  return { email: loginEmail, password: newPassword }
 }
 
 // Create or repair the front desk login for this hospital

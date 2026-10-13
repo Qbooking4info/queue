@@ -11,7 +11,7 @@ const updateUserById = vi.fn(() => Promise.resolve({ error: null }))
 // hospital_admins membership + users row, both keyed off the filters the action applies.
 function mockDb(opts: { memberOf?: { hospital: string; user: string; role: string }; user?: { email: string; auth_id: string } }) {
   return {
-    auth: { admin: { updateUserById } },
+    auth: { admin: { updateUserById, getUserById: () => Promise.resolve({ data: { user: { email: opts.user?.email } } }) } },
     from: vi.fn((table: string) => {
       const f: Record<string, unknown> = {}
       const b: Record<string, unknown> = {}
