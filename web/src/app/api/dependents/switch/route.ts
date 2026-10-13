@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+import { PRIVILEGED_ACCOUNT_MESSAGE, isPrivilegedAccount } from '@/lib/dependent-linking'
 
 // POST /api/dependents/switch { dependentId } -- lets a caretaker's mobile app
 // actually sign in as a linked dependent's own account, without ever knowing
@@ -47,8 +48,10 @@ async function handlePOST(req: NextRequest) {
   const rlAllowed = await checkRateLimit(db, `dependents-switch:${caller.id}`, 20, 3600)
   if (!rlAllowed) return Errors.forbidden('Too many switch attempts. Please try again later.')
 
-  const { data: dependent } = await db.from('users').select('email, full_name').eq('id', dependentId).single()
+  const { data: dependent } = await db.from('users').select('email, full_name, auth_id').eq('id', dependentId).single()
   if (!dependent?.email) return Errors.notFound('Dependent account')
+  // Never mint a session for a staff/doctor/admin account, whatever links exist.
+  if (await isPrivilegedAccount(db, dependentId, dependent.auth_id)) return Errors.forbidden(PRIVILEGED_ACCOUNT_MESSAGE)
 
   const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email: dependent.email })
   if (error || !data?.properties?.hashed_token) {

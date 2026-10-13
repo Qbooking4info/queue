@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+import { ADULT_SELF_LINK_MESSAGE, PRIVILEGED_ACCOUNT_MESSAGE, isMinor, isPrivilegedAccount } from '@/lib/dependent-linking'
 
 // POST /api/dependents/link -- links a caretaker's account to another real,
 // independently-registered patient account (the dependent), given the
@@ -44,13 +45,24 @@ async function handleGET(req: NextRequest) {
   const { data: caller } = await db.from('users').select('id').eq('auth_id', user.id).single()
   if (!caller) return Errors.notFound('User')
 
+  // Codes are short; without a limit this endpoint enumerates names.
+  const rlAllowed = await checkRateLimit(db, `dependents-lookup:${caller.id}`, 30, 3600)
+  if (!rlAllowed) return Errors.forbidden('Too many lookups. Please try again later.')
+
   const { data: account } = await db
     .from('users')
-    .select('id, full_name, date_of_birth')
+    .select('id, auth_id, full_name, date_of_birth')
     .eq('patient_code', code)
     .single()
   if (!account) return Errors.notFound('No account found with that Patient ID')
   if (account.id === caller.id) return Errors.validation('You cannot link your own account')
+
+  // Same rules as POST, answered before any personal detail is returned.
+  const dependentId = as === 'dependent' ? caller.id : account.id
+  if (await isPrivilegedAccount(db, dependentId, as === 'dependent' ? user.id : account.auth_id)) {
+    return Errors.forbidden(PRIVILEGED_ACCOUNT_MESSAGE)
+  }
+  if (as === 'caretaker' && !isMinor(account.date_of_birth)) return Errors.forbidden(ADULT_SELF_LINK_MESSAGE)
 
   // The unique-active-dependent index only ever cares about the DEPENDENT side of
   // the pair -- when as=dependent that's the caller, not the looked-up account.
@@ -61,9 +73,10 @@ async function handleGET(req: NextRequest) {
     .eq('status', 'active')
     .maybeSingle()
 
+  // Date of birth is not returned: the name is enough to confirm who it is.
   return NextResponse.json({
     fullName: account.full_name,
-    dateOfBirth: account.date_of_birth,
+    dateOfBirth: null,
     alreadyLinked: !!existingLink,
   })
 }
@@ -93,15 +106,24 @@ async function handlePOST(req: NextRequest) {
   // looked-up account instead -- self-service linking, e.g. right after signup.
   const asDependent = as === 'dependent'
 
-  const { data: account } = await db.from('users').select('id, full_name').eq('patient_code', code.trim().toUpperCase()).single()
-  if (!account) return Errors.notFound('No account found with that Patient ID')
-  if (account.id === caller.id) return Errors.validation('You cannot link your own account')
-
+  // Rate-limit before the lookup so failed guesses count too.
   const rlAllowed = await checkRateLimit(db, `dependents-link:${caller.id}`, 20, 3600)
   if (!rlAllowed) return Errors.forbidden('Too many link attempts. Please try again later.')
 
+  const { data: account } = await db.from('users').select('id, auth_id, full_name, date_of_birth').eq('patient_code', code.trim().toUpperCase()).single()
+  if (!account) return Errors.notFound('No account found with that Patient ID')
+  if (account.id === caller.id) return Errors.validation('You cannot link your own account')
+
   const caretakerId = asDependent ? account.id : caller.id
   const dependentId = asDependent ? caller.id : account.id
+
+  // Consent: the link hands the caretaker this account's records and a session for
+  // it (/switch). An adult must create it from their own account (as=dependent);
+  // a caretaker may claim only a minor by code; staff/doctor/admin accounts never.
+  if (await isPrivilegedAccount(db, dependentId, asDependent ? user.id : account.auth_id)) {
+    return Errors.forbidden(PRIVILEGED_ACCOUNT_MESSAGE)
+  }
+  if (!asDependent && !isMinor(account.date_of_birth)) return Errors.forbidden(ADULT_SELF_LINK_MESSAGE)
 
   // The unique partial index on dependent_links(dependent_id) WHERE status='active'
   // is the hard backstop; this check just gives a clean error instead of a raw
