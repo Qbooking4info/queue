@@ -94,15 +94,22 @@ export const themes = {
 export type Theme = typeof themes.forest | typeof themes.clinical
 export type ThemeId = 'forest' | 'clinical'
 
+export type ThemePreference = 'light' | 'dark' | 'system'
+
 interface ThemeContextValue {
   theme: Theme
   themeId: ThemeId
+  /** What the user picked; 'system' follows the OS setting. */
+  preference: ThemePreference
+  setPreference: (p: ThemePreference) => void
   toggleTheme: () => void
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
   theme: themes.clinical,
   themeId: 'clinical',
+  preference: 'system',
+  setPreference: () => {},
   toggleTheme: () => {},
 })
 
@@ -110,33 +117,47 @@ export const useTheme = () => useContext(ThemeContext)
 
 const STORAGE_KEY = 'qb_dashboard_theme'
 
+// Stored values: 'light' | 'dark' | 'system'. Older builds stored the theme ids
+// 'clinical' / 'forest'; those read back as light / dark.
+function readPreference(): ThemePreference {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY)
+    if (v === 'light' || v === 'clinical') return 'light'
+    if (v === 'dark' || v === 'forest') return 'dark'
+  } catch { /* storage blocked: fall through */ }
+  return 'system'
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeId, setThemeId] = useState<ThemeId>('clinical')
+  const [preference, setPreferenceState] = useState<ThemePreference>('system')
+  const [systemDark, setSystemDark] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as ThemeId | null
-    if (saved && saved in themes) setThemeId(saved)
+    setPreferenceState(readPreference())
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    setSystemDark(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  // Mirror the active theme onto the document as data-theme, so plain CSS can react
-  // to the toggle too. Everything themed on this dashboard reads useTheme() into an
-  // inline style, which works for components but leaves globals.css blind -- it already
-  // carried a `:root[data-theme="light"]` block (skeleton shimmer) that never matched
-  // anything because nobody stamped the attribute. Written in an effect rather than
-  // during render so the server-rendered HTML and the first client render stay
-  // identical; light/dark rather than clinical/forest to match that existing block.
+  const themeId: ThemeId = (preference === 'dark' || (preference === 'system' && systemDark)) ? 'forest' : 'clinical'
+
+  // Mirror the active theme onto the document as data-theme, so plain CSS
+  // (globals.css skeleton shimmer, etc.) can react to it too. Written in an effect
+  // so the server render and the first client render stay identical.
   useEffect(() => {
     document.documentElement.dataset.theme = themeId === 'forest' ? 'dark' : 'light'
   }, [themeId])
 
-  const toggleTheme = () => setThemeId(id => {
-    const next = id === 'forest' ? 'clinical' : 'forest'
-    localStorage.setItem(STORAGE_KEY, next)
-    return next
-  })
+  const setPreference = (p: ThemePreference) => {
+    setPreferenceState(p)
+    try { localStorage.setItem(STORAGE_KEY, p) } catch { /* not persisted */ }
+  }
+  const toggleTheme = () => setPreference(themeId === 'forest' ? 'light' : 'dark')
 
   return (
-    <ThemeContext.Provider value={{ theme: themes[themeId], themeId, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme: themes[themeId], themeId, preference, setPreference, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   )

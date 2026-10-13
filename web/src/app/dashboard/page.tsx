@@ -9,6 +9,7 @@ import { DateFilter, getDateBounds } from '@/components/dashboard/DateFilter'
 import type { DateRangeKey, DateBounds } from '@/components/dashboard/DateFilter'
 import { SkeletonRow } from '@/components/dashboard/SkeletonRow'
 import { BedSpaceCard } from '@/components/dashboard/BedSpaceCard'
+import { HospitalDashboard } from '@/components/dashboard/HospitalDashboard'
 import type { AdminAppointment, DoctorAvailabilityStatus } from '@/lib/admin-api'
 import { T, SPACE } from '@/lib/typography'
 import Link from 'next/link'
@@ -448,14 +449,14 @@ export default function OverviewPage() {
     )
   }
 
-  // ── Admin / clinic_admin dashboard ────────────────────────────────────────────
+  // ── Admin / clinic_admin dashboard (v3.1 w-dash) ──────────────────────────────
+  // While the account loads, show the new layout's skeletons rather than flashing the platform view.
+  if (hospital || ctxLoading) return <HospitalDashboard />
+
+  // Super admin with no hospital selected: platform view.
   return (
     <div>
       <Header />
-
-      {canManageBedSpace && hospital && (
-        <BedSpaceCard hospitalId={hospital.id} status={hospital.bed_space_status ?? 'unknown'} updatedAt={hospital.bed_space_updated_at ?? null} />
-      )}
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
         padding: `${SPACE.md}px ${SPACE.lg}px`, marginBottom: SPACE.lg }}>

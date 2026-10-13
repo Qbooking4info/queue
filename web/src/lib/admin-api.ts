@@ -6,6 +6,7 @@ export interface AdminAppointment {
   booking_ref: string
   appointment_date: string
   check_in_date?: string | null
+  payment_method?: string | null
   start_time: string
   status: string
   type: string

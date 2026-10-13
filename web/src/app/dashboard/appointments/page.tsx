@@ -577,6 +577,15 @@ export default function AppointmentsPage() {
   const [search,  setSearch]  = useState('')
 
   const [showWalkIn,     setShowWalkIn]     = useState(false)
+
+  // The top bar's "+ Walk in" lands here with ?walkin=1 from any page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('walkin') !== '1') return
+    setShowWalkIn(true)
+    params.delete('walkin')
+    window.history.replaceState(null, '', window.location.pathname + (params.size ? `?${params}` : ''))
+  }, [])
   const [assignAppt,     setAssignAppt]     = useState<AdminAppointment | null>(null)
   const [rejectAppt,     setRejectAppt]     = useState<AdminAppointment | null>(null)
   const [detailAppt,     setDetailAppt]     = useState<AdminAppointment | null>(null)
