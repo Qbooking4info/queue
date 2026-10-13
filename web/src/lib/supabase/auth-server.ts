@@ -12,6 +12,9 @@ export interface CallerInfo {
   hospitalId?: string
   clinicId?: string
   doctorId?: string
+  // hospital_admins.role ('admin' | 'owner') for role 'hospital_admin' -- the CallerRole
+  // collapses both, but some actions (payout account) are owner-only.
+  hospitalRole?: string
 }
 
 // Resolve the authenticated caller's role using the service-role key (bypasses RLS).
@@ -80,7 +83,7 @@ export async function requireRole(allowed: CallerRole[], req?: Request): Promise
       } else if (adminRow && adminRow.role === 'front_desk') {
         caller = { authId, role: 'front_desk', hospitalId: adminRow.hospital_id }
       } else if (adminRow) {
-        caller = { authId, role: 'hospital_admin', hospitalId: adminRow.hospital_id }
+        caller = { authId, role: 'hospital_admin', hospitalId: adminRow.hospital_id, hospitalRole: adminRow.role ?? undefined }
       } else {
         // clinic_admins used to have a second identity column (auth_user_id)
         // with its own separate fallback query below this whole block --

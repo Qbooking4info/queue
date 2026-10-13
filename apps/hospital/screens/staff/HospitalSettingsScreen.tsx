@@ -11,6 +11,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -80,7 +81,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
     try {
       const [settingsRes, hosRes] = await Promise.all([
         authedFetch(`/api/hospitals/${hospitalId}/settings`),
-        supabase.from('hospitals').select('name').eq('id', hospitalId).single(),
+        getMyHospital(hospitalId).then(h => ({ data: h })),
       ])
       if (settingsRes.ok) {
         const body = await settingsRes.json()
@@ -417,7 +418,9 @@ function PayoutAccountCard({ theme: t }: { theme: any }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         const res = await authedFetch('/api/payments/subaccount', { method: 'DELETE' })
-        if (res.ok) setCurrent({ bankName: null, last4: null, subaccountCode: null })
+        if (res.ok) { setCurrent({ bankName: null, last4: null, subaccountCode: null }); return }
+        const b = await res.json().catch(() => null)
+        Alert.alert('Could not remove', b?.error ?? 'Try again.')
       } },
     ])
   }
