@@ -12,6 +12,8 @@ import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
 
 interface ApptRow {
   id:               string
@@ -111,6 +113,9 @@ export function SpecialistQueueScreen({ navigation }: Props) {
 
   // Emergency patients sort to the top of the active queue — same tiering used on the
   // front-desk queue and the web dashboard's queue view.
+  // Pre-check-in only -- a checked-in patient already sits in a queue.
+  const [rescheduling, setRescheduling] = useState<ApptRow | null>(null)
+
   const active = appts
     .filter(a => ['pending','confirmed','checked_in','in_progress'].includes(a.status))
     .sort((a, b) => (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1))
@@ -149,7 +154,7 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textPrimary }]}>Waiting / active</Text>
               {active.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} onReschedule={setRescheduling} />
               ))}
             </View>
           )}
@@ -159,17 +164,33 @@ export function SpecialistQueueScreen({ navigation }: Props) {
             <View style={st.group}>
               <Text style={[st.groupLabel, { color: t.textPrimary }]}>Completed</Text>
               {done.map(appt => (
-                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} />
+                <ApptCard key={appt.id} appt={appt} navigation={navigation} showDate={tab === 'upcoming'} onReschedule={setRescheduling} />
               ))}
             </View>
           )}
         </ScrollView>
       )}
+
+      {rescheduling && (
+        <RescheduleModal
+          patientName={rescheduling.patient_name ?? undefined}
+          onClose={() => setRescheduling(null)}
+          onConfirm={async payload => {
+            const err = await rescheduleHospitalAppointment(rescheduling.id, payload)
+            if (err) return err
+            setRescheduling(null)
+            await load()
+            return null
+          }}
+        />
+      )}
     </SafeAreaView>
   )
 }
 
-function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: any; showDate: boolean }) {
+function ApptCard({ appt, navigation, showDate, onReschedule }: {
+  appt: ApptRow; navigation: any; showDate: boolean; onReschedule: (a: ApptRow) => void
+}) {
   const { theme: t } = useTheme()
   const sc = statusBadgeColors(t)
   const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -257,6 +278,20 @@ function ApptCard({ appt, navigation, showDate }: { appt: ApptRow; navigation: a
         </View>
         {appt.queue_position != null && (
           <Text style={[st.queuePos, { color: t.textMuted }]}>#{appt.queue_position}</Text>
+        )}
+        {/* Only before check-in: after that the patient is in a queue and the
+            renumber trigger owns their position. */}
+        {['pending', 'confirmed'].includes(appt.status) && (
+          <TouchableOpacity
+            onPress={e => { e.stopPropagation(); haptics.tap(); onReschedule(appt) }}
+            accessibilityRole="button"
+            accessibilityLabel={`Reschedule ${appt.patient_name ?? 'appointment'}`}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+          >
+            <Ionicons name="calendar-outline" size={12} color={t.accent} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: t.accent }}>Reschedule</Text>
+          </TouchableOpacity>
         )}
       </View>
     </TouchableOpacity>

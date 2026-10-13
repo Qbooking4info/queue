@@ -14,6 +14,8 @@ import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
 import { Button } from '@queue/shared/components/ui/Button'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
+import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -70,6 +72,8 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [actioning,  setActioning]  = useState<string | null>(null)
+  // Pre-check-in only; see the gate on the button below.
+  const [rescheduling, setRescheduling] = useState<Appt | null>(null)
   const [tab,        setTab]        = useState<FilterTab>('pending')
   const [search,     setSearch]     = useState('')
 
@@ -279,10 +283,35 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
                     />
                   </View>
                 )}
+                {/* Moving the visit is only safe before the patient is in a queue:
+                    once they have checked in the queue trigger owns the ordering,
+                    and the route re-checks the status in its UPDATE anyway. */}
+                {['pending', 'confirmed'].includes(appt.status) && (
+                  <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
+                    <Button
+                      label="Reschedule" onPress={() => setRescheduling(appt)}
+                      disabled={!!actioning} variant="outline" icon="calendar-outline" size="sm" style={{ flex: 1 }}
+                    />
+                  </View>
+                )}
               </View>
             )
           })}
         </ScrollView>
+      )}
+
+      {rescheduling && (
+        <RescheduleModal
+          patientName={rescheduling.patient?.full_name ?? rescheduling.walkin_patient_name ?? undefined}
+          onClose={() => setRescheduling(null)}
+          onConfirm={async payload => {
+            const err = await rescheduleHospitalAppointment(rescheduling.id, payload)
+            if (err) return err
+            setRescheduling(null)
+            await load(true)
+            return null
+          }}
+        />
       )}
     </SafeAreaView>
   )

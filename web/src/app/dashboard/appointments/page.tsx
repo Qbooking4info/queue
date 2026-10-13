@@ -475,6 +475,89 @@ function RejectModal({
   )
 }
 
+// ── Reschedule Modal ──────────────────────────────────────────────────────────
+
+/**
+ * Staff-side reschedule, pre-check-in only. Free-form date/time: the route
+ * clears slot_id so the vacated time_slots row has its capacity returned by
+ * trg_release_appointment_slot_moved, and re-checks the status in its WHERE
+ * clause so a patient who checks in mid-edit cannot be moved out from under
+ * the queue.
+ */
+function RescheduleModal({
+  appointment, onClose, onDone,
+}: { appointment: AdminAppointment; onClose: () => void; onDone: () => void }) {
+  const { theme: C } = useTheme()
+  const today = new Date().toISOString().slice(0, 10)
+  const [date, setDate] = useState(appointment.appointment_date ?? today)
+  const [startTime, setStartTime] = useState((appointment.start_time ?? '09:00').slice(0, 5))
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleReschedule() {
+    if (!date || !startTime) return
+    setSaving(true); setError('')
+    const res = await fetch(`/api/appointments/${appointment.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reschedule', date, startTime, reason: reason.trim() || undefined }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setError(body?.error ?? 'Could not reschedule')
+      return
+    }
+    onDone()
+  }
+
+  const field: React.CSSProperties = {
+    width: '100%', background: C.bgAlt, border: `1px solid ${C.borderMed}`,
+    borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.text,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ width: '100%', maxWidth: 420, background: C.card,
+        border: `1px solid ${C.borderMed}`, borderRadius: 20,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)', padding: '24px 28px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 6 }}>
+          Reschedule Appointment
+        </div>
+        <div style={{ fontSize: 13, color: C.textSub, marginBottom: 16 }}>
+          <strong style={{ color: C.text }}>{appointment.patient_name}</strong> will be notified of the new time.
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label htmlFor="resched-date" style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>NEW DATE</label>
+            <input id="resched-date" type="date" value={date} min={today} onChange={e => setDate(e.target.value)} style={field} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label htmlFor="resched-time" style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>NEW TIME</label>
+            <input id="resched-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={field} />
+          </div>
+        </div>
+        <label htmlFor="resched-reason" style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 6 }}>REASON (OPTIONAL)</label>
+        <textarea id="resched-reason" value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Tell the patient why…" rows={2}
+          style={{ ...field, resize: 'vertical' }} />
+        {!!error && <div style={{ fontSize: 12, color: '#f07070', marginTop: 10 }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <Button onClick={onClose} variant="outline" style={{ flex: 1 }}>Cancel</Button>
+          <Button onClick={handleReschedule} loading={saving} disabled={!date || !startTime} style={{ flex: 1 }}>
+            Confirm New Time
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Appointment Detail Panel ──────────────────────────────────────────────────
 
 function DetailPanel({
@@ -588,6 +671,7 @@ export default function AppointmentsPage() {
   }, [])
   const [assignAppt,     setAssignAppt]     = useState<AdminAppointment | null>(null)
   const [rejectAppt,     setRejectAppt]     = useState<AdminAppointment | null>(null)
+  const [reschedAppt,    setReschedAppt]    = useState<AdminAppointment | null>(null)
   const [detailAppt,     setDetailAppt]     = useState<AdminAppointment | null>(null)
   const [vitalsAppt,     setVitalsAppt]     = useState<AdminAppointment | null>(null)
   const [actionError,    setActionError]    = useState('')
@@ -998,6 +1082,10 @@ export default function AppointmentsPage() {
                               style={{ ...btnBase, fontWeight: 700, border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)', color: '#f07070' }}>
                               Reject
                             </button>
+                            <button onClick={() => setReschedAppt(a)} disabled={isPending}
+                              style={{ ...btnBase, fontWeight: 700, border: `1px solid ${C.borderMed}`, background: 'transparent', color: C.textSub }}>
+                              Reschedule
+                            </button>
                           </>
                         )}
                         {/* Assign / Reassign Doctor — admins and front desk, before check-in */}
@@ -1146,6 +1234,10 @@ export default function AppointmentsPage() {
                       style={{ ...btnBase, border: '1px solid rgba(220,60,60,0.3)', background: 'rgba(220,60,60,0.08)', color: '#f07070' }}>
                       Reject
                     </button>
+                    <button onClick={() => setReschedAppt(a)} disabled={isPending}
+                      style={{ ...btnBase, border: `1px solid ${C.borderMed}`, background: 'transparent', color: C.textSub }}>
+                      Reschedule
+                    </button>
                   </>
                 )}
                 {canAssignDoctor && (
@@ -1208,6 +1300,13 @@ export default function AppointmentsPage() {
           appointment={rejectAppt}
           onClose={() => setRejectAppt(null)}
           onDone={() => { load(); setRejectAppt(null) }}
+        />
+      )}
+      {reschedAppt && (
+        <RescheduleModal
+          appointment={reschedAppt}
+          onClose={() => setReschedAppt(null)}
+          onDone={() => { load(); setReschedAppt(null) }}
         />
       )}
       {detailAppt && (
