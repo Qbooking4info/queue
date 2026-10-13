@@ -14,6 +14,173 @@ export type Database = {
   }
   public: {
     Tables: {
+      care_plan_task_logs: {
+        Row: {
+          done_at: string
+          done_on: string
+          id: string
+          logged_by: string | null
+          plan_id: string
+          task_id: string
+        }
+        Insert: {
+          done_at?: string
+          done_on?: string
+          id?: string
+          logged_by?: string | null
+          plan_id: string
+          task_id: string
+        }
+        Update: {
+          done_at?: string
+          done_on?: string
+          id?: string
+          logged_by?: string | null
+          plan_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_plan_task_logs_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_plan_task_logs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "care_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_plan_task_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "care_plan_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      care_plan_tasks: {
+        Row: {
+          cadence: string
+          created_at: string
+          due_on: string | null
+          id: string
+          plan_id: string
+          sort_order: number
+          title: string
+        }
+        Insert: {
+          cadence?: string
+          created_at?: string
+          due_on?: string | null
+          id?: string
+          plan_id: string
+          sort_order?: number
+          title: string
+        }
+        Update: {
+          cadence?: string
+          created_at?: string
+          due_on?: string | null
+          id?: string
+          plan_id?: string
+          sort_order?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_plan_tasks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "care_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      care_plans: {
+        Row: {
+          condition: string | null
+          created_at: string
+          created_by: string | null
+          doctor_id: string | null
+          ends_on: string | null
+          hospital_id: string
+          id: string
+          next_check_in: string | null
+          notes: string | null
+          patient_id: string
+          starts_on: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          condition?: string | null
+          created_at?: string
+          created_by?: string | null
+          doctor_id?: string | null
+          ends_on?: string | null
+          hospital_id: string
+          id?: string
+          next_check_in?: string | null
+          notes?: string | null
+          patient_id: string
+          starts_on?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          condition?: string | null
+          created_at?: string
+          created_by?: string | null
+          doctor_id?: string | null
+          ends_on?: string | null
+          hospital_id?: string
+          id?: string
+          next_check_in?: string | null
+          notes?: string | null
+          patient_id?: string
+          starts_on?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "care_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_plans_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_plans_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "care_plans_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string

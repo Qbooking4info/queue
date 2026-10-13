@@ -60,6 +60,7 @@ import { SosTriageScreen }             from './screens/SosTriageScreen'
 import { AmbulanceHomeScreen }         from './screens/AmbulanceHomeScreen'
 import { VirtualCareScreen }           from './screens/VirtualCareScreen'
 import { MyCareScreen }                from './screens/MyCareScreen'
+import { CarePlansScreen }             from './screens/CarePlansScreen'
 import { MessagesScreen }              from './screens/MessagesScreen'
 import { ChatScreen }                  from '@queue/shared/screens/ChatScreen'
 import { WalletScreen }                from './screens/WalletScreen'
@@ -161,6 +162,7 @@ function AppStack() {
       <Stack.Screen name="AmbulanceHome"        component={AmbulanceHomeScreen} />
       <Stack.Screen name="VirtualCare"          component={VirtualCareScreen} />
       <Stack.Screen name="MyCare"               component={MyCareScreen} />
+      <Stack.Screen name="CarePlans"            component={CarePlansScreen} />
       <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
       <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
       <Stack.Screen name="DoctorSearch"         component={DoctorSearchScreen} />

@@ -8,6 +8,7 @@ import { TopBar } from './TopBar'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useInboundAmbulances } from '@/lib/useInboundAmbulances'
+import { useUnreadMessages } from '@/lib/useUnreadMessages'
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { theme: C } = useTheme()
@@ -15,6 +16,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
   // Hospital admins and front desk see inbound ambulances; same roles GET /api/ambulances allows.
   const inbound = useInboundAmbulances(hospital?.id, role === 'hospital_admin' || role === 'front_desk')
   const top = inbound[0]
+  const unreadMessages = useUnreadMessages(['hospital_admin', 'clinic_admin', 'front_desk'].includes(role ?? ''))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
@@ -86,7 +88,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
         />
       )}
 
-      <Sidebar mobileOpen={sidebarOpen} onClose={closeSidebar} inboundCount={inbound.length} />
+      <Sidebar mobileOpen={sidebarOpen} onClose={closeSidebar} inboundCount={inbound.length} unreadMessages={unreadMessages} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
         <TopBar onMenuToggle={toggleSidebar} />

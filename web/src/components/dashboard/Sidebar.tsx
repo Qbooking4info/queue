@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { UserRole } from '@/lib/admin-api'
-import { LayoutDashboard, CalendarDays, ListOrdered, CalendarRange, Stethoscope, Settings, BarChart2, Tag, Building2, Hospital, Monitor, ArrowLeft, Ambulance, type LucideIcon } from 'lucide-react'
+import { Users, Video, ClipboardCheck, MessageSquare, LayoutDashboard, CalendarDays, ListOrdered, CalendarRange, Stethoscope, Settings, BarChart2, Tag, Building2, Hospital, Monitor, ArrowLeft, Ambulance, type LucideIcon } from 'lucide-react'
 
 type NavItem = { href: string; icon: LucideIcon; label: string }
 
@@ -31,7 +31,11 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: LayoutDashboard, label: 'Dashboard'     },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/patients',     icon: Users,           label: 'Patients'      },
+    { href: '/dashboard/virtual',      icon: Video,           label: 'Virtual Care'  },
     { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulance'     },
+    { href: '/dashboard/care-plans',   icon: ClipboardCheck,  label: 'Care Plans'    },
+    { href: '/dashboard/messages',     icon: MessageSquare,   label: 'Messages'      },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
     { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Reports'       },
@@ -42,6 +46,10 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: LayoutDashboard, label: 'Dashboard'     },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
+    { href: '/dashboard/patients',     icon: Users,           label: 'Patients'      },
+    { href: '/dashboard/virtual',      icon: Video,           label: 'Virtual Care'  },
+    { href: '/dashboard/care-plans',   icon: ClipboardCheck,  label: 'Care Plans'    },
+    { href: '/dashboard/messages',     icon: MessageSquare,   label: 'Messages'      },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
     { href: '/dashboard/analytics',    icon: BarChart2,       label: 'Reports'       },
@@ -57,6 +65,8 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard',              icon: Monitor,         label: 'Dashboard'     },
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
     { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulance'     },
+    { href: '/dashboard/patients',     icon: Users,           label: 'Patients'      },
+    { href: '/dashboard/messages',     icon: MessageSquare,   label: 'Messages'      },
     { href: '/dashboard/appointments', icon: CalendarDays,    label: 'Appointments'  },
   ],
   // Ambulance crew work through the mobile crew app, not this dashboard — this
@@ -83,6 +93,8 @@ interface SidebarProps {
   onClose?: () => void
   /** Live inbound ambulances, for the Ambulance badge. */
   inboundCount?: number
+  /** Unread messages in the hospital inbox. */
+  unreadMessages?: number
 }
 
 // v3.1 w-dash: deep teal rail, white logo tile, text items 42px tall, active item
@@ -91,7 +103,7 @@ interface SidebarProps {
 const RAIL_TEXT = '#CCFBF1'
 const RAIL_SUB  = '#99F6E4'
 
-export function Sidebar({ mobileOpen = false, inboundCount = 0 }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, inboundCount = 0, unreadMessages = 0 }: SidebarProps) {
   const { theme: C } = useTheme()
   const { hospital, stats, role, clinicId } = useAdmin()
   const pathname = usePathname()
@@ -121,6 +133,7 @@ export function Sidebar({ mobileOpen = false, inboundCount = 0 }: SidebarProps) 
   const badgeFor = (href: string): number => {
     if (href === '/dashboard/appointments') return openToday
     if (href === '/dashboard/ambulances') return inboundCount
+    if (href === '/dashboard/messages') return unreadMessages
     return 0
   }
 
