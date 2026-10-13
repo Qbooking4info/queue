@@ -7,19 +7,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('./alert-relay', () => ({
-  raiseDispatchAlert: vi.fn(async (db: any, alert: any) => { db.alerts.push(alert) }),
+  raiseDispatchAlert: vi.fn(async (db: { alerts: unknown[] }, alert: unknown) => { db.alerts.push(alert) }),
   relayDispatchAlert: vi.fn(async () => {}),
 }))
 
 type Row = { id: string; status: string; request_type: string; triage_level: number; requester_id: string }
 
 function makeDb(row: Row) {
-  const db: any = { alerts: [] as unknown[], notifications: [] as unknown[] }
+  const db: Record<string, unknown> & { alerts: unknown[]; notifications: unknown[] } = { alerts: [], notifications: [] }
   db.rpc = vi.fn(async () => ({ data: null, error: null }))
   db.from = vi.fn((table: string) => {
     if (table === 'notifications') return { insert: vi.fn(async (r: unknown) => { db.notifications.push(r); return { error: null } }) }
     // transport_requests
-    const q: any = {}
+    const q: Record<string, unknown> = {}
     let patch: Partial<Row> | null = null
     let allowed: string[] = []
     q.select = vi.fn(() => q)
@@ -40,7 +40,7 @@ function makeDb(row: Row) {
   return db
 }
 
-const dbRef: { current: any } = { current: null }
+const dbRef: { current: ReturnType<typeof makeDb> | null } = { current: null }
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => dbRef.current }))
 
 const { runDispatchRound } = await import('./engine')
@@ -56,8 +56,8 @@ describe('exhaustSearch (via runDispatchRound past maxRounds)', () => {
     const results = await Promise.all([runDispatchRound('r1', 99), runDispatchRound('r1', 99)])
 
     expect(row.status).toBe('no_unit_available')
-    expect(dbRef.current.alerts).toHaveLength(1)
-    expect(dbRef.current.notifications).toHaveLength(1)
+    expect(dbRef.current!.alerts).toHaveLength(1)
+    expect(dbRef.current!.notifications).toHaveLength(1)
     expect(results.filter(r => r.exhausted)).toHaveLength(1)
   })
 
@@ -68,6 +68,6 @@ describe('exhaustSearch (via runDispatchRound past maxRounds)', () => {
 
     expect(row.status).toBe('no_unit_available')
     expect(result.exhausted).toBe(true)
-    expect(dbRef.current.alerts).toHaveLength(1)
+    expect(dbRef.current!.alerts).toHaveLength(1)
   })
 })

@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase/auth-server', () => ({
 const updateResult = { current: { error: null as null | { code: string; message: string } } }
 
 function builder(single: unknown) {
-  const b: any = {}
+  const b: Record<string, unknown> = {}
   for (const m of ['select', 'eq']) b[m] = vi.fn(() => b)
   b.single = vi.fn(async () => ({ data: single, error: null }))
   b.update = vi.fn(() => ({ eq: vi.fn(async () => updateResult.current) }))
