@@ -16,6 +16,12 @@
  * a key the server now rejects, turning a clear startup error into a confusing
  * runtime 401.
  *
+ * 2026-10-13: legacy keys were found re-enabled, and the leaked service_role
+ * JWT still had full access, even paired with the publishable key, because the
+ * old HS256 signing key was still trusted. Legacy keys were disabled again and
+ * the HS256 signing key revoked. Nothing here needs either. Do not re-enable
+ * them: that restores the leaked key.
+ *
  * Both values are public by design — a publishable key grants exactly what anon
  * granted, with RLS still enforced. Verified against production: it can read the
  * hospital directory but not users, appointments or patient_medical_history.
