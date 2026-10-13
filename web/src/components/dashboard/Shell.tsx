@@ -6,10 +6,15 @@ import { createClient } from '@/lib/supabase/client'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+import { useInboundAmbulances } from '@/lib/useInboundAmbulances'
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { theme: C } = useTheme()
-  const { accessDenied, crewOnly, patientOnly, loading, signOut } = useAdmin()
+  const { accessDenied, crewOnly, patientOnly, loading, signOut, hospital, role } = useAdmin()
+  // Hospital admins and front desk see inbound ambulances; same roles GET /api/ambulances allows.
+  const inbound = useInboundAmbulances(hospital?.id, role === 'hospital_admin' || role === 'front_desk')
+  const top = inbound[0]
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
@@ -81,12 +86,33 @@ function ShellLayout({ children }: { children: ReactNode }) {
         />
       )}
 
-      <Sidebar mobileOpen={sidebarOpen} onClose={closeSidebar} />
+      <Sidebar mobileOpen={sidebarOpen} onClose={closeSidebar} inboundCount={inbound.length} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
         <TopBar onMenuToggle={toggleSidebar} />
-        <main style={{ flex: 1, padding: 'clamp(12px, 3vw, 28px) clamp(12px, 3vw, 32px)',
-          overflowY: 'auto', background: C.bg, transition: 'background .4s' }}>
+        <main style={{ flex: 1, padding: '4px clamp(16px, 3vw, 36px) 28px',
+          overflowY: 'auto', background: C.bg }}>
+          {/* v3.1: the most urgent inbound ambulance, on every page, until the hospital receives it. */}
+          {top && !pathname.startsWith('/dashboard/ambulances') && (() => {
+            const unit = Array.isArray(top.unit) ? top.unit[0] : top.unit
+            const mins = top.eta_seconds != null ? Math.max(1, Math.round(top.eta_seconds / 60)) : null
+            const when = top.status === 'arrived_at_destination' ? 'arrived' : mins != null ? `${mins} min` : 'en route'
+            return (
+              <div role="alert" style={{ borderRadius: 14, background: C.redLight, padding: '12px 16px', marginBottom: 18,
+                display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', color: C.id === 'forest' ? '#FECACA' : '#7F1D1D' }}>
+                <b style={{ fontSize: 14 }}>Inbound ambulance · {when}</b>
+                <span style={{ fontSize: 14, flex: '1 1 240px' }}>
+                  {[top.triage_level != null && top.triage_level <= 2 ? 'Top priority' : top.triage_level != null ? `Triage ${top.triage_level}` : null,
+                    top.symptom_description, unit?.call_sign ?? unit?.plate_number,
+                    inbound.length > 1 ? `+${inbound.length - 1} more` : null].filter(Boolean).join(' · ')}
+                </span>
+                <Link href="/dashboard/ambulances" style={{ height: 40, padding: '0 14px', borderRadius: 10, background: C.red,
+                  color: C.id === 'forest' ? '#450A0A' : '#FFFFFF', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+                  Open ambulance desk
+                </Link>
+              </div>
+            )
+          })()}
           {children}
         </main>
       </div>
