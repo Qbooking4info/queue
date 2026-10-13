@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getHospitalContext } from '@/lib/getHospitalContext'
 import { AlertsInbox } from './AlertsInbox'
+import { loadDispatcherAlerts } from '@/lib/dispatcher-alerts'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,22 +19,9 @@ export default async function DispatcherAlertsPage() {
 
   if (!['admin', 'owner', 'front_desk'].includes(adminRecord.role ?? '')) redirect('/dashboard')
 
-  // Scoped through the request's destination hospital, matching how the
-  // ambulances list scopes itself.
-  const { data: rows } = await db
-    .from('dispatcher_alerts')
-    .select(`
-      id, severity, kind, message, created_at, acknowledged_at,
-      request:transport_requests!inner(
-        id, booking_ref, status, triage_level, symptom_description,
-        pickup_address, contact_phone, caller_patient_name, created_at,
-        destination_hospital_id, failure_reason
-      ),
-      ack:users!dispatcher_alerts_acknowledged_by_fkey(full_name)
-    `)
-    .eq('request.destination_hospital_id', adminRecord.hospital_id)
-    .order('created_at', { ascending: false })
-    .limit(100)
+  // Destination hospital, or destination-less requests inside this hospital's
+  // fleet radius (lib/dispatcher-alerts.ts, REP-017).
+  const { data: rows } = await loadDispatcherAlerts(db, adminRecord.hospital_id)
 
   return <AlertsInbox alerts={(rows ?? []) as never[]} />
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { loadDispatcherAlerts, canSeeDispatcherAlert } from '@/lib/dispatcher-alerts'
 
 /**
  * PATCH /api/ambulances/alerts   { alertId }
@@ -24,35 +25,17 @@ import { Errors } from '@/lib/api-error'
  * The read half -- existed only as a query inside
  * dashboard/ambulances/alerts/page.tsx (server component, admin client) with
  * no REST equivalent, same situation the transport-requests list was in. Same
- * query, same scoping. No super_admin: unlike the PATCH handler below (which
- * skips its hospital-scoping check for super_admin instead of comparing
- * against a hospitalId that role doesn't have), a plain caller.hospitalId
- * scope here has no meaningful "every hospital" mode to fall back to, and
- * this route only exists for the Hospital mobile app, which a super_admin
- * never signs into.
+ * query, same scoping (lib/dispatcher-alerts.ts). A super_admin sees every
+ * alert, including ones outside any fleet's radius that no hospital is shown.
  */
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(['hospital_admin', 'front_desk'], req)
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
-  if (!caller.hospitalId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (caller.role !== 'super_admin' && !caller.hospitalId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const db = createAdminClient()
-
-  const { data: rows, error } = await db
-    .from('dispatcher_alerts')
-    .select(`
-      id, severity, kind, message, created_at, acknowledged_at,
-      request:transport_requests!inner(
-        id, booking_ref, status, triage_level, symptom_description,
-        pickup_address, contact_phone, caller_patient_name, created_at,
-        destination_hospital_id, failure_reason
-      ),
-      ack:users!dispatcher_alerts_acknowledged_by_fkey(full_name)
-    `)
-    .eq('request.destination_hospital_id', caller.hospitalId)
-    .order('created_at', { ascending: false })
-    .limit(100)
+  const { data: rows, error } = await loadDispatcherAlerts(db, caller.role === 'super_admin' ? null : caller.hospitalId!)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ alerts: rows ?? [] })
@@ -80,15 +63,15 @@ export async function PATCH(req: NextRequest) {
   // ambulance.
   const { data: alert } = await db
     .from('dispatcher_alerts')
-    .select('id, request_id, transport_requests(destination_hospital_id)')
+    .select('id')
     .eq('id', body.alertId)
     .single()
 
   if (!alert) return Errors.notFound('Alert')
 
+  // Same visibility as GET: an alert can be cleared by whoever is shown it.
   if (caller.role !== 'super_admin') {
-    const tr = (alert as { transport_requests?: { destination_hospital_id: string | null } | null }).transport_requests
-    if (!caller.hospitalId || tr?.destination_hospital_id !== caller.hospitalId) {
+    if (!caller.hospitalId || !(await canSeeDispatcherAlert(db, caller.hospitalId, body.alertId))) {
       return Errors.forbidden("Cannot acknowledge another hospital's alert")
     }
   }
