@@ -173,7 +173,9 @@ export async function sendLocationPing(
   ambulanceId: string,
   pings: Array<{ lat: number; lng: number; heading?: number; speedKmh?: number; accuracyM?: number; recordedAt: string }>,
 ): Promise<{ received: number; accepted: number }> {
-  return authedFetch('/api/transport/location', { ambulanceId, pings })
+  // Longer than the default: a backlog flushed after a dead zone is up to 500
+  // pings, each one RPC on the server.
+  return authedFetch('/api/transport/location', { ambulanceId, pings }, 60_000)
 }
 
 export const CREW_STATUS_LABEL: Record<CrewJobStatus, string> = {

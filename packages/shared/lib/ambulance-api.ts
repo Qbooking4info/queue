@@ -79,21 +79,44 @@ export function triageForSymptom(symptom: string): { triageLevel: number; requir
   return SYMPTOM_TRIAGE_MAP[symptom] ?? { triageLevel: 3, requiredTier: 'BLS' }
 }
 
-export async function authedFetch(path: string, body: unknown) {
+export const AUTHED_FETCH_TIMEOUT_MS = 20_000
+
+/**
+ * POST to the web API with the caller's session.
+ *
+ * Always settles. Without a timeout, a request lost on a dead mobile connection
+ * never resolved and the SOS screen sat on "Sending SOS…" indefinitely; and an
+ * HTML error page (a Vercel 502/504) made res.json() throw "JSON Parse error"
+ * instead of saying the request failed. Callers show err.message as-is.
+ */
+export async function authedFetch(path: string, body: unknown, timeoutMs = AUTHED_FETCH_TIMEOUT_MS) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in')
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-  const json = await res.json()
-  if (!res.ok) throw new Error(json?.error ?? 'Request failed')
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch {
+    throw new Error(controller.signal.aborted
+      ? 'The request timed out. Check your connection and try again.'
+      : 'Could not reach Queue. Check your connection and try again.')
+  } finally {
+    clearTimeout(timer)
+  }
+
+  const json = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(json?.error ?? `Request failed (${res.status})`)
   return json
 }
 
