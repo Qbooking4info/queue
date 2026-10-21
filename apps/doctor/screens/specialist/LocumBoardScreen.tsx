@@ -55,7 +55,6 @@ export function LocumBoardScreen({ navigation }: Props) {
         subtitle={tab === 'feed'
           ? (states.length ? states.join(', ') : 'No state yet')
           : 'Shifts you have advertised'}
-        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
       >
         <SegmentedControl<Tab> onDark value={tab} onChange={setTab}
           options={[{ value: 'feed', label: 'Open to me' }, { value: 'mine', label: 'My posts' }]} />
