@@ -2,7 +2,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
-import { Avatar } from '../ui/Avatar'
+import { EntityAvatar } from '../ui/EntityAvatar'
 import type { IndependentDoctor } from '../../lib/api'
 
 interface Props { doctor: IndependentDoctor; onPress: () => void }
@@ -12,11 +12,14 @@ export function DoctorListItem({ doctor: d, onPress }: Props) {
   return (
     <TouchableOpacity onPress={onPress}
       style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      {/* The doctor's uploaded photo, with initials as the fallback. */}
-      <Avatar
+      {/* Uploaded photo if there is one, otherwise a person icon -- gendered
+          when we know, neutral when we do not. */}
+      <EntityAvatar
         size={46}
+        kind="doctor"
         uri={d.avatarUrl}
-        initials={d.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+        gender={d.gender}
+        label={d.fullName}
       />
       <View style={{ flex: 1 }}>
         <Text style={[st.name, { color: t.textPrimary }]}>{d.title ? `${d.title} ` : ''}{d.fullName}</Text>

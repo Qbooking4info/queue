@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
@@ -418,7 +419,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Doctor / placeholder */}
           <View style={st.doctorRow}>
             {appt.doctor ? (
-              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={52} />
+              <EntityAvatar size={52} kind="doctor" label={appt.doctor ?? undefined} />
             ) : (
               <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
@@ -586,7 +587,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {appt.doctor ? (
             <Section title="Your doctor">
               <View style={[st.doctorCard, { borderBottomColor: t.cardBorder }]}>
-                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={44} />
+                <EntityAvatar size={44} kind="doctor" label={appt.doctor ?? undefined} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.dcName, { color: t.textPrimary }]}>{appt.doctor}</Text>
                   <Text style={[st.dcSpec, { color: t.textMuted }]}>{appt.spec} · {appt.hospital}</Text>

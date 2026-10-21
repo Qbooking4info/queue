@@ -562,6 +562,8 @@ export interface IndependentDoctor {
   userId: string
   fullName: string
   avatarUrl: string | null
+  /** Only for choosing a fallback avatar when avatarUrl is null. */
+  gender: string | null
   title: string | null
   level: string | null
   avgRating: number | null
@@ -1599,5 +1601,47 @@ export async function registerVerified(payload: {
     return null
   } catch (e) {
     return e instanceof Error ? e.message : 'Network error'
+  }
+}
+
+// ── Care plans (doctor-authored) ─────────────────────────────────────────────
+//
+// Written by the treating doctor during a consultation, hospital-linked or
+// independent alike. The server resolves the doctor and hospital from the
+// caller, so neither is sent from here: a client that could name them could
+// file a plan under another doctor or hospital.
+
+export type CarePlanCadence = 'daily' | 'weekly' | 'once'
+
+export interface NewCarePlanTask {
+  title: string
+  cadence: CarePlanCadence
+  /** Required when cadence is 'once'. */
+  dueOn?: string
+}
+
+export async function createCarePlan(input: {
+  patientId: string
+  title: string
+  condition?: string
+  notes?: string
+  startsOn?: string
+  endsOn?: string
+  nextCheckIn?: string
+  tasks: NewCarePlanTask[]
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/care-plans`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not create the plan.' }
+    return { ok: true, id: body.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
   }
 }

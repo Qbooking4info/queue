@@ -44,11 +44,14 @@ export async function GET(req: NextRequest) {
     db.from('doctor_profiles')
       .select('user_id, bio, qualification, years_experience, virtual_fee, home_visit_fee, accepts_direct_virtual, accepts_direct_home_visit, show_phone_to_patients, is_paused')
       .in('user_id', userIds.length ? userIds : emptyIds),
-    db.from('users').select('id, phone').in('id', userIds.length ? userIds : emptyIds),
+    db.from('users').select('id, phone, gender').in('id', userIds.length ? userIds : emptyIds),
   ])
 
   const profileByUser = new Map((profiles ?? []).map((p: any) => [p.user_id, p]))
   const phoneByUser = new Map((users ?? []).map((u: any) => [u.id, u.phone as string | null]))
+  // Only to pick the fallback avatar when a doctor has uploaded no photo. Joined
+  // here because patients cannot read another person's users row themselves.
+  const genderByUser = new Map((users ?? []).map((u: any) => [u.id, u.gender as string | null]))
 
   // One entry per doctor identity -- hospitals aggregated, not one row per link.
   const byUser = new Map<string, any>()
@@ -64,6 +67,7 @@ export async function GET(req: NextRequest) {
         userId: r.user_id,
         fullName: r.full_name,
         avatarUrl: r.avatar_url,
+        gender: genderByUser.get(r.user_id) ?? null,
         title: r.title,
         level: r.level,
         avgRating: r.avg_rating,

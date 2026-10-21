@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
@@ -737,7 +738,8 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                       setStep(STEP_DETAILS)
                     }}
                     style={[s.hospRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                    <Avatar initials={h.avatar} bg={h.avatarBg} size={42} />
+                    <EntityAvatar size={42} kind="hospital" uri={h.logoUrl} label={h.name}
+                      hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }} />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                         <Text style={[s.hospName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
@@ -1136,7 +1138,7 @@ export function BookingFlowScreen({ navigation, route }: Props) {
                               borderColor:     active ? t.accent : t.cardBorder,
                               backgroundColor: active ? t.accentBg : t.cardBg,
                             }]}>
-                            <Avatar initials={initials} bg="#1A2A4A" size={40} />
+                            <EntityAvatar size={40} kind="doctor" />
                             <View style={{ flex: 1 }}>
                               <Text style={[s.docName, { color: active ? t.accent : t.textPrimary }]}>{d.full_name}</Text>
                               <Text style={[s.docSpec, { color: t.textMuted }]}>

@@ -2,7 +2,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
-import { Avatar } from '../ui/Avatar'
+import { EntityAvatar } from '../ui/EntityAvatar'
 import { Stars } from '../ui/Stars'
 import { StatusBadge } from '../ui/StatusBadge'
 import type { BedSpaceStatus } from '../../lib/api'
@@ -35,6 +35,7 @@ export interface DisplayHospital {
   phone?:     string | null
   // Booking policy fields
   hospitalType?:       string | null
+  ownership?:          string | null
   clinic_model?:       string | null
   approval_mode?:      string | null
   opd_fee?:            number | null
@@ -53,7 +54,13 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
       <View style={styles.row}>
-        <Avatar initials={h.avatar} bg={h.avatarBg} size={46} uri={h.logoUrl} />
+        <EntityAvatar
+          size={46}
+          kind="hospital"
+          uri={h.logoUrl}
+          label={h.name}
+          hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }}
+        />
         <View style={styles.info}>
           <View style={styles.topRow}>
             <View style={{ flex: 1 }}>

@@ -78,6 +78,7 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     slots:     [],
     // Booking policy fields — forwarded from hospital record
     hospitalType:        (h as any).type             ?? null,
+    ownership:           (h as any).ownership        ?? null,
     clinic_model:        (h as any).clinic_model     ?? null,
     approval_mode:       (h as any).approval_mode    ?? null,
     opd_fee:             (h as any).opd_fee          ?? null,
