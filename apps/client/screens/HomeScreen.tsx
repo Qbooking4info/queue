@@ -18,6 +18,7 @@ import { Header, HeaderIconButton, HeaderTail, ServiceTile, SectionTitle, Card }
 import type { AppointmentWithRelations } from '@queue/shared/lib/api'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import { HomeCarousel, type Slide } from '../components/HomeCarousel'
 
 function greeting() {
   const h = new Date().getHours()
@@ -116,6 +117,49 @@ export function HomeScreen({ navigation }: Props) {
   const visit = activeAppt ?? nextAppt
   const inQueue = !!activeAppt
 
+  // Shown in place of the old one-line "No upcoming visits" row. Every slide is
+  // built from data this screen already has, and only appears when it has
+  // something true to say -- an empty hero is worse than a short carousel.
+  const heroSlides: Slide[] = [
+    {
+      key: 'book',
+      title: 'Book your doctor appointment',
+      body: 'Find the right doctor, at the right time, for a healthier tomorrow.',
+      icon: 'medkit',
+      onPress: () => navigation.navigate('Search'),
+      search: { placeholder: 'Search for doctor, specialty, or clinic…' },
+    },
+    ...(virtualDoctors
+      ? [{
+          key: 'virtual',
+          title: 'See a doctor without leaving home',
+          body: `${virtualDoctors} ${virtualDoctors === 1 ? 'doctor is' : 'doctors are'} available for video, audio or chat right now.`,
+          icon: 'videocam' as const,
+          cta: 'Start a virtual visit',
+          onPress: () => navigation.navigate('VirtualCare'),
+        } satisfies Slide]
+      : []),
+    ...(lastDoctor
+      ? [{
+          key: 'again',
+          title: `Book again with ${lastDoctor.name}`,
+          body: lastDoctor.specialty ? `Your last visit was ${lastDoctor.specialty}.` : 'Pick up where you left off.',
+          icon: 'person' as const,
+          cta: 'See availability',
+          onPress: () => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId }),
+        } satisfies Slide]
+      : []),
+    {
+      key: 'sos',
+      title: 'Need help now?',
+      body: 'Request an ambulance, or call the emergency lines without leaving the app.',
+      icon: 'alert-circle',
+      cta: 'Emergency',
+      tone: 'alert',
+      onPress: () => { haptics.heavy(); navigation.navigate('Sos') },
+    },
+  ]
+
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
       <Header>
@@ -181,17 +225,7 @@ export function HomeScreen({ navigation }: Props) {
               ) : null}
             </Card>
           ) : (
-            <Card onPress={() => navigation.navigate('Search')} accessibilityLabel="Book a visit"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar" size={22} color={t.id === 'forest' ? '#081416' : '#FFFFFF'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>No upcoming visits</Text>
-                <Text style={{ fontSize: 13, color: t.textMuted }}>Book a hospital or online visit</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </Card>
+            <HomeCarousel slides={heroSlides} />
           )}
 
           {failed && (
