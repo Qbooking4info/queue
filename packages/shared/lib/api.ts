@@ -1645,3 +1645,157 @@ export async function createCarePlan(input: {
     return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
   }
 }
+
+// ── Locum board ──────────────────────────────────────────────────────────────
+//
+// A doctor advertises a shift at a hospital they are attached to; doctors in
+// that state accept it or counter with their own rate. Rates, the state and the
+// responder ranking are all decided server-side -- see /api/locum/*.
+
+export interface LocumJob {
+  id: string
+  employment_type: 'locum' | 'full_time'
+  state: string
+  lga: string | null
+  starts_on: string
+  start_time: string | null
+  end_time: string | null
+  rate_per_hour: number
+  hours: number | null
+  total_amount: number | null
+  notes: string | null
+  status: 'open' | 'filled' | 'cancelled' | 'expired'
+  created_at: string
+  posted_by: string
+  hospital: { id: string; name: string; city: string | null } | null
+  specialty: { id: string; name: string } | null
+  poster?: { full_name: string | null } | null
+  /** feed only */
+  myResponse?: boolean
+  /** mine only */
+  responseCount?: number
+  selectedCount?: number
+}
+
+export interface LocumResponse {
+  id: string
+  kind: 'accept' | 'counter'
+  counterRate: number | null
+  effectiveRate: number
+  message: string | null
+  selectedAt: string | null
+  createdAt: string
+  doctorUserId: string
+  fullName: string
+  avatarUrl: string | null
+  /** Released only once the poster has selected this doctor. */
+  phone: string | null
+}
+
+export async function getLocumJobs(scope: 'feed' | 'mine' = 'feed'): Promise<{
+  jobs: LocumJob[]; states: string[]; reason?: string
+}> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { jobs: [], states: [] }
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs?scope=${scope}`, { headers })
+    if (!res.ok) return { jobs: [], states: [] }
+    const b = await res.json()
+    return { jobs: b.jobs ?? [], states: b.states ?? [], reason: b.reason }
+  } catch {
+    return { jobs: [], states: [] }
+  }
+}
+
+export async function getLocumJob(id: string): Promise<
+  | { ok: true; job: LocumJob; isPoster: boolean; responses?: LocumResponse[]; myResponse?: LocumResponse | null }
+  | { ok: false; error: string }
+> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs/${id}`, { headers })
+    const b = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: b?.error ?? 'Could not load the post.' }
+    return { ok: true, job: b.job, isPoster: b.isPoster, responses: b.responses, myResponse: b.myResponse }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function postLocumJob(input: {
+  hospitalId: string
+  employmentType: 'locum' | 'full_time'
+  lga?: string
+  startsOn: string
+  startTime?: string
+  endTime?: string
+  ratePerHour: number
+  specialtyId?: string
+  notes?: string
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs`, {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    const b = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: b?.error ?? 'Could not post the job.' }
+    return { ok: true, id: b.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
+  }
+}
+
+export async function respondToLocum(
+  jobId: string,
+  input: { kind: 'accept' | 'counter'; counterRate?: number; message?: string },
+): Promise<string | null> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return 'Not authenticated'
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs/${jobId}/respond`, {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    if (res.ok) return null
+    const b = await res.json().catch(() => ({}))
+    return b?.error ?? 'Could not save your response.'
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Network error'
+  }
+}
+
+export async function selectLocumDoctor(jobId: string, responseId: string): Promise<string | null> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return 'Not authenticated'
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs/${jobId}/select`, {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ responseId }),
+    })
+    if (res.ok) return null
+    const b = await res.json().catch(() => ({}))
+    return b?.error ?? 'Could not select that doctor.'
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Network error'
+  }
+}
+
+export async function cancelLocumJob(jobId: string): Promise<string | null> {
+  const headers = await doctorAuthHeader()
+  if (!headers) return 'Not authenticated'
+  try {
+    const res = await fetch(`${API_URL}/api/locum/jobs/${jobId}`, {
+      method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel' }),
+    })
+    if (res.ok) return null
+    const b = await res.json().catch(() => ({}))
+    return b?.error ?? 'Could not cancel the post.'
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Network error'
+  }
+}

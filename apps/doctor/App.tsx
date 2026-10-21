@@ -23,6 +23,9 @@ import { SplashScreen } from '@queue/shared/screens/SplashScreen'
 import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
 import { ConsultationPlanScreen } from '@queue/shared/screens/ConsultationPlanScreen'
 import { CarePlanComposeScreen } from '@queue/shared/screens/CarePlanComposeScreen'
+import { LocumBoardScreen } from './screens/specialist/LocumBoardScreen'
+import { LocumPostScreen } from './screens/specialist/LocumPostScreen'
+import { LocumJobScreen } from './screens/specialist/LocumJobScreen'
 import { DoctorAnalyticsScreen } from './screens/specialist/DoctorAnalyticsScreen'
 import { RequestAmbulanceScreen } from './screens/specialist/RequestAmbulanceScreen'
 
@@ -139,6 +142,9 @@ function SpecialistStack() {
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
       <DocStack.Screen name="ConsultationPlan" component={ConsultationPlanScreen as any} />
       <DocStack.Screen name="CarePlanCompose" component={CarePlanComposeScreen as any} />
+      <DocStack.Screen name="LocumBoard" component={LocumBoardScreen as any} />
+      <DocStack.Screen name="LocumPost"  component={LocumPostScreen as any} />
+      <DocStack.Screen name="LocumJob"   component={LocumJobScreen as any} />
       <DocStack.Screen name="DoctorAnalytics" component={DoctorAnalyticsScreen as any} />
       <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
     </DocStack.Navigator>

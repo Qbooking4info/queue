@@ -101,6 +101,101 @@ export type Database = {
           },
         ]
       }
+      locum_jobs: {
+        Row: {
+          id: string
+          posted_by: string
+          hospital_id: string
+          employment_type: string
+          state: string
+          lga: string | null
+          starts_on: string
+          start_time: string | null
+          end_time: string | null
+          rate_per_hour: number
+          hours: number | null
+          total_amount: number | null
+          specialty_id: string | null
+          notes: string | null
+          status: string
+          filled_with: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          posted_by: string
+          hospital_id: string
+          employment_type?: string
+          state: string
+          lga?: string | null
+          starts_on: string
+          start_time?: string | null
+          end_time?: string | null
+          rate_per_hour: number
+          specialty_id?: string | null
+          notes?: string | null
+          status?: string
+          filled_with?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          posted_by?: string
+          hospital_id?: string
+          employment_type?: string
+          state?: string
+          lga?: string | null
+          starts_on?: string
+          start_time?: string | null
+          end_time?: string | null
+          rate_per_hour?: number
+          specialty_id?: string | null
+          notes?: string | null
+          status?: string
+          filled_with?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      locum_responses: {
+        Row: {
+          id: string
+          job_id: string
+          doctor_user_id: string
+          kind: string
+          counter_rate: number | null
+          effective_rate: number
+          message: string | null
+          selected_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          doctor_user_id: string
+          kind: string
+          counter_rate?: number | null
+          effective_rate: number
+          message?: string | null
+          selected_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          doctor_user_id?: string
+          kind?: string
+          counter_rate?: number | null
+          effective_rate?: number
+          message?: string | null
+          selected_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       care_plans: {
         Row: {
           condition: string | null
