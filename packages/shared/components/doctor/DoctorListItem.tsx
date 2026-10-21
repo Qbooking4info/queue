@@ -2,6 +2,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
+import { Avatar } from '../ui/Avatar'
 import type { IndependentDoctor } from '../../lib/api'
 
 interface Props { doctor: IndependentDoctor; onPress: () => void }
@@ -11,11 +12,12 @@ export function DoctorListItem({ doctor: d, onPress }: Props) {
   return (
     <TouchableOpacity onPress={onPress}
       style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-        <Text style={{ fontSize: 15, fontWeight: '800', color: t.accent }}>
-          {d.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-        </Text>
-      </View>
+      {/* The doctor's uploaded photo, with initials as the fallback. */}
+      <Avatar
+        size={46}
+        uri={d.avatarUrl}
+        initials={d.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+      />
       <View style={{ flex: 1 }}>
         <Text style={[st.name, { color: t.textPrimary }]}>{d.title ? `${d.title} ` : ''}{d.fullName}</Text>
         <Text style={[st.specialty, { color: t.accent }]}>

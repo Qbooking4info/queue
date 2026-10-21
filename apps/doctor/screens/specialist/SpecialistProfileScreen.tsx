@@ -98,7 +98,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
       <Header>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <ProfileAvatar size={68} editable name={doctor?.full_name ?? user?.full_name} />
+          <ProfileAvatar size={68} editable variant="doctor" name={doctor?.full_name ?? user?.full_name} />
           <View style={{ flex: 1 }}>
             <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>
               {doctor?.full_name ?? user?.full_name ?? 'Your profile'}

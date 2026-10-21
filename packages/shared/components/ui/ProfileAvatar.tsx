@@ -6,14 +6,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { Text } from './Typography'
 import { useAuth } from '../../contexts/AuthContext'
 import { Alert } from '../../contexts/AlertContext'
-import { pickAndUploadAvatar } from '../../lib/avatar'
+import { pickAndUploadAvatar, pickAndUploadDoctorPhoto } from '../../lib/avatar'
 import { haptics } from '../../lib/haptics'
 
 export function initialsOf(name?: string | null) {
   return (name ?? '').replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'
 }
 
-export function ProfileAvatar({ size = 68, editable, onPress, name }: {
+export function ProfileAvatar({ size = 68, editable, onPress, name, variant = 'user' }: {
   size?: number
   /** Tapping offers Take photo / Choose from photos and uploads the result. */
   editable?: boolean
@@ -21,6 +21,12 @@ export function ProfileAvatar({ size = 68, editable, onPress, name }: {
   onPress?: () => void
   /** Name for initials when the user row has none (doctor / staff display names). */
   name?: string | null
+  /**
+   * 'doctor' also writes doctors.avatar_url. Patients cannot read another
+   * person's users row, so a doctor photo saved only to users.avatar_url is
+   * invisible to them -- which is what happened before this existed.
+   */
+  variant?: 'user' | 'doctor'
 }) {
   const { user, refreshProfile } = useAuth() as any
   const [busy, setBusy] = useState(false)
@@ -29,7 +35,9 @@ export function ProfileAvatar({ size = 68, editable, onPress, name }: {
   async function change(source: 'library' | 'camera') {
     setBusy(true)
     try {
-      const u = await pickAndUploadAvatar(source)
+      const u = variant === 'doctor'
+        ? await pickAndUploadDoctorPhoto(source)
+        : await pickAndUploadAvatar(source)
       if (u) { haptics.success(); await refreshProfile?.() }
     } catch (e) {
       haptics.error()

@@ -19,6 +19,7 @@ export interface DisplayHospital {
   tagType:   string
   avatar:    string
   avatarBg:  string
+  logoUrl?:  string | null
   services:  string[]
   virtual:   boolean
   verified:  boolean
@@ -52,7 +53,7 @@ export function HospitalCard({ hospital: h, onPress }: Props) {
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
       style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
       <View style={styles.row}>
-        <Avatar initials={h.avatar} bg={h.avatarBg} size={46} />
+        <Avatar initials={h.avatar} bg={h.avatarBg} size={46} uri={h.logoUrl} />
         <View style={styles.info}>
           <View style={styles.topRow}>
             <View style={{ flex: 1 }}>

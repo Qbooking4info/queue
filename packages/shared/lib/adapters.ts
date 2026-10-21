@@ -67,6 +67,8 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     tag, tagType,
     avatar:    initials(h.name),
     avatarBg:  bgFromName(h.name),
+    // The uploaded logo. Initials above stay as the fallback when it is null.
+    logoUrl:   (h as any).logo_url ?? null,
     services:  services.length ? services : ['General Practice'],
     virtual:   h.accepts_virtual ?? false,
     verified:  h.is_verified   ?? false,

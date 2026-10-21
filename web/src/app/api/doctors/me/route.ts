@@ -97,14 +97,47 @@ async function handlePATCH(req: NextRequest) {
   if (!caller.doctorId) return Errors.forbidden()
   const db = createAdminClient()
 
-  const { availability_status } = await req.json()
-  if (!['on_duty', 'on_break', 'off_duty'].includes(availability_status)) {
-    return Errors.validation('Invalid availability_status')
+  const body = await req.json()
+  const update: Record<string, unknown> = {}
+
+  if ('availability_status' in body) {
+    if (!['on_duty', 'on_break', 'off_duty'].includes(body.availability_status)) {
+      return Errors.validation('Invalid availability_status')
+    }
+    update.availability_status = body.availability_status
   }
 
-  const { error } = await (db.from('doctors') as any)
-    .update({ availability_status })
-    .eq('id', caller.doctorId)
+  // The profile photo patients see. It has to be written here rather than
+  // straight from the app: `doctors` has read policies only, so a client-side
+  // update is refused by RLS -- and patients read doctors.avatar_url, not
+  // users.avatar_url, which they cannot select for anyone but themselves.
+  //
+  // Only a URL inside our own public avatars bucket is accepted. Without that
+  // check this endpoint would let a doctor point their public photo at any
+  // address on the internet.
+  if ('avatar_url' in body) {
+    const url = typeof body.avatar_url === 'string' ? body.avatar_url.trim() : ''
+    const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''}/storage/v1/object/public/avatars/`
+    if (url && !url.startsWith(base)) {
+      return Errors.validation('avatar_url must point at the avatars bucket')
+    }
+    update.avatar_url = url || null
+  }
+
+  if (Object.keys(update).length === 0) {
+    return Errors.validation('Nothing to update')
+  }
+
+  // Every doctors row this person owns, not just the active one: one account
+  // can hold a row per linked hospital and the photo is the same person.
+  // doctors rows match on either auth_user_id (self-registered) or user_id
+  // (portal-created), so both are covered.
+  const { data: me } = await db.from('users').select('id').eq('auth_id', caller.authId).maybeSingle()
+  const match = me?.id
+    ? `auth_user_id.eq.${caller.authId},user_id.eq.${me.id}`
+    : `auth_user_id.eq.${caller.authId}`
+
+  const { error } = await (db.from('doctors') as any).update(update).or(match)
   if (error) return Errors.internal(error.message)
   return NextResponse.json({ success: true })
 }
