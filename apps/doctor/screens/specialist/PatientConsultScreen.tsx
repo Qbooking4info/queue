@@ -353,6 +353,19 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                 <Ionicons name="calendar-outline" size={15} color={t.info} />
                 <Text style={{ color: t.info, fontSize: 13, fontWeight: '700' }}>Book Follow-up</Text>
               </TouchableOpacity>
+
+              {/* The care plan is written here now -- the hospital apps no
+                  longer offer it. Works the same for a hospital-linked or an
+                  independent consultation; the server resolves which. */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('CarePlanCompose', {
+                  patientId: appt.patient_id,
+                  patientName: patient?.full_name,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                <Ionicons name="checkbox-outline" size={15} color={t.accent} />
+                <Text style={{ color: t.accent, fontSize: 13, fontWeight: '700' }}>Care plan</Text>
+              </TouchableOpacity>
             </View>
           )}
 

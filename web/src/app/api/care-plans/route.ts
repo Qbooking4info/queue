@@ -65,10 +65,14 @@ const CADENCES: Cadence[] = ['daily', 'weekly', 'once']
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole([...STAFF], req)
+  // Care plans are written in the consultation now, so the author is the
+  // treating doctor. Hospital staff keep POST access for the plans already in
+  // flight, but the hospital apps no longer offer it.
+  const auth = await requireRole([...STAFF, 'doctor'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
-  if (!caller.hospitalId) return Errors.forbidden()
+  const asDoctor = caller.role === 'doctor'
+  if (!asDoctor && !caller.hospitalId) return Errors.forbidden()
 
   const b = await req.json().catch(() => null) as Record<string, unknown> | null
   const title = typeof b?.title === 'string' ? b.title.trim() : ''
@@ -87,20 +91,42 @@ export async function POST(req: NextRequest) {
   if (endsOn && endsOn < startsOn) return NextResponse.json({ error: 'The end date is before the start date.' }, { status: 400 })
 
   const db = createAdminClient()
-  const { count } = await db.from('appointments').select('id', { count: 'exact', head: true })
-    .eq('hospital_id', caller.hospitalId).eq('patient_id', b.patientId)
-  if (!count) return NextResponse.json({ error: 'This patient has no visit at your hospital.' }, { status: 403 })
-
-  let doctorId: string | null = null
-  if (typeof b.doctorId === 'string' && b.doctorId) {
-    const { data: d } = await db.from('doctors').select('id').eq('id', b.doctorId).eq('hospital_id', caller.hospitalId).maybeSingle()
-    if (!d) return NextResponse.json({ error: 'That doctor is not at your hospital.' }, { status: 400 })
-    doctorId = d.id
-  }
   const { data: me } = await db.from('users').select('id').eq('auth_id', caller.authId).single()
 
+  // Who the plan belongs to, resolved server-side. The doctor and the hospital
+  // are never taken from the request body: a client that could name either
+  // could write a plan into someone else's hospital, or under another doctor.
+  let doctorId: string | null = null
+  let hospitalId: string | null = null
+
+  if (asDoctor) {
+    if (!caller.doctorId) return Errors.forbidden()
+    doctorId = caller.doctorId
+
+    // The doctor must actually have seen this patient. hospital_id on that
+    // doctors row is null for an independent practice, which is exactly the
+    // case the hospital_id NOT NULL drop in 20261021000001 exists for.
+    const { data: d } = await db.from('doctors').select('hospital_id').eq('id', caller.doctorId).maybeSingle()
+    hospitalId = d?.hospital_id ?? null
+
+    const { count } = await db.from('appointments').select('id', { count: 'exact', head: true })
+      .eq('doctor_id', caller.doctorId).eq('patient_id', b.patientId)
+    if (!count) return NextResponse.json({ error: 'You have no visit with this patient.' }, { status: 403 })
+  } else {
+    hospitalId = caller.hospitalId!
+    const { count } = await db.from('appointments').select('id', { count: 'exact', head: true })
+      .eq('hospital_id', hospitalId).eq('patient_id', b.patientId)
+    if (!count) return NextResponse.json({ error: 'This patient has no visit at your hospital.' }, { status: 403 })
+
+    if (typeof b.doctorId === 'string' && b.doctorId) {
+      const { data: d } = await db.from('doctors').select('id').eq('id', b.doctorId).eq('hospital_id', hospitalId).maybeSingle()
+      if (!d) return NextResponse.json({ error: 'That doctor is not at your hospital.' }, { status: 400 })
+      doctorId = d.id
+    }
+  }
+
   const { data: plan, error } = await db.from('care_plans').insert({
-    hospital_id: caller.hospitalId, patient_id: b.patientId, doctor_id: doctorId, created_by: me?.id ?? null,
+    hospital_id: hospitalId, patient_id: b.patientId, doctor_id: doctorId, created_by: me?.id ?? null,
     title, condition: typeof b.condition === 'string' && b.condition.trim() ? b.condition.trim().slice(0, 120) : null,
     notes: typeof b.notes === 'string' && b.notes.trim() ? b.notes.trim().slice(0, 2000) : null,
     starts_on: startsOn, ends_on: endsOn, next_check_in: isDate(b.nextCheckIn) ? b.nextCheckIn : null,

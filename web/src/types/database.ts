@@ -108,7 +108,7 @@ export type Database = {
           created_by: string | null
           doctor_id: string | null
           ends_on: string | null
-          hospital_id: string
+          hospital_id: string | null
           id: string
           next_check_in: string | null
           notes: string | null
@@ -124,7 +124,7 @@ export type Database = {
           created_by?: string | null
           doctor_id?: string | null
           ends_on?: string | null
-          hospital_id: string
+          hospital_id: string | null
           id?: string
           next_check_in?: string | null
           notes?: string | null
@@ -140,7 +140,7 @@ export type Database = {
           created_by?: string | null
           doctor_id?: string | null
           ends_on?: string | null
-          hospital_id?: string
+          hospital_id?: string | null
           id?: string
           next_check_in?: string | null
           notes?: string | null

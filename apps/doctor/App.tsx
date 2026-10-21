@@ -22,6 +22,7 @@ import { usePushNotifications }    from '@queue/shared/hooks/usePushNotification
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
 import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
 import { ConsultationPlanScreen } from '@queue/shared/screens/ConsultationPlanScreen'
+import { CarePlanComposeScreen } from '@queue/shared/screens/CarePlanComposeScreen'
 import { DoctorAnalyticsScreen } from './screens/specialist/DoctorAnalyticsScreen'
 import { RequestAmbulanceScreen } from './screens/specialist/RequestAmbulanceScreen'
 
@@ -137,6 +138,7 @@ function SpecialistStack() {
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
       <DocStack.Screen name="ConsultationPlan" component={ConsultationPlanScreen as any} />
+      <DocStack.Screen name="CarePlanCompose" component={CarePlanComposeScreen as any} />
       <DocStack.Screen name="DoctorAnalytics" component={DoctorAnalyticsScreen as any} />
       <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
     </DocStack.Navigator>
