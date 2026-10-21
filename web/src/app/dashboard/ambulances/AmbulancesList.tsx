@@ -145,18 +145,10 @@ export function AmbulancesList({ requests, hospitalId, canManageFleet }: {
             style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
             Alerts
           </Link>
-          {canManageFleet && (
-            <Link href="/dashboard/ambulances/coverage"
-              style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
-              Coverage
-            </Link>
-          )}
-          {canManageFleet && (
-            <Link href="/dashboard/ambulances/fleet"
-              style={{ padding: '10px 16px', background: C.bgAlt, border: `1px solid ${C.borderMed}`, fontSize: 13, fontWeight: 600, borderRadius: 12, textDecoration: 'none', color: C.text }}>
-              Manage Fleet
-            </Link>
-          )}
+          {/* Fleet and coverage management moved to Queue Ambulance's operator
+              console, which is the only place ambulances are managed now --
+              including for a hospital that owns its own fleet. This page keeps
+              inbound patients and alerts, which are hospital work. */}
         </div>
       </div>
 

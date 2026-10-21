@@ -98,9 +98,9 @@ export function StaffList({ staff, hasFrontDesk, profileId }: {
                 <CredentialsBadge userId={user.id} email={user.email} />
               )}
               {isAmbulanceCrew && (
-                <Link href="/dashboard/ambulances/fleet" style={{ fontSize: 12, color: C.textMuted, marginTop: 8, display: 'inline-block', textDecoration: 'none' }}>
-                  Manage shifts &rarr;
-                </Link>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
+                  Shifts are set in the Queue Ambulance app
+                </div>
               )}
             </div>
           )

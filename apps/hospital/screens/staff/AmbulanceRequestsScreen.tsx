@@ -156,25 +156,18 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Ambulance desk" subtitle="Inbound patients and your fleet's jobs" onBack={() => navigation.goBack()} />
+      <Header title="Ambulance desk" subtitle="Patients being brought here" onBack={() => navigation.goBack()} />
 
       <View style={st.linkRow}>
         <TouchableOpacity onPress={() => navigation.navigate('AmbulanceAlerts')}
           style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
           <Text style={[st.linkText, { color: t.textPrimary }]}>Alerts</Text>
         </TouchableOpacity>
-        {isAdmin && (
-          <>
-            <TouchableOpacity onPress={() => navigation.navigate('AmbulanceCoverage')}
-              style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.linkText, { color: t.textPrimary }]}>Coverage</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('AmbulanceFleet')}
-              style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.linkText, { color: t.textPrimary }]}>Manage Fleet</Text>
-            </TouchableOpacity>
-          </>
-        )}
+        {/* Fleet and coverage management used to hang off here. Managing
+            ambulances -- units, crew, shifts, coverage -- now happens only in
+            Queue Ambulance's operator console, including for a hospital that
+            owns its own fleet. This desk keeps what is genuinely hospital work:
+            inbound patients, and alerts for requests that found no unit. */}
       </View>
 
       {loading ? (
