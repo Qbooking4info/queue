@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   const SELECT =
     'id, employment_type, state, lga, starts_on, start_time, end_time, rate_per_hour, ' +
-    'hours, total_amount, notes, status, created_at, posted_by, ' +
+    'hours, total_amount, notes, status, created_at, posted_by, expires_at, ' +
     'hospital:hospitals(id, name, city), specialty:specialties(id, name)'
 
   if (scope === 'mine') {
@@ -80,12 +80,15 @@ export async function GET(req: NextRequest) {
     return withCors(NextResponse.json({ jobs: [], states: [], reason: 'no_state' }))
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Filtered on expires_at rather than waiting for the hourly sweep, so a post
+  // is invisible the moment its deadline passes: 24h after the start date for a
+  // locum shift, a month for a permanent post. The sweep only flips the status
+  // and notifies -- it is not what makes a job disappear.
   const { data, error } = await db.from('locum_jobs')
     .select(`${SELECT}, responses:locum_responses(doctor_user_id)`)
     .in('state', states)
     .eq('status', 'open')
-    .gte('starts_on', today)
+    .gt('expires_at', new Date().toISOString())
     .neq('posted_by', me.id)          // your own post is not a job offer to you
     .order('starts_on', { ascending: true })
     .limit(100)
@@ -141,11 +144,20 @@ export async function POST(req: NextRequest) {
 
   // A doctor may only advertise somewhere they actually work. Checked against
   // their own doctors rows, so a hospital id from the body proves nothing.
-  const { data: link } = await db.from('doctors')
+  // Matched on either id column, the same way AuthContext resolves a doctor's
+  // links: a portal-created row carries user_id, a self-registered one carries
+  // auth_user_id. Filtering on user_id alone would reject a self-registered
+  // doctor whose hospitals the app had just offered them.
+  //
+  // limit(1) rather than maybeSingle(): a doctor with two rows at one hospital
+  // is unusual but not impossible, and it should not turn into an error here.
+  const { data: links } = await db.from('doctors')
     .select('id, hospital:hospitals(id, name, state)')
-    .eq('user_id', me.id)
     .eq('hospital_id', b.hospitalId)
-    .maybeSingle()
+    .eq('is_active', true)
+    .or(`user_id.eq.${me.id},auth_user_id.eq.${caller.authId}`)
+    .limit(1)
+  const link = links?.[0]
   const hospital = (link as any)?.hospital
   if (!link || !hospital) {
     return withCors(Errors.validation('You can only post for a hospital you are attached to.'))

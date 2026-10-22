@@ -115,6 +115,7 @@ export type Database = {
           rate_per_hour: number
           hours: number | null
           total_amount: number | null
+          expires_at: string | null
           specialty_id: string | null
           notes: string | null
           status: string

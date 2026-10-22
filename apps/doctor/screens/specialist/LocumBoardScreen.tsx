@@ -16,6 +16,18 @@ interface Props { navigation: any }
 export const money = (n: number | null | undefined) =>
   n == null ? '—' : `₦${Number(n).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`
 
+/** "Closes in 6h" / "Closes tomorrow" — how long a post is still an offer. */
+export function closesIn(iso: string | null): string | null {
+  if (!iso) return null
+  const ms = new Date(iso).getTime() - Date.now()
+  if (ms <= 0) return 'Closed'
+  const hours = Math.floor(ms / 3_600_000)
+  if (hours < 1) return `Closes in ${Math.max(1, Math.round(ms / 60_000))} min`
+  if (hours < 24) return `Closes in ${hours}h`
+  const days = Math.round(hours / 24)
+  return days === 1 ? 'Closes tomorrow' : `Closes in ${days} days`
+}
+
 export function shiftLine(j: LocumJob) {
   const date = new Date(j.starts_on + 'T00:00:00')
     .toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -107,6 +119,8 @@ function JobCard({ job: j, tab, onPress }: { job: LocumJob; tab: Tab; onPress: (
   // Unanswered posts pulse so a shift that needs a reply is visible without
   // reading every card. It settles once answered rather than blinking forever.
   const needsReply = tab === 'feed' && !j.myResponse && j.status === 'open'
+  const closesLabel = closesIn(j.expires_at)
+  const closingSoon = closesLabel && !/days/.test(closesLabel) ? closesLabel : null
   const pulse = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -177,6 +191,13 @@ function JobCard({ job: j, tab, onPress }: { job: LocumJob; tab: Tab; onPress: (
         )}
         {tab === 'feed' && j.myResponse && (
           <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent, marginTop: 2 }}>You replied</Text>
+        )}
+        {/* Only shown when the deadline is close enough to matter -- a month
+            out it is noise, a few hours out it is the reason to reply now. */}
+        {j.status === 'open' && !!closingSoon && (
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusBusy.text, marginTop: 2 }}>
+            {closingSoon}
+          </Text>
         )}
       </Animated.View>
     </TouchableOpacity>

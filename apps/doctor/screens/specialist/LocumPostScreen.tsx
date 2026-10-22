@@ -5,7 +5,7 @@ import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Header, Card, PrimaryButton, SectionTitle } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { useAuth } from '@queue/shared/contexts/AuthContext'
+import { useAuth, type LinkedHospital } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtLocalDate } from '@queue/shared/lib/format'
 import { postLocumJob } from '@queue/shared/lib/api'
@@ -39,11 +39,15 @@ function hoursBetween(start: string, end: string): number | null {
 
 export function LocumPostScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { linkedHospitals, doctorProfile } = useAuth() as any
+  const { doctorProfile } = useAuth()
 
   // Only hospitals this doctor is attached to. The server re-checks, but
   // offering anything else here would be a form that fails on submit.
-  const hospitals: { doctorId: string; hospitalId: string; hospitalName: string }[] = linkedHospitals ?? []
+  //
+  // linkedHospitals hangs off doctorProfile, not off the context root. Reading
+  // it from the root returned undefined for everyone, so every doctor saw "not
+  // attached to a hospital" no matter how many links they had.
+  const hospitals: LinkedHospital[] = doctorProfile?.linkedHospitals ?? []
 
   const [hospitalId, setHospitalId] = useState<string>(hospitals[0]?.hospitalId ?? '')
   const [kind, setKind]     = useState<'locum' | 'full_time'>('locum')

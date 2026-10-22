@@ -1663,6 +1663,8 @@ export interface LocumJob {
   rate_per_hour: number
   hours: number | null
   total_amount: number | null
+  /** When an unfilled post stops being offered. Generated in the database. */
+  expires_at: string | null
   notes: string | null
   status: 'open' | 'filled' | 'cancelled' | 'expired'
   created_at: string
