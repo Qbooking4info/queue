@@ -10,6 +10,7 @@ import { HospitalCard } from '@queue/shared/components/hospital/HospitalCard'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import { DoctorListItem } from '@queue/shared/components/doctor/DoctorListItem'
 import { Dropdown, type DropdownOption } from '@queue/shared/components/ui/Dropdown'
+import { GridCard } from '@queue/shared/components/ui/GridCard'
 import { getHospitals, searchIndependentDoctors, type IndependentDoctor } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
@@ -47,7 +48,7 @@ export function SearchScreen({ navigation }: Props) {
   const [q, setQ]       = useState('')
   const [hFilter, setHFilter] = useState<HospitalFilter>('all')
   const [dFilter, setDFilter] = useState<DoctorFilter>('all')
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('list')
 
   const [all, setAll]         = useState<DisplayHospital[]>([])
   const [doctors, setDoctors] = useState<IndependentDoctor[]>([])
@@ -122,6 +123,9 @@ export function SearchScreen({ navigation }: Props) {
       : { latitude: 6.5244, longitude: 3.3792 } // Lagos default
 
   const showingHospitals = mode === 'hospitals'
+  // Map has no meaning on the doctors side, so a mode switch drops back to the
+  // grid rather than showing an empty map the user has to escape from.
+  const effectiveView = !showingHospitals && viewMode === 'map' ? 'grid' : viewMode
   const count = showingHospitals ? results.length : doctors.length
 
   return (
@@ -185,22 +189,31 @@ export function SearchScreen({ navigation }: Props) {
             />
           )}
 
-          {/* Map is hospitals-only: independent doctors carry no coordinates,
-              so a map of them would always be empty. */}
-          {showingHospitals && (
-            <View style={[styles.viewToggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <TouchableOpacity onPress={() => setViewMode('list')}
-                accessibilityLabel="List view" accessibilityState={{ selected: viewMode === 'list' }}
-                style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: t.accentBg }]}>
-                <Ionicons name="list-outline" size={15} color={viewMode === 'list' ? t.accent : t.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setViewMode('map')}
-                accessibilityLabel="Map view" accessibilityState={{ selected: viewMode === 'map' }}
+          {/* List and grid apply to both sides. Map is hospitals-only:
+              independent doctors carry no coordinates, so a map of them would
+              always be empty. */}
+          <View style={[styles.viewToggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+            <TouchableOpacity onPress={() => { haptics.tap(); setViewMode('list') }}
+              accessibilityRole="button" accessibilityLabel="List view"
+              accessibilityState={{ selected: viewMode === 'list' }}
+              style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: t.accentBg }]}>
+              <Ionicons name="list-outline" size={15} color={viewMode === 'list' ? t.accent : t.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { haptics.tap(); setViewMode('grid') }}
+              accessibilityRole="button" accessibilityLabel="Grid view"
+              accessibilityState={{ selected: viewMode === 'grid' }}
+              style={[styles.toggleBtn, viewMode === 'grid' && { backgroundColor: t.accentBg }]}>
+              <Ionicons name="grid-outline" size={15} color={viewMode === 'grid' ? t.accent : t.textMuted} />
+            </TouchableOpacity>
+            {showingHospitals && (
+              <TouchableOpacity onPress={() => { haptics.tap(); setViewMode('map') }}
+                accessibilityRole="button" accessibilityLabel="Map view"
+                accessibilityState={{ selected: viewMode === 'map' }}
                 style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: t.accentBg }]}>
                 <Ionicons name="map-outline" size={15} color={viewMode === 'map' ? t.accent : t.textMuted} />
               </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </View>
         </View>
 
         {!(loading || docLoading) && (
@@ -218,7 +231,7 @@ export function SearchScreen({ navigation }: Props) {
               <SkeletonCard />
               <SkeletonCard />
             </ScrollView>
-          ) : viewMode === 'map' ? (
+          ) : effectiveView === 'map' ? (
             <HospitalsMap
               style={{ flex: 1, borderRadius: 16, marginHorizontal: 20, marginBottom: 16 }}
               initialRegion={{ ...mapCenter, latitudeDelta: 0.15, longitudeDelta: 0.15 }}
@@ -238,10 +251,34 @@ export function SearchScreen({ navigation }: Props) {
                 <Empty theme={t} icon="business-outline" title="No hospitals found"
                   sub={q.trim() ? `Nothing matches “${q.trim()}”.` : 'Try a different filter.'} />
               )}
-              {results.map(h => (
-                <HospitalCard key={String(h.id)} hospital={h}
-                  onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
-              ))}
+
+              {effectiveView === 'grid' ? (
+                <View style={styles.grid}>
+                  {results.map(h => (
+                    <GridCard
+                      key={String(h.id)}
+                      kind="hospital"
+                      uri={h.logoUrl}
+                      hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }}
+                      title={h.name}
+                      subtitle={h.distance}
+                      rating={h.rating}
+                      reviews={h.reviews}
+                      badge={h.tagType === 'open' ? { label: 'Open now', tone: 'online' } : null}
+                      actionLabel="Book"
+                      onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }}
+                    />
+                  ))}
+                  {/* Keeps a lone tile on the last row at half width instead of
+                      stretching it across the full row. */}
+                  {results.length % 2 === 1 && <View style={{ flexGrow: 1, flexBasis: '45%' }} />}
+                </View>
+              ) : (
+                results.map(h => (
+                  <HospitalCard key={String(h.id)} hospital={h}
+                    onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
+                ))
+              )}
               <View style={{ height: 32 }} />
             </ScrollView>
           )
@@ -253,10 +290,31 @@ export function SearchScreen({ navigation }: Props) {
               <Empty theme={t} icon="medkit-outline" title="No independent doctors found"
                 sub={q.trim() ? `Nothing matches “${q.trim()}”.` : 'No doctors currently accept direct bookings with that filter.'} />
             )}
-            {doctors.map(d => (
-              <DoctorListItem key={d.userId} doctor={d}
-                onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
-            ))}
+            {effectiveView === 'grid' ? (
+              <View style={[styles.grid, { paddingHorizontal: 20 }]}>
+                {doctors.map(d => (
+                  <GridCard
+                    key={d.userId}
+                    kind="doctor"
+                    uri={d.avatarUrl}
+                    gender={d.gender}
+                    title={`${d.title ? d.title + ' ' : ''}${d.fullName}`}
+                    subtitle={d.specialty?.name ?? 'General Practice'}
+                    rating={d.avgRating}
+                    reviews={d.reviewCount}
+                    badge={d.acceptsDirectVirtual ? { label: 'Online', tone: 'online' } : null}
+                    actionLabel="Book"
+                    onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }}
+                  />
+                ))}
+                {doctors.length % 2 === 1 && <View style={{ flexGrow: 1, flexBasis: '45%' }} />}
+              </View>
+            ) : (
+              doctors.map(d => (
+                <DoctorListItem key={d.userId} doctor={d}
+                  onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
+              ))
+            )}
             <View style={{ height: 32 }} />
           </ScrollView>
         )}
@@ -305,4 +363,7 @@ const styles = StyleSheet.create({
   viewToggle: { flexDirection: 'row', borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
   toggleBtn:  { paddingHorizontal: 10, paddingVertical: 8 },
   resultCount: { fontSize: 11, marginBottom: 10, paddingHorizontal: 20 },
+  // Two columns via wrap rather than FlatList numColumns: this sits inside a
+  // ScrollView, and nesting a VirtualizedList in one breaks its windowing.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
 })
