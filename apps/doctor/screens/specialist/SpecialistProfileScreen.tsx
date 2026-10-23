@@ -96,7 +96,9 @@ export function SpecialistProfileScreen({ navigation }: Props) {
   // the same grouped-row layout as the patient Profile.
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header>
+      {/* Pushed from the top-bar avatar now that Profile is no longer a tab,
+          so it needs its own way back -- a tab screen never did. */}
+      <Header onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
           <ProfileAvatar size={68} editable variant="doctor" name={doctor?.full_name ?? user?.full_name} />
           <View style={{ flex: 1 }}>

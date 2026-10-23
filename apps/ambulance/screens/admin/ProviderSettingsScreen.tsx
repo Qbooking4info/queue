@@ -14,7 +14,7 @@ import { getProviderSettings, updateProviderSettings } from '@queue/shared/lib/a
  * hospital, or be flexible"); an independent operator has no home hospital
  * for it to refer to, so that toggle is hidden for them.
  */
-export function ProviderSettingsScreen() {
+export function ProviderSettingsScreen({ navigation }: { navigation?: any }) {
   const { theme: t } = useTheme()
 
   const [providerType, setProviderType] = useState<'hospital_fleet' | 'third_party' | null>(null)
@@ -70,6 +70,21 @@ export function ProviderSettingsScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        {/* Pushed from the operator's profile, so it needs its own way back. */}
+        {navigation?.canGoBack?.() && (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button" accessibilityLabel="Back"
+            hitSlop={8}
+            style={{
+              width: 38, height: 38, borderRadius: 13, marginBottom: 12,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
+            }}
+          >
+            <Ionicons name="chevron-back" size={20} color={t.textPrimary} />
+          </TouchableOpacity>
+        )}
         <Text style={[s.title, { color: t.textPrimary }]}>Service Settings</Text>
         <Text style={[s.subtitle, { color: t.textMuted }]}>How far and when your fleet is dispatched.</Text>
 
