@@ -6,7 +6,8 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
 import * as ExpoLocation from 'expo-location'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header, HeaderTail, Card, SectionTitle, PrimaryButton, EmptyState } from '@queue/shared/components/ui/v3'
+import { Card, SectionTitle, PrimaryButton, EmptyState } from '@queue/shared/components/ui/v3'
+import { TopBar, TopBarButton } from '@queue/shared/components/ui/home'
 import { haptics } from '@queue/shared/lib/haptics'
 import { startConversation } from '@queue/shared/lib/chat'
 import {
@@ -320,7 +321,7 @@ export function CrewHomeScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Duty" subtitle="Loading…" />
+        <TopBar initials="  " eyebrow="Loading…" title="Duty" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={t.accent} /></View>
       </View>
     )
@@ -400,13 +401,18 @@ export function CrewHomeScreen() {
           )
         })()}
       </Modal>
-      <Header title={activeJob ? 'Active job' : 'Duty'} subtitle={headerSub}
-        right={<ProfileAvatar size={44} onPress={() => navigation.navigate('CrewProfile')} />} />
+      <TopBar
+        avatar={<ProfileAvatar size={40} onPress={() => navigation.navigate('CrewProfile')} />}
+        eyebrow={headerSub}
+        title={activeJob ? 'Active job' : 'Duty'}
+        onAvatarPress={() => navigation.navigate('CrewProfile')}
+        right={<TopBarButton icon="person-circle-outline" label="Your profile"
+          onPress={() => navigation.navigate('CrewProfile')} />}
+      />
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: 40, gap: 14 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
       >
-        <HeaderTail />
         {/* Duty. Above everything else because an off-duty unit receives no
             offers at all — if this is off, the empty offer list below is not a
             quiet night, it's the crew being invisible. */}

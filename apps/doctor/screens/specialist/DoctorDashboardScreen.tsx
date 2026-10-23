@@ -9,7 +9,8 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { todayLocalDate } from '@queue/shared/lib/format'
-import { Header, HeaderIconButton, KpiCard, Card, SectionTitle, ListRow, PrimaryButton, SegmentedControl, HeaderTail } from '@queue/shared/components/ui/v3'
+import { KpiCard, Card, SectionTitle, ListRow, PrimaryButton, SegmentedControl } from '@queue/shared/components/ui/v3'
+import { TopBar, TopBarButton, SectionHead } from '@queue/shared/components/ui/home'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { getMyDoctorStats, setMyAvailability, ringPatient, type DoctorAvailability } from '@queue/shared/lib/api'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
@@ -24,6 +25,10 @@ const WAITING = ['pending', 'confirmed', 'checked_in']
 const rank = (a: NextPatient) => (a.urgency === 'emergency' ? 0 : 10) + (a.status === 'checked_in' ? 0 : 5)
 
 interface Props { navigation: any }
+
+function longDate(d = new Date()) {
+  return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -120,17 +125,22 @@ export function DoctorDashboardScreen({ navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title={`${greeting}, Dr. ${firstName}`}
-        subtitle={doctorProfile ? (availability === 'on_duty' ? 'On duty' : availability === 'on_break' ? 'On a break · call in paused' : 'Off duty · call in paused') : "Here's your practice today"}
-        right={<ProfileAvatar size={44} name={doctorProfile?.fullName} onPress={() => navigation.navigate('SpecialistProfile')} />}>
+      <TopBar
+        avatar={<ProfileAvatar size={40} name={doctorProfile?.fullName} onPress={() => navigation.navigate('SpecialistProfile')} />}
+        eyebrow={longDate()}
+        title={`${greeting}, Dr. ${firstName}`}
+        onAvatarPress={() => navigation.navigate('SpecialistProfile')}
+        right={<TopBarButton icon="person-circle-outline" label="Your profile"
+          onPress={() => navigation.navigate('SpecialistProfile')} />}
+      />
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 40, gap: 14 }}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent} onRefresh={() => { setRefreshing(true); setReloadTick(n => n + 1) }} />}>
+        {/* Duty status moved out of the header and onto the page, where the
+            rest of the controls now live. */}
         {doctorProfile && (
-          <SegmentedControl<DoctorAvailability> onDark value={availability} onChange={changeAvailability}
+          <SegmentedControl<DoctorAvailability> value={availability} onChange={changeAvailability}
             options={[{ value: 'on_duty', label: 'On duty' }, { value: 'on_break', label: 'Break' }, { value: 'off_duty', label: 'Off' }]} />
         )}
-      </Header>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: 40, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent} onRefresh={() => { setRefreshing(true); setReloadTick(n => n + 1) }} />}>
-        <HeaderTail />
         {loading ? (
           <View style={{ gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
         ) : (
