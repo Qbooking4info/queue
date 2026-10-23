@@ -7,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Card } from '@queue/shared/components/ui/v3'
+import { Image } from 'react-native'
+import { pickAndUploadAmbulancePhoto } from '@queue/shared/lib/avatar'
+import { haptics } from '@queue/shared/lib/haptics'
 import { IconOrb } from './adminBits'
 import { Button } from '@queue/shared/components/ui/Button'
 import { authedRequest } from '@queue/shared/lib/ambulance-api'
@@ -69,6 +72,8 @@ export function AdminFleetScreen() {
   const [newCreds, setNewCreds] = useState<{ email: string; password: string } | null>(null)
 
   const [dutyBusy, setDutyBusy] = useState<string | null>(null)
+
+  const [photoBusy, setPhotoBusy] = useState<string | null>(null)
   const [assignBusy, setAssignBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -178,6 +183,27 @@ export function AdminFleetScreen() {
     }
   }
 
+  // The vehicle's own photo. Camera first: an operator standing next to the
+  // ambulance is the common case, and a library pick is one tap further.
+  async function handlePhoto(unit: FleetUnit) {
+    Alert.alert(unit.call_sign ?? unit.plate_number, 'Add a photo of this vehicle', [
+      { text: 'Take photo', onPress: () => doPhoto(unit, 'camera') },
+      { text: 'Choose from photos', onPress: () => doPhoto(unit, 'library') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  async function doPhoto(unit: FleetUnit, source: 'camera' | 'library') {
+    setPhotoBusy(unit.id)
+    try {
+      const url = await pickAndUploadAmbulancePhoto(unit.id, source)
+      if (url) { haptics.success(); await load() }
+    } catch (e) {
+      haptics.error()
+      Alert.alert('Vehicle photo', e instanceof Error ? e.message : 'Could not save the photo.')
+    } finally { setPhotoBusy(null) }
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
@@ -283,7 +309,24 @@ export function AdminFleetScreen() {
                     borderColor: u.on_duty ? (u.visible_to_dispatch ? t.accent : t.statusBusy.text) + '55' : t.cardBorder,
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <IconOrb name="bus-outline" size={42} color={u.on_duty ? t.accent : t.textMuted} />
+                      <TouchableOpacity
+                        onPress={() => handlePhoto(u)}
+                        disabled={photoBusy === u.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${u.photo_url ? 'Change' : 'Add'} photo of ${u.call_sign ?? u.plate_number}`}
+                        style={{ width: 54, height: 42, borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: t.accentBg, borderWidth: 1, borderColor: t.accentBorder }}
+                      >
+                        {u.photo_url ? (
+                          <Image source={{ uri: u.photo_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                        ) : (
+                          <Ionicons name="camera-outline" size={18} color={t.accent} />
+                        )}
+                        {photoBusy === u.id && (
+                          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={[s.unitTitle, { color: t.textPrimary }]}>{u.call_sign ?? u.plate_number}</Text>
                         <Text style={[s.unitSub, { color: t.textSecondary }]} numberOfLines={1}>

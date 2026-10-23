@@ -38,7 +38,7 @@ export function AdminProfileScreen({ navigation }: Props) {
           {/* alignItems lives on this inner View, never on the Card itself --
               a Card given alignItems shrink-wraps instead of filling its row. */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <ProfileAvatar name={user?.full_name ?? '—'} size={52} />
+            <ProfileAvatar name={user?.full_name ?? '—'} size={52} editable />
             <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
               <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }} numberOfLines={1}>
                 {user?.full_name ?? '—'}

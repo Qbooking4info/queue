@@ -52,6 +52,8 @@ export interface FleetUnit {
   plate_number: string
   call_sign: string | null
   vehicle_tier: string
+  /** Photo of the vehicle, shown to a waiting patient. */
+  photo_url?: string | null
   capabilities: string[]
   status: string
   is_active: boolean

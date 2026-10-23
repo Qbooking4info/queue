@@ -45,7 +45,7 @@ async function handleGET(req: NextRequest) {
 
   const { data: ambulances } = await db.from('ambulances')
     .select(`
-      id, plate_number, call_sign, vehicle_tier, capabilities, status, is_active,
+      id, plate_number, call_sign, vehicle_tier, capabilities, status, is_active, photo_url,
       ambulance_shifts (
         id, crew_tier, starts_at, ends_at,
         ambulance_shift_crew (

@@ -673,6 +673,7 @@ export type Database = {
           home_base: unknown
           id: string
           is_active: boolean
+          photo_url: string | null
           plate_number: string
           provider_id: string
           status: string
@@ -686,6 +687,7 @@ export type Database = {
           home_base: unknown
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           plate_number: string
           provider_id: string
           status?: string
@@ -699,6 +701,7 @@ export type Database = {
           home_base?: unknown
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           plate_number?: string
           provider_id?: string
           status?: string

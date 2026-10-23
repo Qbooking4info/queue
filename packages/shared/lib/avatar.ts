@@ -17,6 +17,8 @@ async function pickAndUpload(
   folder: string,
   prefix: string,
   source: 'library' | 'camera',
+  /** Crop shape. Square for faces and logos; a vehicle wants landscape. */
+  aspect: [number, number] = [1, 1],
 ): Promise<string | null> {
   const perm = source === 'camera'
     ? await ImagePicker.requestCameraPermissionsAsync()
@@ -27,7 +29,7 @@ async function pickAndUpload(
       : 'Allow photo access to choose a picture.')
   }
 
-  const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 }
+  const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.7 }
   const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts)
   if (res.canceled || !res.assets?.[0]) return null
   const asset = res.assets[0]
@@ -83,6 +85,24 @@ export async function pickAndUploadDoctorPhoto(source: 'library' | 'camera' = 'l
     throw new Error(b?.error ?? 'Your picture was saved, but patients will not see it yet. Please try again.')
   }
 
+  return url
+}
+
+/**
+ * A photo of the vehicle itself, so a patient waiting at the roadside can tell
+ * which ambulance is theirs.
+ *
+ * Landscape rather than square: a vehicle is wider than it is tall, and a
+ * square crop of one is mostly road and sky.
+ */
+export async function pickAndUploadAmbulancePhoto(
+  ambulanceId: string,
+  source: 'library' | 'camera' = 'camera',
+): Promise<string | null> {
+  const url = await pickAndUpload('ambulances', ambulanceId, 'vehicle', source, [16, 10])
+  if (!url) return null
+  const { error } = await supabase.from('ambulances').update({ photo_url: url }).eq('id', ambulanceId)
+  if (error) throw new Error(error.message)
   return url
 }
 
