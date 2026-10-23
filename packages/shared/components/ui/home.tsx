@@ -16,10 +16,37 @@ type IconName = React.ComponentProps<typeof Ionicons>['name']
  * colour is spent in two places that carry meaning -- the status card at the
  * top, and the quick-action tiles.
  *
- * The status card keeps its dark teal in light mode too. It is the one bold
- * element on the page, and inverting it in light mode would leave the screen
- * with no anchor.
+ * The status card is always the opposite of the page it sits on: pale mint on
+ * the near-black dark theme, deep teal on the white light one. It is the one
+ * bold element on the page, and matching the page would lose it.
  */
+
+/** Hero palette, flipped against the page so the card always stands off it. */
+function heroTones(dark: boolean) {
+  return dark
+    ? {
+        fill:    ['#BDE9D8', '#A8E0CC'] as [string, string],
+        ink:     '#0A2C26',
+        soft:    '#2F6459',
+        accent:  '#0D4F44',
+        divider: 'rgba(10,44,38,0.18)',
+        tileBg:  '#0C332C',
+        tileInk: '#FFFFFF',
+        tileSub: '#8FD9CE',
+        dotOff:  'rgba(10,44,38,0.22)',
+      }
+    : {
+        fill:    ['#15514B', '#0C2E2C'] as [string, string],
+        ink:     '#FFFFFF',
+        soft:    '#B9D9D3',
+        accent:  '#6EE7D7',
+        divider: 'rgba(255,255,255,0.16)',
+        tileBg:  'rgba(0,0,0,0.26)',
+        tileInk: '#FFFFFF',
+        tileSub: '#8FD9CE',
+        dotOff:  'rgba(255,255,255,0.3)',
+      }
+}
 
 // ── top bar ───────────────────────────────────────────────────────────────────
 
@@ -78,7 +105,7 @@ export function TopBarButton({ icon, label, onPress, dot }: {
       style={[tb.round, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
     >
       <Ionicons name={icon} size={19} color={t.textPrimary} />
-      {dot && <View style={[tb.dot, { borderColor: t.canvasBg }]} />}
+      {dot && <View style={[tb.dot, { borderColor: t.cardBg, backgroundColor: t.accent }]} />}
     </TouchableOpacity>
   )
 }
@@ -119,11 +146,13 @@ export function Pill({ label, value, icon, onPress, tone = 'neutral' }: {
 // ── status card ───────────────────────────────────────────────────────────────
 
 export function DateTile({ weekday, day, month }: { weekday: string; day: string; month: string }) {
+  const { theme: t } = useTheme()
+  const c = heroTones(t.id === 'forest')
   return (
-    <View style={hc.date}>
-      <Text style={hc.dateWeekday}>{weekday}</Text>
-      <Text style={hc.dateDay}>{day}</Text>
-      <Text style={hc.dateMonth}>{month}</Text>
+    <View style={[hc.date, { backgroundColor: c.tileBg }]}>
+      <Text style={[hc.dateWeekday, { color: c.tileSub }]}>{weekday}</Text>
+      <Text style={[hc.dateDay, { color: c.tileInk }]}>{day}</Text>
+      <Text style={[hc.dateMonth, { color: c.tileSub }]}>{month}</Text>
     </View>
   )
 }
@@ -149,6 +178,8 @@ export function HeroCard({
   onPress?: () => void
   style?: StyleProp<ViewStyle>
 }) {
+  const { theme: t } = useTheme()
+  const c = heroTones(t.id === 'forest')
   const Wrapper: any = onPress ? TouchableOpacity : View
 
   return (
@@ -159,16 +190,16 @@ export function HeroCard({
       style={style}
     >
       <LinearGradient
-        colors={['#15514B', '#0C2E2C']}
+        colors={c.fill}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={hc.card}
       >
         <View style={hc.head}>
-          <Text style={hc.eyebrow} numberOfLines={1}>{eyebrow}</Text>
+          <Text style={[hc.eyebrow, { color: c.soft }]} numberOfLines={1}>{eyebrow}</Text>
           {!!status && (
             <View style={hc.status}>
-              <Ionicons name={status.icon ?? 'checkmark-circle'} size={13} color="#6EE7D7" />
-              <Text style={hc.statusText}>{status.label}</Text>
+              <Ionicons name={status.icon ?? 'checkmark-circle'} size={13} color={c.accent} />
+              <Text style={[hc.statusText, { color: c.accent }]}>{status.label}</Text>
             </View>
           )}
         </View>
@@ -178,22 +209,26 @@ export function HeroCard({
         {!!dots && dots.count > 1 && (
           <View style={hc.dots}>
             {Array.from({ length: dots.count }).map((_, i) => (
-              <View key={i} style={[hc.dot, i === dots.index && hc.dotOn]} />
+              <View key={i} style={[
+                hc.dot,
+                { backgroundColor: c.dotOff },
+                i === dots.index && { width: 16, backgroundColor: c.accent },
+              ]} />
             ))}
           </View>
         )}
 
         {!!footer?.length && (
-          <View style={hc.footer}>
+          <View style={[hc.footer, { borderTopColor: c.divider }]}>
             {footer.map((f, i) => (
               <TouchableOpacity
                 key={f.label}
                 onPress={() => { haptics.tap(); f.onPress() }}
                 accessibilityRole="button" accessibilityLabel={f.label}
-                style={[hc.footerBtn, i > 0 && hc.footerDivider]}
+                style={[hc.footerBtn, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.divider }]}
               >
-                {!!f.icon && <Ionicons name={f.icon} size={14} color="#D6F2EC" />}
-                <Text style={hc.footerText} numberOfLines={1}>{f.label}</Text>
+                {!!f.icon && <Ionicons name={f.icon} size={14} color={c.accent} />}
+                <Text style={[hc.footerText, { color: c.accent }]} numberOfLines={1}>{f.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -207,13 +242,15 @@ export function HeroCard({
 export function HeroBody({ title, subtitle, meta, leading }: {
   title: string; subtitle?: string | null; meta?: string | null; leading?: React.ReactNode
 }) {
+  const { theme: t } = useTheme()
+  const c = heroTones(t.id === 'forest')
   return (
     <View style={hc.body}>
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={hc.title} numberOfLines={1}>{title}</Text>
-        {!!subtitle && <Text style={hc.subtitle} numberOfLines={1}>{subtitle}</Text>}
-        {!!meta && <Text style={hc.meta} numberOfLines={1}>{meta}</Text>}
+        <Text style={[hc.title, { color: c.ink }]} numberOfLines={1}>{title}</Text>
+        {!!subtitle && <Text style={[hc.subtitle, { color: c.soft }]} numberOfLines={1}>{subtitle}</Text>}
+        {!!meta && <Text style={[hc.meta, { color: c.ink }]} numberOfLines={1}>{meta}</Text>}
       </View>
     </View>
   )
@@ -241,8 +278,10 @@ export function QuickTile({ icon, label, color, badge, onPress }: {
       accessibilityRole="button" accessibilityLabel={badge ? `${label}, ${badge}` : label}
       style={qt.wrap}
     >
+      {/* Dark icon on a bright fill, not white: these tiles are saturated
+          pastels and white on them reads as washed out. */}
       <View style={[qt.tile, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={23} color="#FFFFFF" />
+        <Ionicons name={icon} size={23} color="#0B2B26" />
         {!!badge && (
           <View style={[qt.badge, { backgroundColor: t.danger, borderColor: t.canvasBg }]}>
             <Text style={qt.badgeText} numberOfLines={1}>{badge}</Text>
@@ -321,8 +360,9 @@ const tb = StyleSheet.create({
   avatarText: { fontSize: 14, fontWeight: '800' },
   eyebrow: { fontSize: 12 },
   title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  round: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  dot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1.5 },
+  // Rounded square, not a circle: it reads as a control rather than a second face next to the avatar.
+  round: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  dot: { position: 'absolute', top: 9, right: 10, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
 })
 
 const pl = StyleSheet.create({

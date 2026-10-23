@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { View, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Text } from './Typography'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { Alert } from '../../contexts/AlertContext'
 import { pickAndUploadAvatar, pickAndUploadDoctorPhoto } from '../../lib/avatar'
@@ -28,6 +29,7 @@ export function ProfileAvatar({ size = 68, editable, onPress, name, variant = 'u
    */
   variant?: 'user' | 'doctor'
 }) {
+  const { theme: t } = useTheme()
   const { user, refreshProfile } = useAuth() as any
   const [busy, setBusy] = useState(false)
   const url = user?.avatar_url as string | null | undefined
@@ -55,10 +57,10 @@ export function ProfileAvatar({ size = 68, editable, onPress, name, variant = 'u
   }
 
   const face = (
-    <View style={{ width: size, height: size, borderRadius: 99, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <View style={{ width: size, height: size, borderRadius: 99, backgroundColor: t.accentBg, borderWidth: 1, borderColor: t.accentBorder, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       {url
         ? <Image source={{ uri: url }} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
-        : <Text style={{ fontSize: Math.round(size / 3.1), fontWeight: '800', color: '#0F766E' }}>{initialsOf(name ?? user?.full_name)}</Text>}
+        : <Text style={{ fontSize: Math.round(size / 3.1), fontWeight: '800', color: t.accent }}>{initialsOf(name ?? user?.full_name)}</Text>}
       {busy && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#FFFFFF" />

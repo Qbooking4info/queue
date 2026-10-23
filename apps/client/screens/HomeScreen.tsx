@@ -263,14 +263,17 @@ export function HomeScreen({ navigation }: Props) {
           <View style={{ gap: 12 }}>
             <SectionHead title="Services" />
             <QuickRow>
-              <QuickTile icon="calendar" label="Book visit" color="#0E9F8C"
+              {/* Saturated pastels rather than full-strength brand colours: four
+                  solid blocks of primary at this size fight each other and the
+                  hero card above them. */}
+              <QuickTile icon="calendar" label="Book visit" color="#4FD1B0"
                 onPress={() => navigation.navigate('Search')} />
-              <QuickTile icon="videocam" label="Virtual care" color="#3B82F6"
+              <QuickTile icon="videocam" label="Virtual care" color="#7C9BF2"
                 badge={virtualDoctors ? String(virtualDoctors) : null}
                 onPress={() => navigation.navigate('VirtualCare')} />
-              <QuickTile icon="medkit" label="Ambulance" color="#EF4444"
+              <QuickTile icon="medkit" label="Ambulance" color="#F28B82"
                 onPress={() => navigation.navigate('AmbulanceHome')} />
-              <QuickTile icon="heart" label="My care" color="#16A34A"
+              <QuickTile icon="heart" label="My care" color="#6EE7C0"
                 onPress={() => navigation.navigate('MyCare')} />
             </QuickRow>
           </View>
