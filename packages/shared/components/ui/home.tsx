@@ -158,6 +158,58 @@ export function DateTile({ weekday, day, month }: { weekday: string; day: string
 }
 
 /**
+ * A number in the hero's leading slot, where a patient's card shows a date:
+ * how many are waiting, how many jobs are open. Same tile, different payload.
+ */
+export function CountTile({ value, label }: { value: number | string; label: string }) {
+  const { theme: t } = useTheme()
+  const c = heroTones(t.id === 'forest')
+  return (
+    <View style={[hc.date, { backgroundColor: c.tileBg, paddingVertical: 12 }]}>
+      <Text style={[hc.countValue, { color: c.tileInk }]}>{value}</Text>
+      <Text style={[hc.dateMonth, { color: c.tileSub }]}>{label}</Text>
+    </View>
+  )
+}
+
+/**
+ * Four figures in one bordered card, split by hairlines rather than four
+ * separate cards. At this size separate cards read as four things to act on;
+ * these are one glance.
+ */
+export function StatGrid({ items }: {
+  items: { label: string; value: string | number; muted?: boolean; onPress?: () => void }[]
+}) {
+  const { theme: t } = useTheme()
+  return (
+    <View style={[sg.wrap, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
+      {items.map((it, i) => {
+        const Cell: any = it.onPress ? TouchableOpacity : View
+        return (
+          <Cell
+            key={it.label}
+            onPress={it.onPress ? () => { haptics.tap(); it.onPress!() } : undefined}
+            accessibilityRole={it.onPress ? 'button' : undefined}
+            accessibilityLabel={`${it.label}: ${it.value}`}
+            style={[
+              sg.cell,
+              // Hairlines only between cells, never on the card's own edge.
+              i % 2 === 0 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: t.cardBorder },
+              i < items.length - 2 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.cardBorder },
+            ]}
+          >
+            <Text style={[sg.label, { color: t.textMuted }]} numberOfLines={2}>{it.label}</Text>
+            <Text style={[sg.value, { color: it.muted ? t.textMuted : t.textPrimary }]} numberOfLines={1}>
+              {it.value}
+            </Text>
+          </Cell>
+        )
+      })}
+    </View>
+  )
+}
+
+/**
  * The one gradient on the page: whatever matters most right now. An upcoming
  * visit for a patient, the next patient for a doctor, the active job for a
  * crew.
@@ -386,7 +438,8 @@ const hc = StyleSheet.create({
   date: { width: 58, borderRadius: 14, paddingVertical: 9, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.26)' },
   dateWeekday: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: '#8FD9CE' },
   dateDay: { fontSize: 23, fontWeight: '800', color: '#FFFFFF', lineHeight: 27 },
-  dateMonth: { fontSize: 10, fontWeight: '700', color: '#8FD9CE' },
+  dateMonth: { fontSize: 10, fontWeight: '700' },
+  countValue: { fontSize: 30, fontWeight: '800', lineHeight: 34 },
 
   dots: { flexDirection: 'row', gap: 5 },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
@@ -411,6 +464,13 @@ const qt = StyleSheet.create({
     paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderWidth: 2,
   },
   badgeText: { fontSize: 10, fontWeight: '800', color: '#FFFFFF' },
+})
+
+const sg = StyleSheet.create({
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  cell: { width: '50%', paddingVertical: 16, paddingHorizontal: 14, gap: 8, minHeight: 86 },
+  label: { fontSize: 12.5, lineHeight: 16 },
+  value: { fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },
 })
 
 const sh = StyleSheet.create({

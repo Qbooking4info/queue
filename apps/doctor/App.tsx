@@ -124,10 +124,9 @@ function SpecialistTabs() {
     }}>
       <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
-      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
+      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Schedule' }} />
       <DocTab.Screen name="Messages"          component={DoctorMessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
       <DocTab.Screen name="LocumBoard"        component={LocumBoardScreen as any}  options={{ tabBarBadge: openJobs > 0 ? openJobs : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 10, minWidth: 16, height: 16, lineHeight: 15, borderRadius: 8, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'briefcase' : 'briefcase-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
-      <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}  options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,     tabBarLabel: 'Profile' }} />
     </DocTab.Navigator>
   )
 }
@@ -144,6 +143,8 @@ function SpecialistStack() {
       <DocStack.Screen name="Chat"            component={ChatScreen            as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
+      {/* No longer a tab -- reached from the avatar in the top bar. */}
+      <DocStack.Screen name="SpecialistProfile" component={SpecialistProfileScreen as any} />
       <DocStack.Screen name="ConsultationPlan" component={ConsultationPlanScreen as any} />
       <DocStack.Screen name="CarePlanCompose" component={CarePlanComposeScreen as any} />
       <DocStack.Screen name="LocumPost"  component={LocumPostScreen as any} />
