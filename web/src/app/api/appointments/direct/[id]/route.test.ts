@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('server-only', () => ({}))
+
 // Regression for the 2026-10-13 audit M6: approving a direct booking for a slot the
 // doctor already has confirmed must be refused clearly, not 500 or double-book.
 // The uniqueness itself is enforced by appointments_direct_doctor_slot_live; this

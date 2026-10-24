@@ -5,12 +5,13 @@ import { Alert } from '@queue/shared/contexts/AlertContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import { Header, EmptyState, HeaderIconButton } from '@queue/shared/components/ui/v3'
+import { Header, EmptyState, HeaderIconButton, PrimaryButton } from '@queue/shared/components/ui/v3'
+import { FollowUpModal } from '@queue/shared/components/FollowUpModal'
 import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { setConsultStatus, saveConsultVitalsAndNotes } from '@queue/shared/lib/api'
+import { setConsultStatus, saveConsultVitalsAndNotes, bookFollowUp } from '@queue/shared/lib/api'
 import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
@@ -89,6 +90,7 @@ function InProgressPulse() {
 export function PatientConsultScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const { appointmentId } = route.params
+  const [showFollowUp, setShowFollowUp] = useState(false)
   const [appt,    setAppt]    = useState<ApptFull | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
@@ -327,6 +329,43 @@ export function PatientConsultScreen({ navigation, route }: Props) {
                   {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Emergency transfer -- a doctor mid-consult realising the patient
+                  needs moving somewhere with more capability than a referral
+                  note implies. */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RequestAmbulance', {
+                  patientId: appt.patient_id,
+                  patientName: patient?.full_name ?? 'Patient',
+                  patientPhone: patient?.phone ?? null,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                <Ionicons name="medkit-outline" size={15} color={t.danger} />
+                <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>Request Ambulance</Text>
+              </TouchableOpacity>
+
+              {/* Books the patient's next visit at the same hospital -- date only,
+                  no slot to pick. The route re-checks the caller is the treating
+                  doctor on this appointment. */}
+              <TouchableOpacity
+                onPress={() => setShowFollowUp(true)}
+                style={[st.referBtn, { backgroundColor: t.infoBg, borderColor: t.infoBorder }]}>
+                <Ionicons name="calendar-outline" size={15} color={t.info} />
+                <Text style={{ color: t.info, fontSize: 13, fontWeight: '700' }}>Book Follow-up</Text>
+              </TouchableOpacity>
+
+              {/* The care plan is written here now -- the hospital apps no
+                  longer offer it. Works the same for a hospital-linked or an
+                  independent consultation; the server resolves which. */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('CarePlanCompose', {
+                  patientId: appt.patient_id,
+                  patientName: patient?.full_name,
+                })}
+                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+                <Ionicons name="checkbox-outline" size={15} color={t.accent} />
+                <Text style={{ color: t.accent, fontSize: 13, fontWeight: '700' }}>Care plan</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -396,6 +435,23 @@ export function PatientConsultScreen({ navigation, route }: Props) {
             <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
               <Ionicons name="checkmark-circle" size={20} color={t.accent} />
               <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
+            </View>
+          )}
+
+          {/* The call-end flow already offers this, but a doctor who skipped it
+              then -- or whose call dropped and left the visit stuck -- still needs
+              a way in. Virtual only: in-person visits keep the plain notes field. */}
+          {isDone && isVirtual && (
+            <View style={st.pad}>
+              <PrimaryButton
+                label="Consultation summary"
+                variant="ghost"
+                icon="document-text-outline"
+                onPress={() => navigation.navigate('ConsultationPlan', {
+                  appointmentId,
+                  patientName: patient?.full_name,
+                })}
+              />
             </View>
           )}
 
@@ -490,6 +546,17 @@ export function PatientConsultScreen({ navigation, route }: Props) {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {showFollowUp && (
+        <FollowUpModal
+          patientName={patient?.full_name}
+          onClose={() => setShowFollowUp(false)}
+          onConfirm={async d => {
+            const res = await bookFollowUp(appt.id, d)
+            return res.ok ? null : res.error
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   )
 }

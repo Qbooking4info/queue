@@ -7,7 +7,8 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
-import { Header, KpiCard, EmptyState, Card, HeaderTail } from '@queue/shared/components/ui/v3'
+import { KpiCard, EmptyState, Card } from '@queue/shared/components/ui/v3'
+import { TopBar, TopBarButton } from '@queue/shared/components/ui/home'
 import {
   getRangeStats, getTodayAppointments, getDoctorsOnDuty, fmtLocalDate,
   type RangeStats, type AdminAppointmentRow, type AdminDoctorRow } from '@queue/shared/lib/admin-api'
@@ -99,8 +100,13 @@ export function AdminDashboardScreen({ navigation }: { navigation: any }) {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Today" subtitle={`${isClinicScoped ? 'Clinic' : 'Hospital'} overview · ${staffProfile?.name ?? ''}`}
-        right={<ProfileAvatar size={44} name={staffProfile?.name} onPress={() => navigation.navigate('StaffMore')} />} />
+      <TopBar
+        avatar={<ProfileAvatar size={40} name={staffProfile?.name} onPress={() => navigation.navigate('StaffMore')} />}
+        eyebrow={new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}
+        title={staffProfile?.name ? `${isClinicScoped ? 'Clinic' : 'Hospital'} · ${staffProfile.name}` : 'Today'}
+        onAvatarPress={() => navigation.navigate('StaffMore')}
+        right={<TopBarButton icon="ellipsis-horizontal" label="More" onPress={() => navigation.navigate('StaffMore')} />}
+      />
 
       {loading ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
@@ -112,7 +118,6 @@ export function AdminDashboardScreen({ navigation }: { navigation: any }) {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
-          <HeaderTail />
           {/* Stats grid */}
           {(inbound > 0 || approvals > 0 || unreadMessages > 0) && (
             <View style={{ gap: 10, marginBottom: 14 }}>

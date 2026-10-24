@@ -16,8 +16,6 @@ const COMMANDS: { label: string; href: string; roles: string[] }[] = [
   { label: 'Live Queue',         href: '/dashboard/queue',        roles: ['hospital_admin', 'clinic_admin', 'front_desk', 'doctor'] },
   { label: 'Patients',           href: '/dashboard/patients',     roles: ['hospital_admin', 'clinic_admin', 'front_desk'] },
   { label: 'Virtual Care',       href: '/dashboard/virtual',      roles: ['hospital_admin', 'clinic_admin'] },
-  { label: 'Care Plans',         href: '/dashboard/care-plans',   roles: ['hospital_admin', 'clinic_admin'] },
-  { label: 'New care plan',      href: '/dashboard/care-plans?new=1', roles: ['hospital_admin', 'clinic_admin'] },
   { label: 'Messages',           href: '/dashboard/messages',     roles: ['hospital_admin', 'clinic_admin', 'front_desk'] },
   { label: 'Ambulance desk',     href: '/dashboard/ambulances',   roles: ['hospital_admin', 'front_desk'] },
   { label: 'Schedule',           href: '/dashboard/schedule',     roles: ['hospital_admin', 'clinic_admin', 'doctor'] },

@@ -96,7 +96,6 @@ export default function PatientsPage() {
                     <span style={{ display: 'inline-flex', gap: 6 }}>
                       <Button onClick={() => setViewing(p)}>Record</Button>
                       <Button onClick={() => message(p)} disabled={busy === p.id}>{busy === p.id ? 'Opening…' : 'Message'}</Button>
-                      <Button variant="link" onClick={() => router.push(`/dashboard/care-plans?new=1&patient=${p.id}&name=${encodeURIComponent(p.name)}`)}>Care plan</Button>
                     </span>
                   </td>
                 </tr>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
@@ -418,7 +419,7 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           {/* Doctor / placeholder */}
           <View style={st.doctorRow}>
             {appt.doctor ? (
-              <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={52} />
+              <EntityAvatar size={52} kind="doctor" label={appt.doctor ?? undefined} />
             ) : (
               <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
                 <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
@@ -549,11 +550,44 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
             </Section>
           )}
 
+          {/* What the doctor recorded for this visit -- the patient-facing half of
+              the doctor app's Consultation summary screen. Completed visits only:
+              a plan on a visit still in progress is not final yet. Multi-line
+              blocks, not InfoRow, because these are paragraphs rather than values. */}
+          {appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).prescription || (raw as any).treatment_plan) && (
+            <Section title="Consultation Plan">
+              {(raw as any).diagnosis && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Diagnosis</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).diagnosis}</Text>
+                </View>
+              )}
+              {(raw as any).investigations && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Investigations</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).investigations}</Text>
+                </View>
+              )}
+              {(raw as any).prescription && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Prescription</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).prescription}</Text>
+                </View>
+              )}
+              {(raw as any).treatment_plan && (
+                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
+                  <Text style={[st.planLabel, { color: t.textMuted }]}>Plan</Text>
+                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).treatment_plan}</Text>
+                </View>
+              )}
+            </Section>
+          )}
+
           {/* Doctor info — only show if a doctor was assigned */}
           {appt.doctor ? (
             <Section title="Your doctor">
               <View style={[st.doctorCard, { borderBottomColor: t.cardBorder }]}>
-                <Avatar initials={appt.doctorAvatar ?? 'DR'} bg="#1A3A28" size={44} />
+                <EntityAvatar size={44} kind="doctor" label={appt.doctor ?? undefined} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.dcName, { color: t.textPrimary }]}>{appt.doctor}</Text>
                   <Text style={[st.dcSpec, { color: t.textMuted }]}>{appt.spec} · {appt.hospital}</Text>
@@ -802,6 +836,9 @@ const DEFAULT_APPT = {
 }
 
 const st = StyleSheet.create({
+  planBlock: { paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, gap: 4 },
+  planLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  planValue: { fontSize: 15, lineHeight: 21 },
   safe:               { flex: 1 },
   header:             { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   backBtn:            { padding: 4 },

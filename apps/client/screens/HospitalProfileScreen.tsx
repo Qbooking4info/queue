@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import { View, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
@@ -62,7 +63,8 @@ export function HospitalProfileScreen({ navigation, route }: Props) {
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: t.canvasBg, paddingTop: 16 }]}>
         <View style={styles.heroRow}>
-          <Avatar initials={hospital.avatar} bg={hospital.avatarBg} size={58} />
+          <EntityAvatar size={58} kind="hospital" uri={hospital.logoUrl} label={hospital.name}
+            hospital={{ type: hospital.hospitalType, ownership: hospital.ownership, clinicModel: hospital.clinic_model }} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={[styles.hospitalName, { color: t.textPrimary }]}>{hospital.name}</Text>

@@ -46,11 +46,15 @@ function assertOwnHospital(caller: { role: string; hospitalId?: string }, hospit
 // /api/payments/subaccount, which resolves the account name with Paystack first.
 const PAYOUT_FIELDS = ['paystack_subaccount_code', 'paystack_bank_name', 'paystack_account_last4'] as const
 
+// Ambulance service settings (private_fleet/service_radius_m/service_hours_247)
+// moved off this table entirely -- they live on ambulance_providers now and
+// are edited from the Ambulance app (see PATCH /api/ambulances/fleet/settings),
+// since a hospital-owned fleet is managed by its own ambulance_provider_admins
+// account, not through this hospital settings page.
 const EDITABLE_SETTINGS = [
   'accepts_virtual', 'emergency_hours', 'is_24_hours', 'daily_booking_limit',
   'approval_mode', 'requires_referral', 'opd_fee', 'latitude', 'longitude',
-  'sms_reminders', 'email_reminders', 'ambulance_private_fleet',
-  'ambulance_service_radius_m', 'ambulance_service_hours_247',
+  'sms_reminders', 'email_reminders',
 ] as const
 
 // GET/PATCH /api/hospitals/[id]/settings -- replaces admin-api.ts's

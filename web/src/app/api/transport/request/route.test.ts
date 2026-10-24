@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('server-only', () => ({}))
+
+// Not a staff session: the route falls through to the patient (Bearer) path.
+vi.mock('@/lib/supabase/auth-server', async () => {
+  const { NextResponse } = await import('next/server')
+  return { requireRole: vi.fn(async () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })) }
+})
+
 const runDispatchRoundMock = vi.fn(() => Promise.resolve())
 vi.mock('@/lib/dispatch/engine', () => ({ runDispatchRound: () => runDispatchRoundMock() }))
 

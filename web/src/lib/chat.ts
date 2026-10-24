@@ -10,7 +10,25 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
 // Untyped: the chat tables and RPCs aren't in the generated web types.
-const supabase = createClient() as unknown as SupabaseClient
+//
+// Built on first use, not at module load. createClient() reads
+// NEXT_PUBLIC_SUPABASE_PUBLIC_KEY and throws when it is absent, and this module
+// reaches the dashboard through Shell.tsx -- so at build time, where that env
+// var need not exist, a module-scope client failed prerendering for every page
+// under /dashboard rather than for the one call that needed it.
+let _supabase: SupabaseClient | null = null
+function sb(): SupabaseClient {
+  if (!_supabase) _supabase = createClient() as unknown as SupabaseClient
+  return _supabase
+}
+
+const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const c = sb() as unknown as Record<string | symbol, unknown>
+    const value = c[prop]
+    return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(c) : value
+  },
+})
 
 export type MemberRole = 'patient' | 'doctor' | 'hospital' | 'crew'
 /** Kept for screens that still say which app they're in. */

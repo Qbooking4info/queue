@@ -449,10 +449,9 @@ export default function SettingsPage() {
                 <Toggle value={ambulance247} onChange={() => setAmbulance247(v => !v)}
                   label="24/7 Dispatch"
                   sub="Off means your fleet only dispatches during your hospital's operating hours above" />
-                <div style={{ paddingTop: 10 }}>
-                  <a href="/dashboard/ambulances/fleet" style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
-                    Manage fleet, units &amp; crew &rarr;
-                  </a>
+                <div style={{ paddingTop: 10, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
+                  Units, crew and shifts are managed in the Queue Ambulance app by a
+                  provider owner or admin — including for a hospital-owned fleet.
                 </div>
               </SectionCard>
             )}

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   let query = db
     .from('doctors')
     .select(
-      'user_id, full_name, title, level, avatar_url, ' +
+      'user_id, full_name, title, level, avatar_url, avg_rating, review_count, ' +
       'hospital:hospitals!doctors_hospital_id_fkey(id, name), ' +
       'specialty:specialties!doctors_specialty_id_fkey(name, icon)',
     )
@@ -42,13 +42,16 @@ export async function GET(req: NextRequest) {
 
   const [{ data: profiles }, { data: users }] = await Promise.all([
     db.from('doctor_profiles')
-      .select('user_id, bio, qualification, years_experience, virtual_fee, home_visit_fee, accepts_direct_virtual, accepts_direct_home_visit, show_phone_to_patients')
+      .select('user_id, bio, qualification, years_experience, virtual_fee, home_visit_fee, accepts_direct_virtual, accepts_direct_home_visit, show_phone_to_patients, is_paused')
       .in('user_id', userIds.length ? userIds : emptyIds),
-    db.from('users').select('id, phone').in('id', userIds.length ? userIds : emptyIds),
+    db.from('users').select('id, phone, gender').in('id', userIds.length ? userIds : emptyIds),
   ])
 
   const profileByUser = new Map((profiles ?? []).map((p: any) => [p.user_id, p]))
   const phoneByUser = new Map((users ?? []).map((u: any) => [u.id, u.phone as string | null]))
+  // Only to pick the fallback avatar when a doctor has uploaded no photo. Joined
+  // here because patients cannot read another person's users row themselves.
+  const genderByUser = new Map((users ?? []).map((u: any) => [u.id, u.gender as string | null]))
 
   // One entry per doctor identity -- hospitals aggregated, not one row per link.
   const byUser = new Map<string, any>()
@@ -64,8 +67,11 @@ export async function GET(req: NextRequest) {
         userId: r.user_id,
         fullName: r.full_name,
         avatarUrl: r.avatar_url,
+        gender: genderByUser.get(r.user_id) ?? null,
         title: r.title,
         level: r.level,
+        avgRating: r.avg_rating,
+        reviewCount: r.review_count,
         specialty: r.specialty ?? null,
         hospitals: hospitalEntry ? [hospitalEntry] : [],
       })
@@ -74,15 +80,21 @@ export async function GET(req: NextRequest) {
 
   let doctors = Array.from(byUser.values()).map(d => {
     const profile: any = profileByUser.get(d.userId)
+    // Folding is_paused in here (rather than exposing it separately) means the
+    // visitType filter below, and every client that reads acceptsDirectVirtual/
+    // HomeVisit, correctly treats a resting doctor as unbookable with no other
+    // code needing to know is_paused exists.
+    const acceptsDirectVirtual = !profile?.is_paused && (profile?.accepts_direct_virtual ?? false)
+    const acceptsDirectHomeVisit = !profile?.is_paused && (profile?.accepts_direct_home_visit ?? false)
     return {
       ...d,
       bio: profile?.bio ?? null,
       qualification: profile?.qualification ?? null,
       yearsExperience: profile?.years_experience ?? null,
-      virtualFee: profile?.accepts_direct_virtual ? profile.virtual_fee : null,
-      homeVisitFee: profile?.accepts_direct_home_visit ? profile.home_visit_fee : null,
-      acceptsDirectVirtual: profile?.accepts_direct_virtual ?? false,
-      acceptsDirectHomeVisit: profile?.accepts_direct_home_visit ?? false,
+      virtualFee: acceptsDirectVirtual ? profile.virtual_fee : null,
+      homeVisitFee: acceptsDirectHomeVisit ? profile.home_visit_fee : null,
+      acceptsDirectVirtual,
+      acceptsDirectHomeVisit,
       phone: profile?.show_phone_to_patients ? (phoneByUser.get(d.userId) ?? null) : null,
     }
   })

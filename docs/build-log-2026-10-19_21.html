@@ -1,0 +1,659 @@
+<title>Queue October Build Log</title>
+
+<style>
+  /* Chronological rail: the content is genuinely a sequence, so the spine is
+     the date and each entry hangs off it. Ink neutrals biased slightly teal to
+     sit in the product's own world; one teal accent, semantic colour kept
+     separate for added / schema / risk. */
+  :root {
+    --bg:        #F7F9F9;
+    --surface:   #FFFFFF;
+    --ink:       #0E1A1C;
+    --ink-soft:  #44585B;
+    --ink-faint: #76888B;
+    --rule:      #DCE6E5;
+    --accent:    #0F766E;
+    --accent-bg: #E6F4F2;
+    --added:     #15803D;
+    --removed:   #B4452F;
+    --schema:    #7C3AED;
+    --warn:      #B45309;
+
+    --display: "Newsreader", Georgia, "Times New Roman", serif;
+    --body:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #0B1416;
+      --surface:   #121F21;
+      --ink:       #E7EFEE;
+      --ink-soft:  #AFC0C1;
+      --ink-faint: #7E9294;
+      --rule:      #223235;
+      --accent:    #43C4B5;
+      --accent-bg: #10302D;
+      --added:     #5BBE7F;
+      --removed:   #E0836E;
+      --schema:    #B191F2;
+      --warn:      #DDA14B;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #0B1416;
+    --surface:   #121F21;
+    --ink:       #E7EFEE;
+    --ink-soft:  #AFC0C1;
+    --ink-faint: #7E9294;
+    --rule:      #223235;
+    --accent:    #43C4B5;
+    --accent-bg: #10302D;
+    --added:     #5BBE7F;
+    --removed:   #E0836E;
+    --schema:    #B191F2;
+    --warn:      #DDA14B;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+    padding-block: 48px 72px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  /* ── masthead ───────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(34px, 7vw, 52px);
+    line-height: 1.08;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0 0 14px;
+  }
+  .standfirst {
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0 0 32px;
+  }
+
+  /* ── figures ────────────────────────────────────────────────── */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 44px;
+  }
+  .fig { background: var(--surface); padding: 16px 14px; }
+  .fig dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+  .fig dd {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 27px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .fig dd span { font-size: 13px; font-family: var(--body); color: var(--ink-faint); }
+  .fig dd.plus  { color: var(--added); }
+  .fig dd.minus { color: var(--removed); }
+
+  /* ── sections ───────────────────────────────────────────────── */
+  h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: -.01em;
+    margin: 0 0 6px;
+    padding-top: 34px;
+    border-top: 1px solid var(--rule);
+  }
+  .section-note {
+    color: var(--ink-faint);
+    font-size: 13.5px;
+    margin: 0 0 24px;
+    max-width: 62ch;
+  }
+
+  /* ── day rail ───────────────────────────────────────────────── */
+  .day { margin-bottom: 34px; }
+  .day-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .day-date {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-bg);
+    padding: 4px 9px;
+    border-radius: 5px;
+  }
+  .day-sub { color: var(--ink-faint); font-size: 13.5px; }
+
+  .entry {
+    position: relative;
+    padding-left: 22px;
+    padding-bottom: 26px;
+    border-left: 2px solid var(--rule);
+  }
+  .entry:last-child { border-left-color: transparent; padding-bottom: 6px; }
+  .entry::before {
+    content: "";
+    position: absolute;
+    left: -5px; top: 7px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .entry.is-infra::before { background: var(--warn); }
+  .entry.is-schema::before { background: var(--schema); }
+
+  .entry-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .sha {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .entry h3 {
+    font-size: 16.5px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -.005em;
+  }
+  .entry p { margin: 0 0 10px; color: var(--ink-soft); max-width: 64ch; }
+  .entry p:last-child { margin-bottom: 0; }
+
+  ul.points { margin: 0 0 10px; padding-left: 18px; color: var(--ink-soft); max-width: 64ch; }
+  ul.points li { margin-bottom: 5px; }
+  ul.points li::marker { color: var(--ink-faint); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--accent-bg);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 99px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .tag.added   { color: var(--added); }
+  .tag.removed { color: var(--removed); }
+  .tag.schema  { color: var(--schema); }
+  .tag.infra   { color: var(--warn); }
+
+  /* ── tables ─────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; margin-bottom: 26px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 440px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px 9px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td code { background: none; padding: 0; color: var(--ink-soft); }
+
+  /* ── risk panel ─────────────────────────────────────────────── */
+  .risk {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .risk h3 { margin: 0 0 5px; font-size: 15.5px; font-weight: 600; }
+  .risk p { margin: 0; color: var(--ink-soft); font-size: 14px; max-width: 64ch; }
+
+  footer {
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    line-height: 1.7;
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<div class="wrap">
+
+  <p class="eyebrow">Queue · 19–21 October 2026</p>
+  <h1>Three days on the Queue platform</h1>
+  <p class="standfirst">
+    A production outage traced to rotated Supabase keys, four patient and doctor
+    features shipped, ambulance and care-plan ownership moved to the apps that
+    should own them, and a new locum job board. Everything below is on
+    <code>main</code>.
+  </p>
+
+  <dl class="figures">
+    <div class="fig"><dt>Commits</dt><dd>8</dd></div>
+    <div class="fig"><dt>Files touched</dt><dd>54</dd></div>
+    <div class="fig"><dt>Added</dt><dd class="plus">3,013<span> lines</span></dd></div>
+    <div class="fig"><dt>Removed</dt><dd class="minus">2,398<span> lines</span></dd></div>
+    <div class="fig"><dt>Migrations</dt><dd>3</dd></div>
+    <div class="fig"><dt>Pushes to main</dt><dd>2</dd></div>
+  </dl>
+
+  <h2>What happened, in order</h2>
+  <p class="section-note">
+    Three working days. The first was spent on an outage, the second and third on
+    features. Entries marked in amber are infrastructure rather than code; purple
+    marks a schema change applied to the production database.
+  </p>
+
+  <!-- ── 19 Oct ─────────────────────────────────────────────── -->
+  <div class="day">
+    <div class="day-head">
+      <span class="day-date">Sun 19 Oct</span>
+      <span class="day-sub">Outage diagnosis and recovery · no commits</span>
+    </div>
+
+    <div class="entry is-infra">
+      <div class="entry-head">
+        <span class="tag infra">Infra</span>
+        <h3>Every app was cut off from its own database</h3>
+      </div>
+      <p>
+        Reported as "I can't find what I have in my database on the app". The data was
+        intact; the apps could not authenticate to read it. Every request was coming
+        back <code>401 — Legacy API keys are disabled</code>.
+      </p>
+      <p>
+        Supabase disabled the project's legacy API keys on 13 October at 08:39 UTC.
+        The browser-facing half had already been migrated to a publishable key, but
+        the server-side <code>SUPABASE_SERVICE_ROLE_KEY</code> was still a legacy JWT.
+        Every web API route uses that key, and all four mobile apps fetch their data
+        through those routes, so the whole query layer failed at the door.
+      </p>
+      <p>
+        Fixed by replacing it with a new <code>sb_secret_</code> key. The dashboard
+        offers to re-enable legacy keys, which would have fixed this in one click and
+        must not be used: a <code>service_role</code> key leaked into a public repo on
+        26 July, and disabling legacy keys is the only thing keeping it dead.
+      </p>
+      <ul class="points">
+        <li>98 users, 95 appointments, 33 doctors and 54 transport requests confirmed present once access was restored.</li>
+        <li>Two dead legacy JWTs still sit in <code>web/.env.local</code>; one carries a <code>NEXT_PUBLIC_</code> prefix, which would inline it into the browser bundle.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 20 Oct ─────────────────────────────────────────────── -->
+  <div class="day">
+    <div class="day-head">
+      <span class="day-date">Mon 20 Oct</span>
+      <span class="day-sub">Storage policy repair</span>
+    </div>
+
+    <div class="entry is-schema">
+      <div class="entry-head">
+        <span class="tag schema">Schema</span>
+        <h3>The hospitals storage bucket accepted nothing</h3>
+      </div>
+      <p>
+        <code>20261020000001_hospital_logo_uploads.sql</code>. The bucket existed and
+        was public-read, but had no policies at all on <code>storage.objects</code>,
+        which under row-level security means every authenticated write was denied. No
+        hospital could ever have uploaded a logo.
+      </p>
+      <ul class="points">
+        <li>Writes limited to an active owner or admin of that specific hospital.</li>
+        <li>A trigger restricts a client-side update to <code>logo_url</code> and <code>cover_url</code>, so owners do not gain blanket write access to pricing or approval mode through this route.</li>
+        <li>Front desk deliberately excluded: they act for the hospital daily, but changing its public identity is a different kind of permission.</li>
+      </ul>
+      <p>
+        Verified against production: an owner passes for their own hospital, fails for
+        another's, front desk fails, and the existing service-role settings path is
+        unaffected.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── 21 Oct ─────────────────────────────────────────────── -->
+  <div class="day">
+    <div class="day-head">
+      <span class="day-date">Tue 21 Oct</span>
+      <span class="day-sub">8 commits · 2 pushes to main</span>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">0f93f8e</span>
+        <h3>Patient home: hero carousel</h3>
+      </div>
+      <p>
+        "No upcoming visits" was a single thin row occupying the most prominent slot on
+        the page. It becomes a swipeable band of cards led by a booking hero with the
+        search field in it.
+      </p>
+      <p>
+        Slides are built from data the screen already loads and appear only when they
+        have something true to say: virtual care carries the live online-doctor count
+        and hides when nobody is online. A carousel padded with dead slides would be
+        worse than the row it replaced.
+      </p>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">6ad16e4</span>
+        <h3>Find care rebuilt around hospitals and independent doctors</h3>
+      </div>
+      <p>
+        The Hospitals / Independent Doctors split previously existed only after picking
+        a specialty. It now governs the whole page, so a patient can reach an
+        independent doctor directly.
+      </p>
+      <ul class="points">
+        <li>Five filter pills became one dropdown, with different options per side: "Open now" and "Accepts HMO" describe a facility and mean nothing for a solo doctor.</li>
+        <li>Hospitals sort nearest first; those without coordinates sort last rather than disappearing, and the count claims "nearest first" only when GPS actually resolved.</li>
+        <li>The map toggle is hospitals-only, since independent doctors carry no coordinates.</li>
+      </ul>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">a901756</span>
+        <span class="tag schema">Schema</span>
+        <h3>Doctor photos and hospital logos reach patients</h3>
+      </div>
+      <p>
+        The doctor profile already had an editable avatar, but an uploaded photo never
+        reached a patient, for two separate reasons. It was written only to
+        <code>users.avatar_url</code>, while patients read <code>doctors.avatar_url</code>
+        and cannot select another person's user row at all. And nothing rendered an
+        image anyway: the avatar component only ever drew initials.
+      </p>
+      <ul class="points">
+        <li>Doctor uploads now write <code>doctors.avatar_url</code> through <code>PATCH /api/doctors/me</code>, because that table has read policies only. The route accepts only URLs inside the project's own avatars bucket.</li>
+        <li>Hospital Settings gained a logo tile.</li>
+      </ul>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">115432a</span>
+        <span class="tag removed">Removed</span>
+        <h3>Ambulance management confined to the ambulance app</h3>
+      </div>
+      <p>
+        Doctors, hospitals and patients book an ambulance and track the one coming to
+        them. Units, crew, shifts and coverage are the operator console's job, including
+        for a hospital that owns its own fleet.
+      </p>
+      <p>
+        Three hospital screens and two web pages removed. The Ambulance desk and Alerts
+        were kept: receiving a patient being brought to you, and feedback on a request
+        you made, are not managing an ambulance.
+      </p>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">db740bb</span>
+        <span class="tag schema">Schema</span>
+        <h3>Care plans authored in the consultation</h3>
+      </div>
+      <p>
+        A care plan is now written by the doctor seeing the patient, at a hospital or
+        booked directly, and nowhere else. Removed from the hospital app and the web
+        dashboard; added to the doctor app as a new compose screen reachable from both
+        halves of a consultation.
+      </p>
+      <p>
+        <code>care_plans.hospital_id</code> lost its <code>NOT NULL</code>: an
+        independent doctor has no hospital, so that case could not be represented. The
+        read policy was checked first — a patient reaches their plans through
+        <code>patient_id</code>, so a plan with no hospital stays visible to them.
+      </p>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">d1964e3</span>
+        <h3>Circular avatars that say what the thing is</h3>
+      </div>
+      <p>
+        Listings showed initials in a rounded square — "DMH" against Divine Mercy
+        Hospital, which tells a patient nothing. An uploaded logo or photo now wins, and
+        without one the fallback is an icon carrying real information, in a circular
+        frame.
+      </p>
+      <ul class="points">
+        <li>Hospitals take their icon from <code>type</code> and their colour from <code>ownership</code>. Shape carries the meaning and colour reinforces it, so the distinction survives dark mode and a colour-blind viewer.</li>
+        <li>Doctors get a gendered or neutral person icon. Nothing guesses gender from a name.</li>
+        <li>Applied across seven listing surfaces.</li>
+      </ul>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">10e0f79</span>
+        <span class="tag added">New feature</span>
+        <span class="tag schema">Schema</span>
+        <h3>Locum board</h3>
+      </div>
+      <p>
+        A doctor posts a locum shift or permanent position at a hospital they are
+        attached to. Every doctor in that state is notified and can accept the rate,
+        counter with their own, or ignore it. The poster sees who replied, picks one,
+        and only then gets their phone number.
+      </p>
+      <ul class="points">
+        <li><strong>Money is computed in the database.</strong> <code>hours</code> and <code>total_amount</code> are generated columns, so a client cannot post ₦5,000/hr with a ₦500,000 total. The expression wraps past midnight: 20:00 to 08:00 is 12 hours.</li>
+        <li><strong>Targeting needed fixing to work at all.</strong> Every doctor's personal state is unset, so "doctors in that state" would have reached nobody. A doctor now counts as being in their own state and in the state of every hospital they are attached to, which reaches 25 of 33 doctors.</li>
+        <li><strong>Ranking is cheapest first, earliest first among equals</strong> — so an accept at the asking price always outranks a counter above it. The rate is set server-side; a client that could set it could buy the top of the list.</li>
+        <li>Responders see only their own reply, so the board cannot be used to undercut. Phone numbers release on selection only, and the doctor is notified at that moment.</li>
+      </ul>
+      <p>
+        Exercised against the live database before shipping: a 08:00–17:00 shift at
+        ₦5,000/hr produced 9 hours and ₦45,000, two doctors responded, and the list
+        ranked the ₦5,000 accept above the ₦7,500 counter.
+      </p>
+    </div>
+
+    <div class="entry">
+      <div class="entry-head">
+        <span class="sha">6dc550e</span>
+        <h3>Jobs tab in the doctor bottom bar</h3>
+      </div>
+      <p>
+        The board moved from behind Profile to a tab between Messages and Profile,
+        badged with the number of open shifts in the doctor's state they have not
+        answered. The badge polls and refreshes when the app returns to the foreground.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── schema ─────────────────────────────────────────────── -->
+  <h2>Database changes applied to production</h2>
+  <p class="section-note">
+    All three were applied and verified against the live project during the work, not
+    deferred to a deploy. Rolling back a commit would leave its schema change in place.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Migration</th><th>Change</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>20261020000001</code></td>
+          <td>Storage policies on the <code>hospitals</code> bucket, plus a column-scoping trigger</td>
+          <td>The bucket had no policies, so every upload was denied</td>
+        </tr>
+        <tr>
+          <td><code>20261021000001</code></td>
+          <td><code>care_plans.hospital_id</code> made nullable</td>
+          <td>An independent doctor has no hospital to attach a plan to</td>
+        </tr>
+        <tr>
+          <td><code>20261021000002</code></td>
+          <td>New <code>locum_jobs</code> and <code>locum_responses</code> tables</td>
+          <td>The locum board, with generated money columns and deny-all RLS</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── surface inventory ──────────────────────────────────── -->
+  <h2>Surfaces added and removed</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Kind</th><th>Added</th><th>Removed</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Screens &amp; components</td>
+          <td class="num">7</td>
+          <td class="num">4</td>
+        </tr>
+        <tr>
+          <td>Web dashboard pages</td>
+          <td class="num">0</td>
+          <td class="num">5</td>
+        </tr>
+        <tr>
+          <td>API routes</td>
+          <td class="num">4</td>
+          <td class="num">0</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="section-note">
+    New: the home carousel, the care-plan composer, the entity avatar, the locum board,
+    post and job screens, and the open-jobs hook. Removed: hospital ambulance fleet,
+    unit schedule and coverage screens, the hospital care plans screen, and the web
+    dashboard's ambulance fleet, ambulance coverage and care-plan pages.
+  </p>
+
+  <!-- ── risks ──────────────────────────────────────────────── -->
+  <h2>Open items</h2>
+  <p class="section-note">
+    None of these block the work above, and all four predate it or were surfaced by it.
+  </p>
+
+  <div class="risk">
+    <h3>The Vercel build on main will fail</h3>
+    <p>
+      Five API routes build a service-role client at module scope, which kills the
+      build when <code>SUPABASE_SERVICE_ROLE_KEY</code> is absent from the environment.
+      Setting it in Vercel fixes production, which is still serving 401s; making those
+      clients lazy would stop a missing variable taking the whole deployment down.
+    </p>
+  </div>
+
+  <div class="risk">
+    <h3>18 local migrations are not on the production database</h3>
+    <p>
+      Including NDPR mechanics, retention purge, signup verification and the ambulance
+      provider tables. Fourteen further migrations exist on the remote with no local
+      file, applied directly on 13 October. Some backend now on <code>main</code>
+      depends on the missing ones. This divergence deserves an audit before production
+      is trusted.
+    </p>
+  </div>
+
+  <div class="risk">
+    <h3>Two hospital-owned ambulance fleets have no operator account</h3>
+    <p>
+      Queue Hospital Ambulance Fleet and Queue OPD Ambulance Fleet hold three units
+      between them and no <code>ambulance_provider_admins</code> row, so since the
+      management move nobody can take those units on duty or assign crew. Two rows would
+      close it.
+    </p>
+  </div>
+
+  <div class="risk">
+    <h3>Pull request #6 is still open and misleading</h3>
+    <p>
+      It targets the abandoned <code>feat/standalone-ambulance-app</code> branch, whose
+      UI half was deliberately dropped when the v3.1 design superseded it. Worth closing
+      before someone merges it.
+    </p>
+  </div>
+
+  <footer>
+    Queue · main at 6dc550e · generated 21 October 2026<br>
+    Period covered: 19–21 October 2026. Figures from <code>git log --since="3 days ago"</code>.
+  </footer>
+
+</div>

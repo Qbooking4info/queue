@@ -21,6 +21,7 @@ interface Props { navigation: any }
 
 interface DirectAppt {
   id: string
+  patient_id: string
   appointment_date: string
   start_time: string
   type: string
@@ -47,7 +48,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
     setLoading(true)
     const { data } = await supabase
       .from('appointments')
-      .select('id, appointment_date, start_time, type, status, approval_status, reason, home_visit_address, patient:users!appointments_patient_id_fkey(full_name, phone)')
+      .select('id, patient_id, appointment_date, start_time, type, status, approval_status, reason, home_visit_address, patient:users!appointments_patient_id_fkey(full_name, phone)')
       .eq('doctor_user_id', user.id)
       .order('appointment_date', { ascending: true })
       .order('start_time', { ascending: true })
@@ -104,6 +105,7 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
                 onComplete={() => act(a.id, { action: 'complete' })}
                 onCancel={reason => act(a.id, { action: 'cancel', reason })}
                 onJoinCall={() => navigation.navigate('DoctorVideoCall', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
+                onCarePlan={() => navigation.navigate('CarePlanCompose', { patientId: a.patient_id, patientName: a.patient?.full_name })}
               />
             ))}
           </ScrollView>
@@ -113,10 +115,11 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
   )
 }
 
-function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall }: {
+function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall, onCarePlan }: {
   appt: DirectAppt; theme: any; busy: boolean
   onApprove: () => void; onReject: (reason: string) => void; onStart: () => void
   onComplete: () => void; onCancel: (reason: string) => void; onJoinCall: () => void
+  onCarePlan: () => void
 }) {
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
@@ -206,6 +209,12 @@ function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComple
           )}
           {appt.status === 'in_progress' && appt.type === 'home_visit' && (
             <ActionBtn label="Mark Completed" theme={t} primary disabled={busy} onPress={onComplete} />
+          )}
+          {/* The independent half of "a doctor seeing a patient". Offered once
+              the visit is under way or done -- there is nothing to plan for a
+              booking that has not happened yet. */}
+          {(appt.status === 'in_progress' || appt.status === 'completed') && (
+            <ActionBtn label="Care plan" theme={t} disabled={busy} onPress={onCarePlan} />
           )}
         </View>
       )}

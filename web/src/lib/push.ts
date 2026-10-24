@@ -7,6 +7,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // credential, and a network error all used to look identical to success.
 // Clears the token when Expo reports the device is gone, so a dead token
 // doesn't get retried on every future notification.
+//
+// Returns whether the push was actually accepted. Callers that record a delivery
+// channel need that: writing down "push" for a send that failed is the same
+// swallow-everything problem this function was written to end, moved up a layer.
 export async function sendExpoPush(
   db: ReturnType<typeof createAdminClient>,
   userId: string,
@@ -18,7 +22,7 @@ export async function sendExpoPush(
   // should ring has to name one. Omitted for everything else, which keeps the
   // existing default-channel behaviour untouched.
   opts?: { channelId?: string },
-) {
+): Promise<boolean> {
   try {
     const res = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
@@ -40,8 +44,11 @@ export async function sendExpoPush(
       if (ticket?.details?.error === 'DeviceNotRegistered') {
         await db.from('users').update({ push_token: null } as any).eq('id', userId)
       }
+      return false
     }
+    return true
   } catch (e) {
     console.warn('[sendExpoPush] request failed', { userId, error: e instanceof Error ? e.message : e })
+    return false
   }
 }

@@ -96,9 +96,11 @@ export function SpecialistProfileScreen({ navigation }: Props) {
   // the same grouped-row layout as the patient Profile.
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header>
+      {/* Pushed from the top-bar avatar now that Profile is no longer a tab,
+          so it needs its own way back -- a tab screen never did. */}
+      <Header onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <ProfileAvatar size={68} editable name={doctor?.full_name ?? user?.full_name} />
+          <ProfileAvatar size={68} editable variant="doctor" name={doctor?.full_name ?? user?.full_name} />
           <View style={{ flex: 1 }}>
             <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>
               {doctor?.full_name ?? user?.full_name ?? 'Your profile'}
@@ -158,6 +160,7 @@ export function SpecialistProfileScreen({ navigation }: Props) {
 
           <Card style={{ paddingVertical: 0 }}>
             {navigation && <ListRow icon="business-outline" title="Hospitals & Doctor ID" subtitle="Linked hospitals and your QR" onPress={() => navigation.navigate('Hospitals')} />}
+            {navigation && <ListRow icon="bar-chart-outline" title="My analytics" subtitle="Visits, wait times, ratings" onPress={() => navigation.navigate('DoctorAnalytics')} />}
             {navigation && <ListRow icon="settings-outline" title="Settings & fees" subtitle="Availability, fees, virtual care" last onPress={() => navigation.navigate('Settings')} />}
           </Card>
 

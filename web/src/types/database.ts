@@ -101,6 +101,174 @@ export type Database = {
           },
         ]
       }
+      user_consents: {
+        Row: {
+          id: string
+          user_id: string
+          kind: string
+          policy_version: string
+          granted_at: string
+          revoked_at: string | null
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          kind: string
+          policy_version: string
+          granted_at?: string
+          revoked_at?: string | null
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          kind?: string
+          policy_version?: string
+          granted_at?: string
+          revoked_at?: string | null
+          source?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      signup_verifications: {
+        Row: {
+          id: string
+          destination: string
+          channel: string
+          code_hash: string
+          expires_at: string
+          attempts: number
+          verified_at: string | null
+          claim_token: string | null
+          consumed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          destination: string
+          channel: string
+          code_hash: string
+          expires_at: string
+          attempts?: number
+          verified_at?: string | null
+          claim_token?: string | null
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          destination?: string
+          channel?: string
+          code_hash?: string
+          expires_at?: string
+          attempts?: number
+          verified_at?: string | null
+          claim_token?: string | null
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      locum_jobs: {
+        Row: {
+          id: string
+          posted_by: string
+          hospital_id: string
+          employment_type: string
+          state: string
+          lga: string | null
+          starts_on: string
+          start_time: string | null
+          end_time: string | null
+          rate_per_hour: number
+          hours: number | null
+          total_amount: number | null
+          expires_at: string | null
+          specialty_id: string | null
+          notes: string | null
+          status: string
+          filled_with: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          posted_by: string
+          hospital_id: string
+          employment_type?: string
+          state: string
+          lga?: string | null
+          starts_on: string
+          start_time?: string | null
+          end_time?: string | null
+          rate_per_hour: number
+          specialty_id?: string | null
+          notes?: string | null
+          status?: string
+          filled_with?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          posted_by?: string
+          hospital_id?: string
+          employment_type?: string
+          state?: string
+          lga?: string | null
+          starts_on?: string
+          start_time?: string | null
+          end_time?: string | null
+          rate_per_hour?: number
+          specialty_id?: string | null
+          notes?: string | null
+          status?: string
+          filled_with?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      locum_responses: {
+        Row: {
+          id: string
+          job_id: string
+          doctor_user_id: string
+          kind: string
+          counter_rate: number | null
+          effective_rate: number
+          message: string | null
+          selected_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          doctor_user_id: string
+          kind: string
+          counter_rate?: number | null
+          effective_rate: number
+          message?: string | null
+          selected_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          doctor_user_id?: string
+          kind?: string
+          counter_rate?: number | null
+          effective_rate?: number
+          message?: string | null
+          selected_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       care_plans: {
         Row: {
           condition: string | null
@@ -108,7 +276,7 @@ export type Database = {
           created_by: string | null
           doctor_id: string | null
           ends_on: string | null
-          hospital_id: string
+          hospital_id: string | null
           id: string
           next_check_in: string | null
           notes: string | null
@@ -124,7 +292,7 @@ export type Database = {
           created_by?: string | null
           doctor_id?: string | null
           ends_on?: string | null
-          hospital_id: string
+          hospital_id: string | null
           id?: string
           next_check_in?: string | null
           notes?: string | null
@@ -140,7 +308,7 @@ export type Database = {
           created_by?: string | null
           doctor_id?: string | null
           ends_on?: string | null
-          hospital_id?: string
+          hospital_id?: string | null
           id?: string
           next_check_in?: string | null
           notes?: string | null
@@ -364,6 +532,55 @@ export type Database = {
           },
         ]
       }
+      ambulance_provider_admins: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          provider_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ambulance_provider_admins_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_provider_admins_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_providers_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_provider_admins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ambulance_providers: {
         Row: {
           commission_rate: number
@@ -375,9 +592,13 @@ export type Database = {
           is_active: boolean
           is_verified: boolean
           name: string
+          ownership_category: string | null
+          private_fleet: boolean
           provider_type: string
           reliability_score: number
           service_area: unknown
+          service_hours_247: boolean
+          service_radius_m: number | null
           updated_at: string | null
         }
         Insert: {
@@ -390,9 +611,13 @@ export type Database = {
           is_active?: boolean
           is_verified?: boolean
           name: string
+          ownership_category?: string | null
+          private_fleet?: boolean
           provider_type: string
           reliability_score?: number
           service_area?: unknown
+          service_hours_247?: boolean
+          service_radius_m?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -405,9 +630,13 @@ export type Database = {
           is_active?: boolean
           is_verified?: boolean
           name?: string
+          ownership_category?: string | null
+          private_fleet?: boolean
           provider_type?: string
           reliability_score?: number
           service_area?: unknown
+          service_hours_247?: boolean
+          service_radius_m?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -425,18 +654,21 @@ export type Database = {
           crew_member_id: string | null
           hospital_admin_id: string | null
           id: string
+          provider_admin_id: string | null
           shift_id: string
         }
         Insert: {
           crew_member_id?: string | null
           hospital_admin_id?: string | null
           id?: string
+          provider_admin_id?: string | null
           shift_id: string
         }
         Update: {
           crew_member_id?: string | null
           hospital_admin_id?: string | null
           id?: string
+          provider_admin_id?: string | null
           shift_id?: string
         }
         Relationships: [
@@ -452,6 +684,13 @@ export type Database = {
             columns: ["hospital_admin_id"]
             isOneToOne: false
             referencedRelation: "hospital_admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ambulance_shift_crew_provider_admin_id_fkey"
+            columns: ["provider_admin_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_provider_admins"
             referencedColumns: ["id"]
           },
           {
@@ -506,6 +745,7 @@ export type Database = {
           home_base: unknown
           id: string
           is_active: boolean
+          photo_url: string | null
           plate_number: string
           provider_id: string
           status: string
@@ -519,6 +759,7 @@ export type Database = {
           home_base: unknown
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           plate_number: string
           provider_id: string
           status?: string
@@ -532,6 +773,7 @@ export type Database = {
           home_base?: unknown
           id?: string
           is_active?: boolean
+          photo_url?: string | null
           plate_number?: string
           provider_id?: string
           status?: string
@@ -3334,13 +3576,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
-          doctor_code: string
+          doctor_code?: string
           email: string
           full_name: string
           gender?: string | null
           id?: string
           is_verified?: boolean | null
-          patient_code: string
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3747,6 +3989,10 @@ export type Database = {
       }
     }
     Functions: {
+      anonymize_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       _postgis_deprecate: {
         Args: { newname: string; oldname: string; version: string }
         Returns: undefined

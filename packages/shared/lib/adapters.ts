@@ -67,6 +67,8 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     tag, tagType,
     avatar:    initials(h.name),
     avatarBg:  bgFromName(h.name),
+    // The uploaded logo. Initials above stay as the fallback when it is null.
+    logoUrl:   (h as any).logo_url ?? null,
     services:  services.length ? services : ['General Practice'],
     virtual:   h.accepts_virtual ?? false,
     verified:  h.is_verified   ?? false,
@@ -76,6 +78,7 @@ export function toDisplayHospital(h: HospitalWithDoctors): DisplayHospital {
     slots:     [],
     // Booking policy fields — forwarded from hospital record
     hospitalType:        (h as any).type             ?? null,
+    ownership:           (h as any).ownership        ?? null,
     clinic_model:        (h as any).clinic_model     ?? null,
     approval_mode:       (h as any).approval_mode    ?? null,
     opd_fee:             (h as any).opd_fee          ?? null,

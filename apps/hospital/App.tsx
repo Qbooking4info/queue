@@ -40,12 +40,9 @@ import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScr
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
 import { PatientsScreen } from './screens/staff/PatientsScreen'
 import { VirtualCareScreen } from './screens/staff/VirtualCareScreen'
-import { HospitalCarePlansScreen, CarePlanNewScreen, CarePlanDetailScreen } from './screens/staff/HospitalCarePlansScreen'
 import { AmbulanceRequestsScreen }     from './screens/staff/AmbulanceRequestsScreen'
 import { AmbulanceAlertsScreen }       from './screens/staff/AmbulanceAlertsScreen'
-import { AmbulanceCoverageScreen }     from './screens/staff/AmbulanceCoverageScreen'
-import { AmbulanceFleetScreen }        from './screens/staff/AmbulanceFleetScreen'
-import { AmbulanceUnitScheduleScreen } from './screens/staff/AmbulanceUnitScheduleScreen'
+import { RequestAmbulanceScreen } from './screens/staff/RequestAmbulanceScreen'
 import { setStatusBarStyle } from 'expo-status-bar'
 import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
 import { HospitalMessagesScreen } from './screens/staff/HospitalMessagesScreen'
@@ -115,13 +112,8 @@ function StaffStack() {
       <StaffStackN.Screen name="AmbulanceRequests"     component={AmbulanceRequestsScreen as any} />
       <StaffStackN.Screen name="Patients"              component={PatientsScreen as any} />
       <StaffStackN.Screen name="VirtualCare"           component={VirtualCareScreen as any} />
-      <StaffStackN.Screen name="HospitalCarePlans"     component={HospitalCarePlansScreen as any} />
-      <StaffStackN.Screen name="CarePlanNew"           component={CarePlanNewScreen as any} />
-      <StaffStackN.Screen name="CarePlanDetail"        component={CarePlanDetailScreen as any} />
       <StaffStackN.Screen name="AmbulanceAlerts"       component={AmbulanceAlertsScreen as any} />
-      <StaffStackN.Screen name="AmbulanceCoverage"     component={AmbulanceCoverageScreen as any} />
-      <StaffStackN.Screen name="AmbulanceFleet"        component={AmbulanceFleetScreen as any} />
-      <StaffStackN.Screen name="AmbulanceUnitSchedule" component={AmbulanceUnitScheduleScreen as any} />
+      <StaffStackN.Screen name="RequestAmbulance"      component={RequestAmbulanceScreen as any} />
       <StaffStackN.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </StaffStackN.Navigator>
   )

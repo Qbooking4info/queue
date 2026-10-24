@@ -40,9 +40,21 @@ import { CrewTrackScreen } from './screens/crew/CrewTrackScreen'
 import { ChatScreen } from '@queue/shared/screens/ChatScreen'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
 
+import { AmbulanceProviderRegisterScreen } from './screens/AmbulanceProviderRegisterScreen'
+import { AmbulanceProviderOnboardingScreen } from './screens/onboarding/AmbulanceProviderOnboardingScreen'
+import { AdminHomeScreen } from './screens/admin/AdminHomeScreen'
+import { AdminFleetScreen } from './screens/admin/AdminFleetScreen'
+import { FleetMapScreen } from './screens/admin/FleetMapScreen'
+import { AdminProfileScreen } from './screens/admin/AdminProfileScreen'
+import { ProviderSettingsScreen } from './screens/admin/ProviderSettingsScreen'
+import { REGISTERED_VIA_AMBULANCE_PROVIDER } from '@queue/shared/contexts/AuthContext'
+
 const AuthStack = createNativeStackNavigator()
 const CrewTab   = createBottomTabNavigator()
 const CrewStackN = createNativeStackNavigator()
+const AdminTab    = createBottomTabNavigator()
+const AdminStackN = createNativeStackNavigator()
+const OnboardStk  = createNativeStackNavigator()
 
 function TabIcon({ name, color, size }: any) {
   return <Ionicons name={name} color={color} size={size ?? 22} />
@@ -53,11 +65,17 @@ function TabIcon({ name, color, size }: any) {
 // "Create account" link (it pushed 'Register', a route only the patient app defines, so
 // the tap did nothing at all). surface 'crew' is what stops signIn from treating this as
 // the patient door and turning crew away from their own app.
+// Two doors into the same app: a crew account, provisioned by whichever fleet
+// employs them (so no self-registration), and a provider admin/owner account,
+// which does self-register -- hospital-owned and independent fleets alike, one
+// form. A crew member who taps "Register it" just finds nothing relevant.
 const LOGIN_PARAMS = {
-  surface:       'crew' as const,
-  registerRoute: null,
-  tagline:       'Every minute counts',
-  subtitle:      'Sign in to your crew account',
+  surface:        'crew' as const,
+  registerRoute:  'AmbulanceProviderRegister',
+  tagline:        'Every minute counts',
+  subtitle:       'Sign in to your account',
+  registerPrompt: 'Running an ambulance service? ',
+  registerCta:    'Register it',
 }
 
 function CrewAuthStack() {
@@ -66,6 +84,7 @@ function CrewAuthStack() {
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
       screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
       <AuthStack.Screen name="Login" component={LoginScreen} initialParams={LOGIN_PARAMS} />
+      <AuthStack.Screen name="AmbulanceProviderRegister" component={AmbulanceProviderRegisterScreen} />
     </AuthStack.Navigator>
   )
 }
@@ -103,9 +122,56 @@ function CrewStack() {
   )
 }
 
+// A freshly registered operator has no ambulance_provider_admins row until this
+// finishes -- same shape as the hospital onboarding stack.
+function ProviderOnboardingStack() {
+  return (
+    <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <OnboardStk.Screen name="AmbulanceProviderOnboarding" component={AmbulanceProviderOnboardingScreen} />
+    </OnboardStk.Navigator>
+  )
+}
+
+// The operator console -- one fleet's admin/owner, hospital-owned or independent,
+// both identical here (see get_my_ambulance_admin_profile). No Alerts tab:
+// dispatcher_alerts is scoped to a request's destination hospital, not to a
+// provider, so it has nothing to show either kind. That stays hospital-side.
+function AdminTabs() {
+  const { theme: t } = useTheme()
+  const insets = useSafeAreaInsets()
+  return (
+    <AdminTab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 80 + (insets.bottom || 0) },
+      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+    }}
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Home' }} />
+      <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'car-sport' : 'car-sport-outline'} {...p} />, tabBarLabel: 'Fleet' }} />
+      <AdminTab.Screen name="FleetMap"     component={FleetMapScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'map' : 'map-outline'} {...p} />, tabBarLabel: 'Map' }} />
+      <AdminTab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    </AdminTab.Navigator>
+  )
+}
+
+function AdminStack() {
+  return (
+    <AdminStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      <AdminStackN.Screen name="AdminTabs" component={AdminTabs} />
+      <AdminStackN.Screen name="ProviderSettings" component={ProviderSettingsScreen as any} />
+      <AdminStackN.Screen name="Chat" component={ChatScreen as any} />
+    </AdminStackN.Navigator>
+  )
+}
+
 function AppNavigator() {
   const [splashDone, setSplashDone] = useState(false)
-  const { session, loading, user, staffProfile, crewProfile, signOut } = useAuth()
+  const {
+    session, loading, user, staffProfile, crewProfile, providerAdminProfile,
+    pendingAmbulanceProviderOnboarding, signOut,
+  } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
 
@@ -122,13 +188,27 @@ function AppNavigator() {
   if (session) {
     // Crew reach this app one of two ways: a dedicated crew row, or a hospital-fleet
     // staff row whose role is 'ambulance_crew'. Both must land on the jobs board.
-    const isCrew = !!crewProfile || staffProfile?.role === 'ambulance_crew'
+    const isCrew  = !!crewProfile || staffProfile?.role === 'ambulance_crew'
+    const isAdmin = !!providerAdminProfile
 
-    const content = isCrew ? <CrewStack /> : (
-      <NoAccessScreen title="This account is not ambulance crew"
-        body="Queue Ambulance is for ambulance crews on duty. Hospital staff should use Queue Hospital, doctors Queue Doctor, and patients the Queue app."
-        onSignOut={() => { void signOut() }} />
-    )
+    // Same escape hatch as hospital/doctor onboarding: someone who registered as
+    // an operator but closed the app before finishing has no
+    // ambulance_provider_admins row yet, and registered_via is the only thing
+    // still telling them apart from a plain patient account at that point.
+    const registeredForProvider =
+      (session.user?.user_metadata as Record<string, unknown> | undefined)?.registered_via
+        === REGISTERED_VIA_AMBULANCE_PROVIDER
+    const needsProviderOnboarding = !isAdmin && !isCrew && (pendingAmbulanceProviderOnboarding || registeredForProvider)
+
+    const content =
+      needsProviderOnboarding ? <ProviderOnboardingStack />
+      : isCrew  ? <CrewStack />
+      : isAdmin ? <AdminStack />
+      : (
+        <NoAccessScreen title="This account is not ambulance crew"
+          body="Queue Ambulance is for ambulance crews on duty and the operators who run them. Hospital staff should use Queue Hospital, doctors Queue Doctor, and patients the Queue app."
+          onSignOut={() => { void signOut() }} />
+      )
     return <SafeAreaProvider>{content}<OfflineBanner /></SafeAreaProvider>
   }
 

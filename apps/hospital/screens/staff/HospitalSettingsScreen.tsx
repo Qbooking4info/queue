@@ -12,6 +12,8 @@ import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
 import { getMyHospital } from '@queue/shared/lib/admin-api'
+import { Image } from 'react-native'
+import { pickAndUploadHospitalLogo } from '@queue/shared/lib/avatar'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
@@ -56,6 +58,8 @@ export function HospitalSettingsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false)
   const [saving,     setSaving]     = useState(false)
   const [hospitalName, setHospitalName] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoBusy, setLogoBusy] = useState(false)
 
   // Local edit buffers for the sections that need an explicit Save rather than
   // the toggle rows' save-on-tap -- text fields would otherwise fire a save
@@ -81,8 +85,11 @@ export function HospitalSettingsScreen({ navigation }: Props) {
     try {
       const [settingsRes, hosRes] = await Promise.all([
         authedFetch(`/api/hospitals/${hospitalId}/settings`),
-        getMyHospital(hospitalId).then(h => ({ data: h })),
-      ])
+        // Name through get_my_hospital(): the hospitals SELECT policy hides unverified
+        // hospitals from their own staff (REP-051). The logo read is best-effort.
+        getMyHospital(hospitalId),
+        supabase.from('hospitals').select('logo_url').eq('id', hospitalId).maybeSingle(),
+      ]).then(([s, h, logo]) => [s, { data: h ? { ...h, logo_url: logo.data?.logo_url ?? null } : null }] as const)
       if (settingsRes.ok) {
         const body = await settingsRes.json()
         setSettings(body.settings)
@@ -92,7 +99,7 @@ export function HospitalSettingsScreen({ navigation }: Props) {
         setOpdFee(body.settings.opd_fee != null ? String(body.settings.opd_fee) : '')
         setAmbRadius(body.settings.ambulance_service_radius_m != null ? String(body.settings.ambulance_service_radius_m) : '')
       }
-      if (hosRes.data) setHospitalName(hosRes.data.name)
+      if (hosRes.data) { setHospitalName(hosRes.data.name); setLogoUrl((hosRes.data as any).logo_url ?? null) }
     } catch { /* silent */ }
     setLoading(false)
     setRefreshing(false)
@@ -177,6 +184,30 @@ export function HospitalSettingsScreen({ navigation }: Props) {
     } finally { setSavingBooking(false) }
   }
 
+  // The logo patients see wherever this hospital appears. Square crop, because
+  // every surface that shows it (search cards, appointment rows) renders a
+  // square tile with the name's initials as the fallback.
+  async function changeLogo(source: 'library' | 'camera') {
+    if (!hospitalId) return
+    setLogoBusy(true)
+    try {
+      const url = await pickAndUploadHospitalLogo(hospitalId, source)
+      if (url) { haptics.success(); setLogoUrl(url) }
+    } catch (e) {
+      haptics.error()
+      Alert.alert('Hospital logo', e instanceof Error ? e.message : 'Could not update the logo.')
+    } finally { setLogoBusy(false) }
+  }
+
+  function askLogo() {
+    haptics.tap()
+    Alert.alert('Hospital logo', 'Choose a new logo', [
+      { text: 'Take photo', onPress: () => changeLogo('camera') },
+      { text: 'Choose from photos', onPress: () => changeLogo('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
   return (
     <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
       <Header title="Settings" subtitle={hospitalName ?? undefined} onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
@@ -196,6 +227,38 @@ export function HospitalSettingsScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
         >
+          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Logo</Text>
+          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 }]}>
+            <TouchableOpacity onPress={askLogo} disabled={logoBusy} accessibilityRole="button"
+              accessibilityLabel="Change hospital logo"
+              style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: t.accentBg, borderWidth: 1.5, borderColor: t.accentBorder }}>
+              {logoUrl ? (
+                <Image source={{ uri: logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
+              ) : (
+                <Text style={{ fontSize: 19, fontWeight: '800', color: t.accent }}>
+                  {(hospitalName || '?').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()}
+                </Text>
+              )}
+              {logoBusy && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                </View>
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>Hospital logo</Text>
+              <Text style={{ fontSize: 12, color: t.textMuted, lineHeight: 17 }}>
+                Patients see this wherever your hospital appears. Without one they see
+                your initials instead.
+              </Text>
+              <TouchableOpacity onPress={askLogo} disabled={logoBusy} accessibilityRole="button">
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent, marginTop: 2 }}>
+                  {logoUrl ? 'Change logo' : 'Upload a logo'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Booking & approval */}
           <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Booking</Text>
           <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>

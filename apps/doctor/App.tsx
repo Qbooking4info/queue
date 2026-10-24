@@ -21,6 +21,13 @@ import { usePushNotifications }    from '@queue/shared/hooks/usePushNotification
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
 import { LoginScreen }  from '@queue/shared/screens/LoginScreen'
+import { ConsultationPlanScreen } from '@queue/shared/screens/ConsultationPlanScreen'
+import { CarePlanComposeScreen } from '@queue/shared/screens/CarePlanComposeScreen'
+import { LocumBoardScreen } from './screens/specialist/LocumBoardScreen'
+import { LocumPostScreen } from './screens/specialist/LocumPostScreen'
+import { LocumJobScreen } from './screens/specialist/LocumJobScreen'
+import { DoctorAnalyticsScreen } from './screens/specialist/DoctorAnalyticsScreen'
+import { RequestAmbulanceScreen } from './screens/specialist/RequestAmbulanceScreen'
 
 import { DoctorRegisterScreen }   from './screens/DoctorRegisterScreen'
 import { DoctorOnboardingScreen } from './screens/DoctorOnboardingScreen'
@@ -37,6 +44,7 @@ import { DoctorMessagesScreen }     from './screens/specialist/DoctorMessagesScr
 import { ChatScreen }               from '@queue/shared/screens/ChatScreen'
 import { setStatusBarStyle } from 'expo-status-bar'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import { useOpenLocumJobs } from '@queue/shared/hooks/useOpenLocumJobs'
 import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
 
 // react-native-agora is a native module Expo Go cannot load, so the call screen is
@@ -103,6 +111,8 @@ function DoctorOnboardingStack() {
 
 function SpecialistTabs() {
   const unread = useUnreadMessages('doctor')
+  // Badge on Jobs: open shifts nearby this doctor has not answered.
+  const openJobs = useOpenLocumJobs(true)
   const { theme: t } = useTheme()
   const insets = useSafeAreaInsets()
   return (
@@ -114,9 +124,9 @@ function SpecialistTabs() {
     }}>
       <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
       <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
-      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Appointments' }} />
+      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Schedule' }} />
       <DocTab.Screen name="Messages"          component={DoctorMessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
-      <DocTab.Screen name="SpecialistProfile" component={SpecialistProfileScreen}  options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,     tabBarLabel: 'Profile' }} />
+      <DocTab.Screen name="LocumBoard"        component={LocumBoardScreen as any}  options={{ tabBarBadge: openJobs > 0 ? openJobs : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 10, minWidth: 16, height: 16, lineHeight: 15, borderRadius: 8, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'briefcase' : 'briefcase-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
     </DocTab.Navigator>
   )
 }
@@ -133,6 +143,14 @@ function SpecialistStack() {
       <DocStack.Screen name="Chat"            component={ChatScreen            as any} />
       <DocStack.Screen name="ReferPatient"    component={ReferPatientScreen    as any} />
       <DocStack.Screen name="DoctorVideoCall" component={DoctorVideoCallScreen as any} options={{ animation: 'fade', gestureEnabled: false }} />
+      {/* No longer a tab -- reached from the avatar in the top bar. */}
+      <DocStack.Screen name="SpecialistProfile" component={SpecialistProfileScreen as any} />
+      <DocStack.Screen name="ConsultationPlan" component={ConsultationPlanScreen as any} />
+      <DocStack.Screen name="CarePlanCompose" component={CarePlanComposeScreen as any} />
+      <DocStack.Screen name="LocumPost"  component={LocumPostScreen as any} />
+      <DocStack.Screen name="LocumJob"   component={LocumJobScreen as any} />
+      <DocStack.Screen name="DoctorAnalytics" component={DoctorAnalyticsScreen as any} />
+      <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
     </DocStack.Navigator>
   )
 }

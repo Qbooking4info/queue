@@ -14,11 +14,16 @@ import { readCache, writeCache } from '@queue/shared/lib/cache'
 import { useEffect } from 'react'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { StatusBadge } from '@queue/shared/components/ui/StatusBadge'
-import { Header, HeaderIconButton, HeaderTail, ServiceTile, SectionTitle, Card } from '@queue/shared/components/ui/v3'
+import { Card } from '@queue/shared/components/ui/v3'
+import {
+  TopBar, TopBarButton, Pill, HeroCard, HeroBody, DateTile,
+  QuickRow, QuickTile, SectionHead, RowCard,
+} from '@queue/shared/components/ui/home'
 import type { AppointmentWithRelations } from '@queue/shared/lib/api'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { todayLocalDate } from '@queue/shared/lib/format'
+import { HomeCarousel, type Slide } from '../components/HomeCarousel'
 
 function greeting() {
   const h = new Date().getHours()
@@ -35,6 +40,20 @@ function visitWhen(a: AppointmentWithRelations) {
   const day = a.appointment_date === today ? 'Today'
     : new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
   return `${day}${a.start_time ? ' · ' + a.start_time.slice(0, 5) : ''}`
+}
+
+function longDate(d = new Date()) {
+  return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+/** The three stacked parts of the hero's date tile. */
+function datePieces(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  return {
+    weekday: d.toLocaleDateString('en-NG', { weekday: 'short' }).toUpperCase(),
+    day:     String(d.getDate()),
+    month:   d.toLocaleDateString('en-NG', { month: 'short' }),
+  }
 }
 
 function initials(name?: string | null) {
@@ -117,141 +136,183 @@ export function HomeScreen({ navigation }: Props) {
   const visit = activeAppt ?? nextAppt
   const inQueue = !!activeAppt
 
+  // Shown in place of the old one-line "No upcoming visits" row. Every slide is
+  // built from data this screen already has, and only appears when it has
+  // something true to say -- an empty hero is worse than a short carousel.
+  const heroSlides: Slide[] = [
+    {
+      key: 'book',
+      title: 'Book your doctor appointment',
+      body: 'Find the right doctor, at the right time, for a healthier tomorrow.',
+      icon: 'medkit',
+      onPress: () => navigation.navigate('Search'),
+      search: { placeholder: 'Search for doctor, specialty, or clinic…' },
+    },
+    ...(virtualDoctors
+      ? [{
+          key: 'virtual',
+          title: 'See a doctor without leaving home',
+          body: `${virtualDoctors} ${virtualDoctors === 1 ? 'doctor is' : 'doctors are'} available for video, audio or chat right now.`,
+          icon: 'videocam' as const,
+          cta: 'Start a virtual visit',
+          onPress: () => navigation.navigate('VirtualCare'),
+        } satisfies Slide]
+      : []),
+    ...(lastDoctor
+      ? [{
+          key: 'again',
+          title: `Book again with ${lastDoctor.name}`,
+          body: lastDoctor.specialty ? `Your last visit was ${lastDoctor.specialty}.` : 'Pick up where you left off.',
+          icon: 'person' as const,
+          cta: 'See availability',
+          onPress: () => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId }),
+        } satisfies Slide]
+      : []),
+    {
+      key: 'sos',
+      title: 'Need help now?',
+      body: 'Request an ambulance, or call the emergency lines without leaving the app.',
+      icon: 'alert-circle',
+      cta: 'Emergency',
+      tone: 'alert',
+      onPress: () => { haptics.heavy(); navigation.navigate('Sos') },
+    },
+  ]
+
   return (
     <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('Dependents') }} accessibilityRole="button"
-              accessibilityLabel={switchedInto ? `Managing for ${user?.full_name}. Change` : 'Booking for me. Change'}
-              style={{ height: 36, paddingHorizontal: 12, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
-                {switchedInto ? `Managing for ${firstName}` : 'For: Me'}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity onPress={() => { haptics.heavy(); navigation.navigate('Sos') }} accessibilityRole="button" accessibilityLabel="Emergency SOS"
-              style={{ height: 36, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#EF4444', justifyContent: 'center' }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 }}>SOS</Text>
-            </TouchableOpacity>
-            <HeaderIconButton icon="notifications-outline" label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-              dot={unread > 0} onPress={() => navigation.navigate('Notifications')} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <ProfileAvatar size={48} onPress={() => navigation.navigate('Profile')} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#CCFBF1', fontSize: 14 }}>{greeting()}</Text>
-              <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '800' }} accessibilityRole="header" numberOfLines={1}>{firstName}</Text>
-            </View>
-          </View>
-        </Header>
+      <TopBar
+        avatar={<ProfileAvatar size={40} onPress={() => navigation.navigate('Profile')} />}
+        eyebrow={longDate()}
+        title={`${greeting()}, ${firstName}`}
+        onAvatarPress={() => navigation.navigate('Profile')}
+        right={
+          <TopBarButton
+            icon="notifications-outline"
+            label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+            dot={unread > 0}
+            onPress={() => navigation.navigate('Notifications')}
+          />
+        }
+      />
+
       <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} colors={[t.accent]} />}>
-        <HeaderTail />
-        <View style={{ paddingHorizontal: 20, paddingTop: 4, gap: 16 }}>
+        <View style={{ paddingHorizontal: 20, gap: 16 }}>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pill
+              label="Booking for:"
+              value={switchedInto ? firstName : 'Me'}
+              onPress={() => navigation.navigate('Dependents')}
+            />
+            <View style={{ flex: 1 }} />
+            <Pill
+              tone="danger"
+              icon="alert-circle"
+              value="Emergency SOS"
+              onPress={() => { haptics.heavy(); navigation.navigate('Sos') }}
+            />
+          </View>
+
           {loading ? (
             <SkeletonCard />
           ) : visit ? (
-            <Card onPress={() => navigation.navigate(inQueue ? 'QueuePass' : 'AppointmentDetail', inQueue ? { appointmentId: visit.id } : { appointment: visit })}
-              accessibilityLabel="Next visit" style={{ gap: 12, shadowColor: '#0B1B1E', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', letterSpacing: 1, color: t.accent }}>NEXT VISIT · {visitWhen(visit).toUpperCase()}</Text>
-                <StatusBadge type={visit.status} />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <View style={{ width: 44, height: 44, borderRadius: 99, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontWeight: '800', color: t.accent }}>{initials(visit.doctor?.full_name)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{visit.doctor?.full_name ?? 'Doctor to be assigned'}</Text>
-                  <Text style={{ fontSize: 13, color: t.textMuted }} numberOfLines={1}>
-                    {[visit.doctor?.specialty?.name, visit.hospital?.name].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
-              </View>
-              {inQueue && visit.queue_position != null ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: t.accentBg, borderRadius: 12, padding: 10 }}>
-                  <Text style={{ fontSize: 26, fontWeight: '800', color: t.accent }}>#{visit.queue_position}</Text>
-                  <Text style={{ flex: 1, fontSize: 13, color: t.textSecondary }}>
-                    in the queue{visit.estimated_wait != null ? ` · about ${visit.estimated_wait} min` : ''}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>Queue Pass ›</Text>
-                </View>
-              ) : visit.type === 'virtual' ? (
-                <Text style={{ fontSize: 13, color: t.textSecondary }}>Video visit · join from the visit 10 minutes before</Text>
-              ) : null}
-            </Card>
+            <HeroCard
+              eyebrow={inQueue ? 'IN THE QUEUE' : 'UPCOMING VISIT'}
+              status={{
+                label: inQueue && visit.queue_position != null
+                  ? `#${visit.queue_position} in line`
+                  : visit.status === 'confirmed' ? 'Confirmed' : 'Pending',
+                icon: inQueue ? 'people' : visit.status === 'confirmed' ? 'checkmark-circle' : 'time',
+              }}
+              onPress={() => navigation.navigate(
+                inQueue ? 'QueuePass' : 'AppointmentDetail',
+                inQueue ? { appointmentId: visit.id } : { appointment: visit },
+              )}
+              footer={[
+                { label: inQueue ? 'Queue Pass' : 'Reschedule', icon: inQueue ? 'qr-code-outline' : 'calendar-outline',
+                  onPress: () => navigation.navigate(
+                    inQueue ? 'QueuePass' : 'AppointmentDetail',
+                    inQueue ? { appointmentId: visit.id } : { appointment: visit }) },
+                { label: visit.type === 'virtual' ? 'Join visit' : 'Get directions',
+                  icon: visit.type === 'virtual' ? 'videocam-outline' : 'navigate-outline',
+                  onPress: () => navigation.navigate('AppointmentDetail', { appointment: visit }) },
+              ]}
+            >
+              <HeroBody
+                leading={<DateTile {...datePieces(visit.appointment_date)} />}
+                title={visit.doctor?.full_name ?? 'Doctor to be assigned'}
+                subtitle={[visit.doctor?.specialty?.name, visit.hospital?.name].filter(Boolean).join(' · ') || null}
+                meta={visitWhen(visit)}
+              />
+            </HeroCard>
           ) : (
-            <Card onPress={() => navigation.navigate('Search')} accessibilityLabel="Book a visit"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar" size={22} color={t.id === 'forest' ? '#081416' : '#FFFFFF'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>No upcoming visits</Text>
-                <Text style={{ fontSize: 13, color: t.textMuted }}>Book a hospital or online visit</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </Card>
+            <HomeCarousel slides={heroSlides} />
           )}
 
           {failed && (
             <Card style={{ backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="cloud-offline-outline" size={20} color={t.danger} />
-              <Text style={{ flex: 1, fontSize: 13, color: t.textPrimary }}>Couldn't load everything.</Text>
+              <Text style={{ flex: 1, fontSize: 13, color: t.textPrimary }}>Couldn&apos;t load everything.</Text>
               <TouchableOpacity onPress={load} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
                 <Text style={{ color: t.accent, fontWeight: '700' }}>Try again</Text>
               </TouchableOpacity>
             </Card>
           )}
 
-          <View style={{ gap: 10 }}>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <ServiceTile icon="calendar" label="Book a visit" sublabel="Hospitals & doctors" onPress={() => navigation.navigate('Search')} />
-              <ServiceTile icon="videocam" label="Virtual Care" tileColor={t.id === 'forest' ? '#60A5FA' : '#2563EB'}
-                sublabel={virtualDoctors ? `● ${virtualDoctors} doctors offer video` : 'Video, audio or chat'}
-                sublabelTone={virtualDoctors ? 'success' : 'muted'} onPress={() => navigation.navigate('VirtualCare')} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <ServiceTile icon="medkit" label="Ambulance" tileColor={t.id === 'forest' ? '#F87171' : '#EF4444'} sublabel="SOS or scheduled"
+          <View style={{ gap: 12 }}>
+            <SectionHead title="Services" />
+            <QuickRow>
+              {/* Saturated pastels rather than full-strength brand colours: four
+                  solid blocks of primary at this size fight each other and the
+                  hero card above them. */}
+              <QuickTile icon="calendar" label="Book visit" color="#4FD1B0"
+                onPress={() => navigation.navigate('Search')} />
+              <QuickTile icon="videocam" label="Virtual care" color="#7C9BF2"
+                badge={virtualDoctors ? String(virtualDoctors) : null}
+                onPress={() => navigation.navigate('VirtualCare')} />
+              <QuickTile icon="medkit" label="Ambulance" color="#F28B82"
                 onPress={() => navigation.navigate('AmbulanceHome')} />
-              <ServiceTile icon="heart" label="My Care" tileColor={t.id === 'forest' ? '#5EEAD4' : '#134E4A'} sublabel="Records & medicines"
+              <QuickTile icon="heart" label="My care" color="#6EE7C0"
                 onPress={() => navigation.navigate('MyCare')} />
-            </View>
+            </QuickRow>
           </View>
 
           {lastDoctor && (
-            <Card onPress={() => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId })} accessibilityLabel={`Book again with ${lastDoctor.name}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 99, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="refresh" size={20} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Book again with {lastDoctor.name}</Text>
-                {!!lastDoctor.specialty && <Text style={{ fontSize: 12, color: t.textMuted }}>{lastDoctor.specialty}</Text>}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </Card>
+            <View style={{ gap: 10 }}>
+              <SectionHead title="Your care team" />
+              <RowCard
+                leading={
+                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontWeight: '800', color: t.accent, fontSize: 13 }}>{initials(lastDoctor.name)}</Text>
+                  </View>
+                }
+                title={lastDoctor.name}
+                subtitle={lastDoctor.specialty ?? null}
+                action="Rebook"
+                onActionPress={() => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId })}
+                onPress={() => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId })}
+              />
+            </View>
           )}
 
-          <View style={{ gap: 8 }}>
-            <SectionTitle title="Near you" action="See all" onAction={() => navigation.navigate('Search')} />
+          <View style={{ gap: 10 }}>
+            <SectionHead title="Near you" action="See all" onAction={() => navigation.navigate('Search')} />
             {loading ? <SkeletonCard /> : hospitals.length === 0 ? (
               <Text style={{ fontSize: 14, color: t.textMuted }}>No hospitals to show yet.</Text>
             ) : hospitals.slice(0, 3).map(h => (
-              <Card key={String(h.id)} onPress={() => navigation.navigate('HospitalProfile', { hospital: h })} accessibilityLabel={h.name}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="business-outline" size={22} color={t.accent} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }} numberOfLines={1}>{h.name}</Text>
-                  <Text style={{ fontSize: 12, color: t.textMuted }}>
-                    {h.rating ? `★ ${h.rating.toFixed(1)} · ` : ''}{formatDistance(h.distanceKm, h.city)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-              </Card>
+              <RowCard
+                key={String(h.id)}
+                leading={
+                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="business" size={20} color={t.accent} />
+                  </View>
+                }
+                title={h.name}
+                subtitle={`${h.rating ? `★ ${h.rating.toFixed(1)} · ` : ''}${formatDistance(h.distanceKm, h.city)}`}
+                onPress={() => navigation.navigate('HospitalProfile', { hospital: h })}
+              />
             ))}
           </View>
         </View>

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAdmin } from '@/contexts/AdminContext'
 import type { UserRole } from '@/lib/admin-api'
-import { Users, Video, ClipboardCheck, MessageSquare, LayoutDashboard, CalendarDays, ListOrdered, CalendarRange, Stethoscope, Settings, BarChart2, Tag, Building2, Hospital, Monitor, ArrowLeft, Ambulance, type LucideIcon } from 'lucide-react'
+import { Users, Video, MessageSquare, LayoutDashboard, CalendarDays, ListOrdered, CalendarRange, Stethoscope, Settings, BarChart2, Tag, Building2, Hospital, Monitor, ArrowLeft, Ambulance, type LucideIcon } from 'lucide-react'
 
 type NavItem = { href: string; icon: LucideIcon; label: string }
 
@@ -34,7 +34,6 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard/patients',     icon: Users,           label: 'Patients'      },
     { href: '/dashboard/virtual',      icon: Video,           label: 'Virtual Care'  },
     { href: '/dashboard/ambulances',   icon: Ambulance,       label: 'Ambulance'     },
-    { href: '/dashboard/care-plans',   icon: ClipboardCheck,  label: 'Care Plans'    },
     { href: '/dashboard/messages',     icon: MessageSquare,   label: 'Messages'      },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },
@@ -48,7 +47,6 @@ const NAV: Record<UserRole, NavItem[]> = {
     { href: '/dashboard/queue',        icon: ListOrdered,     label: 'Live Queue'    },
     { href: '/dashboard/patients',     icon: Users,           label: 'Patients'      },
     { href: '/dashboard/virtual',      icon: Video,           label: 'Virtual Care'  },
-    { href: '/dashboard/care-plans',   icon: ClipboardCheck,  label: 'Care Plans'    },
     { href: '/dashboard/messages',     icon: MessageSquare,   label: 'Messages'      },
     { href: '/dashboard/schedule',     icon: CalendarRange,   label: 'Schedule'      },
     { href: '/dashboard/doctors',      icon: Stethoscope,     label: 'Doctors'       },

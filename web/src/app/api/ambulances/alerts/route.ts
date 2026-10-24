@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
+import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 import { loadDispatcherAlerts, canSeeDispatcherAlert } from '@/lib/dispatcher-alerts'
+
+export async function OPTIONS() {
+  return corsOptions()
+}
+
+/**
+ * GET /api/ambulances/alerts
+ *
+ * Same scoping as the web dashboard's DispatcherAlertsPage (lib/dispatcher-alerts.ts):
+ * the hospital's own destination requests plus destination-less requests inside its
+ * fleet's radius (a "no unit available" alert usually has no destination at all, so
+ * destination-only scoping hid them from everyone -- REP-017). super_admin sees all. Ambulance management
+ * (including a hospital-owned fleet's own admin account) lives entirely in
+ * the Ambulance app and has no hospitalId to scope this by at all now, so
+ * ambulance_admin was removed from the allowed roles.
+ */
+export async function GET(req: NextRequest) {
+  const res = await handleGET(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
+}
+
+async function handleGET(req: NextRequest) {
+  const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
+  if (auth instanceof NextResponse) return auth
+  const { caller } = auth
+  if (caller.role !== 'super_admin' && !caller.hospitalId) return NextResponse.json({ alerts: [] })
+
+  const db = createAdminClient()
+  const { data: rows, error } = await loadDispatcherAlerts(db, caller.role === 'super_admin' ? null : caller.hospitalId!)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ alerts: rows ?? [] })
+}
 
 /**
  * PATCH /api/ambulances/alerts   { alertId }
@@ -18,30 +53,13 @@ import { loadDispatcherAlerts, canSeeDispatcherAlert } from '@/lib/dispatcher-al
  * Acknowledgement records who saw it, so "nobody noticed" and "someone looked
  * and judged it handled" stop being indistinguishable after the fact.
  */
-
-/**
- * GET /api/ambulances/alerts
- *
- * The read half -- existed only as a query inside
- * dashboard/ambulances/alerts/page.tsx (server component, admin client) with
- * no REST equivalent, same situation the transport-requests list was in. Same
- * query, same scoping (lib/dispatcher-alerts.ts). A super_admin sees every
- * alert, including ones outside any fleet's radius that no hospital is shown.
- */
-export async function GET(req: NextRequest) {
-  const auth = await requireRole(['super_admin', 'hospital_admin', 'front_desk'], req)
-  if (auth instanceof NextResponse) return auth
-  const { caller } = auth
-  if (caller.role !== 'super_admin' && !caller.hospitalId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const db = createAdminClient()
-  const { data: rows, error } = await loadDispatcherAlerts(db, caller.role === 'super_admin' ? null : caller.hospitalId!)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ alerts: rows ?? [] })
+export async function PATCH(req: NextRequest) {
+  const res = await handlePATCH(req)
+  for (const [k, v] of Object.entries(AUTH_CORS_HEADERS)) res.headers.set(k, v)
+  return res
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
@@ -57,10 +75,9 @@ export async function PATCH(req: NextRequest) {
     .from('users').select('id').eq('auth_id', caller.authId).single()
   if (!profile) return Errors.notFound('User')
 
-  // Scope: an alert belongs to a hospital through its transport request's
-  // destination. Without this any admin could clear another hospital's alerts,
-  // which on this table means hiding the fact that someone didn't get an
-  // ambulance.
+  // Scope: the same visibility as GET. Without this any admin could clear another
+  // hospital's alerts, which on this table means hiding the fact that someone
+  // didn't get an ambulance.
   const { data: alert } = await db
     .from('dispatcher_alerts')
     .select('id')
@@ -69,7 +86,6 @@ export async function PATCH(req: NextRequest) {
 
   if (!alert) return Errors.notFound('Alert')
 
-  // Same visibility as GET: an alert can be cleared by whoever is shown it.
   if (caller.role !== 'super_admin') {
     if (!caller.hospitalId || !(await canSeeDispatcherAlert(db, caller.hospitalId, body.alertId))) {
       return Errors.forbidden("Cannot acknowledge another hospital's alert")

@@ -27,7 +27,6 @@ export function PatientsScreen({ navigation }: Props) {
   const [open, setOpen] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const canPlan = staffProfile?.role === 'hospital_admin' || staffProfile?.role === 'clinic_admin'
 
   const load = useCallback(async () => {
     const r = await staffApi<{ patients: Patient[] }>('/api/patients')
@@ -95,12 +94,6 @@ export function PatientsScreen({ navigation }: Props) {
                       style={{ flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: t.cardBorder, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
                       {busy === p.id ? <ActivityIndicator color={t.accent} /> : <><Ionicons name="chatbubble-outline" size={16} color={t.accent} /><Text style={{ color: t.accent, fontWeight: '700' }}>Message</Text></>}
                     </TouchableOpacity>
-                    {canPlan && (
-                      <TouchableOpacity onPress={() => navigation.navigate('CarePlanNew', { patientId: p.id, patientName: p.name })} accessibilityRole="button"
-                        style={{ flex: 1, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
-                        <Ionicons name="checkbox-outline" size={16} color="#FFFFFF" /><Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Care plan</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 )}
               </View>

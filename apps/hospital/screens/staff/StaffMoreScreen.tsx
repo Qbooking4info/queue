@@ -45,7 +45,6 @@ export function StaffMoreScreen({ navigation }: Props) {
     { icon: 'chatbubbles-outline', label: 'Messages', sub: 'Patients, doctors, crews', onPress: () => navigation.navigate('HospitalMessages') },
     ...(isAdmin || isClinicAdmin ? [
       { icon: 'videocam-outline', label: 'Virtual Care', sub: 'Video consultations', onPress: () => navigation.navigate('VirtualCare') },
-      { icon: 'checkbox-outline', label: 'Care Plans', sub: 'Plans and adherence', onPress: () => navigation.navigate('HospitalCarePlans') },
     ] : []),
     { icon: 'time-outline', label: 'Staff shifts', sub: isAdmin ? 'Plan the weekly rota' : 'Your shifts and the rota', onPress: () => navigation.navigate('StaffShifts') },
     // Staff Management also holds doctor-linking (see StaffManagementScreen's
@@ -61,7 +60,8 @@ export function StaffMoreScreen({ navigation }: Props) {
     // screen (same hub-and-spoke shape as the web page's own button row), not listed
     // here separately.
     ...(isAdmin || staffProfile?.role === 'front_desk' ? [
-      { icon: 'medical-outline', label: 'Ambulance desk', sub: 'Inbound, fleet, alerts', onPress: () => navigation.navigate('AmbulanceRequests') },
+      { icon: 'medical-outline', label: 'Ambulance desk', sub: 'Inbound patients and alerts', onPress: () => navigation.navigate('AmbulanceRequests') },
+      { icon: 'medkit-outline', label: 'Request ambulance', sub: 'Dispatch for a patient here', onPress: () => navigation.navigate('RequestAmbulance') },
     ] : []),
     ...(isAdmin ? [
       { icon: 'analytics-outline', label: 'Analytics', sub: 'Trends and revenue', onPress: () => navigation.navigate('StaffAnalytics') },
