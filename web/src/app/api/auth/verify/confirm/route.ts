@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 import type { Channel } from '@/lib/otp-delivery'
@@ -16,11 +16,6 @@ import {
  * all.
  */
 
-const adminDb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
 
 export async function OPTIONS() {
   return corsOptions()
@@ -33,6 +28,13 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
+  // Built per request, not at module scope. A module-scope client is
+  // evaluated while Next collects page data at build time, where
+  // SUPABASE_SERVICE_ROLE_KEY is absent, and createClient throws
+  // 'supabaseKey is required' -- which failed the whole deployment
+  // rather than this one route.
+  const adminDb = createAdminClient()
+
   const body = await req.json().catch(() => ({})) as { destination?: string; channel?: string; code?: string }
   const channel = body.channel === 'sms' ? 'sms' : body.channel === 'email' ? 'email' : null
   if (!channel) return NextResponse.json({ error: 'channel must be email or sms' }, { status: 400 })

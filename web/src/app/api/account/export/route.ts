@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { POLICY_VERSION, RETENTION_SUMMARY } from '@queue/shared/lib/privacy'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
@@ -21,11 +21,6 @@ import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
  * will not remove, at the moment they are most likely to care.
  */
 
-const adminDb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
 
 export async function OPTIONS() {
   return corsOptions()
@@ -38,6 +33,13 @@ export async function GET(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
+  // Built per request, not at module scope. A module-scope client is
+  // evaluated while Next collects page data at build time, where
+  // SUPABASE_SERVICE_ROLE_KEY is absent, and createClient throws
+  // 'supabaseKey is required' -- which failed the whole deployment
+  // rather than this one route.
+  const adminDb = createAdminClient()
+
   const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
@@ -54,15 +56,23 @@ async function handle(req: NextRequest) {
 
   const id = profile.id
 
-  const [appointments, consents, notifications, insurance, vitals, transport, reviews] = await Promise.all([
+  const [appointments, consents, notifications, insurance, transport, reviews] = await Promise.all([
     adminDb.from('appointments').select('*').eq('patient_id', id),
     adminDb.from('user_consents').select('*').eq('user_id', id),
     adminDb.from('notifications').select('*').eq('user_id', id),
     adminDb.from('user_insurance').select('*').eq('user_id', id),
-    adminDb.from('vitals_audit_log').select('*').eq('patient_id', id),
     adminDb.from('transport_requests').select('*').eq('requester_id', id),
     adminDb.from('reviews').select('*').eq('patient_id', id),
   ])
+
+  // vitals_audit_log is keyed to the appointment, not the patient -- this used
+  // to filter on a patient_id column that does not exist, so the whole export
+  // failed for everyone. It has to go through the appointment ids above, and
+  // therefore after that query rather than alongside it.
+  const apptIds = (appointments.data ?? []).map(a => a.id)
+  const vitals = apptIds.length
+    ? await adminDb.from('vitals_audit_log').select('*').in('appointment_id', apptIds)
+    : { data: [], error: null }
 
   // auth_id is this system's internal link to the login record and is of no use to
   // the person; everything else about them is theirs.

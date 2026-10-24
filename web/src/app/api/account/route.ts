@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit } from '@/lib/rate-limit'
 
-const adminDb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
 
 // DELETE /api/account — patient requests own account deletion
 export async function DELETE(req: NextRequest) {
+  // Built per request, not at module scope. A module-scope client is
+  // evaluated while Next collects page data at build time, where
+  // SUPABASE_SERVICE_ROLE_KEY is absent, and createClient throws
+  // 'supabaseKey is required' -- which failed the whole deployment
+  // rather than this one route.
+  const adminDb = createAdminClient()
+
   const user = await getServerUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

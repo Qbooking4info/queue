@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 import { normaliseDestination } from '@/lib/verification'
 import { POLICY_VERSION, CONSENT_KIND } from '@queue/shared/lib/privacy'
@@ -16,11 +16,6 @@ import type { Channel } from '@/lib/otp-delivery'
  * checks, and it lives somewhere the client cannot reach around.
  */
 
-const adminDb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
 
 export async function OPTIONS() {
   return corsOptions()
@@ -43,6 +38,13 @@ interface Body {
 }
 
 async function handle(req: NextRequest) {
+  // Built per request, not at module scope. A module-scope client is
+  // evaluated while Next collects page data at build time, where
+  // SUPABASE_SERVICE_ROLE_KEY is absent, and createClient throws
+  // 'supabaseKey is required' -- which failed the whole deployment
+  // rather than this one route.
+  const adminDb = createAdminClient()
+
   const b = (await req.json().catch(() => ({}))) as Body
 
   const claimToken = (b.claimToken ?? '').trim()

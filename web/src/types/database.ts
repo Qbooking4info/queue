@@ -101,6 +101,78 @@ export type Database = {
           },
         ]
       }
+      user_consents: {
+        Row: {
+          id: string
+          user_id: string
+          kind: string
+          policy_version: string
+          granted_at: string
+          revoked_at: string | null
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          kind: string
+          policy_version: string
+          granted_at?: string
+          revoked_at?: string | null
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          kind?: string
+          policy_version?: string
+          granted_at?: string
+          revoked_at?: string | null
+          source?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      signup_verifications: {
+        Row: {
+          id: string
+          destination: string
+          channel: string
+          code_hash: string
+          expires_at: string
+          attempts: number
+          verified_at: string | null
+          claim_token: string | null
+          consumed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          destination: string
+          channel: string
+          code_hash: string
+          expires_at: string
+          attempts?: number
+          verified_at?: string | null
+          claim_token?: string | null
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          destination?: string
+          channel?: string
+          code_hash?: string
+          expires_at?: string
+          attempts?: number
+          verified_at?: string | null
+          claim_token?: string | null
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       locum_jobs: {
         Row: {
           id: string
@@ -3504,13 +3576,13 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           date_of_birth?: string | null
-          doctor_code: string
+          doctor_code?: string
           email: string
           full_name: string
           gender?: string | null
           id?: string
           is_verified?: boolean | null
-          patient_code: string
+          patient_code?: string
           patient_id?: string | null
           patient_number?: string | null
           phone?: string | null
@@ -3917,6 +3989,10 @@ export type Database = {
       }
     }
     Functions: {
+      anonymize_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       _postgis_deprecate: {
         Args: { newname: string; oldname: string; version: string }
         Returns: undefined
