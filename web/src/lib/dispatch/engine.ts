@@ -319,10 +319,18 @@ async function escalateNoSupply(db: Db, request: RequestRow, probe: SupplyProbe 
 }
 
 async function exhaustSearch(db: Db, request: RequestRow): Promise<DispatchResult> {
-  await db.from('transport_requests')
+  // Only the caller that actually ends the search raises the alarm. The sweeper, a
+  // decline and the SQL deadline can all reach here for the same request at once;
+  // each used to page the dispatcher and notify the patient again. And a request
+  // still in 'requested'/'scheduled' (its first round never flipped it) used to be
+  // left untouched while the patient was told no ambulance was coming.
+  const { data: ended } = await db.from('transport_requests')
     .update({ status: 'no_unit_available', updated_at: new Date().toISOString() })
     .eq('id', request.id)
-    .eq('status', 'searching')
+    .in('status', ['requested', 'scheduled', 'searching'])
+    .select('id')
+
+  if (!ended?.length) return { skipped: true, reason: 'search already resolved' }
 
   await raiseDispatchAlert(db, {
     requestId: request.id,

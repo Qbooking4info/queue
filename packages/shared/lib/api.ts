@@ -1324,7 +1324,9 @@ export async function addNotification(payload: {
   body:    string
   data?:   Record<string, unknown>
 }) {
-  await publicDb.from('notifications').insert({
+  // The signed-in client, not publicDb: RLS only lets a user write to their own
+  // inbox (20261013000008), and the anon key has no identity to check.
+  await supabase.from('notifications').insert({
     user_id:  payload.userId,
     type:     payload.type,
     title:    payload.title,

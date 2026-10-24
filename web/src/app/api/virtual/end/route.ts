@@ -4,11 +4,18 @@ import { getServerUser } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
-// POST { appointmentId } — either party on the call can end it (previously
-// doctor-only; a patient tapping "End" only navigated away locally with no
-// server effect at all, leaving the appointment stuck in_progress for the
-// doctor -- exactly the stuck-call scenario fixed elsewhere this session).
-// Sets virtual_sessions.ended_at, calculates duration_secs, marks appointment completed.
+// POST { appointmentId } — either party may call it, with different effects.
+//
+// Doctor: ends the consultation. Sets virtual_sessions.ended_at + duration_secs and
+// marks the appointment completed (consult_ended_at too, which analytics reads).
+// Idempotent: a second call does not stretch the recorded duration.
+//
+// Patient: leaving is NOT ending. The patient screens call this on every exit,
+// including a dropped network and the CallErrorBoundary fallback that tells them to
+// rejoin. Completing the appointment there made rejoining impossible (the token
+// route refuses 'completed') and the doctor's "Start" failed with no explanation.
+// The call stays open for the doctor to finish; a stale in_progress consult is
+// still auto-closed when the doctor starts their next one (admin-api startConsultation).
 //
 // Called cross-origin by the doctors/mobile apps -- needs real CORS handling
 // (preflight OPTIONS + headers on every response), not just the
@@ -34,11 +41,12 @@ async function handlePOST(req: NextRequest) {
 
   const { data: appt } = await db
     .from('appointments')
-    .select('id, doctor_id, doctor_user_id, patient_id')
+    .select('id, type, status, doctor_id, doctor_user_id, patient_id')
     .eq('id', appointmentId)
     .single()
 
   if (!appt) return Errors.notFound('Appointment')
+  if (appt.type !== 'virtual') return Errors.validation('This appointment is not a virtual consultation')
 
   // Verify caller is the doctor. Direct (hospital-less) bookings have no
   // `doctors` row -- doctor_user_id points straight at users.id instead.
@@ -68,13 +76,17 @@ async function handlePOST(req: NextRequest) {
 
   if (!callerIsDoctor && !callerIsPatient) return Errors.forbidden()
 
+  if (!callerIsDoctor) return NextResponse.json({ success: true, ended: false })
+
   const now = new Date().toISOString()
 
   const { data: session } = await db
     .from('virtual_sessions')
-    .select('started_at')
+    .select('started_at, ended_at')
     .eq('appointment_id', appointmentId)
-    .single()
+    .maybeSingle()
+
+  if (session?.ended_at) return NextResponse.json({ success: true, ended: true, durationSecs: null })
 
   const durationSecs = session?.started_at
     ? Math.round((Date.now() - new Date(session.started_at).getTime()) / 1000)
@@ -84,7 +96,7 @@ async function handlePOST(req: NextRequest) {
   // A mid-flight failure leaves the appointment complete with a stale session (recoverable)
   // rather than a completed session with no appointment update (inconsistent).
   await db.from('appointments')
-    .update({ status: 'completed' })
+    .update({ status: 'completed', consult_ended_at: now })
     .eq('id', appointmentId)
     .eq('status', 'in_progress')
 
@@ -92,7 +104,7 @@ async function handlePOST(req: NextRequest) {
     status:        'ended',
     ended_at:      now,
     duration_secs: durationSecs,
-  }).eq('appointment_id', appointmentId)
+  }).eq('appointment_id', appointmentId).is('ended_at', null)
 
-  return NextResponse.json({ success: true, durationSecs })
+  return NextResponse.json({ success: true, ended: true, durationSecs })
 }

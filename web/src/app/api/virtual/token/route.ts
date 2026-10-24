@@ -8,7 +8,7 @@ import { notifyIncomingCall } from '@/lib/notify-patient'
 
 // Doctor-initiated: POST with { appointmentId }
 // Generates host + guest tokens, upserts virtual_sessions, sets appointment to in_progress.
-// Patient reads guest_token directly from virtual_sessions via Supabase (RLS allows it).
+// Patient reads guest_token directly from virtual_sessions via Supabase (RLS: own rows only).
 //
 // Called cross-origin by the doctors/mobile apps -- needs real CORS handling
 // (preflight OPTIONS + headers on every response), not just the
@@ -97,14 +97,18 @@ async function handlePOST(req: NextRequest) {
 
   const now = new Date().toISOString()
 
-  // Upsert session — host_token + guest_token generated together so patient
-  // can read guest_token directly from DB without calling this endpoint
+  // Upsert session. Only the patient's guest_token is stored: the patient reads it
+  // from virtual_sessions under RLS (own appointments only). The host token goes to
+  // the doctor in this response and is never persisted -- a stored copy was readable
+  // by the patient and by every staff member at the hospital, and joining as uid 1
+  // pushes the real doctor out of the channel.
   const { error: sessionErr } = await db.from('virtual_sessions').upsert({
     appointment_id: appointmentId,
     room_name:      channelName,
     status:         'active',
     started_at:     now,
-    host_token:     hostToken,
+    ended_at:       null,
+    host_token:     null,
     guest_token:    guestToken,
   }, { onConflict: 'appointment_id' })
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { requireRole } from '@/lib/supabase/auth-server'
+import { requireRole, type CallerInfo } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { paystackConfigured, listBanks, resolveAccount, createSubaccount } from '@/lib/paystack'
 
@@ -62,6 +62,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
+  if (!(await mayManagePayouts(createAdminClient(), caller))) {
+    return Errors.forbidden('Only the hospital owner can change where payouts go')
+  }
   if (!paystackConfigured()) {
     return NextResponse.json({ error: 'Online payment is not enabled', code: 'PAYMENTS_DISABLED' }, { status: 503 })
   }
@@ -126,6 +129,9 @@ export async function DELETE(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
   if (!caller.hospitalId) return Errors.forbidden()
+  if (!(await mayManagePayouts(createAdminClient(), caller))) {
+    return Errors.forbidden('Only the hospital owner can change where payouts go')
+  }
 
   const db = createAdminClient()
   // Detaches locally only. The Paystack subaccount is left intact so historical
@@ -138,4 +144,15 @@ export async function DELETE(req: NextRequest) {
   if (error) return Errors.internal(error.message)
 
   return NextResponse.json({ success: true, note: 'Online payment is now off for this hospital; bookings continue with payment at the desk.' })
+}
+
+// The payout account decides where the hospital's money settles, so changing it is the
+// owner's call, not any admin's. A hospital with no active owner row (older or
+// super-admin-created hospitals) falls back to its admins so it isn't locked out.
+async function mayManagePayouts(db: ReturnType<typeof createAdminClient>, caller: CallerInfo): Promise<boolean> {
+  if (caller.role === 'super_admin' || caller.hospitalRole === 'owner') return true
+  if (caller.role !== 'hospital_admin' || !caller.hospitalId) return false
+  const { data: owners } = await db.from('hospital_admins')
+    .select('id').eq('hospital_id', caller.hospitalId).eq('role', 'owner').eq('is_active', true).limit(1)
+  return !owners?.length
 }

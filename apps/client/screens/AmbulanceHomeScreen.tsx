@@ -44,7 +44,7 @@ export function AmbulanceHomeScreen({ navigation }: Props) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>Emergency</Text>
-              <Text style={{ color: '#FECACA', fontSize: 13, marginTop: 2, lineHeight: 18 }}>Hold to send. We dispatch first and ask questions while the crew is on the way.</Text>
+              <Text style={{ color: '#FECACA', fontSize: 13, marginTop: 2, lineHeight: 18 }}>Hold to send. We start looking for a crew straight away and ask questions while we search.</Text>
             </View>
           </TouchableOpacity>
 

@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth }  from '../contexts/AuthContext'
 import type { AuthSurface } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { requestPasswordReset } from '../lib/password-reset'
 import { Button } from '../components/ui/Button'
 import { PasswordInput } from '../components/ui/PasswordField'
 
@@ -61,7 +61,8 @@ export function LoginScreen({ navigation, route }: Props) {
 
   async function handleForgotPassword() {
     if (!email.trim()) { Alert.alert('Enter your email address first, then tap Forgot password.'); return }
-    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase())
+    const result = await requestPasswordReset(email)
+    if (!result.ok) { Alert.alert('Could not send reset email', result.error); return }
     Alert.alert('Check your email', 'If an account exists for that address, a password reset link has been sent.')
   }
 

@@ -19,6 +19,8 @@ export async function getHospitalContext() {
     .from('hospital_admins')
     .select('hospital_id, role')
     .eq('user_id', profile.id)
+    // A deactivated staff member must lose dashboard access, not keep it.
+    .eq('is_active', true)
     .single()
   if (!adminRecord) redirect('/onboarding')
 

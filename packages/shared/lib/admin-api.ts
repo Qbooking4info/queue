@@ -115,3 +115,20 @@ export async function getDoctorsOnDuty(hospitalId: string, clinicId?: string | n
     availability_status: (d.availability_status ?? 'on_duty') as DoctorAvailabilityStatus,
   }))
 }
+
+// ── The caller's own hospital (staff apps) ───────────────────────────────────
+// hospitals is only publicly readable once verified, so staff at a hospital that is
+// still under review got nothing from a direct select (blank names, no Clinics menu).
+// get_my_hospital() (20261013300003) returns the row to that hospital's own staff.
+// Falls back to the direct read while the RPC isn't deployed yet.
+export interface MyHospital { id: string; name: string; clinic_model: string | null }
+
+export async function getMyHospital(hospitalId: string): Promise<MyHospital | null> {
+  const { data, error } = await supabase.rpc('get_my_hospital', { p_hospital_id: hospitalId })
+  if (!error) {
+    const row = Array.isArray(data) ? data[0] : data
+    return (row as MyHospital | undefined) ?? null
+  }
+  const { data: direct } = await supabase.from('hospitals').select('id, name, clinic_model').eq('id', hospitalId).maybeSingle()
+  return (direct as MyHospital | null) ?? null
+}

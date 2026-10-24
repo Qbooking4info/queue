@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+import { PRIVILEGED_ACCOUNT_MESSAGE, isPrivilegedAccount } from '@/lib/dependent-linking'
 
 // POST /api/dependents/switch { dependentId } -- lets a caretaker's mobile app
 // actually sign in as a linked dependent's own account, without ever knowing
@@ -47,12 +48,27 @@ async function handlePOST(req: NextRequest) {
   const rlAllowed = await checkRateLimit(db, `dependents-switch:${caller.id}`, 20, 3600)
   if (!rlAllowed) return Errors.forbidden('Too many switch attempts. Please try again later.')
 
-  const { data: dependent } = await db.from('users').select('email, full_name').eq('id', dependentId).single()
-  if (!dependent?.email) return Errors.notFound('Dependent account')
+  const { data: dependent } = await db.from('users').select('full_name, auth_id').eq('id', dependentId).single()
+  if (!dependent?.auth_id) return Errors.notFound('Dependent account')
+  // Never mint a session for a staff/doctor/admin account, whatever links exist.
+  if (await isPrivilegedAccount(db, dependentId, dependent.auth_id)) return Errors.forbidden(PRIVILEGED_ACCOUNT_MESSAGE)
 
-  const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email: dependent.email })
+  // The magic link must be for the dependent's own AUTH account. public.users.email is
+  // a profile copy the account holder can edit; minting the link from it let anyone
+  // who controls a linked account set that email to a victim's address and receive a
+  // session for the victim.
+  const { data: authUser } = await db.auth.admin.getUserById(dependent.auth_id)
+  const authEmail = authUser?.user?.email
+  if (!authEmail) return Errors.notFound('Dependent account')
+
+  const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email: authEmail })
   if (error || !data?.properties?.hashed_token) {
     return Errors.internal(error?.message ?? 'Could not generate a session for that account')
+  }
+  // Belt and braces: the link must resolve to the same auth user we authorised.
+  if (data.user?.id && data.user.id !== dependent.auth_id) {
+    console.error('[dependents/switch] magic link resolved to a different user', dependentId)
+    return Errors.forbidden('Could not switch to that account')
   }
 
   return NextResponse.json({ tokenHash: data.properties.hashed_token, fullName: dependent.full_name })

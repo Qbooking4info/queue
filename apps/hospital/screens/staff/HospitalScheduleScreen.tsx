@@ -11,6 +11,7 @@ import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { fmtLocalDate } from '@queue/shared/lib/format'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -57,7 +58,7 @@ export function HospitalScheduleScreen({ navigation }: Props) {
   const loadFilters = useCallback(async () => {
     if (!hospitalId) return
     const [{ data: hosp }, { data: roster }] = await Promise.all([
-      supabase.from('hospitals').select('clinic_model').eq('id', hospitalId).single(),
+      getMyHospital(hospitalId).then(h => ({ data: h })),
       supabase.rpc('get_hospital_staff_roster', { p_hospital_id: hospitalId }),
     ])
     setClinicModel((hosp as any)?.clinic_model ?? null)

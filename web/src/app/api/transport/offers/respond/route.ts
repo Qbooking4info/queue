@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { runDispatchRound } from '@/lib/dispatch/engine'
@@ -51,10 +51,12 @@ export async function POST(req: NextRequest) {
       .eq('response', 'pending')
 
     // Advance immediately rather than waiting for the sweeper — there is
-    // nothing left pending to wait for on a sequential offer.
-    runDispatchRound(offer.request_id, offer.round + 1).catch((err) =>
+    // nothing left pending to wait for on a sequential offer. Inside after():
+    // Vercel freezes the function once the response flushes, so a floating
+    // promise here could leave the next round unrun (same fix as request/route.ts).
+    after(() => runDispatchRound(offer.request_id, offer.round + 1).catch((err) =>
       console.error('[transport] re-dispatch after decline failed', offer.request_id, err),
-    )
+    ))
 
     return NextResponse.json({ accepted: false, reason: 'declined' })
   }

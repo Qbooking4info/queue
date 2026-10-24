@@ -42,8 +42,9 @@ async function handle(req: NextRequest) {
   if (!appt) return Errors.notFound('Appointment')
   if (['cancelled', 'completed', 'no_show'].includes((appt as any).status)) return Errors.validation(`Cannot pay for a ${(appt as any).status} appointment`)
 
-  const { data: paid } = await db.from('payments').select('id').eq('appointment_id', appointmentId).eq('status', 'success').maybeSingle()
-  if (paid) return NextResponse.json({ alreadyPaid: true })
+  // limit(1), not maybeSingle(): with two success rows maybeSingle errors and returns null.
+  const { data: paid } = await db.from('payments').select('id').eq('appointment_id', appointmentId).eq('status', 'success').limit(1)
+  if (paid?.length) return NextResponse.json({ alreadyPaid: true })
 
   const { fee } = resolved
   const { error: debitErr } = await (db as any).rpc('wallet_apply', {

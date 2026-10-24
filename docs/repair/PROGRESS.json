@@ -1,0 +1,805 @@
+{
+  "project": "Queue \u2014 hospital management and digital healthcare platform",
+  "last_updated": "2026-10-13T17:10:00+01:00",
+  "overall_status": "in_progress",
+  "current_phase": "batch_2_db_applied_awaiting_deploy_and_commit",
+  "current_batch": 2,
+  "applications": [
+    {
+      "id": "app-client",
+      "name": "Queue (patient)",
+      "path": "apps/client",
+      "stack": [
+        "Expo SDK 56",
+        "React Native 0.85",
+        "TypeScript"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "virtual call screen",
+        "SOS/ambulance copy",
+        "care plans",
+        "home",
+        "ratings"
+      ],
+      "bugs_open": [
+        "REP-006",
+        "REP-053"
+      ],
+      "tests_run": [
+        "tsc"
+      ],
+      "blockers": [
+        "no device run this session"
+      ]
+    },
+    {
+      "id": "app-doctor",
+      "name": "Queue Doctor",
+      "path": "apps/doctor",
+      "stack": [
+        "Expo SDK 56",
+        "React Native 0.85",
+        "TypeScript"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "video call screen",
+        "appointment actions routing"
+      ],
+      "bugs_open": [],
+      "tests_run": [
+        "tsc"
+      ],
+      "blockers": [
+        "no device run this session"
+      ]
+    },
+    {
+      "id": "app-hospital",
+      "name": "Queue Hospital",
+      "path": "apps/hospital",
+      "stack": [
+        "Expo SDK 56",
+        "React Native 0.85",
+        "TypeScript"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "staff management",
+        "clinic detail",
+        "care plans",
+        "API wiring"
+      ],
+      "bugs_open": [
+        "REP-051",
+        "REP-057"
+      ],
+      "tests_run": [
+        "tsc"
+      ],
+      "blockers": [
+        "no device run this session"
+      ]
+    },
+    {
+      "id": "app-ambulance",
+      "name": "Queue Ambulance (crew)",
+      "path": "apps/ambulance",
+      "stack": [
+        "Expo SDK 56",
+        "React Native 0.85",
+        "TypeScript"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "offer response",
+        "dispatch RPC grants"
+      ],
+      "bugs_open": [
+        "REP-019",
+        "REP-020"
+      ],
+      "tests_run": [
+        "tsc"
+      ],
+      "blockers": [
+        "no device run this session"
+      ]
+    },
+    {
+      "id": "svc-web",
+      "name": "Web API + hospital dashboard",
+      "path": "web",
+      "stack": [
+        "Next.js 16.3",
+        "React 19.2",
+        "Vitest 4",
+        "Supabase JS"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "virtual",
+        "transport",
+        "appointments/[id]",
+        "dependents",
+        "staff actions",
+        "dashboard actions",
+        "clinic-staff",
+        "payments (read-only)"
+      ],
+      "bugs_open": [
+        "REP-017",
+        "REP-044",
+        "REP-045",
+        "REP-047",
+        "REP-048"
+      ],
+      "tests_run": [
+        "vitest",
+        "tsc",
+        "eslint",
+        "next build"
+      ],
+      "blockers": [
+        "Vercel deploy needs owner login"
+      ]
+    },
+    {
+      "id": "svc-db",
+      "name": "Supabase Postgres",
+      "path": "supabase/migrations",
+      "stack": [
+        "Postgres",
+        "PostGIS",
+        "pg_cron",
+        "RLS"
+      ],
+      "status": "partially_audited",
+      "features_audited": [
+        "virtual_sessions RLS",
+        "transport RLS/grants",
+        "appointments RLS/triggers"
+      ],
+      "bugs_open": [],
+      "tests_run": [
+        "libpg_query syntax check"
+      ],
+      "blockers": [
+        "no prod DB access this session",
+        "no Docker for local Supabase/pgTAP"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "id": "REP-001",
+      "severity": "P0",
+      "component": "virtual",
+      "title": "Agora tokens readable by hospital staff / host token by patient",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-001"
+    },
+    {
+      "id": "REP-002",
+      "severity": "P1",
+      "component": "virtual",
+      "title": "Patient leaving completes the consult; rejoin impossible",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-002"
+    },
+    {
+      "id": "REP-003",
+      "severity": "P2",
+      "component": "client,doctor",
+      "title": "Call screens never detect the other party leaving",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-003"
+    },
+    {
+      "id": "REP-004",
+      "severity": "P2",
+      "component": "db",
+      "title": "Terminal appointment leaves call session active",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-004"
+    },
+    {
+      "id": "REP-005",
+      "severity": "P3",
+      "component": "virtual",
+      "title": "Call timing inaccuracies",
+      "status": "in_progress",
+      "details": "docs/repair/ISSUES.md#rep-005"
+    },
+    {
+      "id": "REP-006",
+      "severity": "P3",
+      "component": "client",
+      "title": "Patient uses EXPO_PUBLIC_AGORA_APP_ID not signing App ID (suspected)",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-006"
+    },
+    {
+      "id": "REP-007",
+      "severity": "P2",
+      "component": "agora",
+      "title": "Agora project certificate mode unverified",
+      "status": "blocked",
+      "details": "docs/repair/ISSUES.md#rep-007"
+    },
+    {
+      "id": "REP-008",
+      "severity": "P2",
+      "component": "web",
+      "title": "saveAppointmentNotes role check (suspected)",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-008"
+    },
+    {
+      "id": "REP-010",
+      "severity": "P0",
+      "component": "db/ambulance",
+      "title": "Patients can insert transport_requests directly",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-010"
+    },
+    {
+      "id": "REP-011",
+      "severity": "P0",
+      "component": "db/ambulance",
+      "title": "record_unit_location executable by anyone",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-011"
+    },
+    {
+      "id": "REP-012",
+      "severity": "P0",
+      "component": "db/ambulance",
+      "title": "accept_dispatch_offer executable by anyone",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-012"
+    },
+    {
+      "id": "REP-013",
+      "severity": "P1",
+      "component": "db/ambulance",
+      "title": "Patient cannot cancel while searching",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-013"
+    },
+    {
+      "id": "REP-014",
+      "severity": "P2",
+      "component": "db/ambulance",
+      "title": "Fleet crew read all inbound patient details",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-014"
+    },
+    {
+      "id": "REP-015",
+      "severity": "P2",
+      "component": "db/ambulance",
+      "title": "Pickup-location functions executable by anyone",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-015"
+    },
+    {
+      "id": "REP-016",
+      "severity": "P2",
+      "component": "web/ambulance",
+      "title": "Concurrent SOS creates two live requests",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-016"
+    },
+    {
+      "id": "REP-017",
+      "severity": "P1",
+      "component": "web/ambulance",
+      "title": "Dispatcher alerts with no destination seen by nobody (suspected)",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-017"
+    },
+    {
+      "id": "REP-018",
+      "severity": "P1",
+      "component": "web/ambulance",
+      "title": "Post-decline re-dispatch floating promise; sweep unscheduled",
+      "status": "in_progress",
+      "details": "docs/repair/ISSUES.md#rep-018"
+    },
+    {
+      "id": "REP-019",
+      "severity": "P2",
+      "component": "ambulance",
+      "title": "Shift delete/end strands active job",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-019"
+    },
+    {
+      "id": "REP-020",
+      "severity": "P2",
+      "component": "ambulance",
+      "title": "No crew hand-back / manual assign",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-020"
+    },
+    {
+      "id": "REP-021",
+      "severity": "P2",
+      "component": "client",
+      "title": "SOS copy claimed dispatch before acceptance",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-021"
+    },
+    {
+      "id": "REP-022",
+      "severity": "P3",
+      "component": "web/ambulance",
+      "title": "Unvalidated triage/tier fields",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-022"
+    },
+    {
+      "id": "REP-023",
+      "severity": "P3",
+      "component": "web/ambulance",
+      "title": "'On the way' sent at matched",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-023"
+    },
+    {
+      "id": "REP-024",
+      "severity": "P3",
+      "component": "web/ambulance",
+      "title": "Offers after deadline",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-024"
+    },
+    {
+      "id": "REP-030",
+      "severity": "P1",
+      "component": "db/appointments",
+      "title": "Patients can update any appointment column",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-030"
+    },
+    {
+      "id": "REP-031",
+      "severity": "P1",
+      "component": "db/appointments",
+      "title": "Patients choose approval/status on insert",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-031"
+    },
+    {
+      "id": "REP-032",
+      "severity": "P2",
+      "component": "db/appointments",
+      "title": "Client-computed refund_pct",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-032"
+    },
+    {
+      "id": "REP-033",
+      "severity": "P2",
+      "component": "db/appointments",
+      "title": "Duplicate booking check races",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-033"
+    },
+    {
+      "id": "REP-034",
+      "severity": "P2",
+      "component": "web/appointments",
+      "title": "Any doctor acts on any hospital appointment",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-034"
+    },
+    {
+      "id": "REP-035",
+      "severity": "P3",
+      "component": "web/appointments",
+      "title": "set_status/start_consultation bypass check-in",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-035"
+    },
+    {
+      "id": "REP-036",
+      "severity": "P3",
+      "component": "web/appointments",
+      "title": "Walk-in staffId from body, UTC month, dropped fields",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-036"
+    },
+    {
+      "id": "REP-037",
+      "severity": "P3",
+      "component": "web/appointments",
+      "title": "Check-in accepts unapproved bookings",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-037"
+    },
+    {
+      "id": "REP-038",
+      "severity": "P3",
+      "component": "web/appointments",
+      "title": "Doctor list misses assigned_doctor_id rows",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-038"
+    },
+    {
+      "id": "REP-040",
+      "severity": "P0",
+      "component": "web/staff",
+      "title": "Hospital admin could reset any user's password",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-040"
+    },
+    {
+      "id": "REP-041",
+      "severity": "P0",
+      "component": "web/dependents",
+      "title": "Account takeover via dependent linking",
+      "status": "in_progress",
+      "details": "docs/repair/ISSUES.md#rep-041"
+    },
+    {
+      "id": "REP-042",
+      "severity": "P1",
+      "component": "web/dashboard",
+      "title": "Server actions missing role/is_active gates",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-042"
+    },
+    {
+      "id": "REP-043",
+      "severity": "P2",
+      "component": "web/clinic-staff",
+      "title": "Cross-clinic password reset",
+      "status": "verified_fixed",
+      "details": "docs/repair/ISSUES.md#rep-043"
+    },
+    {
+      "id": "REP-044",
+      "severity": "P2",
+      "component": "web/payments",
+      "title": "Double payment for one booking",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-044"
+    },
+    {
+      "id": "REP-045",
+      "severity": "P2",
+      "component": "web/payments",
+      "title": "Non-owner admin can swap payout account",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-045"
+    },
+    {
+      "id": "REP-046",
+      "severity": "P3",
+      "component": "web/staff",
+      "title": "Admin could remove owner",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-046"
+    },
+    {
+      "id": "REP-047",
+      "severity": "P3",
+      "component": "web",
+      "title": "Onboarding planId, clear-session CSRF, raw errors",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-047"
+    },
+    {
+      "id": "REP-048",
+      "severity": "P2",
+      "component": "web",
+      "title": "Doctor link consent, self-declared profiles, role fallthrough (suspected)",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-048"
+    },
+    {
+      "id": "REP-050",
+      "severity": "P1",
+      "component": "hospital",
+      "title": "Invite staff always failed",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-050"
+    },
+    {
+      "id": "REP-051",
+      "severity": "P3",
+      "component": "hospital,ambulance",
+      "title": "Unverified hospitals can't read own hospital row",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-051"
+    },
+    {
+      "id": "REP-052",
+      "severity": "P2",
+      "component": "client",
+      "title": "Care-plan tick dated in UTC",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-052"
+    },
+    {
+      "id": "REP-053",
+      "severity": "P2",
+      "component": "client",
+      "title": "Booking notifications never saved",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-053"
+    },
+    {
+      "id": "REP-054",
+      "severity": "P3",
+      "component": "client",
+      "title": "Rating ignores errors",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-054"
+    },
+    {
+      "id": "REP-055",
+      "severity": "P3",
+      "component": "client,hospital,web",
+      "title": "UTC 'today' date slices",
+      "status": "in_progress",
+      "details": "docs/repair/ISSUES.md#rep-055"
+    },
+    {
+      "id": "REP-056",
+      "severity": "P3",
+      "component": "ambulance",
+      "title": "Expired offer shown as taken by another crew",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-056"
+    },
+    {
+      "id": "REP-057",
+      "severity": "P3",
+      "component": "hospital",
+      "title": "Navigate to unregistered MainTabs",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-057"
+    },
+    {
+      "id": "REP-090",
+      "severity": "P3",
+      "component": "web",
+      "title": "eslint baseline 329 errors",
+      "status": "deferred_with_reason",
+      "details": "docs/repair/ISSUES.md#rep-090"
+    },
+    {
+      "id": "REP-091",
+      "severity": "P3",
+      "component": "docs",
+      "title": "README documents removed mobile/ layout",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-091"
+    },
+    {
+      "id": "REP-058",
+      "severity": "P0",
+      "component": "db/hospitals",
+      "title": "Clients could write hospitals (payout swap, self-verify)",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-058"
+    },
+    {
+      "id": "REP-059",
+      "severity": "P0",
+      "component": "db/hospital_admins",
+      "title": "Staff could make themselves owner",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-059"
+    },
+    {
+      "id": "REP-060",
+      "severity": "P1",
+      "component": "db",
+      "title": "is_hospital_admin admitted crew/deactivated",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-060"
+    },
+    {
+      "id": "REP-061",
+      "severity": "P1",
+      "component": "db",
+      "title": "Any user could write subscriptions/hours/specialties; staff edit reviews",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-061"
+    },
+    {
+      "id": "REP-062",
+      "severity": "P0",
+      "component": "web+db",
+      "title": "Takeover via profile email + dependent switch",
+      "status": "fixed_pending_verification",
+      "details": "docs/repair/ISSUES.md#rep-062"
+    },
+    {
+      "id": "REP-063",
+      "severity": "P2",
+      "component": "db/hospitals",
+      "title": "Unverified hospitals publicly readable (product decision)",
+      "status": "open",
+      "details": "docs/repair/ISSUES.md#rep-063"
+    }
+  ],
+  "test_runs": [
+    {
+      "id": "T-BASE-1",
+      "at": "2026-10-13T12:43:54+01:00",
+      "command": "npx vitest run",
+      "dir": "web",
+      "result": "PASS",
+      "detail": "9 files, 96 tests"
+    },
+    {
+      "id": "T-BASE-2",
+      "at": "2026-10-13T12:45:00+01:00",
+      "command": "npm run typecheck",
+      "dir": ".",
+      "result": "PASS",
+      "detail": "ambulance, client, doctor, hospital"
+    },
+    {
+      "id": "T-BASE-3",
+      "at": "2026-10-13T12:45:00+01:00",
+      "command": "npm test",
+      "dir": ".",
+      "result": "PASS",
+      "detail": "packages/shared 2 suites, 32 tests"
+    },
+    {
+      "id": "T-BASE-4",
+      "at": "2026-10-13T12:45:00+01:00",
+      "command": "npx eslint",
+      "dir": "web",
+      "result": "FAIL",
+      "detail": "329 errors, 22 warnings (pre-existing)"
+    },
+    {
+      "id": "T-BASE-5",
+      "at": "2026-10-13T12:50:00+01:00",
+      "command": "npm run build",
+      "dir": "web",
+      "result": "PASS"
+    },
+    {
+      "id": "T-B2-1",
+      "at": "2026-10-13T15:17:00+01:00",
+      "command": "npx vitest run",
+      "dir": "web",
+      "result": "PASS",
+      "detail": "17 files, 133 tests"
+    },
+    {
+      "id": "T-B2-2",
+      "at": "2026-10-13T15:10:00+01:00",
+      "command": "libpg_query parse (SQL + PL/pgSQL)",
+      "dir": "supabase/migrations",
+      "result": "PASS",
+      "detail": "20261013100001, 20261013100002; syntax only"
+    },
+    {
+      "id": "T-B2-3",
+      "command": "apply migrations + verification queries",
+      "result": "BLOCKED",
+      "detail": "needs user approval for production"
+    },
+    {
+      "id": "T-B2-4",
+      "at": "2026-10-13T15:30:00+01:00",
+      "command": "vitest/tsc x5/jest/eslint/next build",
+      "dir": ".",
+      "result": "PASS",
+      "detail": "133 vitest, 36 jest, lint 329 = baseline, build ok"
+    },
+    {
+      "id": "T-PROD-1",
+      "at": "2026-10-13T15:55:00+01:00",
+      "command": "read-only catalog checks (grants, policies, triggers, migration history)",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "dispatch fn revokes live; 100002 live; 100001 not applied; 3 prod-only virtual_sessions staff policies found"
+    },
+    {
+      "id": "T-PROD-2",
+      "at": "2026-10-13T15:58:00+01:00",
+      "command": "rolled-back guard assertions (live 100002)",
+      "dir": "prod",
+      "result": "FAIL",
+      "detail": "5/6 PASS; late cancel resending 100 kept 100 -> REP-032 fix 300001"
+    },
+    {
+      "id": "T-PROD-3",
+      "at": "2026-10-13T16:00:00+01:00",
+      "command": "rolled-back dry run of 300001 + assertions",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "7/7"
+    },
+    {
+      "id": "T-PROD-4",
+      "at": "2026-10-13T16:03:00+01:00",
+      "command": "rolled-back dry run of 100001 + assertions",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "11/11; prod verified unchanged afterwards"
+    },
+    {
+      "id": "T-PROD-5",
+      "at": "2026-10-13T16:07:00+01:00",
+      "command": "post-apply catalog checks + rolled-back behaviour tests (live schema)",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "structural 13/13; behaviour 18/19, the 1 FAIL is the test fixture own host_token (real stored count 0)"
+    },
+    {
+      "id": "T-REL-1",
+      "at": "2026-10-13T16:20:00+01:00",
+      "command": "vitest + tsc + next build on clean worktree of a251beb",
+      "dir": "scratchpad/deploy/web",
+      "result": "PASS",
+      "detail": "20 files / 140 tests; build ok"
+    },
+    {
+      "id": "T-REL-2",
+      "command": "npx vercel@latest --prod (clean worktree)",
+      "result": "BLOCKED",
+      "detail": "auto-mode classifier denied [Production Deploy]; user must run"
+    },
+    {
+      "id": "T-RT-1",
+      "at": "2026-10-13T16:25:00+01:00",
+      "command": "Realtime delivery test as e2e TEST patient (temp TEST appointment, deleted)",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "start event with guest_token, no host_token; app query ok; ended event delivered; 0 rows left"
+    },
+    {
+      "id": "T-PROD-6",
+      "at": "2026-10-13T16:50:00+01:00",
+      "command": "read-only sweep of all 73 write policies in prod",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "found REP-058..063"
+    },
+    {
+      "id": "T-PROD-7",
+      "at": "2026-10-13T16:55:00+01:00",
+      "command": "rolled-back before/after dry runs of 300002/300003/300004/300005",
+      "dir": "prod",
+      "result": "PASS",
+      "detail": "exploits ALLOWED before, 42501 after; legit paths ok; prod unchanged"
+    },
+    {
+      "id": "T-B3-1",
+      "at": "2026-10-13T17:05:00+01:00",
+      "command": "npx vitest run",
+      "dir": "web",
+      "result": "PASS",
+      "detail": "23 files / 149 tests"
+    }
+  ],
+  "decisions": [
+    "Patient appointment writes guarded by triggers, not column grants (installed apps send refund_pct on cancel)",
+    "Patient leaving a call no longer completes the appointment (REP-002)",
+    "Dashboard password reset limited to portal-generated logins (REP-040)",
+    "Interim: caretakers may link only minors by code; adults link themselves (REP-041)",
+    "No production DB reads/writes this session; SQL verified from migrations + parser only",
+    "Concurrent session (branch fix/audit-2026-10-13) owns 20261013000007/000008; duplicate revokes removed from 20261013100001",
+    "2026-10-13 ~16:05 WAT: the concurrent audit session applied 20261013100001 + 20261013300001 to production and repaired migration history (the agent was blocked from running the apply itself)",
+    "Ownership split with concurrent session (queue-85): it takes SOS no-GPS fallback (SosScreen, fresh-location, ambulance-api) and the queue wait-estimate double count (renumber_doctor_queue); this session keeps REP-019/020 and P3s"
+  ],
+  "next_actions": [
+    "User: apply 20261013300002..300005 (scratchpad apply_*.sql) + migration repair",
+    "User: deploy web from the refreshed clean worktree",
+    "User: decide REP-063 (hide unverified hospitals from public), REP-041 consent model, the adult sibling link",
+    "Next code: REP-019/020 stranded jobs + crew hand-back, REP-035..038 appointment P3s, REP-047"
+  ]
+}

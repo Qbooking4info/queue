@@ -207,7 +207,10 @@ export function CrewHomeScreen() {
     try {
       const result = await respondToOffer(offerId, action)
       if (action === 'accept' && !result.accepted) {
-        Alert.alert('Already covered', 'Another crew accepted this job first.')
+        // offer_no_longer_open covers expiry and the patient cancelling, not just a
+        // faster crew -- say what the server actually knows.
+        if (result.reason === 'already_covered') Alert.alert('Already covered', 'Another crew accepted this job first.')
+        else Alert.alert('Offer closed', 'This offer is no longer open — it expired or the request was cancelled.')
       }
       await load()
     } catch (err) {
