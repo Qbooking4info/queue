@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 import { normaliseDestination } from '@/lib/verification'
-import { POLICY_VERSION, CONSENT_KIND } from '@queue/shared/lib/privacy'
+import { POLICY_VERSION, CONSENT_KIND } from '@/lib/privacy'
 import type { Channel } from '@/lib/otp-delivery'
 
 /**

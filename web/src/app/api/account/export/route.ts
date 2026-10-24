@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { POLICY_VERSION, RETENTION_SUMMARY } from '@queue/shared/lib/privacy'
+import { POLICY_VERSION, RETENTION_SUMMARY } from '@/lib/privacy'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
 
 /**
