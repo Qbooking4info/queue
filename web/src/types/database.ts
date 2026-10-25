@@ -288,6 +288,7 @@ export type Database = {
           notes: string | null
           patient_id: string
           starts_on: string
+          source: string
           status: string
           title: string
           updated_at: string
@@ -304,6 +305,7 @@ export type Database = {
           notes?: string | null
           patient_id: string
           starts_on?: string
+          source?: string
           status?: string
           title: string
           updated_at?: string
@@ -320,6 +322,7 @@ export type Database = {
           notes?: string | null
           patient_id?: string
           starts_on?: string
+          source?: string
           status?: string
           title?: string
           updated_at?: string

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { View, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Switch } from 'react-native'
+import { View, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Switch, TextInput } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { Text } from '@queue/shared/components/ui/Typography'
@@ -9,6 +9,7 @@ import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import {
   getTaskTimes, setTaskTimes, syncCarePlanReminders, defaultTimes,
+  addOwnGoal, removeOwnGoal,
   type ReminderSlot,
 } from '@queue/shared/lib/carePlanReminders'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -24,7 +25,7 @@ interface Props { navigation: any }
 type Cadence = 'daily' | 'weekly' | 'once'
 interface Task { id: string; title: string; cadence: Cadence; due_on: string | null; sort_order: number; times_per_day: number }
 interface Plan {
-  id: string; title: string; condition: string | null; notes: string | null; starts_on: string; ends_on: string | null
+  id: string; title: string; source: 'clinical' | 'self'; condition: string | null; notes: string | null; starts_on: string; ends_on: string | null
   next_check_in: string | null; hospital: { name: string } | null; doctor: { full_name: string | null } | null; tasks: Task[]
 }
 interface Log { id: string; task_id: string; plan_id: string; done_on: string; slot: number }
@@ -43,6 +44,7 @@ export function CarePlansScreen({ navigation }: Props) {
   const [logs, setLogs] = useState<Log[]>([])
   const [times, setTimes] = useState<{ id: string; task_id: string; slot: number; time_of_day: string; enabled: boolean }[]>([])
   const [editing, setEditing] = useState<Task | null>(null)
+  const [adding, setAdding] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -51,7 +53,7 @@ export function CarePlansScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('care_plans')
-      .select('id, title, condition, notes, starts_on, ends_on, next_check_in, hospital:hospitals(name), doctor:doctors(full_name), tasks:care_plan_tasks(id, title, cadence, due_on, sort_order, times_per_day)')
+      .select('id, title, source, condition, notes, starts_on, ends_on, next_check_in, hospital:hospitals(name), doctor:doctors(full_name), tasks:care_plan_tasks(id, title, cadence, due_on, sort_order, times_per_day)')
       .eq('status', 'active').order('created_at', { ascending: false })
     if (error) { setPlans([]); setRefreshing(false); return }
     const ps = ((data ?? []) as any[]).map(p => ({ ...p, tasks: (p.tasks ?? []).sort((a: Task, b: Task) => a.sort_order - b.sort_order) })) as Plan[]
@@ -138,9 +140,10 @@ export function CarePlansScreen({ navigation }: Props) {
         {plans == null ? (
           <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
         ) : plans.length === 0 ? (
-          <View style={{ padding: 20 }}>
-            <EmptyState icon="checkbox-outline" title="No care plan yet"
-              body="Care plans are set by your hospital or doctor after a visit, for things like blood pressure, diabetes or recovery. When they create one, it appears here." />
+          <View style={{ padding: 20, gap: 14 }}>
+            <EmptyState icon="checkbox-outline" title="Nothing here yet"
+              body="Your hospital or doctor can set a plan after a visit — for blood pressure, diabetes or recovery. You can also set your own goals right now." />
+            <PrimaryButton label="Set your own goal" icon="add" onPress={() => setAdding(true)} />
           </View>
         ) : plans.map(p => {
           const pct = weekProgress(p)
@@ -195,6 +198,20 @@ export function CarePlansScreen({ navigation }: Props) {
                               : task.cadence === 'weekly' ? 'Once this week' : `Due ${task.due_on ? fmt(task.due_on) : ''}`}
                           </Text>
                         </View>
+                        {p.source === 'self' && (
+                          <TouchableOpacity
+                            onPress={() => Alert.alert('Remove goal?', task.title, [
+                              { text: 'Keep', style: 'cancel' },
+                              { text: 'Remove', style: 'destructive', onPress: async () => {
+                                const err = await removeOwnGoal(task.id)
+                                if (err) Alert.alert('Could not remove', err); else { haptics.success(); await load() }
+                              } },
+                            ])}
+                            accessibilityRole="button" accessibilityLabel={`Remove ${task.title}`} hitSlop={8}
+                            style={{ padding: 4 }}>
+                            <Ionicons name="trash-outline" size={16} color={t.textMuted} />
+                          </TouchableOpacity>
+                        )}
                         {task.cadence === 'daily' && (
                           <TouchableOpacity onPress={() => setEditing(task)} accessibilityRole="button"
                             accessibilityLabel={`Set reminder times for ${task.title}`} hitSlop={8}
@@ -239,7 +256,21 @@ export function CarePlansScreen({ navigation }: Props) {
             </View>
           )
         })}
+
+        {!!plans?.length && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
+            <PrimaryButton label="Add a goal of your own" variant="ghost" icon="add"
+              onPress={() => setAdding(true)} />
+          </View>
+        )}
       </ScrollView>
+
+      {adding && (
+        <AddGoalSheet
+          onClose={() => setAdding(false)}
+          onSaved={async () => { setAdding(false); await load() }}
+        />
+      )}
 
       {editing && (
         <TimesSheet
@@ -345,6 +376,118 @@ function TimesSheet({ task, current, onClose, onSaved }: {
 
           <View style={{ gap: 9 }}>
             <PrimaryButton label={saving ? 'Saving…' : 'Save reminders'} onPress={save} loading={saving} />
+            <PrimaryButton label="Cancel" variant="ghost" onPress={onClose} disabled={saving} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+/**
+ * A goal the patient sets for themselves -- "no alcohol today", "walk after
+ * dinner". It behaves exactly like a prescribed task once saved: ticked the
+ * same way, remindable the same way. Only the author differs, and RLS keeps
+ * these separate from anything a doctor wrote.
+ */
+function AddGoalSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { theme: t } = useTheme()
+  const [title, setTitle] = useState('')
+  const [cadence, setCadence] = useState<'daily' | 'weekly'>('daily')
+  const [perDay, setPerDay] = useState(1)
+  const [saving, setSaving] = useState(false)
+
+  // Starting points, not a fixed menu. Chosen to cover the common shapes: a
+  // thing to avoid, a thing to do, and a thing to do several times a day.
+  const SUGGESTIONS = [
+    'No alcohol today',
+    'No smoking today',
+    'Walk 30 minutes',
+    'Drink 2 litres of water',
+    'Take blood pressure reading',
+    '30 minutes of exercise',
+  ]
+
+  async function save() {
+    if (!title.trim()) return
+    setSaving(true)
+    const err = await addOwnGoal({ title, cadence, timesPerDay: perDay })
+    setSaving(false)
+    if (err) { haptics.error(); Alert.alert('Could not add', err); return }
+    haptics.success()
+    onSaved()
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: t.cardBg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, gap: 16, maxHeight: '86%' }}>
+          <View style={{ gap: 3 }}>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>Your own goal</Text>
+            <Text style={{ fontSize: 13, color: t.textMuted, lineHeight: 18 }}>
+              Something you want to hold yourself to. It sits alongside your doctor&apos;s plan
+              and only you can see it.
+            </Text>
+          </View>
+
+          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 16 }} keyboardShouldPersistTaps="handled">
+            <TextInput
+              value={title} onChangeText={setTitle} autoFocus
+              placeholder="e.g. No alcohol today"
+              placeholderTextColor={t.textMuted}
+              style={{ borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15,
+                backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }}
+            />
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {SUGGESTIONS.map(x => (
+                <TouchableOpacity key={x} onPress={() => { haptics.tap(); setTitle(x) }}
+                  accessibilityRole="button"
+                  style={{ paddingHorizontal: 11, paddingVertical: 7, borderRadius: 99, borderWidth: 1,
+                    borderColor: t.cardBorder, backgroundColor: t.inputBg }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: t.textMuted }}>{x}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>How often</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {([['daily', 'Every day'], ['weekly', 'Once a week']] as const).map(([k, label]) => (
+                  <TouchableOpacity key={k} onPress={() => { haptics.tap(); setCadence(k) }}
+                    accessibilityRole="button" accessibilityState={{ selected: cadence === k }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99, borderWidth: 1,
+                      borderColor: cadence === k ? t.accentBorder : t.cardBorder,
+                      backgroundColor: cadence === k ? t.accentBg : t.inputBg }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: cadence === k ? t.accent : t.textMuted }}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {cadence === 'daily' && (
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Times a day</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[1, 2, 3, 4].map(n => (
+                    <TouchableOpacity key={n} onPress={() => { haptics.tap(); setPerDay(n) }}
+                      accessibilityRole="button" accessibilityState={{ selected: perDay === n }}
+                      style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99, borderWidth: 1,
+                        borderColor: perDay === n ? t.accentBorder : t.cardBorder,
+                        backgroundColor: perDay === n ? t.accentBg : t.inputBg }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: perDay === n ? t.accent : t.textMuted }}>{n}×</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={{ fontSize: 12, color: t.textMuted }}>
+                  You can set the times, and turn reminders on, once it is added.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={{ gap: 9 }}>
+            <PrimaryButton label={saving ? 'Adding…' : 'Add goal'} onPress={save} loading={saving} disabled={saving || !title.trim()} />
             <PrimaryButton label="Cancel" variant="ghost" onPress={onClose} disabled={saving} />
           </View>
         </View>

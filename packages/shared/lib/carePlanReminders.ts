@@ -167,3 +167,82 @@ export async function setTaskTimes(
   )
   return error?.message ?? null
 }
+
+// ── the patient's own goals ──────────────────────────────────────────────────
+//
+// Goals the patient sets for themselves -- "no alcohol today", "walk after
+// dinner" -- kept in a care plan of their own with source='self'. They tick,
+// log and remind exactly like a prescribed task; only the author differs.
+//
+// Everything here is scoped by RLS to the caller's own self-authored plan, so
+// none of it can reach a plan a doctor wrote.
+
+const OWN_GOALS_TITLE = 'My own goals'
+
+/** The patient's goal list, created the first time they add something. */
+export async function getOrCreateOwnGoalPlan(): Promise<{ id: string } | { error: string }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Please sign in again.' }
+
+  const { data: me } = await supabase.from('users').select('id').eq('auth_id', user.id).maybeSingle()
+  if (!me) return { error: 'Profile not found.' }
+
+  const { data: existing } = await supabase
+    .from('care_plans')
+    .select('id')
+    .eq('patient_id', me.id)
+    .eq('source', 'self')
+    .eq('status', 'active')
+    .maybeSingle()
+  if (existing) return { id: existing.id }
+
+  const { data: made, error } = await supabase
+    .from('care_plans')
+    .insert({
+      patient_id: me.id,
+      title: OWN_GOALS_TITLE,
+      starts_on: new Date().toISOString().slice(0, 10),
+      source: 'self',
+      created_by: me.id,
+    } as never)
+    .select('id')
+    .single()
+
+  if (error || !made) return { error: error?.message ?? 'Could not start your goal list.' }
+  return { id: made.id }
+}
+
+export async function addOwnGoal(input: {
+  title: string
+  cadence: 'daily' | 'weekly'
+  timesPerDay?: number
+}): Promise<string | null> {
+  const plan = await getOrCreateOwnGoalPlan()
+  if ('error' in plan) return plan.error
+
+  const { data: last } = await supabase
+    .from('care_plan_tasks').select('sort_order')
+    .eq('plan_id', plan.id).order('sort_order', { ascending: false }).limit(1).maybeSingle()
+
+  const { error } = await supabase.from('care_plan_tasks').insert({
+    plan_id: plan.id,
+    title: input.title.trim().slice(0, 160),
+    cadence: input.cadence,
+    // Only meaningful daily; a weekly goal happens once when it happens.
+    times_per_day: input.cadence === 'daily'
+      ? Math.min(12, Math.max(1, Math.round(input.timesPerDay ?? 1)))
+      : 1,
+    sort_order: (last?.sort_order ?? -1) + 1,
+  } as never)
+
+  return error?.message ?? null
+}
+
+/**
+ * Remove one of the patient's own goals. RLS refuses this for a prescribed
+ * task, so a mistyped id cannot delete something a doctor set.
+ */
+export async function removeOwnGoal(taskId: string): Promise<string | null> {
+  const { error } = await supabase.from('care_plan_tasks').delete().eq('id', taskId)
+  return error?.message ?? null
+}
