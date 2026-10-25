@@ -36,7 +36,7 @@ const COMMON = [
 let seq = 0
 const nextId = () => `t${++seq}`
 
-interface Draft { id: string; title: string; cadence: CarePlanCadence; dueOn: string }
+interface Draft { id: string; title: string; cadence: CarePlanCadence; dueOn: string; perDay: number }
 
 /**
  * The doctor writes the patient's care plan during the consultation -- the
@@ -55,7 +55,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
   const [condition, setCondition] = useState('')
   const [notes, setNotes]         = useState('')
   const [weeks, setWeeks]         = useState<number | null>(4)
-  const [tasks, setTasks]         = useState<Draft[]>([{ id: nextId(), title: '', cadence: 'daily', dueOn: '' }])
+  const [tasks, setTasks]         = useState<Draft[]>([{ id: nextId(), title: '', cadence: 'daily', dueOn: '', perDay: 1 }])
   const [saving, setSaving]       = useState(false)
 
   const filled = tasks.filter(x => x.title.trim())
@@ -70,7 +70,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
       // Fill the first blank row rather than stacking another empty one under it.
       const blank = list.find(x => !x.title.trim())
       if (blank && text) return list.map(x => (x.id === blank.id ? { ...x, title: text } : x))
-      return [...list, { id: nextId(), title: text, cadence: 'daily', dueOn: '' }]
+      return [...list, { id: nextId(), title: text, cadence: 'daily', dueOn: '', perDay: 1 }]
     })
   }
 
@@ -88,6 +88,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
       title: x.title.trim(),
       cadence: x.cadence,
       ...(x.cadence === 'once' ? { dueOn: x.dueOn.trim() } : {}),
+      ...(x.cadence === 'daily' ? { timesPerDay: x.perDay } : {}),
     }))
 
     const res = await createCarePlan({
@@ -162,6 +163,22 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
                       onPress={() => setTask(x.id, { cadence: c.key })} theme={t} small />
                   ))}
                 </View>
+
+                {/* How often, not when. The patient sets the clock times in
+                    their own app -- a doctor cannot know when this person eats
+                    or sleeps, and a reminder at the wrong hour gets dismissed
+                    until it is ignored altogether. */}
+                {x.cadence === 'daily' && (
+                  <View style={{ gap: 6 }}>
+                    <Text style={[s.hint, { color: t.textMuted }]}>How many times a day</Text>
+                    <View style={s.row}>
+                      {[1, 2, 3, 4].map(n => (
+                        <Chip key={n} on={x.perDay === n} label={`${n}×`}
+                          onPress={() => setTask(x.id, { perDay: n })} theme={t} small />
+                      ))}
+                    </View>
+                  </View>
+                )}
 
                 {x.cadence === 'once' && (
                   <TextInput

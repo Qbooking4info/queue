@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           done_at: string
           done_on: string
+          slot: number
           id: string
           logged_by: string | null
           plan_id: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           done_at?: string
           done_on?: string
+          slot?: number
           id?: string
           logged_by?: string | null
           plan_id: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           done_at?: string
           done_on?: string
+          slot?: number
           id?: string
           logged_by?: string | null
           plan_id?: string
@@ -71,6 +74,7 @@ export type Database = {
           id: string
           plan_id: string
           sort_order: number
+          times_per_day: number
           title: string
         }
         Insert: {
@@ -80,6 +84,7 @@ export type Database = {
           id?: string
           plan_id: string
           sort_order?: number
+          times_per_day?: number
           title: string
         }
         Update: {
@@ -89,6 +94,7 @@ export type Database = {
           id?: string
           plan_id?: string
           sort_order?: number
+          times_per_day?: number
           title?: string
         }
         Relationships: [

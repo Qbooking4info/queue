@@ -1618,6 +1618,11 @@ export interface NewCarePlanTask {
   cadence: CarePlanCadence
   /** Required when cadence is 'once'. */
   dueOn?: string
+  /**
+   * How many times a day, for a daily task. The doctor says how often; the
+   * patient picks the clock times in the app.
+   */
+  timesPerDay?: number
 }
 
 export async function createCarePlan(input: {

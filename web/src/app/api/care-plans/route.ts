@@ -80,8 +80,15 @@ export async function POST(req: NextRequest) {
   if (!b || typeof b.patientId !== 'string' || !title) return NextResponse.json({ error: 'Patient and title are required.' }, { status: 400 })
   if (title.length > 120) return NextResponse.json({ error: 'Title is too long (120 characters max).' }, { status: 400 })
   const cleanTasks = tasks
-    .map((t, i) => ({ title: typeof t.title === 'string' ? t.title.trim() : '', cadence: CADENCES.includes(t.cadence as Cadence) ? t.cadence as Cadence : 'daily',
-      due_on: isDate(t.dueOn) ? t.dueOn : null, sort_order: i }))
+    .map((t, i) => ({
+      title: typeof t.title === 'string' ? t.title.trim() : '',
+      cadence: CADENCES.includes(t.cadence as Cadence) ? t.cadence as Cadence : 'daily',
+      due_on: isDate(t.dueOn) ? t.dueOn : null,
+      // Clamped here, not trusted: the column's CHECK would reject anything
+      // outside 1-12 with a 500 rather than a readable message.
+      times_per_day: Math.min(12, Math.max(1, Math.round(Number(t.timesPerDay) || 1))),
+      sort_order: i,
+    }))
     .filter(t => t.title)
   if (!cleanTasks.length) return NextResponse.json({ error: 'Add at least one task.' }, { status: 400 })
   if (cleanTasks.some(t => t.title.length > 160)) return NextResponse.json({ error: 'A task is too long (160 characters max).' }, { status: 400 })
