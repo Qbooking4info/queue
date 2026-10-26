@@ -71,30 +71,33 @@ export type Database = {
           cadence: string
           created_at: string
           due_on: string | null
+          ends_on: string | null
           id: string
           plan_id: string
           sort_order: number
-          times_per_day: number
+          times_per_period: number
           title: string
         }
         Insert: {
           cadence?: string
           created_at?: string
           due_on?: string | null
+          ends_on?: string | null
           id?: string
           plan_id: string
           sort_order?: number
-          times_per_day?: number
+          times_per_period?: number
           title: string
         }
         Update: {
           cadence?: string
           created_at?: string
           due_on?: string | null
+          ends_on?: string | null
           id?: string
           plan_id?: string
           sort_order?: number
-          times_per_day?: number
+          times_per_period?: number
           title?: string
         }
         Relationships: [
