@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
-import { adherence, isoDay, type PlanTask, type TaskLog, type Cadence } from '@/lib/care-plans'
+import { adherence, isoDay, endsOnFrom, MAX_PER_PERIOD, type PlanTask, type TaskLog, type Cadence } from '@/lib/care-plans'
 
 /**
  * GET   /api/care-plans/[id]  plan, tasks, 28 days of ticks, 7-day and per-week adherence
@@ -18,7 +18,7 @@ async function load(db: ReturnType<typeof createAdminClient>, id: string, hospit
     .select(`id, hospital_id, title, condition, notes, status, starts_on, ends_on, next_check_in, created_at, patient_id,
       patient:users!care_plans_patient_id_fkey(full_name, phone),
       doctor:doctors(full_name),
-      tasks:care_plan_tasks(id, title, cadence, due_on, sort_order)`)
+      tasks:care_plan_tasks(id, title, cadence, due_on, sort_order, times_per_period, ends_on)`)
     .eq('id', id).eq('hospital_id', hospitalId).maybeSingle()
   return data as unknown as (Record<string, unknown> & { id: string; starts_on: string; ends_on: string | null; tasks: PlanTask[] | null }) | null
 }
@@ -86,9 +86,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Array.isArray(b.addTasks) && b.addTasks.length) {
     const base = (plan.tasks ?? []).reduce((m, t) => Math.max(m, t.sort_order), -1) + 1
     const rows = (b.addTasks as Record<string, unknown>[])
-      .map((t, i) => ({ plan_id: id, title: typeof t.title === 'string' ? t.title.trim().slice(0, 160) : '',
-        cadence: (['daily', 'weekly', 'once'] as Cadence[]).includes(t.cadence as Cadence) ? t.cadence as Cadence : 'daily',
-        due_on: isDate(t.dueOn) ? t.dueOn : null, sort_order: base + i }))
+      .map((t, i) => {
+        const cadence = (['daily', 'weekly', 'monthly', 'once'] as Cadence[]).includes(t.cadence as Cadence)
+          ? t.cadence as Cadence : 'daily'
+        return {
+          plan_id: id,
+          title: typeof t.title === 'string' ? t.title.trim().slice(0, 160) : '',
+          cadence,
+          times_per_period: Math.min(MAX_PER_PERIOD[cadence], Math.max(1, Math.round(Number(t.timesPerPeriod) || 1))),
+          // Counted from the plan's start, the same as it is on create, so a
+          // task added later to a running plan ends where it would have.
+          ends_on: cadence === 'once' ? null : endsOnFrom(plan.starts_on, t.durationWeeks),
+          due_on: isDate(t.dueOn) ? t.dueOn : null,
+          sort_order: base + i,
+        }
+      })
       .filter(t => t.title && (t.cadence !== 'once' || t.due_on))
     if (rows.length) {
       const { error: tErr } = await db.from('care_plan_tasks').insert(rows)

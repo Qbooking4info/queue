@@ -11,17 +11,12 @@ import { Alert } from '../contexts/AlertContext'
 import { haptics } from '../lib/haptics'
 import { fmtLocalDate } from '../lib/format'
 import { createCarePlan, type CarePlanCadence, type NewCarePlanTask } from '../lib/api'
+import { SchedulePicker, type Schedule } from '../components/ui/SchedulePicker'
 
 interface Props {
   navigation: any
   route: { params: { patientId: string; patientName?: string } }
 }
-
-const CADENCES: { key: CarePlanCadence; label: string }[] = [
-  { key: 'daily',  label: 'Every day' },
-  { key: 'weekly', label: 'Every week' },
-  { key: 'once',   label: 'Once' },
-]
 
 // Starting points, not a fixed list -- every one is editable once added.
 const COMMON = [
@@ -36,7 +31,15 @@ const COMMON = [
 let seq = 0
 const nextId = () => `t${++seq}`
 
-interface Draft { id: string; title: string; cadence: CarePlanCadence; dueOn: string }
+interface Draft extends Schedule { id: string; title: string; dueOn: string }
+
+const blankTask = (title = ''): Draft => ({
+  id: nextId(), title, dueOn: '',
+  cadence: 'daily', timesPerPeriod: 1,
+  // Null is "as long as the plan": the common case, and what every task did
+  // before a task could end on its own.
+  durationWeeks: null,
+})
 
 /**
  * The doctor writes the patient's care plan during the consultation -- the
@@ -55,7 +58,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
   const [condition, setCondition] = useState('')
   const [notes, setNotes]         = useState('')
   const [weeks, setWeeks]         = useState<number | null>(4)
-  const [tasks, setTasks]         = useState<Draft[]>([{ id: nextId(), title: '', cadence: 'daily', dueOn: '' }])
+  const [tasks, setTasks]         = useState<Draft[]>([blankTask()])
   const [saving, setSaving]       = useState(false)
 
   const filled = tasks.filter(x => x.title.trim())
@@ -70,7 +73,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
       // Fill the first blank row rather than stacking another empty one under it.
       const blank = list.find(x => !x.title.trim())
       if (blank && text) return list.map(x => (x.id === blank.id ? { ...x, title: text } : x))
-      return [...list, { id: nextId(), title: text, cadence: 'daily', dueOn: '' }]
+      return [...list, blankTask(text)]
     })
   }
 
@@ -87,7 +90,9 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
     const payload: NewCarePlanTask[] = filled.map(x => ({
       title: x.title.trim(),
       cadence: x.cadence,
-      ...(x.cadence === 'once' ? { dueOn: x.dueOn.trim() } : {}),
+      ...(x.cadence === 'once'
+        ? { dueOn: x.dueOn.trim() }
+        : { timesPerPeriod: x.timesPerPeriod, durationWeeks: x.durationWeeks }),
     }))
 
     const res = await createCarePlan({
@@ -123,7 +128,7 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
             <Field label="Condition (optional)" value={condition} onChangeText={setCondition} placeholder="e.g. Hypertension" theme={t} />
 
             <View style={{ gap: 8 }}>
-              <Text style={[s.label, { color: t.textPrimary }]}>Runs for</Text>
+              <Text style={[s.label, { color: t.textPrimary }]}>The whole plan runs for</Text>
               <View style={s.row}>
                 {[2, 4, 8, 12].map(w => (
                   <Chip key={w} on={weeks === w} label={`${w} wks`} onPress={() => setWeeks(w)} theme={t} />
@@ -156,12 +161,24 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
                   )}
                 </View>
 
+                {/* How often, not when. The patient sets the clock times -- and
+                    the weekday or day of the month -- in their own app: a doctor
+                    cannot know when this person eats or sleeps, and a reminder at
+                    the wrong hour gets dismissed until it is ignored altogether. */}
                 <View style={s.row}>
-                  {CADENCES.map(c => (
-                    <Chip key={c.key} on={x.cadence === c.key} label={c.label}
-                      onPress={() => setTask(x.id, { cadence: c.key })} theme={t} small />
-                  ))}
+                  <Chip on={x.cadence !== 'once'} label="Repeating"
+                    onPress={() => setTask(x.id, { cadence: 'daily' })} theme={t} small />
+                  <Chip on={x.cadence === 'once'} label="Once, on a date"
+                    onPress={() => setTask(x.id, { cadence: 'once', timesPerPeriod: 1, durationWeeks: null })} theme={t} small />
                 </View>
+
+                {x.cadence !== 'once' && (
+                  <SchedulePicker
+                    compact
+                    value={x}
+                    onChange={next => setTask(x.id, next)}
+                  />
+                )}
 
                 {x.cadence === 'once' && (
                   <TextInput

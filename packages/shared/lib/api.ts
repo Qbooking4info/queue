@@ -1613,13 +1613,26 @@ export async function registerVerified(payload: {
 // caller, so neither is sent from here: a client that could name them could
 // file a plan under another doctor or hospital.
 
-export type CarePlanCadence = 'daily' | 'weekly' | 'once'
+export type CarePlanCadence = 'daily' | 'weekly' | 'monthly' | 'once'
 
 export interface NewCarePlanTask {
   title: string
+  /** Which period the count is against; 'once' is a dated one-off. */
   cadence: CarePlanCadence
   /** Required when cadence is 'once'. */
   dueOn?: string
+  /**
+   * How many times within one period -- 3 with 'daily' is three times a day,
+   * 2 with 'weekly' is twice a week. The doctor says how often; the patient
+   * picks the clock times, and the day within the period, in the app.
+   */
+  timesPerPeriod?: number
+  /**
+   * How many weeks this task runs for, counted from the plan's start. Omitted
+   * or null means it runs as long as the plan does -- which is what every task
+   * did before tasks could end on their own.
+   */
+  durationWeeks?: number | null
 }
 
 export async function createCarePlan(input: {

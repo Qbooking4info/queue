@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           done_at: string
           done_on: string
+          slot: number
           id: string
           logged_by: string | null
           plan_id: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           done_at?: string
           done_on?: string
+          slot?: number
           id?: string
           logged_by?: string | null
           plan_id: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           done_at?: string
           done_on?: string
+          slot?: number
           id?: string
           logged_by?: string | null
           plan_id?: string
@@ -68,27 +71,33 @@ export type Database = {
           cadence: string
           created_at: string
           due_on: string | null
+          ends_on: string | null
           id: string
           plan_id: string
           sort_order: number
+          times_per_period: number
           title: string
         }
         Insert: {
           cadence?: string
           created_at?: string
           due_on?: string | null
+          ends_on?: string | null
           id?: string
           plan_id: string
           sort_order?: number
+          times_per_period?: number
           title: string
         }
         Update: {
           cadence?: string
           created_at?: string
           due_on?: string | null
+          ends_on?: string | null
           id?: string
           plan_id?: string
           sort_order?: number
+          times_per_period?: number
           title?: string
         }
         Relationships: [
@@ -282,6 +291,7 @@ export type Database = {
           notes: string | null
           patient_id: string
           starts_on: string
+          source: string
           status: string
           title: string
           updated_at: string
@@ -298,6 +308,7 @@ export type Database = {
           notes?: string | null
           patient_id: string
           starts_on?: string
+          source?: string
           status?: string
           title: string
           updated_at?: string
@@ -314,6 +325,7 @@ export type Database = {
           notes?: string | null
           patient_id?: string
           starts_on?: string
+          source?: string
           status?: string
           title?: string
           updated_at?: string

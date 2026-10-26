@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
-import { adherence, isoDay, type PlanTask, type TaskLog, type Cadence } from '@/lib/care-plans'
+import { adherence, isoDay, endsOnFrom, MAX_PER_PERIOD, type PlanTask, type TaskLog, type Cadence } from '@/lib/care-plans'
 
 /**
  * GET  /api/care-plans?status=active|completed|stopped|all
  *      The hospital's care plans with patient, task count and 7-day adherence.
  * POST /api/care-plans
  *      { patientId, title, condition?, notes?, startsOn?, endsOn?, nextCheckIn?, doctorId?,
- *        tasks: [{ title, cadence: 'daily'|'weekly'|'once', dueOn? }] }
+ *        tasks: [{ title, cadence, dueOn?, timesPerPeriod?, durationWeeks? }] }
  *      The patient must have a visit at this hospital. Shared by web and Queue Hospital.
  */
 const STAFF = ['hospital_admin', 'clinic_admin', 'front_desk'] as const
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     .select(`id, title, condition, status, starts_on, ends_on, next_check_in, created_at, patient_id,
       patient:users!care_plans_patient_id_fkey(full_name, phone),
       doctor:doctors(full_name),
-      tasks:care_plan_tasks(id, title, cadence, due_on, sort_order)`)
+      tasks:care_plan_tasks(id, title, cadence, due_on, sort_order, times_per_period, ends_on)`)
     .eq('hospital_id', caller.hospitalId).order('created_at', { ascending: false }).limit(500)
   if (status !== 'all') q = q.eq('status', status)
   const { data, error } = await q
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   })
 }
 
-const CADENCES: Cadence[] = ['daily', 'weekly', 'once']
+const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'once']
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 
 export async function POST(req: NextRequest) {
@@ -80,13 +80,29 @@ export async function POST(req: NextRequest) {
   if (!b || typeof b.patientId !== 'string' || !title) return NextResponse.json({ error: 'Patient and title are required.' }, { status: 400 })
   if (title.length > 120) return NextResponse.json({ error: 'Title is too long (120 characters max).' }, { status: 400 })
   const cleanTasks = tasks
-    .map((t, i) => ({ title: typeof t.title === 'string' ? t.title.trim() : '', cadence: CADENCES.includes(t.cadence as Cadence) ? t.cadence as Cadence : 'daily',
-      due_on: isDate(t.dueOn) ? t.dueOn : null, sort_order: i }))
+    .map((t, i) => {
+      const cadence = CADENCES.includes(t.cadence as Cadence) ? t.cadence as Cadence : 'daily'
+      return {
+        title: typeof t.title === 'string' ? t.title.trim() : '',
+        cadence,
+        due_on: isDate(t.dueOn) ? t.dueOn : null,
+        // Clamped against this task's own period, never trusted from the client.
+        times_per_period: Math.min(MAX_PER_PERIOD[cadence], Math.max(1, Math.round(Number(t.timesPerPeriod) || 1))),
+        durationWeeks: t.durationWeeks,
+        sort_order: i,
+      }
+    })
     .filter(t => t.title)
   if (!cleanTasks.length) return NextResponse.json({ error: 'Add at least one task.' }, { status: 400 })
   if (cleanTasks.some(t => t.title.length > 160)) return NextResponse.json({ error: 'A task is too long (160 characters max).' }, { status: 400 })
   if (cleanTasks.some(t => t.cadence === 'once' && !t.due_on)) return NextResponse.json({ error: 'One-off tasks need a due date.' }, { status: 400 })
   const startsOn = isDate(b.startsOn) ? b.startsOn : isoDay(new Date())
+  // A task's duration is counted from the plan's start, so it becomes a date
+  // only once that is known. A one-off ends on its due date, not a duration.
+  const datedTasks = cleanTasks.map(({ durationWeeks, ...t }) => ({
+    ...t,
+    ends_on: t.cadence === 'once' ? null : endsOnFrom(startsOn, durationWeeks),
+  }))
   const endsOn = isDate(b.endsOn) ? b.endsOn : null
   if (endsOn && endsOn < startsOn) return NextResponse.json({ error: 'The end date is before the start date.' }, { status: 400 })
 
@@ -133,7 +149,7 @@ export async function POST(req: NextRequest) {
   }).select('id').single()
   if (error || !plan) return NextResponse.json({ error: error?.message ?? 'Could not create the plan.' }, { status: 500 })
 
-  const { error: tErr } = await db.from('care_plan_tasks').insert(cleanTasks.map(t => ({ ...t, plan_id: plan.id })))
+  const { error: tErr } = await db.from('care_plan_tasks').insert(datedTasks.map(t => ({ ...t, plan_id: plan.id })))
   if (tErr) {
     await db.from('care_plans').delete().eq('id', plan.id)
     return NextResponse.json({ error: tErr.message }, { status: 500 })

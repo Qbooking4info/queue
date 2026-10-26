@@ -1,5 +1,5 @@
 # Queue — Row Level Security Policies
-**Updated:** July 2026 · All tables have RLS enabled · Service-role (admin) always bypasses RLS
+**Updated:** October 2026 · All tables have RLS enabled · Service-role (admin) always bypasses RLS
 
 Web API routes use `createAdminClient()` (service role key) and are **not affected by these policies**. Policies protect direct anon-key access — primarily from the mobile app and any unauthenticated requests.
 
@@ -257,6 +257,75 @@ Web API routes use `createAdminClient()` (service role key) and are **not affect
 |---|---|---|
 | Public can read hospital images | SELECT | `true` |
 | Hospital admins manage hospital images | ALL | hospital admin with role `admin` or `owner` only |
+
+---
+
+## `care_plans` *(`20261013000006`, `20261025000002`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| care plans readable by patient and hospital | SELECT | `patient_id IN (SELECT current_patient_ids())` **OR** `hospital_id IN (SELECT my_staff_hospital_ids())` |
+| patient creates own goals | INSERT | `source = 'self'` AND `patient_id IN (SELECT current_patient_ids())` AND `hospital_id IS NULL` AND `doctor_id IS NULL` |
+| patient edits own goals | UPDATE | `source = 'self'` AND own patient id (both USING and WITH CHECK) |
+| patient deletes own goals | DELETE | `source = 'self'` AND own patient id |
+
+A self-authored plan carries no `hospital_id` and no `doctor_id`, which the INSERT policy
+requires. That keeps a patient's private goal out of a hospital's roster — and it means
+**staff never see these at all**, because their read is scoped by hospital. A doctor will
+not know their patient set them.
+
+`source` is additionally immutable via trigger (`trg_care_plans_source_immutable`). The
+UPDATE policy alone is not enough: its `WITH CHECK` only re-tests the *new* row, so without
+the trigger a clinical plan could be flipped to `self` by anyone who can reach it, after
+which the patient owns a plan their doctor wrote. Service-role callers bypass RLS but not
+triggers, so the trigger also stops an API route reclassifying a plan by accident.
+
+---
+
+## `care_plan_tasks` *(`20261013000006`, `20261025000002`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| care plan tasks readable with their plan | SELECT | `plan_id IN (SELECT id FROM care_plans)` |
+| patient adds own goal tasks | INSERT | `owns_self_care_plan(plan_id)` |
+| patient edits own goal tasks | UPDATE | `owns_self_care_plan(plan_id)` (both USING and WITH CHECK) |
+| patient deletes own goal tasks | DELETE | `owns_self_care_plan(plan_id)` |
+
+The SELECT rule looks unbounded but is not: RLS applies inside the subquery too, so
+`SELECT id FROM care_plans` returns only the plans this caller may already read. The write
+policies are narrower than the read on purpose — a patient may read the tasks a doctor
+wrote, and may not touch them.
+
+`owns_self_care_plan(uuid)` is `SECURITY DEFINER`, `search_path = public`, revoked from
+PUBLIC and granted to `authenticated` only.
+
+---
+
+## `care_plan_task_times` *(`20261025000001`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| patient reads own care plan times | SELECT | `owns_care_plan_task(task_id)` |
+| patient sets own care plan times | INSERT | `owns_care_plan_task(task_id)` |
+| patient changes own care plan times | UPDATE | `owns_care_plan_task(task_id)` (both) |
+| patient clears own care plan times | DELETE | `owns_care_plan_task(task_id)` |
+
+The times are the patient's own choice, so the patient manages all four operations — on
+*any* of their tasks, prescribed or self-authored, which is the difference from
+`care_plan_tasks` above. Scoped through the plan to that patient, so this cannot reach
+somebody else's schedule.
+
+`owns_care_plan_task(uuid)` is `SECURITY DEFINER`, `search_path = public`, revoked from
+PUBLIC and granted to `authenticated` only.
+
+---
+
+## `care_plan_task_logs` *(`20261013000006`, `20261025000001`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| care plan logs readable with their plan | SELECT | `plan_id IN (SELECT id FROM care_plans)` |
+| patient ticks own care plan task | INSERT | plan is `active` and the caller's own; `done_on` within the plan's `starts_on`..`ends_on`; `task_id` belongs to that plan; and `done_on` is today or yesterday |
+| patient unticks own care plan task | DELETE | own plan **and** `done_on >= CURRENT_DATE - 1` |
+
+Ticking is bounded to today or yesterday in both directions, so a patient cannot
+retroactively manufacture — or erase — a month of adherence the hospital is reading.
 
 ---
 

@@ -1,5 +1,5 @@
 # Queue — Database Schema
-**Updated:** September 2026 · Supabase / PostgreSQL · RLS enabled on all tables
+**Updated:** October 2026 · Supabase / PostgreSQL · RLS enabled on all tables
 
 ---
 
@@ -474,6 +474,92 @@ dependent) — no INSERT/UPDATE policy at all; every write goes through the serv
 | `plan_name` | text | yes | |
 | `policy_number` | text | yes | |
 | `created_at` | timestamptz | yes | |
+
+---
+
+## Care Plans *(added Oct 2026, migrations `20261013000006`, `2026102500000{1..4}`)*
+
+A plan is a set of repeating tasks one patient works through: "check blood pressure daily
+for 4 weeks". Written by the treating doctor during a consultation (hospital-linked or
+independent), or by the patient for themselves. The patient ticks each occurrence; the
+hospital reads progress as adherence.
+
+Three decisions are split by who is entitled to make them:
+
+- the **author** says *what* and *how often* — `care_plan_tasks.cadence` + `times_per_period`
+- the **patient** says *when* — `care_plan_task_times` (clock time, and weekday or day of month)
+- the **author** says *how long* — `care_plan_tasks.ends_on`
+
+A doctor prescribing "three times a day" cannot know when this person eats, works or
+sleeps, and a reminder at the wrong hour is one that gets dismissed until it is ignored.
+
+### `care_plans`
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `patient_id` | uuid | no | FK → users |
+| `hospital_id` | uuid | yes | FK → hospitals. Null for a plan written by an independent doctor, and always null for `source='self'` |
+| `doctor_id` | uuid | yes | FK → doctors. Null for `source='self'` |
+| `created_by` | uuid | yes | FK → users |
+| `title` | text | no | |
+| `condition` | text | yes | What the plan manages, e.g. "Hypertension" |
+| `notes` | text | yes | Free text for the patient |
+| `status` | text | no | `active` / `completed` / `cancelled` |
+| `starts_on` | date | no | |
+| `ends_on` | date | yes | Null = ongoing |
+| `next_check_in` | date | yes | |
+| `created_at` / `updated_at` | timestamptz | no | |
+| `source` | text | no | `clinical` (a doctor or hospital wrote it) or `self` (the patient's own goals). **Immutable** — trigger `trg_care_plans_source_immutable` refuses any change, in both directions (`20261025000002`) |
+
+### `care_plan_tasks`
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `plan_id` | uuid | no | FK → care_plans, ON DELETE CASCADE |
+| `title` | text | no | 1–160 chars after trim |
+| `cadence` | text | no | `daily` / `weekly` / `monthly` / `once`. `monthly` added `20261025000003` |
+| `times_per_period` | smallint | no | Default 1. How many times within one cadence period — 3 + `daily` is three times a day, 2 + `weekly` is twice a week. **Renamed from `times_per_day`** (`20261025000003`); the old name could only count inside a day, so "twice a week" was inexpressible. CHECK caps it *per period*: 12 daily, 7 weekly, 31 monthly, 1 for `once` |
+| `ends_on` | date | yes | Last day the task is asked for; null runs as long as the plan (`20261025000004`). Trigger `trg_care_plan_task_end_is_sane` refuses a date before the plan's `starts_on` |
+| `due_on` | date | yes | For `cadence='once'` |
+| `sort_order` | int | no | |
+| `created_at` | timestamptz | no | |
+
+### `care_plan_task_times` *(`20261025000001`)*
+
+The patient's chosen times for one task — one row per occurrence, so "three times a day"
+is three rows.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `task_id` | uuid | no | FK → care_plan_tasks, ON DELETE CASCADE |
+| `slot` | smallint | no | 0-based position within the period, `0 <= slot < 31`. Lets a log name its occurrence without depending on the clock time, which the patient may change later |
+| `time_of_day` | time | no | |
+| `day_of_week` | smallint | yes | ISO weekday, 1 = Monday. Set for `weekly`, null otherwise (`20261025000003`) |
+| `day_of_month` | smallint | yes | 1–28 only, so a monthly reminder also occurs in February. Set for `monthly` (`20261025000003`) |
+| `enabled` | boolean | no | Silences one occurrence without losing the time chosen for it |
+| `created_at` / `updated_at` | timestamptz | no | |
+
+Unique on `(task_id, slot)`.
+
+### `care_plan_task_logs`
+
+One row per tick.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | no | Primary key |
+| `task_id` | uuid | no | FK → care_plan_tasks |
+| `plan_id` | uuid | no | FK → care_plans |
+| `done_on` | date | no | The patient's **local** calendar date, sent by the client — not a UTC slice (REP-052) |
+| `slot` | smallint | no | Which occurrence of the period (`20261025000001`). Existing rows default to 0, correct for every once-a-day task |
+| `done_at` | timestamptz | no | Server-timed |
+| `logged_by` | uuid | yes | FK → users |
+
+Unique on `(task_id, done_on, slot)`. Was `(task_id, done_on)`, which made the second
+and later doses of a multi-occurrence task untickable.
 
 ---
 
