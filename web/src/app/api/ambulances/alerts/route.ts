@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Errors } from '@/lib/api-error'
 import { AUTH_CORS_HEADERS, corsOptions } from '@/lib/cors'
+import { loadDispatcherAlerts, canSeeDispatcherAlert } from '@/lib/dispatcher-alerts'
 
 export async function OPTIONS() {
   return corsOptions()
@@ -11,11 +12,10 @@ export async function OPTIONS() {
 /**
  * GET /api/ambulances/alerts
  *
- * Same query as the web dashboard's DispatcherAlertsPage. Alerts are scoped
- * by the *destination hospital* of the underlying request (dispatcher_alerts
- * has no notion of which ambulance provider was involved -- a "no unit
- * available" alert means no provider was involved) -- a hospital-side
- * concern, read here by the web dashboard only. Ambulance management
+ * Same scoping as the web dashboard's DispatcherAlertsPage (lib/dispatcher-alerts.ts):
+ * the hospital's own destination requests plus destination-less requests inside its
+ * fleet's radius (a "no unit available" alert usually has no destination at all, so
+ * destination-only scoping hid them from everyone -- REP-017). super_admin sees all. Ambulance management
  * (including a hospital-owned fleet's own admin account) lives entirely in
  * the Ambulance app and has no hospitalId to scope this by at all now, so
  * ambulance_admin was removed from the allowed roles.
@@ -30,23 +30,11 @@ async function handleGET(req: NextRequest) {
   const auth = await requireRole(['super_admin', 'hospital_admin', 'clinic_admin', 'front_desk'], req)
   if (auth instanceof NextResponse) return auth
   const { caller } = auth
-  if (!caller.hospitalId) return NextResponse.json({ alerts: [] })
+  if (caller.role !== 'super_admin' && !caller.hospitalId) return NextResponse.json({ alerts: [] })
 
   const db = createAdminClient()
-  const { data: rows } = await db
-    .from('dispatcher_alerts')
-    .select(`
-      id, severity, kind, message, created_at, acknowledged_at,
-      request:transport_requests!inner(
-        id, booking_ref, status, triage_level, symptom_description,
-        pickup_address, contact_phone, caller_patient_name, created_at,
-        destination_hospital_id, failure_reason
-      ),
-      ack:users!dispatcher_alerts_acknowledged_by_fkey(full_name)
-    `)
-    .eq('request.destination_hospital_id', caller.hospitalId)
-    .order('created_at', { ascending: false })
-    .limit(100)
+  const { data: rows, error } = await loadDispatcherAlerts(db, caller.role === 'super_admin' ? null : caller.hospitalId!)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ alerts: rows ?? [] })
 }
@@ -87,21 +75,19 @@ async function handlePATCH(req: NextRequest) {
     .from('users').select('id').eq('auth_id', caller.authId).single()
   if (!profile) return Errors.notFound('User')
 
-  // Scope: an alert belongs to a hospital through its transport request's
-  // destination. Without this any admin could clear another hospital's alerts,
-  // which on this table means hiding the fact that someone didn't get an
-  // ambulance.
+  // Scope: the same visibility as GET. Without this any admin could clear another
+  // hospital's alerts, which on this table means hiding the fact that someone
+  // didn't get an ambulance.
   const { data: alert } = await db
     .from('dispatcher_alerts')
-    .select('id, request_id, transport_requests(destination_hospital_id)')
+    .select('id')
     .eq('id', body.alertId)
     .single()
 
   if (!alert) return Errors.notFound('Alert')
 
   if (caller.role !== 'super_admin') {
-    const tr = (alert as { transport_requests?: { destination_hospital_id: string | null } | null }).transport_requests
-    if (!caller.hospitalId || tr?.destination_hospital_id !== caller.hospitalId) {
+    if (!caller.hospitalId || !(await canSeeDispatcherAlert(db, caller.hospitalId, body.alertId))) {
       return Errors.forbidden("Cannot acknowledge another hospital's alert")
     }
   }

@@ -9,6 +9,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation } from '@queue/shared/contexts/LocationContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getLinkedDependents, findEmergencyClinic, type LinkedDependent } from '@queue/shared/lib/api'
 import { requestAmbulance, triageForSymptom } from '@queue/shared/lib/ambulance-api'
+import { getFreshFix } from '@queue/shared/lib/fresh-location'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '@queue/shared/lib/fees'
 import { FallbackPanel } from '@queue/shared/components/emergency/FallbackPanel'
@@ -219,16 +220,26 @@ export function EmergencyBookingScreen({ navigation }: Props) {
     setSubmitError('')
 
     if (arrival === AMBULANCE_ARRIVAL) {
-      if (!coords) { setSubmitError('Location is required to dispatch an ambulance.'); return }
       setSubmitting(true)
+      // A reading taken now: LocationContext's coords are captured once when the app
+      // opens and could put the pickup kilometres from where the patient is.
+      const located = await getFreshFix()
+      if (!located.ok) {
+        setSubmitting(false)
+        setSubmitError(located.reason === 'permission_denied'
+          ? 'Location permission is needed to send an ambulance. Allow it in Settings, or call 112 or 767 now.'
+          : "We couldn't get your location. Turn on location (GPS) and try again, or call 112 or 767 now.")
+        return
+      }
+      const pickup = located.fix
       const { triageLevel, requiredTier } = triageForSymptom(symptom || customSymptom)
       try {
         const { request } = await requestAmbulance({
           requestType:           'emergency',
           triageLevel,
           requiredTier,
-          lat:                   coords.latitude,
-          lng:                   coords.longitude,
+          lat:                   pickup.latitude,
+          lng:                   pickup.longitude,
           contactPhone:          user.phone ?? undefined,
           symptomDescription:    symptom || customSymptom,
           // Ambulance dispatch-for-a-dependent isn't migrated to the new
@@ -411,7 +422,7 @@ export function EmergencyBookingScreen({ navigation }: Props) {
             <>
               <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
                 <Text style={[s.noteText, { color: t.danger }]}>
-                  An ambulance will be dispatched to your current location immediately after you confirm.
+                  We start looking for the nearest available ambulance as soon as you confirm, and show you when a crew accepts.
                   The nearest available crew decides the receiving hospital based on your condition and
                   bed capacity — a preference below is used only when it doesn't conflict with that.
                 </Text>

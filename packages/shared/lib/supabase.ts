@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { createClient } from '@supabase/supabase-js'
 
@@ -94,6 +94,18 @@ export const supabase = createClient(supabaseUrl, supabaseClientKey, {
     detectSessionInUrl: false,
   },
 })
+
+// Supabase's documented React Native pattern: run the refresh timer only while the
+// app is in the foreground. Timers are suspended in the background, so on resume the
+// session could sit past expiry until the next tick; starting it on 'active' refreshes
+// straight away. (Each request also refreshes an expired token via getSession(), so
+// this is belt and braces — it matters most for the realtime socket.)
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', state => {
+    if (state === 'active') supabase.auth.startAutoRefresh()
+    else supabase.auth.stopAutoRefresh()
+  })
+}
 
 // Public read-only client — no session needed
 export const publicDb = createClient(supabaseUrl, supabaseClientKey, {

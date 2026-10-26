@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     // Resolve: clinic_admins.id → users.auth_id
     const { data: caRow } = await db
       .from('clinic_admins')
-      .select('user_id, hospital_id')
+      .select('user_id, hospital_id, clinic_id')
       .eq('id', staffId)
       .single()
     if (!caRow) return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
@@ -31,6 +31,11 @@ export async function POST(req: NextRequest) {
     // at clinic-staff/route.ts:117.
     if (caller.role !== 'super_admin' && caller.hospitalId !== caRow.hospital_id) {
       return NextResponse.json({ error: "Cannot reset another hospital's staff password" }, { status: 403 })
+    }
+    // A clinic admin manages only their own clinic's staff (PATCH/DELETE on the
+    // sibling route already enforce this; reset is the one that hands out a login).
+    if (caller.role === 'clinic_admin' && (!caller.clinicId || caller.clinicId !== caRow.clinic_id)) {
+      return NextResponse.json({ error: "Cannot reset another clinic's staff password" }, { status: 403 })
     }
 
     const { data: userRow } = await db

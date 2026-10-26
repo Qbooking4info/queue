@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, AlertTriangle, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { parseRecoveryHash } from '@/lib/recovery-link'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Button } from '@/components/ui/button'
 
@@ -21,8 +22,22 @@ export default function ResetPasswordPage() {
   const [ready, setReady]           = useState(false)
   const [passFocus, setPassFocus]   = useState(false)
   const [confFocus, setConfFocus]   = useState(false)
+  const [done, setDone]             = useState(false)
 
   useEffect(() => {
+    // Implicit-flow links (the mobile apps) put the session in the fragment, which
+    // this PKCE browser client never reads on its own.
+    const recovery = parseRecoveryHash(window.location.hash)
+    if (recovery) {
+      supabase.auth.setSession({ access_token: recovery.accessToken, refresh_token: recovery.refreshToken })
+        .then(({ error }) => {
+          // Strip the tokens from the address bar either way.
+          window.history.replaceState(null, '', window.location.pathname + window.location.search)
+          if (!error) setReady(true)
+        })
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) { setReady(true); return }
       supabase.auth.onAuthStateChange((event) => {
@@ -40,6 +55,13 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) { setError(error.message); setLoading(false); return }
+      // Links requested from the mobile apps carry ?from=app: those users are patients
+      // or crew, not dashboard staff, so they're sent back to the app instead.
+      if (new URLSearchParams(window.location.search).get('from') === 'app') {
+        await supabase.auth.signOut()
+        setDone(true)
+        return
+      }
       router.push('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -89,6 +111,20 @@ export default function ResetPasswordPage() {
       </div>
     </div>
   )
+
+  if (done) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "var(--font-jakarta), system-ui, sans-serif" }}>
+        {leftPanel}
+        <div style={{ flex: 1, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+          <div role="status" style={{ textAlign: 'center', maxWidth: 360 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 8 }}>Password updated</div>
+            <div style={{ fontSize: 14, color: C.textSub }}>Go back to the Queue app and sign in with your new password.</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!ready) {
     return (

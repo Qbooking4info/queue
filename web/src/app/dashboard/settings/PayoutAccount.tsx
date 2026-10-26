@@ -67,8 +67,11 @@ export function PayoutAccount({ existing }: { existing: Existing }) {
 
   async function remove() {
     if (!confirm('Remove this payout account? Online payment will be turned off for this hospital — bookings continue, but patients pay at the desk.')) return
+    setError('')
     const res = await fetch('/api/payments/subaccount', { method: 'DELETE' })
-    if (res.ok) setCurrent({ bankName: null, last4: null, subaccountCode: null })
+    if (res.ok) { setCurrent({ bankName: null, last4: null, subaccountCode: null }); return }
+    const b = await res.json().catch(() => null)
+    setError(b?.error ?? 'Could not remove the payout account')
   }
 
   const input: React.CSSProperties = {
@@ -112,7 +115,9 @@ export function PayoutAccount({ existing }: { existing: Existing }) {
             <Trash2 size={15} />
           </button>
         </div>
-      ) : (
+      ) : null}
+      {current.subaccountCode && error && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{error}</div>}
+      {current.subaccountCode ? null : (
         <>
           <div style={{ background: '#B4530914', border: '1px solid #B4530944', borderRadius: 10,
             padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#B45309', display: 'flex', gap: 8 }}>

@@ -79,33 +79,56 @@ export function triageForSymptom(symptom: string): { triageLevel: number; requir
   return SYMPTOM_TRIAGE_MAP[symptom] ?? { triageLevel: 3, requiredTier: 'BLS' }
 }
 
+export const AUTHED_FETCH_TIMEOUT_MS = 20_000
+
 /**
- * General-purpose authenticated request. authedFetch (below) is the POST-only
+ * Authenticated request to the web API. authedFetch (below) is the POST-only
  * original every existing caller uses; the admin console also needs GET/PATCH/
- * DELETE (list the fleet, acknowledge an alert, unassign crew), so this is the
- * one real implementation both build on rather than a second copy of the
- * session/header/error-shape boilerplate.
+ * DELETE (list the fleet, acknowledge an alert, unassign crew).
+ *
+ * Always settles. Without a timeout, a request lost on a dead mobile connection
+ * never resolved and the SOS screen sat on "Sending SOS…" indefinitely; and an
+ * HTML error page (a Vercel 502/504) made res.json() throw "JSON Parse error"
+ * instead of saying the request failed. Callers show err.message as-is.
  */
-export async function authedRequest(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+export async function authedRequest(
+  path: string,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  body?: unknown,
+  timeoutMs = AUTHED_FETCH_TIMEOUT_MS,
+) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in')
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: controller.signal,
+    })
+  } catch {
+    throw new Error(controller.signal.aborted
+      ? 'The request timed out. Check your connection and try again.'
+      : 'Could not reach Queue. Check your connection and try again.')
+  } finally {
+    clearTimeout(timer)
+  }
 
   const json = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(json?.error ?? 'Request failed')
+  if (!res.ok) throw new Error(json?.error ?? `Request failed (${res.status})`)
   return json
 }
 
-export async function authedFetch(path: string, body: unknown) {
-  return authedRequest(path, 'POST', body)
+export async function authedFetch(path: string, body: unknown, timeoutMs = AUTHED_FETCH_TIMEOUT_MS) {
+  return authedRequest(path, 'POST', body, timeoutMs)
 }
 
 export async function requestAmbulance(input: CreateTransportInput) {
@@ -167,12 +190,16 @@ export async function getActiveTransport(): Promise<TransportRequestRow | null> 
   return (data as TransportRequestRow | null) ?? null
 }
 
+// Throws on a failed read so the caller can tell "network/server error" (retry)
+// from "no such request" (null) — they used to look identical, and the tracking
+// screen treated both as "still loading" forever.
 export async function getTransportRequestById(requestId: string): Promise<TransportRequestRow | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('transport_requests')
     .select('*')
     .eq('id', requestId)
     .maybeSingle()
+  if (error) throw error
 
   return (data as TransportRequestRow | null) ?? null
 }

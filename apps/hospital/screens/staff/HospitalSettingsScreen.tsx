@@ -11,6 +11,7 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { Button } from '@queue/shared/components/ui/Button'
+import { getMyHospital } from '@queue/shared/lib/admin-api'
 import { Image } from 'react-native'
 import { pickAndUploadHospitalLogo } from '@queue/shared/lib/avatar'
 
@@ -84,8 +85,11 @@ export function HospitalSettingsScreen({ navigation }: Props) {
     try {
       const [settingsRes, hosRes] = await Promise.all([
         authedFetch(`/api/hospitals/${hospitalId}/settings`),
-        supabase.from('hospitals').select('name, logo_url').eq('id', hospitalId).single(),
-      ])
+        // Name through get_my_hospital(): the hospitals SELECT policy hides unverified
+        // hospitals from their own staff (REP-051). The logo read is best-effort.
+        getMyHospital(hospitalId),
+        supabase.from('hospitals').select('logo_url').eq('id', hospitalId).maybeSingle(),
+      ]).then(([s, h, logo]) => [s, { data: h ? { ...h, logo_url: logo.data?.logo_url ?? null } : null }] as const)
       if (settingsRes.ok) {
         const body = await settingsRes.json()
         setSettings(body.settings)
@@ -477,7 +481,9 @@ function PayoutAccountCard({ theme: t }: { theme: any }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         const res = await authedFetch('/api/payments/subaccount', { method: 'DELETE' })
-        if (res.ok) setCurrent({ bankName: null, last4: null, subaccountCode: null })
+        if (res.ok) { setCurrent({ bankName: null, last4: null, subaccountCode: null }); return }
+        const b = await res.json().catch(() => null)
+        Alert.alert('Could not remove', b?.error ?? 'Try again.')
       } },
     ])
   }

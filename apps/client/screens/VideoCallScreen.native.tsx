@@ -114,6 +114,29 @@ export function VideoCallScreen({ navigation, route }: Props) {
     }
   }, [appointmentId])
 
+  // ── 1b. Leave when the doctor ends the consultation ──────────────────────
+  // The doctor's End sets virtual_sessions.status='ended'. Without this the patient
+  // sat on an empty channel; the effect above stops listening once a session exists.
+  useEffect(() => {
+    if (!session) return
+    let closed = false
+    const channel = supabase
+      .channel(`vs-end:${appointmentId}`)
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'virtual_sessions', filter: `appointment_id=eq.${appointmentId}` },
+        (payload: any) => {
+          if (closed || payload.new?.status !== 'ended' || !mountedRef.current) return
+          closed = true
+          Alert.alert('Consultation ended', 'The doctor has ended this consultation.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ])
+        },
+      )
+      .subscribe()
+    return () => { closed = true; supabase.removeChannel(channel) }
+  }, [session, appointmentId, navigation])
+
   // ── 2. Init Agora and join channel when session is ready ─────────────────
   useEffect(() => {
     if (!session) return
@@ -146,7 +169,9 @@ export function VideoCallScreen({ navigation, route }: Props) {
         if (active) setRemoteUid(uid)
       })
       engine.current.addListener('onUserOffline', (_conn: any, uid: number) => {
-        if (active && uid === remoteUid) setRemoteUid(null)
+        // Functional update: this listener is registered once, so a captured `remoteUid`
+        // would still be null here and the other party leaving would never register.
+        if (active) setRemoteUid(cur => (cur === uid ? null : cur))
       })
       engine.current.addListener('onRemoteVideoStateChanged', (_c: any, _uid: number, state: number) => {
         // 0 = stopped, 1 = starting, 2 = decoding, 3 = frozen. Only 2 means we have

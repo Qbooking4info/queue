@@ -34,12 +34,12 @@ export default function VirtualCarePage() {
   }, [bounds])
   useEffect(() => { setData(null); load() }, [load])
 
-  // Calls starting and ending flip the live state; follow both tables.
+  // Calls starting and ending flip the appointment's status, so following appointments
+  // is enough. virtual_sessions is not readable by staff sessions (it holds call tokens).
   useEffect(() => {
     if (!hospital?.id) return
     const supabase = createClient()
     const ch = supabase.channel(`virtual-${hospital.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'virtual_sessions' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `hospital_id=eq.${hospital.id}` }, load)
       .subscribe()
     const t = setInterval(load, 30_000)

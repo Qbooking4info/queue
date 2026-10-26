@@ -156,7 +156,11 @@ export function CarePlansScreen({ navigation }: Props) {
       const { error } = await supabase.from('care_plan_task_logs').delete().eq('id', existing.id)
       if (error) Alert.alert('Could not update', error.message)
     } else if (!existing) {
-      const { error } = await supabase.from('care_plan_task_logs').insert({ task_id: task.id, plan_id: plan.id, slot })
+      // done_on is the patient's local calendar date (REP-052), and slot says
+      // which occurrence of the period it is -- both, or a tick lands on the
+      // wrong day for anyone off UTC, or overwrites another dose.
+      const { error } = await supabase.from('care_plan_task_logs')
+        .insert({ task_id: task.id, plan_id: plan.id, done_on: today, slot })
       if (error) Alert.alert('Could not tick', 'Try again in a moment.')
       else haptics.success()
     }

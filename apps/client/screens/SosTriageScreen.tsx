@@ -48,7 +48,7 @@ export function SosTriageScreen({ navigation, route }: Props) {
           SOS sent · finding the nearest crew
         </Text>
         <Text style={{ color: '#FECACA', fontSize: 14, lineHeight: 20 }}>
-          Help is already being arranged. Answer what you can — it helps the crew bring the right kit.
+          We are asking the nearest available crews now. Answer what you can — it helps the crew bring the right kit.
         </Text>
       </View>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
