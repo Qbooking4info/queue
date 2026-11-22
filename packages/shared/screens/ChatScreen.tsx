@@ -63,6 +63,13 @@ export function ChatScreen({ navigation, route }: Props) {
   const closed = conv?.status === 'closed'
   const iAmPatient = conv?.me?.role === 'patient'
 
+  // Only the patient app registers an Sos route. This screen is shared with the
+  // doctor, hospital and ambulance apps, where navigating there would throw, so
+  // the banner is offered only where the destination actually exists.
+  const canSos = (() => {
+    try { return (navigation.getState?.()?.routeNames ?? []).includes('Sos') } catch { return false }
+  })()
+
   return (
     <Screen>
       <AppBar
@@ -72,7 +79,7 @@ export function ChatScreen({ navigation, route }: Props) {
       />
       {/* A message is not an emergency channel, and nobody watching a thread
           for a reply should have to work that out for themselves. */}
-      {iAmPatient && (
+      {iAmPatient && canSos && (
         <TouchableOpacity onPress={() => navigation.navigate('Sos')} accessibilityRole="button"
           accessibilityLabel="Emergency SOS"
           style={{ backgroundColor: t.q.redBg, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
-import { View } from 'react-native'
+import { View, Pressable } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { Ionicons } from '@expo/vector-icons'
@@ -77,6 +77,29 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   }
 
   const chatHospitalId: string | null = raw.hospital_id ?? (raw.hospital?.id ? String(raw.hospital.id) : null)
+
+  async function submitRating(stars: number) {
+    if (!user || !doctorObj?.id || !chatHospitalId) return
+    setRatingBusy(true)
+    haptics.tap()
+    const { error } = await supabase.from('reviews').insert({
+      appointment_id: raw.id,
+      patient_id:     user.id,
+      doctor_id:      doctorObj.id,
+      hospital_id:    chatHospitalId,
+      rating:         stars,
+      body:           '',
+    })
+    setRatingBusy(false)
+    if (error) {
+      haptics.error()
+      Alert.alert('Could not submit rating',
+        error.code === '23505' ? 'You have already rated this consultation.' : 'Please try again in a moment.')
+      return
+    }
+    haptics.success()
+    setMyRating(stars)
+  }
   async function messageHospital() {
     if (!chatHospitalId) return
     setOpeningChat(true)
@@ -92,6 +115,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const [rescheduleLoading,  setRescheduleLoading]  = useState(false)
   const [queuePosition,      setQueuePosition]      = useState<number | null>(raw.queue_position ?? null)
   const [showQueuePicker,    setShowQueuePicker]    = useState(false)
+  const [myRating,           setMyRating]           = useState<number | null>(null)
+  const [ratingBusy,         setRatingBusy]         = useState(false)
 
   const approvalStatus  = (raw as any).approval_status ?? 'auto_approved'
   const bookingMode     = (raw as any).booking_mode ?? 'doctor'
@@ -139,6 +164,11 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     paymentMethod:       (raw as any).payment_method ?? null,
     rescheduleCount:     (raw as any).reschedule_count ?? 0,
   }
+
+  // reviews.hospital_id is NOT NULL, so a rating can only be stored for a visit
+  // that belongs to a hospital. A direct (hospital-less) booking has nowhere to
+  // put it, and offering the stars there would fail every time.
+  const canRate = appt.status === 'completed' && !!appt.doctor && !!doctorObj?.id && !!chatHospitalId
 
   // Vitals live in vitals_audit_log, not on appointments (the denormalised
   // appointments.vitals_* columns this used to read were dropped in migration
@@ -692,38 +722,35 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
               <Hair />
             </>
           )}
-          {appt.status === 'completed' && appt.doctor && (
-            <Row
-              icon="star-outline"
-              title={`Rate ${appt.doctor}`}
-              sub="Help other patients choose"
-              chevron
-              onPress={() => {
-                Alert.alert(
-                  `Rate ${appt.doctor}`,
-                  'How would you rate this consultation?',
-                  [1, 2, 3, 4, 5].map(stars => ({
-                    text: `${stars} star${stars === 1 ? '' : 's'}`,
-                    onPress: async () => {
-                      if (!user || !doctorObj?.id) return
-                      const { error } = await supabase.from('reviews').insert({
-                        appointment_id: raw.id,
-                        patient_id: user.id,
-                        doctor_id: doctorObj.id,
-                        rating: stars,
-                        body: '',
-                      })
-                      if (error) {
-                        Alert.alert('Could not submit rating',
-                          error.code === '23505' ? 'You have already rated this consultation.' : 'Please try again in a moment.')
-                        return
-                      }
-                      Alert.alert('Thank you', 'Your rating has been submitted.')
-                    },
-                  })),
-                )
-              }}
-            />
+          {canRate && (
+            <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+              <CardLabel>{myRating ? 'Thank you' : `Rate ${appt.doctor}`}</CardLabel>
+              <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60, marginTop: 2 }}>
+                {myRating
+                  ? `You rated this consultation ${myRating} star${myRating === 1 ? '' : 's'}.`
+                  : 'Help other patients choose.'}
+              </Text>
+              {/* Five tappable stars rather than a five-button Alert: Android's
+                  dialog only ever shows three buttons, so two of the five
+                  ratings were unreachable on most of our handsets. */}
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+                {[1, 2, 3, 4, 5].map(stars => (
+                  <Pressable
+                    key={stars}
+                    disabled={ratingBusy || myRating != null}
+                    onPress={() => submitRating(stars)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${stars} star${stars === 1 ? '' : 's'}`}
+                    hitSlop={6}
+                    style={{ padding: 4, opacity: ratingBusy ? 0.5 : 1 }}>
+                    <Ionicons
+                      name={myRating != null && stars <= myRating ? 'star' : 'star-outline'}
+                      size={26}
+                      color={myRating != null && stars <= myRating ? t.q.amber : t.q.line} />
+                  </Pressable>
+                ))}
+              </View>
+            </View>
           )}
         </Card>
 

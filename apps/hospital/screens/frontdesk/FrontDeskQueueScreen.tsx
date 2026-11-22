@@ -101,21 +101,7 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const load = useCallback(async (silent = false) => {
     if (!hospitalId) { setLoading(false); return }
     if (!silent) setLoading(true)
-
-    const offline = useIsOffline()
-
-  // Opening hours drive the day bar. Loaded once per hospital; a hospital with
-  // none set simply gets no bar rather than an invented day.
-  const [hours, setHours] = useState<DayHours[] | null>(null)
-  useEffect(() => {
-    if (!hospitalId) return
-    let cancelled = false
-    getHospitalHours(hospitalId).then(h => { if (!cancelled) setHours(h) }).catch(() => {})
-    return () => { cancelled = true }
-  }, [hospitalId])
-  const today_ = hours?.find(h => h.day === new Date().getDay())
-
-  const today = todayLocalDate()
+    const today = todayLocalDate()
     let query = supabase
       .from('appointments')
       .select(`
