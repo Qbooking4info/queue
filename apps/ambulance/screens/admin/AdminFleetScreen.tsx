@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, RefreshControl, Switch} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+  View, ActivityIndicator, RefreshControl, Switch, Image, Pressable,
+  KeyboardAvoidingView, Platform,
+} from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Card } from '@queue/shared/components/ui/v3'
-import { Image } from 'react-native'
 import { pickAndUploadAmbulancePhoto } from '@queue/shared/lib/avatar'
 import { haptics } from '@queue/shared/lib/haptics'
-import { IconOrb } from './adminBits'
-import { Button } from '@queue/shared/components/ui/Button'
 import { authedRequest } from '@queue/shared/lib/ambulance-api'
 import {
   getFleet, addUnit, removeUnit, toggleUnitDuty,
   getCrewOptions, addCrewMember, assignCrew, unassignCrew,
   type FleetProvider, type FleetUnit, type CrewOption,
 } from '@queue/shared/lib/ambulance-admin-api'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Chip, Field,
+  Btn, IconBtn, Empty, Mono, Notice, type PillTone,
+} from '@queue/shared/components/q'
 
 const VEHICLE_TIERS = ['PTS', 'BLS', 'ALS', 'CCT']
 const CAPABILITIES = ['oxygen', 'ventilator', 'incubator', 'bariatric', 'wheelchair']
@@ -49,10 +50,9 @@ export function AdminFleetScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  // Add-unit form -- address only, no device GPS required. "for testing
-  // sake, i can register and add ambulance with address only": geocoding an
-  // address is also just more practical for a desk-bound operator adding a
-  // unit that isn't wherever this phone/browser happens to be.
+  // Add-unit form -- address only, no device GPS required: geocoding an address
+  // is more practical for a desk-bound operator adding a unit that isn't
+  // wherever this phone happens to be.
   const [showAddUnit, setShowAddUnit] = useState(false)
   const [plateNumber, setPlateNumber] = useState('')
   const [callSign, setCallSign] = useState('')
@@ -72,7 +72,6 @@ export function AdminFleetScreen() {
   const [newCreds, setNewCreds] = useState<{ email: string; password: string } | null>(null)
 
   const [dutyBusy, setDutyBusy] = useState<string | null>(null)
-
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
   const [assignBusy, setAssignBusy] = useState<string | null>(null)
 
@@ -108,11 +107,12 @@ export function AdminFleetScreen() {
 
   async function handleAddUnit() {
     if (!plateNumber.trim()) { setError('Plate number is required'); return }
-    if (!coords) { setError('Look up the unit\'s home base address first'); return }
+    if (!coords) { setError("Look up the unit's home base address first"); return }
     setAddingUnit(true); setError('')
     try {
       await addUnit({ plateNumber: plateNumber.trim(), callSign: callSign.trim() || undefined, vehicleTier, capabilities: caps, lat: coords.lat, lng: coords.lng })
       setPlateNumber(''); setCallSign(''); setCaps([]); setAddress(''); setCoords(null); setShowAddUnit(false)
+      haptics.success()
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add unit')
@@ -150,6 +150,7 @@ export function AdminFleetScreen() {
       const creds = await addCrewMember({ fullName: crewName_.trim(), crewRole, crewTier })
       setNewCreds(creds)
       setCrewName_(''); setShowAddCrew(false)
+      haptics.success()
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add crew member')
@@ -206,280 +207,267 @@ export function AdminFleetScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar large title="Your fleet" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
+  const crewCount = crewOptions.length
+
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-      >
-        <Text style={[s.title, { color: t.textPrimary }]}>Your Fleet</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar large title="Your fleet"
+          sub={`${units.length} unit${units.length === 1 ? '' : 's'} · ${crewCount} crew`} />
 
-        {error ? (
-          <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
-          </View>
-        ) : null}
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} tintColor={t.q.primary} colors={[t.q.primary]}
+            onRefresh={() => { setRefreshing(true); load() }} />
+        }>
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
 
-        {newCreds && (
-          <View style={[s.credsBox, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={{ color: t.accent, fontWeight: '800', fontSize: 15, marginBottom: 6 }}>Crew account created — save these now</Text>
-            <Text style={{ color: t.textPrimary, fontSize: 15 }} selectable>Email: {newCreds.email}</Text>
-            <Text style={{ color: t.textPrimary, fontSize: 15 }} selectable>Password: {newCreds.password}</Text>
-            <TouchableOpacity onPress={() => setNewCreds(null)} style={{ marginTop: 8 }}>
-              <Text style={{ color: t.textMuted, fontSize: 14 }}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {!provider ? (
-          <View style={[s.emptyBox, { borderColor: t.cardBorder }]}>
-            <Text style={[s.emptyText, { color: t.textMuted }]}>
-              No provider found on this account. Try signing out and back in, or contact support.
-            </Text>
-          </View>
-        ) : (
-          <>
-            <TouchableOpacity onPress={() => setShowAddUnit(v => !v)} style={[s.addToggle, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-              <Ionicons name={showAddUnit ? 'remove' : 'add'} size={16} color={t.accent} />
-              <Text style={{ color: t.accent, fontWeight: '700', fontSize: 15 }}>Add an ambulance</Text>
-            </TouchableOpacity>
-
-            {showAddUnit && (
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 16 }]}>
-                <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                  <TextInput value={plateNumber} onChangeText={setPlateNumber} placeholder="Plate number" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
-                </View>
-                <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                  <TextInput value={callSign} onChangeText={setCallSign} placeholder="Call sign (optional)" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
-                </View>
-                <View style={s.chipRow}>
-                  {VEHICLE_TIERS.map(tier => (
-                    <TouchableOpacity key={tier} onPress={() => setVehicleTier(tier)}
-                      style={[s.chip, { borderColor: vehicleTier === tier ? t.accentBorder : t.cardBorder, backgroundColor: vehicleTier === tier ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: vehicleTier === tier ? t.accent : t.textSecondary, fontSize: 14, fontWeight: '700' }}>{tier}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={s.chipRow}>
-                  {CAPABILITIES.map(c => {
-                    const on = caps.includes(c)
-                    return (
-                      <TouchableOpacity key={c} onPress={() => setCaps(cs => on ? cs.filter(x => x !== c) : [...cs, c])}
-                        style={[s.chip, { borderColor: on ? t.accentBorder : t.cardBorder, backgroundColor: on ? t.accentBgMid : 'transparent' }]}>
-                        <Text style={{ color: on ? t.accent : t.textSecondary, fontSize: 14 }}>{c}</Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-                <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                  <TextInput value={address} onChangeText={t2 => { setAddress(t2); setCoords(null) }} placeholder="Home base address" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
-                  <TouchableOpacity onPress={handleGeocode} disabled={geocoding || !address.trim()}>
-                    {geocoding ? <ActivityIndicator size="small" color={t.textMuted} /> : <Text style={{ color: t.accent, fontSize: 15, fontWeight: '700' }}>Find</Text>}
-                  </TouchableOpacity>
-                </View>
-                {coords && (
-                  <View style={[s.foundRow]}>
-                    <Ionicons name="checkmark-circle" size={14} color={t.accent} />
-                    <Text style={{ color: t.accent, fontSize: 14 }}>Location found: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</Text>
-                  </View>
-                )}
-                <Button label="Add ambulance" onPress={handleAddUnit} loading={addingUnit} style={{ marginTop: 10 }} />
+          {/* Shown once, and only here: the server generates the password and
+              never shows it again. */}
+          {!!newCreds && (
+            <Card>
+              <View style={{ padding: 14, gap: 8 }}>
+                <CardLabel>Crew account created — save this now</CardLabel>
+                <Mono size={14} weight="600">{newCreds.email}</Mono>
+                <Mono size={14} weight="600">{newCreds.password}</Mono>
+                <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60 }}>
+                  The password is not stored anywhere you can read it again. Send it to them now.
+                </Text>
+                <Btn label="Dismiss" variant="secondary" small onPress={() => setNewCreds(null)} />
               </View>
-            )}
+            </Card>
+          )}
 
-            {units.length === 0 ? (
-              <View style={[s.emptyBox, { borderColor: t.cardBorder }]}>
-                <Text style={[s.emptyText, { color: t.textMuted }]}>No ambulances yet — add your first one above.</Text>
-              </View>
-            ) : (
-              units.map(u => {
+          {!provider ? (
+            <Card>
+              <Empty icon="alert-circle-outline" title="No provider on this account"
+                body="Try signing out and back in, or contact support." />
+            </Card>
+          ) : (
+            <>
+              {units.length === 0 ? (
+                <Card>
+                  <Empty icon="car-outline" title="No ambulances yet"
+                    body="Add your first one below. A unit shows up on the fleet map at its home base straight away."
+                    action="Add an ambulance" onAction={() => setShowAddUnit(true)} />
+                </Card>
+              ) : units.map(u => {
                 const shift = coveringShift(u)
+                // Toggling a unit on duty attaches whoever toggled it to the shift
+                // as bookkeeping (set_unit_duty's own identity) so the shift has an
+                // owner from the instant it exists. That is not a crew assignment
+                // and has no crew_member_id -- shown here it would just be an
+                // unlabelled, un-removable "Crew" chip next to real assignments.
+                const realCrew = shift ? shift.ambulance_shift_crew.filter(m => m.crew_member_id) : []
+                const tone: PillTone = !u.on_duty ? 'neutral'
+                  : u.visible_to_dispatch ? 'green' : 'amber'
+                const label = !u.on_duty ? 'Off duty'
+                  : u.visible_to_dispatch ? 'Ready' : 'No signal'
                 return (
-                  <Card key={u.id} style={{
-                    marginBottom: 12,
-                    borderColor: u.on_duty ? (u.visible_to_dispatch ? t.accent : t.statusBusy.text) + '55' : t.cardBorder,
-                  }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <TouchableOpacity
-                        onPress={() => handlePhoto(u)}
-                        disabled={photoBusy === u.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${u.photo_url ? 'Change' : 'Add'} photo of ${u.call_sign ?? u.plate_number}`}
-                        style={{ width: 54, height: 42, borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: t.accentBg, borderWidth: 1, borderColor: t.accentBorder }}
-                      >
-                        {u.photo_url ? (
-                          <Image source={{ uri: u.photo_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
-                        ) : (
-                          <Ionicons name="camera-outline" size={18} color={t.accent} />
-                        )}
-                        {photoBusy === u.id && (
-                          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                            <ActivityIndicator color="#FFFFFF" size="small" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[s.unitTitle, { color: t.textPrimary }]}>{u.call_sign ?? u.plate_number}</Text>
-                        <Text style={[s.unitSub, { color: t.textSecondary }]} numberOfLines={1}>
-                          {u.plate_number}, {u.vehicle_tier}
+                  <Card key={u.id} style={{ marginTop: 12 }}>
+                    <Row
+                      leading={
+                        <Pressable
+                          onPress={() => handlePhoto(u)}
+                          disabled={photoBusy === u.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${u.photo_url ? 'Change' : 'Add'} photo of ${u.call_sign ?? u.plate_number}`}
+                          style={{
+                            width: 52, height: 40, borderRadius: 10, overflow: 'hidden',
+                            alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: t.q.sel, borderWidth: 1, borderColor: t.q.line,
+                          }}>
+                          {u.photo_url ? (
+                            <Image source={{ uri: u.photo_url }} style={{ width: '100%', height: '100%' }}
+                              resizeMode="cover" accessibilityIgnoresInvertColors />
+                          ) : (
+                            <Ionicons name="camera-outline" size={18} color={t.q.primary} />
+                          )}
+                          {photoBusy === u.id && (
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                              <ActivityIndicator color="#FFFFFF" size="small" />
+                            </View>
+                          )}
+                        </Pressable>
+                      }
+                      title={u.call_sign ?? u.plate_number}
+                      sub={[
+                        u.plate_number,
+                        u.vehicle_tier,
+                        realCrew.length
+                          ? realCrew.map(m => {
+                              const cm = Array.isArray(m.ambulance_crew) ? m.ambulance_crew[0] : m.ambulance_crew
+                              return cm ? crewName(cm.users) : 'Crew'
+                            }).join(', ')
+                          : 'no one assigned yet',
+                      ].filter(Boolean).join(' · ')}
+                      pill={label}
+                      pillTone={tone}
+                      right={<IconBtn name="trash-outline" label={`Remove ${u.call_sign ?? u.plate_number}`}
+                        color={t.q.red} onPress={() => handleRemoveUnit(u)} />} />
+
+                    <Hair />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 56 }}>
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.q.ink }}>On duty</Text>
+                        <Text style={{ fontSize: 12.5, lineHeight: 17, color: t.q.ink60 }}>
+                          {!u.on_duty
+                            ? 'This unit receives no offers.'
+                            : u.visible_to_dispatch
+                              ? 'Visible to dispatch, can receive jobs.'
+                              : u.seconds_since_ping == null
+                                ? 'On duty, but it has never reported a position — dispatch cannot send it a job.'
+                                : `On duty, but its last position is ${u.seconds_since_ping}s old — dispatch cannot send it a job.`}
                         </Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        {dutyBusy === u.id ? (
-                          <ActivityIndicator color={t.accent} />
-                        ) : (
-                          <Switch
+                      {dutyBusy === u.id
+                        ? <ActivityIndicator color={t.q.primary} />
+                        : <Switch
                             value={u.on_duty}
-                            onValueChange={() => handleToggleDuty(u)}
-                            trackColor={{ false: t.inputBorder, true: t.accent + '99' }}
-                            thumbColor={u.on_duty ? t.accent : undefined}
-                          />
-                        )}
-                        <Text style={{ fontSize: 10.5, color: t.textSecondary, marginTop: 4 }}>
-                          {u.on_duty ? 'On duty' : 'Off duty'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity onPress={() => handleRemoveUnit(u)} style={{ padding: 6 }}>
-                        <Ionicons name="trash-outline" size={16} color={t.danger} />
-                      </TouchableOpacity>
+                            onValueChange={() => { haptics.tap(); handleToggleDuty(u) }}
+                            accessibilityLabel={`${u.call_sign ?? u.plate_number} on duty`}
+                            trackColor={{ false: t.q.line, true: t.q.primary }}
+                            thumbColor="#FFFFFF" />}
                     </View>
 
-                    {u.on_duty && (
-                      <View style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12,
-                        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
-                        backgroundColor: u.visible_to_dispatch ? t.statusOpen.bg : t.statusBusy.bg,
-                      }}>
-                        <View style={{
-                          width: 7, height: 7, borderRadius: 4,
-                          backgroundColor: u.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
-                        }} />
-                        <Text style={{
-                          flex: 1, fontSize: 12,
-                          color: u.visible_to_dispatch ? t.statusOpen.text : t.statusBusy.text,
-                        }}>
-                          {u.visible_to_dispatch
-                            ? 'Visible to dispatch, can receive jobs'
-                            : u.seconds_since_ping == null
-                              ? 'Not dispatchable, no position reported yet'
-                              : `Not dispatchable, position is ${u.seconds_since_ping}s old`}
-                        </Text>
-                      </View>
-                    )}
-
-                    {shift && (() => {
-                      // Toggling a unit on duty attaches whoever toggled it to the
-                      // shift as bookkeeping (set_unit_duty's own identity, e.g. this
-                      // admin's provider_admin_id) so the shift has an owner from the
-                      // instant it exists. That is not a crew assignment and has no
-                      // crew_member_id -- shown here it would just be an unlabelled,
-                      // un-removable "Crew" chip next to real assignments.
-                      const realCrew = shift.ambulance_shift_crew.filter(m => m.crew_member_id)
-                      return (
-                      <View style={{ marginTop: 10 }}>
-                        <Text style={[s.sectionLabel, { color: t.textMuted }]}>CREW ON THIS SHIFT</Text>
-                        <View style={s.chipRow}>
-                          {realCrew.length === 0 && (
-                            <Text style={{ color: t.textMuted, fontSize: 14 }}>No one assigned yet</Text>
-                          )}
-                          {realCrew.map(m => {
-                            const cm = Array.isArray(m.ambulance_crew) ? m.ambulance_crew[0] : m.ambulance_crew
-                            return (
-                              <View key={m.id} style={[s.crewChip, { borderColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-                                <Text style={{ color: t.textPrimary, fontSize: 14 }}>{cm ? crewName(cm.users) : 'Crew'}</Text>
-                                {m.crew_member_id && (
-                                  <TouchableOpacity onPress={() => handleUnassign(u, m.crew_member_id!)}>
-                                    <Ionicons name="close" size={13} color={t.danger} />
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            )
-                          })}
-                        </View>
-                        {crewOptions.length > 0 && (
-                          <View style={[s.chipRow, { marginTop: 6 }]}>
-                            {crewOptions.map(opt => (
-                              <TouchableOpacity key={opt.id} disabled={assignBusy === u.id} onPress={() => handleAssign(u, opt)}
-                                style={[s.chip, { borderColor: t.cardBorder }]}>
-                                <Text style={{ color: t.textSecondary, fontSize: 14 }}>+ {crewName(opt.users)}</Text>
-                              </TouchableOpacity>
-                            ))}
+                    {!!shift && (
+                      <>
+                        <Hair />
+                        <View style={{ padding: 14, gap: 10 }}>
+                          <CardLabel>Crew on this shift</CardLabel>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {realCrew.length === 0 && (
+                              <Text style={{ fontSize: 13, color: t.q.ink60 }}>No one assigned yet.</Text>
+                            )}
+                            {realCrew.map(m => {
+                              const cm = Array.isArray(m.ambulance_crew) ? m.ambulance_crew[0] : m.ambulance_crew
+                              return (
+                                <View key={m.id} style={{
+                                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                                  paddingLeft: 12, paddingRight: 6, minHeight: 36, borderRadius: 999,
+                                  backgroundColor: t.q.sel, borderWidth: 1, borderColor: t.q.primary,
+                                }}>
+                                  <Text style={{ fontSize: 13, fontWeight: '600', color: t.q.primary }}>
+                                    {cm ? crewName(cm.users) : 'Crew'}
+                                  </Text>
+                                  {!!m.crew_member_id && (
+                                    <Pressable
+                                      onPress={() => handleUnassign(u, m.crew_member_id!)}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Remove ${cm ? crewName(cm.users) : 'crew'} from this shift`}
+                                      hitSlop={8}
+                                      style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+                                      <Ionicons name="close" size={14} color={t.q.red} />
+                                    </Pressable>
+                                  )}
+                                </View>
+                              )
+                            })}
                           </View>
-                        )}
-                      </View>
-                      )
-                    })()}
+                          {crewOptions.length > 0 && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                              {crewOptions.map(opt => (
+                                <Chip key={opt.id} label={`+ ${crewName(opt.users)}`}
+                                  onPress={assignBusy === u.id ? undefined : () => { haptics.tap(); handleAssign(u, opt) }} />
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </>
+                    )}
                   </Card>
                 )
-              })
-            )}
+              })}
 
-            <TouchableOpacity onPress={() => setShowAddCrew(v => !v)} style={[s.addToggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginTop: 8 }]}>
-              <Ionicons name={showAddCrew ? 'remove' : 'person-add-outline'} size={16} color={t.textPrimary} />
-              <Text style={{ color: t.textPrimary, fontWeight: '700', fontSize: 15 }}>Add a crew member</Text>
-            </TouchableOpacity>
+              <SectionHead title="Add an ambulance"
+                action={showAddUnit ? 'Close' : 'Open'}
+                onAction={() => setShowAddUnit(v => !v)} />
+              {showAddUnit && (
+                <Card>
+                  <View style={{ padding: 14, gap: 14 }}>
+                    <Field label="Plate number" value={plateNumber} onChangeText={setPlateNumber}
+                      placeholder="e.g. KJA 412 XB" autoCapitalize="characters" />
+                    <Field label="Call sign (optional)" value={callSign} onChangeText={setCallSign}
+                      placeholder="e.g. LAG-04" autoCapitalize="characters" />
+                    <View style={{ gap: 8 }}>
+                      <CardLabel>Care tier</CardLabel>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {VEHICLE_TIERS.map(tier => (
+                          <Chip key={tier} label={tier} on={vehicleTier === tier}
+                            onPress={() => { haptics.tap(); setVehicleTier(tier) }} />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={{ gap: 8 }}>
+                      <CardLabel>What it carries</CardLabel>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {CAPABILITIES.map(c => (
+                          <Chip key={c} label={c} on={caps.includes(c)}
+                            onPress={() => { haptics.tap(); setCaps(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]) }} />
+                        ))}
+                      </View>
+                    </View>
+                    <Field label="Home base address" value={address}
+                      onChangeText={v => { setAddress(v); setCoords(null) }}
+                      placeholder="Where this unit is based"
+                      hint={coords
+                        ? `Found: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`
+                        : 'Look the address up so the unit can be plotted on the map.'} />
+                    <Btn label="Look up address" variant="secondary" icon="search-outline"
+                      loading={geocoding} disabled={!address.trim()} onPress={handleGeocode} />
+                    <Btn label="Add ambulance" loading={addingUnit}
+                      disabled={!plateNumber.trim() || !coords} onPress={handleAddUnit} />
+                  </View>
+                </Card>
+              )}
 
-            {showAddCrew && (
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                  <TextInput value={crewName_} onChangeText={setCrewName_} placeholder="Full name" placeholderTextColor={t.textMuted}
-                    style={{ color: t.textPrimary, fontSize: 16, flex: 1 }} />
-                </View>
-                <Text style={[s.sectionLabel, { color: t.textMuted }]}>ROLE</Text>
-                <View style={s.chipRow}>
-                  {CREW_ROLES.map(r => (
-                    <TouchableOpacity key={r} onPress={() => setCrewRole(r)}
-                      style={[s.chip, { borderColor: crewRole === r ? t.accentBorder : t.cardBorder, backgroundColor: crewRole === r ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: crewRole === r ? t.accent : t.textSecondary, fontSize: 14 }}>{r}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={[s.sectionLabel, { color: t.textMuted, marginTop: 8 }]}>CARE TIER</Text>
-                <View style={s.chipRow}>
-                  {VEHICLE_TIERS.map(tier => (
-                    <TouchableOpacity key={tier} onPress={() => setCrewTier(tier)}
-                      style={[s.chip, { borderColor: crewTier === tier ? t.accentBorder : t.cardBorder, backgroundColor: crewTier === tier ? t.accentBgMid : 'transparent' }]}>
-                      <Text style={{ color: crewTier === tier ? t.accent : t.textSecondary, fontSize: 14, fontWeight: '700' }}>{tier}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Button label="Add crew member" onPress={handleAddCrew} loading={addingCrew} style={{ marginTop: 12 }} />
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+              <SectionHead title="Add a crew member"
+                action={showAddCrew ? 'Close' : 'Open'}
+                onAction={() => setShowAddCrew(v => !v)} />
+              {showAddCrew && (
+                <Card>
+                  <View style={{ padding: 14, gap: 14 }}>
+                    <Field label="Full name" value={crewName_} onChangeText={setCrewName_}
+                      placeholder="e.g. Chinedu Umeh" autoCapitalize="words" />
+                    <View style={{ gap: 8 }}>
+                      <CardLabel>Role</CardLabel>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {CREW_ROLES.map(r => (
+                          <Chip key={r} label={r} on={crewRole === r}
+                            onPress={() => { haptics.tap(); setCrewRole(r) }} />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={{ gap: 8 }}>
+                      <CardLabel>Care tier</CardLabel>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {VEHICLE_TIERS.map(tier => (
+                          <Chip key={tier} label={tier} on={crewTier === tier}
+                            onPress={() => { haptics.tap(); setCrewTier(tier) }} />
+                        ))}
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60 }}>
+                      Queue creates the sign-in for them and shows the password once. Crew do not register
+                      themselves.
+                    </Text>
+                    <Btn label="Create crew account" loading={addingCrew}
+                      disabled={!crewName_.trim()} onPress={handleAddCrew} />
+                  </View>
+                </Card>
+              )}
+            </>
+          )}
+        </Body>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-const s = StyleSheet.create({
-  safe:  { flex: 1 },
-  title: { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 16 },
-  errorBanner: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 12 },
-  credsBox:    { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  card:  { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
-  input: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 10, gap: 8 },
-  addToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 13, marginBottom: 12, justifyContent: 'center' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  foundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  unitHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  unitTitle: { fontSize: 17, fontWeight: '700' },
-  unitSub:   { fontSize: 14, marginTop: 2 },
-  dutyBtn:   { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  dispatchNote: { borderRadius: 10, borderWidth: 1, padding: 9, marginTop: 10 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  crewChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
-  emptyBox: { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText: { fontSize: 15, textAlign: 'center' },
-})

@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Linking } from 'react-native'
+import { View, ActivityIndicator, RefreshControl, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Notice, Btn, Empty, Mono, type PillTone,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -111,108 +111,100 @@ export function AmbulanceAlertsScreen({ navigation }: Props) {
   const openCritical = sorted.filter(a => !a.acknowledged_at && a.severity === 'critical').length
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Dispatcher alerts" subtitle="No-unit searches and crews that stop reporting" onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar
+        title="Dispatcher alerts"
+        sub="No-unit searches and stale crews"
+        onBack={() => navigation.goBack()}
+      />
 
       {loading ? (
-        <View style={st.center}><ActivityIndicator color={t.accent} /></View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
           {openCritical > 0 && (
-            <View style={[st.criticalBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-              <Ionicons name="warning" size={16} color={t.danger} />
-              <Text style={[st.criticalText, { color: t.danger }]}>
-                {openCritical} unacknowledged critical {openCritical === 1 ? 'alert' : 'alerts'} — a high-acuity request went unserved
-              </Text>
-            </View>
+            <Notice tone="red" icon="warning">
+              {openCritical} unacknowledged critical {openCritical === 1 ? 'alert' : 'alerts'} — a
+              high-acuity request went unserved.
+            </Notice>
           )}
 
           {!sorted.length ? (
-            <View style={[st.empty, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.emptyText, { color: t.textMuted }]}>No alerts. Every transport request so far has found a unit.</Text>
-            </View>
+            <Card style={{ marginTop: 12 }}>
+              <Empty
+                icon="checkmark-done-outline"
+                title="No alerts"
+                body="Every transport request so far has found a unit."
+              />
+            </Card>
           ) : (
-            <View style={{ gap: 10 }}>
-              {sorted.map(a => {
-                const sc = severityTrio(a.severity)
+            <Card>
+              {sorted.map((a, i) => {
                 const done = !!a.acknowledged_at
+                const tone: PillTone = done ? 'neutral'
+                  : a.severity === 'critical' || a.severity === 'high' ? 'red'
+                  : a.severity === 'medium' ? 'amber' : 'neutral'
                 return (
-                  <View key={a.id} style={[st.card, { backgroundColor: t.cardBg, borderColor: done ? t.cardBorder : sc.border, borderLeftColor: done ? t.cardBorder : sc.text, opacity: done ? 0.65 : 1 }]}>
-                    <View style={st.cardHeadRow}>
-                      <View style={[st.sevBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-                        <Text style={[st.sevText, { color: sc.text }]}>{a.severity.toUpperCase()}</Text>
+                  <View key={a.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon={a.kind === 'tracking_stale' ? 'cellular-outline' : 'alert-circle-outline'}
+                      iconTone={tone}
+                      tint={!done && (a.severity === 'critical' || a.severity === 'high')}
+                      dim={done}
+                      title={KIND_LABEL[a.kind] ?? a.kind}
+                      sub={[
+                        a.request?.booking_ref,
+                        a.request?.caller_patient_name,
+                        a.request?.triage_level != null ? `P${a.request.triage_level}` : null,
+                        ago(a.created_at),
+                      ].filter(Boolean).join(' · ')}
+                      pill={done ? 'Resolved' : a.severity}
+                      pillTone={tone}
+                      pillSolid={!done && a.severity === 'critical'}
+                    />
+
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 12, gap: 10 }}>
+                      <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink70 }}>{a.message}</Text>
+
+                      {!!a.request?.pickup_address && (
+                        <Text numberOfLines={1} style={{ fontSize: 12, color: t.q.ink60 }}>
+                          {a.request.pickup_address}
+                        </Text>
+                      )}
+
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        {!!a.request?.contact_phone && (
+                          <Btn
+                            label="Call the caller" variant="secondary" small icon="call-outline"
+                            onPress={() => Linking.openURL(`tel:${a.request!.contact_phone}`).catch(() => {})}
+                          />
+                        )}
+                        {done ? (
+                          <Mono size={11} color={t.q.ink60}>
+                            {`Acknowledged${a.ack?.full_name ? ' by ' + a.ack.full_name : ''} · ${ago(a.acknowledged_at!)}`}
+                          </Mono>
+                        ) : (
+                          <Btn
+                            label="Acknowledge" small icon="checkmark"
+                            loading={busyId === a.id}
+                            onPress={() => acknowledge(a.id)}
+                          />
+                        )}
                       </View>
-                      <Text style={[st.kind, { color: t.textPrimary }]}>{KIND_LABEL[a.kind] ?? a.kind}</Text>
-                      {a.request?.triage_level != null && <Text style={[st.meta, { color: t.textSecondary }]}>Triage {a.request.triage_level}</Text>}
-                      <Text style={[st.meta, { color: t.textMuted }]}>· {ago(a.created_at)}</Text>
                     </View>
-
-                    <Text style={[st.message, { color: t.textSecondary }]}>{a.message}</Text>
-
-                    {!!a.request && (
-                      <View style={st.reqRow}>
-                        <Text style={[st.reqRef, { color: t.textPrimary }]}>{a.request.booking_ref}</Text>
-                        {!!a.request.caller_patient_name && <Text style={[st.reqMeta, { color: t.textSecondary }]}>{a.request.caller_patient_name}</Text>}
-                        {!!a.request.pickup_address && (
-                          <View style={st.metaItem}><Ionicons name="location-outline" size={11} color={t.textSecondary} /><Text style={[st.reqMeta, { color: t.textSecondary }]} numberOfLines={1}>{a.request.pickup_address}</Text></View>
-                        )}
-                        {!!a.request.contact_phone && (
-                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${a.request!.contact_phone}`)} style={st.metaItem}>
-                            <Ionicons name="call-outline" size={11} color={t.textPrimary} />
-                            <Text style={[st.reqMeta, { color: t.textPrimary, fontWeight: '700' }]}>{a.request.contact_phone}</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-
-                    {done ? (
-                      <Text style={[st.ackText, { color: t.textMuted }]}>
-                        Acknowledged{a.ack?.full_name ? ` by ${a.ack.full_name}` : ''} · {ago(a.acknowledged_at!)}
-                      </Text>
-                    ) : (
-                      <TouchableOpacity onPress={() => acknowledge(a.id)} disabled={busyId === a.id}
-                        style={[st.ackBtn, { borderColor: t.cardBorder }]}>
-                        {busyId === a.id ? <ActivityIndicator size="small" color={t.textPrimary} /> : (
-                          <><Ionicons name="checkmark" size={14} color={t.textPrimary} /><Text style={[st.ackBtnText, { color: t.textPrimary }]}>Acknowledge</Text></>
-                        )}
-                      </TouchableOpacity>
-                    )}
                   </View>
                 )
               })}
-            </View>
+            </Card>
           )}
-        </ScrollView>
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
-  title: { fontSize: 18, fontWeight: '800' },
-  subtitle: { fontSize: 12, paddingHorizontal: 20, marginTop: 4 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  criticalBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1.5, marginBottom: 16 },
-  criticalText: { fontSize: 13, fontWeight: '700', flex: 1 },
-  empty: { padding: 40, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
-  emptyText: { fontSize: 13, textAlign: 'center' },
-  card: { borderRadius: 14, borderWidth: 1, borderLeftWidth: 3, padding: 14 },
-  cardHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  sevBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  sevText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  kind: { fontSize: 13, fontWeight: '700' },
-  meta: { fontSize: 11 },
-  message: { fontSize: 12.5, lineHeight: 18, marginTop: 6 },
-  reqRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 },
-  reqRef: { fontSize: 12, fontWeight: '700' },
-  reqMeta: { fontSize: 12 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ackText: { fontSize: 11, marginTop: 8 },
-  ackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingVertical: 8, marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 14 },
-  ackBtnText: { fontSize: 12, fontWeight: '700' },
-})

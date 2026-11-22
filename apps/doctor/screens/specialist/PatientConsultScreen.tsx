@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import { View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
-import { Ionicons } from '@expo/vector-icons'
-import { Header, EmptyState, HeaderIconButton, PrimaryButton } from '@queue/shared/components/ui/v3'
 import { FollowUpModal } from '@queue/shared/components/FollowUpModal'
 import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { setConsultStatus, saveConsultVitalsAndNotes, bookFollowUp } from '@queue/shared/lib/api'
-import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Stat, StatStrip,
+  Journey, Btn, BottomBar, IconBtn, Empty, Initials, Mono, Pill, Notice,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: { params: { appointmentId: string } } }
 
@@ -30,6 +30,8 @@ interface ApptFull {
   doctor_notes:     string | null
   diagnosis:        string | null
   queue_position:   number | null
+  booking_ref:      string | null
+  consult_started_at: string | null
   patient_id:       string
   patient:          PatientRow | null
   referral_reason?:  string | null
@@ -43,6 +45,7 @@ interface ApptFull {
 
 const NOTES_MAX = 1000
 const DIAG_MAX  = 500
+const STEPS = ['Checked in', 'Called', 'In consult', 'Done']
 
 function calcBMI(weightKg: string, heightCm: string): string | null {
   const w = parseFloat(weightKg)
@@ -54,37 +57,23 @@ function calcBMI(weightKg: string, heightCm: string): string | null {
 function age(dob: string | null): string | null {
   if (!dob) return null
   const diff = Date.now() - new Date(dob).getTime()
-  return Math.floor(diff / (365.25 * 24 * 3600 * 1000)) + ' yrs'
+  const y = Math.floor(diff / (365.25 * 24 * 3600 * 1000))
+  return y >= 0 && y < 130 ? String(y) : null
 }
 
-function fmt12(time: string): string {
-  if (!time) return '—'
-  const [hStr, mStr] = time.split(':')
-  const h = parseInt(hStr)
-  return `${h % 12 || 12}:${mStr} ${h >= 12 ? 'PM' : 'AM'}`
-}
-
-function InProgressPulse() {
-  const pulse = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
-
-  // Indefinite loop with no stop control (WCAG 2.2.2) -- gated behind reduce-motion since
-  // the dot's color already marks "in progress" without the pulse.
+/** mm:ss since the consult was started, ticking. */
+function useElapsed(startedAt: string | null): string | null {
+  const [, tick] = useState(0)
   useEffect(() => {
-    if (reduceMotion) return
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1,    duration: 700, useNativeDriver: true }),
-      ])
-    )
-    anim.start()
-    return () => anim.stop()
-  }, [reduceMotion])
-
-  return (
-    <Animated.View style={{ transform: [{ scale: pulse }], width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF8C42' }} />
-  )
+    if (!startedAt) return
+    const id = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  if (!startedAt) return null
+  const ms = Date.now() - Date.parse(startedAt)
+  if (!Number.isFinite(ms) || ms < 0) return null
+  const s = Math.floor(ms / 1000)
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
 export function PatientConsultScreen({ navigation, route }: Props) {
@@ -95,6 +84,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
+  const [vitalsAt, setVitalsAt] = useState<string | null>(null)
 
   const [weight, setWeight]   = useState('')
   const [height, setHeight]   = useState('')
@@ -103,8 +93,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   const [bSugar, setBSugar]   = useState('')
   const [notes,  setNotes]    = useState('')
   const [diag,   setDiag]     = useState('')
-
   const [saved,  setSaved]    = useState(false)
+  const dirty = useRef(false)
 
   async function fetchAppt() {
     const [{ data }, { data: vitals }] = await Promise.all([
@@ -123,7 +113,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       // desk can record more than once per visit, so the latest entry wins.
       supabase
         .from('vitals_audit_log')
-        .select('weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar')
+        .select('weight_kg, height_cm, bp_systolic, bp_diastolic, blood_sugar, recorded_at')
         .eq('appointment_id', appointmentId)
         .order('recorded_at', { ascending: false })
         .limit(1)
@@ -132,8 +122,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
     if (data) {
       setAppt(data as ApptFull)
-      setNotes(data.doctor_notes ?? '')
-      setDiag(data.diagnosis ?? '')
+      // Only adopt the server's copy while the doctor has not typed over it --
+      // a refocus mid-sentence used to wipe what they were writing.
+      if (!dirty.current) {
+        setNotes(data.doctor_notes ?? '')
+        setDiag(data.diagnosis ?? '')
+      }
     }
     if (vitals) {
       setWeight(vitals.weight_kg    != null ? String(vitals.weight_kg)    : '')
@@ -141,6 +135,7 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       setBpSys( vitals.bp_systolic  != null ? String(vitals.bp_systolic)  : '')
       setBpDia( vitals.bp_diastolic != null ? String(vitals.bp_diastolic) : '')
       setBSugar(vitals.blood_sugar  != null ? String(vitals.blood_sugar)  : '')
+      setVitalsAt((vitals as any).recorded_at ?? null)
     }
     setLoading(false)
   }
@@ -149,6 +144,8 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   // screen re-fetches -- a referral sent from an in-progress consult completes it
   // server-side, and this screen needs to pick that status change up.
   useFocusEffect(useCallback(() => { fetchAppt() }, [appointmentId]))
+
+  const elapsed = useElapsed(appt?.status === 'in_progress' ? appt?.consult_started_at ?? null : null)
 
   async function saveVitalsAndNotes() {
     setSaving(true)
@@ -163,10 +160,10 @@ export function PatientConsultScreen({ navigation, route }: Props) {
       } : null,
       { notes, diagnosis: diag },
     )
-
     setSaving(false)
     if (!error) {
       haptics.success()
+      dirty.current = false
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       fetchAppt()
@@ -178,13 +175,12 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   async function updateStatus(newStatus: 'in_progress' | 'completed') {
     setStatusUpdating(true)
-
     const { error } = await setConsultStatus(appointmentId, newStatus)
-
     setStatusUpdating(false)
     if (!error) {
       if (newStatus === 'completed') haptics.success()
       setAppt(prev => prev ? { ...prev, status: newStatus } : prev)
+      fetchAppt()
     } else {
       haptics.error()
       Alert.alert('Update failed', error)
@@ -193,359 +189,290 @@ export function PatientConsultScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <Header title="Consultation" onBack={() => navigation.goBack()} />
-        <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Consultation" onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} size="large" />
+        </View>
+      </Screen>
     )
   }
 
   if (!appt) {
     return (
-      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <Header title="Consultation" onBack={() => navigation.goBack()} />
-        <EmptyState icon="document-outline" title="Appointment not found" body="It may have been cancelled or moved." action="Go back" onAction={() => navigation.goBack()} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Consultation" onBack={() => navigation.goBack()} />
+        <Card style={{ marginTop: 12 }}>
+          <Empty icon="document-outline" title="Appointment not found"
+            body="It may have been cancelled or moved." action="Go back" onAction={() => navigation.goBack()} />
+        </Card>
+      </Screen>
     )
   }
 
-  const patient    = appt.patient
-  const isVirtual  = appt.type === 'virtual'
-  const canStart   = ['pending','confirmed','checked_in'].includes(appt.status) && !isVirtual
-  const canComplete = appt.status === 'in_progress'
-  const isDone      = appt.status === 'completed'
+  const patient     = appt.patient
+  const isVirtual   = appt.type === 'virtual'
+  const canStart    = ['pending', 'confirmed', 'checked_in'].includes(appt.status) && !isVirtual
   const isInProgress = appt.status === 'in_progress'
-  // Vitals only mean anything once the patient has actually been checked in --
-  // Clinical Notes/Diagnosis/Save stay available regardless (out of scope here).
+  const isDone      = appt.status === 'completed'
+  // Vitals only mean anything once the patient has actually been checked in.
   const canRecordVitals = appt.status === 'checked_in' || isInProgress
   const bmi = calcBMI(weight, height)
-
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyBg  = isEmergency ? t.dangerSubtle
-    : appt.urgency === 'urgent' ? 'rgba(239,159,39,0.12)' : t.accentBg
-  const urgencyCol = isEmergency ? t.danger
-    : appt.urgency === 'urgent' ? t.statusBusy.text : t.accent
+
+  const step = isDone ? 3 : isInProgress ? 2 : appt.status === 'checked_in' ? 1 : 0
+  const subline = [
+    age(patient?.date_of_birth ?? null),
+    patient?.gender,
+    patient?.blood_group ? `blood ${patient.blood_group}` : null,
+    isEmergency ? 'brought forward' : null,
+  ].filter(Boolean).join(' · ')
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <Header title={patient?.full_name ?? 'Patient'} subtitle={`Consultation · ${fmt12(appt.start_time)}`} onBack={() => navigation.goBack()}
-          right={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {!!patient?.id && (
-              <HeaderIconButton icon="chatbubble-ellipses-outline" label="Message patient" onPress={async () => {
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar
+          title={appt.queue_position != null ? `Number ${appt.queue_position}` : (patient?.full_name ?? 'Consultation')}
+          sub={appt.booking_ref ?? undefined}
+          onBack={() => navigation.goBack()}
+          right={patient?.id
+            ? <IconBtn name="chatbubble-outline" label="Message patient" onPress={async () => {
                 const r = await startConversation('patient', patient.id, appt.id)
                 if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
                 else { haptics.error(); Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error) }
               }} />
-            )}
-            <View style={[st.statusBadge, { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFFFFF' }]}>
-              {isEmergency ? <Ionicons name="alert-circle" size={12} color={t.danger} /> : isInProgress ? <InProgressPulse /> : null}
-              <Text style={[st.statusText, { color: isEmergency ? '#B91C1C' : '#0F766E' }]}>
-                {isEmergency ? 'Emergency' : isInProgress ? 'In progress' : (appt.urgency ?? 'routine')}
-              </Text>
-            </View>
-            </View>
-          } />
+            : undefined} />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Patient Hero Card */}
-          <View style={[st.heroCard, {
-            backgroundColor: isEmergency ? t.dangerSubtle : t.bannerBg,
-            borderColor: isEmergency ? t.danger : t.bannerBorder,
-          }]}>
-            <View style={st.patientRow}>
-              <View style={[st.avatarLg, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                <Text style={[st.avatarText, { color: t.accent }]}>
-                  {patient?.full_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() ?? '?'}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.heroName}>{patient?.full_name ?? '—'}</Text>
-                <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.55)' }]}>
-                  {[
-                    patient?.gender ?? null,
-                    age(patient?.date_of_birth ?? null),
-                    patient?.blood_group ? `Blood: ${patient.blood_group}` : null,
-                  ].filter(Boolean).join(' · ')}
-                </Text>
-                {patient?.phone && (
-                  <Text style={[st.heroSub, { color: 'rgba(255,255,255,0.4)', marginTop: 2 }]}>{patient.phone}</Text>
+        <Body>
+          <Card style={{ marginTop: 12 }}>
+            <Row
+              leading={<Initials name={patient?.full_name} size={44} tint={isEmergency ? '#7F1D1D' : '#7C2D12'} />}
+              title={patient?.full_name ?? 'Patient'}
+              titleColor={isEmergency ? t.q.red : undefined}
+              sub={subline || null}
+              pill={isEmergency ? 'Emergency' : isVirtual ? 'Video' : 'In person'}
+              pillTone={isEmergency ? 'red' : isVirtual ? 'teal' : 'neutral'}
+              pillSolid={isEmergency}
+              right={<Mono size={12} color={t.q.ink60}>{appt.start_time?.slice(0, 5)}</Mono>} />
+            {!!patient?.phone && (
+              <>
+                <Hair />
+                <Row compact icon="call-outline" title={patient.phone} sub="Patient's phone" />
+              </>
+            )}
+            <Hair />
+            <Row compact icon="person-outline" title="Full patient record"
+              sub="Vitals history, allergies, medications" chevron
+              onPress={() => navigation.navigate('PatientDetails', { appointmentId: appt.id })} />
+          </Card>
+
+          <Journey label="This visit" steps={STEPS} activeIndex={step} />
+
+          {!!appt.referred_by && (
+            <>
+              <SectionHead title="Referred to you" />
+              <Card>
+                <Row
+                  icon="arrow-redo-outline" iconTone="teal"
+                  title={[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
+                  sub={[appt.referring_clinic?.name, appt.referring_hospital?.name].filter(Boolean).join(' · ') || null} />
+                {!!appt.referral_reason && (
+                  <>
+                    <Hair />
+                    <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                      <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink }}>{appt.referral_reason}</Text>
+                    </View>
+                  </>
                 )}
-              </View>
-              <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={11} color={isVirtual ? t.statusVirtual.text : t.accent} />
-                  <Text style={[st.typeChip, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
-                    {isVirtual ? 'Virtual' : 'In-person'}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-                  {fmt12(appt.start_time)}
-                </Text>
-              </View>
-            </View>
-
-            {appt.reason && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
-                <Text style={st.reasonLabel}>REASON FOR VISIT</Text>
-                <Text style={st.reasonText}>{appt.reason}</Text>
-              </View>
-            )}
-            {appt.symptom_description && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
-                <Text style={st.reasonLabel}>SYMPTOMS</Text>
-                <Text style={st.reasonText}>{appt.symptom_description}</Text>
-              </View>
-            )}
-            {appt.referred_by && (
-              <View style={[st.reasonBox, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
-                <Text style={st.reasonLabel}>REFERRED BY</Text>
-                <Text style={st.reasonText}>
-                  {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
-                  {appt.referring_clinic?.name ? ` · ${appt.referring_clinic.name}` : ''}
-                  {appt.referring_hospital?.name ? ` · ${appt.referring_hospital.name}` : ''}
-                </Text>
-                {appt.referral_reason && (
-                  <Text style={[st.reasonText, { marginTop: 4, opacity: 0.85 }]}>{appt.referral_reason}</Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Refer to another clinic/hospital */}
-          {!isDone && (
-            <View style={st.pad}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ReferPatient', {
-                  appointmentId: appt.id,
-                  patientName: patient?.full_name ?? 'Patient',
-                  ownHospitalId: appt.hospital_id,
-                  isInProgress,
-                })}
-                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Ionicons name="arrow-redo-outline" size={15} color={t.textPrimary} />
-                <Text style={{ color: t.textPrimary, fontSize: 13, fontWeight: '700' }}>
-                  {isInProgress ? 'Refer & End Consultation' : 'Refer to Another Hospital'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Emergency transfer -- a doctor mid-consult realising the patient
-                  needs moving somewhere with more capability than a referral
-                  note implies. */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('RequestAmbulance', {
-                  patientId: appt.patient_id,
-                  patientName: patient?.full_name ?? 'Patient',
-                  patientPhone: patient?.phone ?? null,
-                })}
-                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Ionicons name="medkit-outline" size={15} color={t.danger} />
-                <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>Request Ambulance</Text>
-              </TouchableOpacity>
-
-              {/* Books the patient's next visit at the same hospital -- date only,
-                  no slot to pick. The route re-checks the caller is the treating
-                  doctor on this appointment. */}
-              <TouchableOpacity
-                onPress={() => setShowFollowUp(true)}
-                style={[st.referBtn, { backgroundColor: t.infoBg, borderColor: t.infoBorder }]}>
-                <Ionicons name="calendar-outline" size={15} color={t.info} />
-                <Text style={{ color: t.info, fontSize: 13, fontWeight: '700' }}>Book Follow-up</Text>
-              </TouchableOpacity>
-
-              {/* The care plan is written here now -- the hospital apps no
-                  longer offer it. Works the same for a hospital-linked or an
-                  independent consultation; the server resolves which. */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('CarePlanCompose', {
-                  patientId: appt.patient_id,
-                  patientName: patient?.full_name,
-                })}
-                style={[st.referBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Ionicons name="checkbox-outline" size={15} color={t.accent} />
-                <Text style={{ color: t.accent, fontSize: 13, fontWeight: '700' }}>Care plan</Text>
-              </TouchableOpacity>
-            </View>
+              </Card>
+            </>
           )}
 
-          {/* Actions */}
-          {!isDone && (
-            <View style={[st.pad, { marginBottom: 0 }]}>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                {isVirtual ? (
-                  <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: '#0D2240', borderColor: t.infoBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
-                    onPress={() => {
-                      haptics.heavy()
-                      navigation.navigate('DoctorVideoCall', {
-                        appointmentId: appt.id,
-                        patientName: patient?.full_name ?? 'Patient',
-                      })
-                    }}
-                  >
-                    <Ionicons name="videocam-outline" size={16} color={t.statusVirtual.text} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.statusVirtual.text }}>Start Video Call</Text>
-                  </TouchableOpacity>
-                ) : canStart ? (
-                  <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
-                    onPress={() => { haptics.heavy(); updateStatus('in_progress') }}
-                    disabled={statusUpdating}
-                  >
-                    {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
-                    ) : (
-                      <>
-                        <Ionicons name="play" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Start Consultation</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ) : null}
+          {!!(appt.reason || appt.symptom_description) && (
+            <>
+              <SectionHead title="Reason for visit" />
+              <Card>
+                <View style={{ paddingHorizontal: 14, paddingVertical: 12, gap: 8 }}>
+                  {!!appt.reason && <Text style={{ fontSize: 14, lineHeight: 20, color: t.q.ink }}>{appt.reason}</Text>}
+                  {!!appt.symptom_description && (
+                    <>
+                      <CardLabel>Symptoms</CardLabel>
+                      <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70 }}>{appt.symptom_description}</Text>
+                    </>
+                  )}
+                </View>
+              </Card>
+            </>
+          )}
 
-                {canComplete && (
-                  <TouchableOpacity
-                    style={[st.actionBtn, { flex: 1, backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
-                    onPress={() => Alert.alert(
-                      'Complete consultation?',
-                      'Mark this appointment as completed?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Complete', onPress: () => updateStatus('completed') },
-                      ]
-                    )}
-                    disabled={statusUpdating}
-                  >
-                    {statusUpdating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>…</Text>
-                    ) : (
-                      <>
-                        <Ionicons name="checkmark" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>Complete</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
+          <SectionHead title={vitalsAt
+            ? `Vitals · recorded ${new Date(vitalsAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+            : 'Vitals'} />
+          {canRecordVitals ? (
+            <Card>
+              <StatStrip>
+                <Stat label="BP" value={bpSys && bpDia ? `${bpSys}/${bpDia}` : '—'} unit={bpSys && bpDia ? 'mmHg' : undefined} />
+                <Stat label="Blood sugar" value={bSugar || '—'} unit={bSugar ? 'mg/dL' : undefined} />
+                <Stat label="BMI" value={bmi ?? '—'} note={weight ? `${weight} kg` : 'no weight'} last />
+              </StatStrip>
+              <Hair inset={0} />
+              <View style={{ padding: 14, gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <VitalField label="Weight (kg)" value={weight} onChange={v => { dirty.current = true; setWeight(v) }} keyboardType="decimal-pad" />
+                  <VitalField label="Height (cm)" value={height} onChange={v => { dirty.current = true; setHeight(v) }} keyboardType="decimal-pad" />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <VitalField label="BP systolic" value={bpSys} onChange={v => { dirty.current = true; setBpSys(v) }} keyboardType="number-pad" />
+                  <VitalField label="BP diastolic" value={bpDia} onChange={v => { dirty.current = true; setBpDia(v) }} keyboardType="number-pad" />
+                </View>
+                <VitalField label="Blood sugar (mg/dL)" value={bSugar} onChange={v => { dirty.current = true; setBSugar(v) }} keyboardType="decimal-pad" />
               </View>
+            </Card>
+          ) : (
+            <Notice tone="neutral" icon="information-circle-outline">
+              Vitals can be recorded once the patient is checked in at the front desk.
+            </Notice>
+          )}
+
+          <SectionHead title="Clinical notes" />
+          <Card>
+            <View style={{ padding: 14, gap: 12 }}>
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <CardLabel style={{ flex: 1 }}>Findings and plan</CardLabel>
+                  <Mono size={11} color={t.q.ink60}>{notes.length}/{NOTES_MAX}</Mono>
+                </View>
+                <TextInput
+                  value={notes}
+                  onChangeText={v => { dirty.current = true; setNotes(v.slice(0, NOTES_MAX)) }}
+                  placeholder="Observations, findings, treatment plan…"
+                  placeholderTextColor={t.q.ink60}
+                  multiline textAlignVertical="top" maxLength={NOTES_MAX}
+                  accessibilityLabel="Findings and plan"
+                  style={{
+                    minHeight: 120, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                    backgroundColor: t.q.field, padding: 12, fontSize: 14, lineHeight: 20, color: t.q.ink,
+                  }} />
+              </View>
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <CardLabel style={{ flex: 1 }}>Diagnosis</CardLabel>
+                  <Mono size={11} color={t.q.ink60}>{diag.length}/{DIAG_MAX}</Mono>
+                </View>
+                <TextInput
+                  value={diag}
+                  onChangeText={v => { dirty.current = true; setDiag(v.slice(0, DIAG_MAX)) }}
+                  placeholder="ICD-10 code or description…"
+                  placeholderTextColor={t.q.ink60}
+                  multiline textAlignVertical="top" maxLength={DIAG_MAX}
+                  accessibilityLabel="Diagnosis"
+                  style={{
+                    minHeight: 72, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                    backgroundColor: t.q.field, padding: 12, fontSize: 14, lineHeight: 20, color: t.q.ink,
+                  }} />
+              </View>
+              <Btn label={saved ? 'Saved' : 'Save notes'} icon={saved ? 'checkmark' : undefined}
+                loading={saving} onPress={saveVitalsAndNotes} />
             </View>
+          </Card>
+
+          {!isDone && (
+            <>
+              <SectionHead title="During this consultation" />
+              <Card>
+                {isVirtual && (
+                  <>
+                    <Row icon="videocam-outline" iconTone="teal" title="Start video call"
+                      sub="Opens the consultation room" chevron
+                      onPress={() => {
+                        haptics.heavy()
+                        navigation.navigate('DoctorVideoCall', { appointmentId: appt.id, patientName: patient?.full_name ?? 'Patient' })
+                      }} />
+                    <Hair />
+                  </>
+                )}
+                <Row icon="arrow-redo-outline" title={isInProgress ? 'Refer & end consultation' : 'Refer patient'}
+                  sub="To another clinic or hospital" chevron
+                  onPress={() => navigation.navigate('ReferPatient', {
+                    appointmentId: appt.id,
+                    patientName: patient?.full_name ?? 'Patient',
+                    ownHospitalId: appt.hospital_id,
+                    isInProgress,
+                  })} />
+                <Hair />
+                <Row icon="medkit-outline" iconTone="red" title="Request ambulance"
+                  sub="Transfer out of this clinic" titleColor={t.q.red} chevron
+                  onPress={() => navigation.navigate('RequestAmbulance', {
+                    patientId: appt.patient_id,
+                    patientName: patient?.full_name ?? 'Patient',
+                    patientPhone: patient?.phone ?? null,
+                  })} />
+                <Hair />
+                <Row icon="calendar-outline" title="Book follow-up"
+                  sub="Their next visit at this hospital" chevron
+                  onPress={() => setShowFollowUp(true)} />
+                <Hair />
+                <Row icon="checkbox-outline" iconTone="teal" title="Care plan"
+                  sub="Daily tasks the patient follows at home" chevron
+                  onPress={() => navigation.navigate('CarePlanCompose', {
+                    patientId: appt.patient_id,
+                    patientName: patient?.full_name,
+                  })} />
+              </Card>
+            </>
           )}
 
           {isDone && (
-            <View style={[st.doneBanner, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Ionicons name="checkmark-circle" size={20} color={t.accent} />
-              <Text style={[st.doneTxt, { color: t.accent }]}>Consultation completed</Text>
-            </View>
+            <>
+              <Notice tone="green" icon="checkmark-circle">
+                Consultation completed. The patient sees the plan you send in My care.
+              </Notice>
+              <Card>
+                <Row icon="document-text-outline" iconTone="teal" title="Consultation plan"
+                  sub="Diagnosis, prescriptions, tests and follow-up" chevron
+                  onPress={() => navigation.navigate('ConsultationPlan', { appointmentId, patientName: patient?.full_name })} />
+                <Hair />
+                <Row icon="checkbox-outline" title="Care plan"
+                  sub="Daily tasks the patient follows at home" chevron
+                  onPress={() => navigation.navigate('CarePlanCompose', { patientId: appt.patient_id, patientName: patient?.full_name })} />
+              </Card>
+            </>
           )}
+        </Body>
 
-          {/* The call-end flow already offers this, but a doctor who skipped it
-              then -- or whose call dropped and left the visit stuck -- still needs
-              a way in. Virtual only: in-person visits keep the plain notes field. */}
-          {isDone && isVirtual && (
-            <View style={st.pad}>
-              <PrimaryButton
-                label="Consultation summary"
-                variant="ghost"
-                icon="document-text-outline"
-                onPress={() => navigation.navigate('ConsultationPlan', {
-                  appointmentId,
-                  patientName: patient?.full_name,
-                })}
-              />
-            </View>
-          )}
-
-          {/* Vitals */}
-          <View style={st.pad}>
-            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>
-                VITALS
-              </Text>
-
-              {canRecordVitals ? (
-                <View style={st.vitalsGrid}>
-                  <VitalInput label="Weight (kg)" value={weight} onChange={setWeight} theme={t} keyboardType="decimal-pad" />
-                  <VitalInput label="Height (cm)" value={height} onChange={setHeight} theme={t} keyboardType="decimal-pad" />
-                  <VitalInput label="BP Systolic"  value={bpSys}  onChange={setBpSys}  theme={t} keyboardType="number-pad" />
-                  <VitalInput label="BP Diastolic" value={bpDia}  onChange={setBpDia}  theme={t} keyboardType="number-pad" />
-                  <VitalInput label="Blood Sugar (mg/dL)" value={bSugar} onChange={setBSugar} theme={t} keyboardType="decimal-pad" />
-                  <View style={[st.vitalBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                    <Text style={[st.vitalLabel, { color: t.accent }]}>BMI</Text>
-                    <Text style={[st.vitalValue, { color: t.accent, fontSize: 20 }]}>{bmi ?? '—'}</Text>
-                  </View>
-                </View>
-              ) : (
-                <Text style={{ fontSize: 12, color: t.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
-                  Vitals can be recorded once the patient is checked in.
-                </Text>
-              )}
-            </View>
-
-            {/* Clinical Notes */}
-            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
-                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
-                  CLINICAL NOTES
-                </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
-                  {notes.length}/{NOTES_MAX}
-                </Text>
-              </View>
-              <TextInput
-                value={notes}
-                onChangeText={v => setNotes(v.slice(0, NOTES_MAX))}
-                placeholder="Enter clinical observations, findings, treatment plan…"
-                placeholderTextColor={t.textMuted}
-                multiline
-                numberOfLines={5}
-                style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-                textAlignVertical="top"
-                maxLength={NOTES_MAX}
-              />
-            </View>
-
-            {/* Diagnosis */}
-            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={st.sectionHeader}>
-                <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomWidth: 0 }]}>
-                  DIAGNOSIS
-                </Text>
-                <Text style={{ fontSize: 10, color: t.textMuted }}>
-                  {diag.length}/{DIAG_MAX}
-                </Text>
-              </View>
-              <TextInput
-                value={diag}
-                onChangeText={v => setDiag(v.slice(0, DIAG_MAX))}
-                placeholder="ICD-10 code or diagnosis description…"
-                placeholderTextColor={t.textMuted}
-                multiline
-                numberOfLines={3}
-                style={[st.notesInput, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-                textAlignVertical="top"
-                maxLength={DIAG_MAX}
-              />
-            </View>
-
-            {/* Save */}
-            <TouchableOpacity
-              onPress={saveVitalsAndNotes}
-              disabled={saving}
-              style={[st.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}
-            >
-              {saving
-                ? <ActivityIndicator color="#fff" size="small" />
-                : saved
-                  ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                      <Text style={st.saveTxt}>Saved</Text>
-                    </View>
-                  : <Text style={st.saveTxt}>Save Vitals & Notes</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+        {!isDone && (
+          <BottomBar meta={<>
+            <Mono size={12} weight="600" color={isInProgress ? t.q.primary : t.q.ink60}>
+              {isInProgress ? `In consult${elapsed ? ` · ${elapsed}` : ''}` : 'Not started'}
+            </Mono>
+            {isEmergency && (
+              <>
+                <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+                <Pill label="Emergency" tone="red" solid />
+              </>
+            )}
+          </>}>
+            {canStart && (
+              <Btn grow label="Start consultation" icon="play" loading={statusUpdating}
+                onPress={() => { haptics.heavy(); updateStatus('in_progress') }} />
+            )}
+            {isInProgress && (
+              <Btn grow label="Complete consultation" icon="checkmark" loading={statusUpdating}
+                onPress={() => Alert.alert('Complete consultation?', 'Mark this appointment as completed?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Complete', onPress: () => updateStatus('completed') },
+                ])} />
+            )}
+            {isInProgress && (
+              <Btn label="Plan" variant="secondary"
+                onPress={() => navigation.navigate('ConsultationPlan', { appointmentId, patientName: patient?.full_name })} />
+            )}
+            {!canStart && !isInProgress && (
+              <Btn grow label="Waiting for check-in" variant="secondary" disabled onPress={() => {}} />
+            )}
+          </BottomBar>
+        )}
+      </Screen>
 
       {showFollowUp && (
         <FollowUpModal
@@ -561,59 +488,20 @@ export function PatientConsultScreen({ navigation, route }: Props) {
   )
 }
 
-function VitalInput({
-  label, value, onChange, theme: t, keyboardType,
-}: {
-  label: string; value: string; onChange: (v: string) => void; theme: any; keyboardType?: any
+function VitalField({ label, value, onChange, keyboardType }: {
+  label: string; value: string; onChange: (v: string) => void; keyboardType?: any
 }) {
+  const { theme: t } = useTheme()
   return (
-    <View style={[st.vitalBox, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-      <Text style={[st.vitalLabel, { color: t.textMuted }]}>{label}</Text>
+    <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: t.q.ink70 }}>{label}</Text>
       <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType={keyboardType ?? 'default'}
-        placeholder="—"
-        placeholderTextColor={t.textMuted}
-        style={[st.vitalInput, { color: t.textPrimary }]}
-      />
+        value={value} onChangeText={onChange} keyboardType={keyboardType ?? 'default'}
+        placeholder="—" placeholderTextColor={t.q.ink60} accessibilityLabel={label}
+        style={{
+          minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: t.q.line,
+          backgroundColor: t.q.field, paddingHorizontal: 12, fontSize: 16, fontWeight: '600', color: t.q.ink,
+        }} />
     </View>
   )
 }
-
-const st = StyleSheet.create({
-  safe:          { flex: 1 },
-  center:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  backBtn:       { padding: 4 },
-  backArrow:     { fontSize: 22 },
-  headerTitle:   { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  statusBadge:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
-  statusText:    { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
-  heroCard:      { marginHorizontal: 16, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
-  patientRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatarLg:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText:    { fontSize: 18, fontWeight: '800' },
-  heroName:      { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  heroSub:       { fontSize: 12, marginTop: 2, lineHeight: 17 },
-  typeChip:      { fontSize: 11, fontWeight: '700' },
-  reasonBox:     { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  reasonLabel:   { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.3)', letterSpacing: 1.5, marginBottom: 4 },
-  reasonText:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
-  pad:           { paddingHorizontal: 16, marginBottom: 0 },
-  actionBtn:     { padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
-  referBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
-  doneBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 12 },
-  doneTxt:       { fontSize: 14, fontWeight: '700' },
-  section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  sectionTitle:  { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  vitalsGrid:    { flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 },
-  vitalBox:      { width: '47%', borderRadius: 12, borderWidth: 1, padding: 12 },
-  vitalLabel:    { fontSize: 10, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
-  vitalValue:    { fontSize: 18, fontWeight: '800' },
-  vitalInput:    { fontSize: 18, fontWeight: '700', padding: 0 },
-  notesInput:    { margin: 12, borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 13, lineHeight: 20, minHeight: 90 },
-  saveBtn:       { marginHorizontal: 0, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 12 },
-  saveTxt:       { fontSize: 15, fontWeight: '800', color: '#fff' },
-})

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { View, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Clipboard, ActivityIndicator } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
-import { ShellScroll } from '@queue/shared/components/AppShell'
 import { getMyDoctorClinics, switchMyActiveClinic, type DoctorClinicOption } from '@queue/shared/lib/api'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Btn, Empty, Pill, qs,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean } }
 
@@ -14,11 +16,11 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const { user, doctorProfile, switchHospital } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Clinics assigned to this doctor at the currently-active hospital -- a
   // doctor may be assigned to several, but only one is active at a time
-  // (doctor_clinics, 20260903000001). Only worth showing/fetching once the
-  // doctor actually has an active hospital to have clinics at.
+  // (doctor_clinics, 20260903000001).
   const [clinics, setClinics] = useState<DoctorClinicOption[]>([])
   const [activeClinicId, setActiveClinicId] = useState<string | null>(null)
   const [clinicSwitching, setClinicSwitching] = useState<string | null>(null)
@@ -51,106 +53,117 @@ export function DoctorHospitalsScreen({ navigation }: Props) {
     setClinicSwitching(null)
   }
 
-  const activeHospitalName = doctorProfile?.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName
+  function copyCode() {
+    if (!user?.doctor_code) return
+    Clipboard.setString(user.doctor_code)
+    haptics.success(); setCopied(true); setTimeout(() => setCopied(false), 1500)
+  }
+
+  const linked = doctorProfile?.linkedHospitals ?? []
+  const activeHospitalName = linked.find(h => h.hospitalId === doctorProfile?.hospitalId)?.hospitalName
 
   return (
-      <ShellScroll title="Hospitals" subtitle="Your linked hospitals and Doctor ID" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
-        <Text style={{ fontSize: 13, color: t.textMuted, lineHeight: 19, marginBottom: 16 }}>
-          Manage the hospitals and clinics you're linked to. Only one can be active at a time —
-          that's the one whose queue and referrals you see.
-        </Text>
+    <Screen>
+      <AppBar title="Hospitals" sub="Linked hospitals and your Doctor ID"
+        onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
-        {(doctorProfile?.linkedHospitals ?? []).length === 0 ? (
-          <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 20, marginBottom: 20, alignItems: 'center' }}>
-            <Ionicons name="business-outline" size={32} color={t.textMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary, marginBottom: 4, textAlign: 'center' }}>
-              Not linked to any hospital yet
-            </Text>
-            <Text style={{ fontSize: 12, color: t.textMuted, textAlign: 'center' }}>
-              You can still accept direct patient bookings — see Settings. To also work with a
-              hospital's queue, share your Doctor ID below with their admin.
+      <Body>
+        {/* A hospital admin either scans this or types the code underneath it.
+            The QR panel keeps a white ground whatever the palette -- a scanner
+            needs the contrast, and an inverted code does not read. */}
+        <Card style={{ marginTop: 12 }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
+            <CardLabel>Your Doctor ID</CardLabel>
+            <View style={{
+              marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+              backgroundColor: t.q.field, paddingVertical: 18, alignItems: 'center', gap: 14,
+            }}>
+              {!!user?.doctor_code && (
+                <View style={{ padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF' }}>
+                  <QRCode value={user.doctor_code} size={148} color="#0B1114" backgroundColor="#FFFFFF" />
+                </View>
+              )}
+              <Text selectable style={[{ fontSize: 28, fontWeight: '800', letterSpacing: 6, color: t.q.ink }, qs.naira]}>
+                {user?.doctor_code ?? '—'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <Btn grow label={copied ? 'Copied' : 'Copy ID'} variant="secondary"
+                icon={copied ? 'checkmark' : 'copy-outline'} onPress={copyCode} />
+            </View>
+            <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60, marginTop: 10 }}>
+              A hospital admin scans this, or types the code, in Staff & doctors to add you to their queue.
             </Text>
           </View>
+        </Card>
+
+        <SectionHead title={`Linked hospitals · ${linked.length}`} />
+        {linked.length === 0 ? (
+          <Card>
+            <Empty
+              icon="business-outline"
+              title="Not linked to any hospital yet"
+              body="You can still take direct video consults and home visits — see Settings & fees. To work a hospital's queue, give them the Doctor ID above." />
+          </Card>
         ) : (
-          <View style={{ gap: 10, marginBottom: 20 }}>
-            {doctorProfile!.linkedHospitals.map(h => {
+          <Card>
+            {linked.map((h, i) => {
               const active = h.hospitalId === doctorProfile?.hospitalId
               return (
-                <TouchableOpacity key={h.hospitalId} disabled={active || switching !== null}
-                  onPress={() => handleSwitch(h.hospitalId)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                    padding: 16, borderRadius: 14, borderWidth: 1,
-                    borderColor: active ? t.accentBorder : t.cardBorder,
-                    backgroundColor: active ? t.accentBg : t.cardBg,
-                  }}>
-                  <View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{h.hospitalName}</Text>
-                    {active && <Text style={{ fontSize: 11, color: t.accent, marginTop: 2 }}>Active — you'll see this hospital's queue</Text>}
-                  </View>
-                  {switching === h.hospitalId ? (
-                    <ActivityIndicator size="small" color={t.accent} />
-                  ) : active ? (
-                    <Ionicons name="checkmark-circle" size={20} color={t.accent} />
-                  ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Switch</Text>
-                  )}
-                </TouchableOpacity>
+                <View key={h.hospitalId}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    icon="business-outline"
+                    iconTone={active ? 'teal' : 'neutral'}
+                    title={h.hospitalName}
+                    sub={active ? "Active — you see this hospital's queue" : 'Tap to make active'}
+                    tint={active}
+                    right={switching === h.hospitalId
+                      ? <ActivityIndicator size="small" color={t.q.primary} />
+                      : active
+                        ? <Pill label="Active here" tone="teal" onTint />
+                        : <Btn label="Set active" variant="secondary" small onPress={() => handleSwitch(h.hospitalId)} />}
+                    onPress={active || switching !== null ? undefined : () => handleSwitch(h.hospitalId)} />
+                </View>
               )
             })}
-          </View>
+          </Card>
         )}
 
         {clinics.length >= 2 && (
-          <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: t.textPrimary, marginBottom: 4 }}>
-              Clinics at {activeHospitalName ?? 'this hospital'}
-            </Text>
-            <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 12 }}>
-              You're assigned to more than one clinic here. Only one can be active at a time.
-            </Text>
-            <View style={{ gap: 10 }}>
-              {clinics.map(c => {
+          <>
+            <SectionHead title={`Clinics at ${activeHospitalName ?? 'this hospital'}`} />
+            <Card>
+              {clinics.map((c, i) => {
                 const active = c.clinicId === activeClinicId
                 return (
-                  <TouchableOpacity key={c.clinicId} disabled={active || clinicSwitching !== null}
-                    onPress={() => handleClinicSwitch(c.clinicId)}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                      padding: 16, borderRadius: 14, borderWidth: 1,
-                      borderColor: active ? t.accentBorder : t.cardBorder,
-                      backgroundColor: active ? t.accentBg : t.cardBg,
-                    }}>
-                    <View>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: active ? t.accent : t.textPrimary }}>{c.clinicName}</Text>
-                      {active && <Text style={{ fontSize: 11, color: t.accent, marginTop: 2 }}>Active here</Text>}
-                    </View>
-                    {clinicSwitching === c.clinicId ? (
-                      <ActivityIndicator size="small" color={t.accent} />
-                    ) : active ? (
-                      <Ionicons name="checkmark-circle" size={20} color={t.accent} />
-                    ) : (
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: t.textMuted }}>Switch</Text>
-                    )}
-                  </TouchableOpacity>
+                  <View key={c.clinicId}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="medical-outline"
+                      iconTone={active ? 'teal' : 'neutral'}
+                      title={c.clinicName}
+                      sub={active ? 'Active here' : 'Tap to make active'}
+                      tint={active}
+                      right={clinicSwitching === c.clinicId
+                        ? <ActivityIndicator size="small" color={t.q.primary} />
+                        : active
+                          ? <Pill label="Active" tone="teal" onTint />
+                          : undefined}
+                      onPress={active || clinicSwitching !== null ? undefined : () => handleClinicSwitch(c.clinicId)} />
+                  </View>
                 )
               })}
+            </Card>
+            <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+              <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                You are assigned to more than one clinic here. Only one can be active at a time — that is
+                the one whose queue and referrals you see.
+              </Text>
             </View>
-          </View>
+          </>
         )}
-
-        <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 16 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-            Your Doctor ID
-          </Text>
-          <View style={{ backgroundColor: t.inputBg, borderColor: t.inputBorder, borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 8, alignItems: 'center' }}>
-            <Text selectable style={{ fontSize: 24, fontFamily: 'monospace', fontWeight: '800', letterSpacing: 4, color: t.textPrimary }}>{user?.doctor_code ?? '—'}</Text>
-          </View>
-          <Text style={{ fontSize: 11, color: t.textMuted }}>
-            Share this with a hospital admin to get linked — they'll enter it in their dashboard's
-            "Link Existing Doctor" flow. Tap and hold to copy.
-          </Text>
-        </View>
-      </ShellScroll>
+      </Body>
+    </Screen>
   )
 }

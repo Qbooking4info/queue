@@ -2,21 +2,20 @@ import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
 import React from 'react'
 import * as Sentry from '@sentry/react-native'
-import { NavigationContainer, DarkTheme } from '@react-navigation/native'
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, TouchableOpacity } from 'react-native'
-import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { View, ActivityIndicator } from 'react-native'
 
-import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
+import { ThemeProvider, useTheme, V4_PALETTES } from '@queue/shared/contexts/ThemeContext'
 import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth, REGISTERED_VIA_DOCTOR } from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
+import { useDeviceRegistration }   from '@queue/shared/hooks/useDeviceRegistration'
 import { usePushNotifications }    from '@queue/shared/hooks/usePushNotifications'
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
@@ -44,8 +43,11 @@ import { DoctorMessagesScreen }     from './screens/specialist/DoctorMessagesScr
 import { ChatScreen }               from '@queue/shared/screens/ChatScreen'
 import { setStatusBarStyle } from 'expo-status-bar'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
-import { useOpenLocumJobs } from '@queue/shared/hooks/useOpenLocumJobs'
 import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
+import { QTabBar } from '@queue/shared/components/q'
+import { ReferralInboxScreen } from './screens/specialist/ReferralInboxScreen'
+import { PatientDetailsScreen } from './screens/specialist/PatientDetailsScreen'
+import { usePendingReferrals } from '@queue/shared/hooks/usePendingReferrals'
 
 // react-native-agora is a native module Expo Go cannot load, so the call screen is
 // lazy-loaded -- importing it eagerly would break the whole app under Expo Go, not
@@ -65,10 +67,6 @@ const AuthStack   = createNativeStackNavigator()
 const DocTab      = createBottomTabNavigator()
 const DocStack    = createNativeStackNavigator()
 const OnboardStk  = createNativeStackNavigator()
-
-function TabIcon({ name, color, size }: any) {
-  return <Ionicons name={name} color={color} size={size ?? 22} />
-}
 
 // LoginScreen is shared with the other three apps, so the doctor-specific bits (which
 // surface signIn() validates against, and which route the "Create account" link goes to)
@@ -90,7 +88,7 @@ function DoctorAuthStack({ initialRouteName }: { initialRouteName: string }) {
     <AuthStack.Navigator
       initialRouteName={initialRouteName}
       screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <AuthStack.Screen name="Login"          component={LoginScreen} initialParams={LOGIN_PARAMS} />
       <AuthStack.Screen name="DoctorRegister" component={DoctorRegisterScreen} />
     </AuthStack.Navigator>
@@ -100,10 +98,12 @@ function DoctorAuthStack({ initialRouteName }: { initialRouteName: string }) {
 // A doctor who has signed up but isn't linked to a hospital yet has no `doctors` row and
 // so no doctorProfile -- see DoctorOnboardingScreen for why that gap is structural.
 function DoctorOnboardingStack() {
+  const { theme: t } = useTheme()
   return (
     <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      // v4 screens sit on the canvas, not under a teal header, so the status-bar
+      // icons follow the palette rather than being pinned light.
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <OnboardStk.Screen name="DoctorOnboarding" component={DoctorOnboardingScreen} />
     </OnboardStk.Navigator>
   )
@@ -111,31 +111,33 @@ function DoctorOnboardingStack() {
 
 function SpecialistTabs() {
   const unread = useUnreadMessages('doctor')
-  // Badge on Jobs: open shifts nearby this doctor has not answered.
-  const openJobs = useOpenLocumJobs(true)
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
+  const { doctorProfile } = useAuth()
+  // Badge on Inbox: referrals sent to this doctor that nobody has answered.
+  const pendingReferrals = usePendingReferrals(doctorProfile?.doctorId ?? null)
   return (
-    <DocTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-    }}>
-      <DocTab.Screen name="Dashboard"         component={DoctorDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,         tabBarLabel: 'Home' }} />
-      <DocTab.Screen name="Queue"             component={SpecialistQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,         tabBarLabel: 'Queue' }} />
-      <DocTab.Screen name="Appointments"      component={DoctorAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />, tabBarLabel: 'Schedule' }} />
-      <DocTab.Screen name="Messages"          component={DoctorMessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
-      <DocTab.Screen name="LocumBoard"        component={LocumBoardScreen as any}  options={{ tabBarBadge: openJobs > 0 ? openJobs : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 10, minWidth: 16, height: 16, lineHeight: 15, borderRadius: 8, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'briefcase' : 'briefcase-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
+    <DocTab.Navigator
+      // Same custom bar as the other apps: the selected tab is marked by a rule
+      // on its own top edge, which the default bar cannot draw.
+      tabBar={props => <QTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <DocTab.Screen name="Dashboard"    component={DoctorDashboardScreen}    options={{ tabBarLabel: 'Home' }} />
+      <DocTab.Screen name="Queue"        component={SpecialistQueueScreen}    options={{ tabBarLabel: 'Queue' }} />
+      <DocTab.Screen name="ReferralInbox" component={ReferralInboxScreen as any}
+        options={{ tabBarLabel: 'Inbox', tabBarBadge: pendingReferrals > 0 ? pendingReferrals : undefined }} />
+      <DocTab.Screen name="Appointments" component={DoctorAppointmentsScreen} options={{ tabBarLabel: 'Schedule' }} />
+      <DocTab.Screen name="Messages"     component={DoctorMessagesScreen}
+        options={{ tabBarLabel: 'Messages', tabBarBadge: unread > 0 ? '' : undefined }} />
     </DocTab.Navigator>
   )
 }
 
 function SpecialistStack() {
+  const { theme: t } = useTheme()
   return (
     <DocStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      // v4 screens sit on the canvas, not under a teal header, so the status-bar
+      // icons follow the palette rather than being pinned light.
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <DocStack.Screen name="SpecialistTabs"  component={SpecialistTabs} />
       <DocStack.Screen name="Hospitals"       component={DoctorHospitalsScreen as any} />
       <DocStack.Screen name="Settings"        component={DoctorSettingsScreen  as any} />
@@ -151,6 +153,10 @@ function SpecialistStack() {
       <DocStack.Screen name="LocumJob"   component={LocumJobScreen as any} />
       <DocStack.Screen name="DoctorAnalytics" component={DoctorAnalyticsScreen as any} />
       <DocStack.Screen name="RequestAmbulance" component={RequestAmbulanceScreen as any} />
+      {/* Off the tab bar in the v4 design, which spends its five cells on the
+          clinic session. Reached from Home and from Profile. */}
+      <DocStack.Screen name="LocumBoard"      component={LocumBoardScreen as any} />
+      <DocStack.Screen name="PatientDetails"  component={PatientDetailsScreen as any} />
     </DocStack.Navigator>
   )
 }
@@ -164,6 +170,7 @@ function AppNavigator() {
   const { session, loading, user, doctorProfile, pendingDoctorOnboarding, signOut } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  useDeviceRegistration(user?.id, 'doctor')
 
   if (loading) {
     return (
@@ -217,10 +224,15 @@ function AppNavigator() {
 // for every screen at once rather than per-screen.
 function ThemedNav({ children }: { children: React.ReactNode }) {
   const { theme: t } = useTheme()
+  // The doctor app defaults to the DARK palette, but the doctor can switch to
+  // light -- so the navigator theme follows the palette rather than being
+  // pinned, or a light palette shows a dark flash on every push.
+  const base = t.isDark ? DarkTheme : DefaultTheme
   const navTheme = {
-    ...DarkTheme,
+    ...base,
+    dark: t.isDark,
     colors: {
-      ...DarkTheme.colors,
+      ...base.colors,
       background: t.canvasBg,
       card:       t.cardBg,
       text:       t.textPrimary,
@@ -239,7 +251,7 @@ function App() {
   const fontsReady = useQueueFonts()
   if (!fontsReady) return null
   return (
-    <ThemeProvider>
+    <ThemeProvider palettes={V4_PALETTES} defaultMode="dark">
       <AlertProvider>
         <AuthProvider>
           <LocationProvider>

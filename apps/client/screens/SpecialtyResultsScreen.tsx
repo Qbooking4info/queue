@@ -1,23 +1,18 @@
-// Results for one specialty (from SpecialtyBrowseScreen), with a toggle
+// Results for one specialty (from SpecialtyBrowseScreen), with a switch
 // between hospitals that officially offer it (hospital_specialties) and
-// independent doctors who specialize in it and accept direct bookings
-// (doctor_profiles.specialty_id). Two different data sources/audiences under
-// one specialty-scoped view, per the user's ask: pick a specialty, see
-// hospitals, optionally toggle to doctors instead.
+// independent doctors who specialise in it (doctor_profiles.specialty_id).
 import { useEffect, useState, useCallback } from 'react'
-import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { useLocation, distanceKm, formatDistance } from '@queue/shared/contexts/LocationContext'
-import { getHospitals, searchIndependentDoctors, IndependentDoctor } from '@queue/shared/lib/api'
+import { useLocation, distanceKm } from '@queue/shared/contexts/LocationContext'
+import { getHospitals, searchIndependentDoctors, type IndependentDoctor } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import { HospitalCard } from '@queue/shared/components/hospital/HospitalCard'
 import { DoctorListItem } from '@queue/shared/components/doctor/DoctorListItem'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Screen, AppBar, Body, Card, Hair, Seg, Empty } from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: any }
 
@@ -39,83 +34,82 @@ export function SpecialtyResultsScreen({ navigation, route }: Props) {
       const raw = await getHospitals(undefined, { specialtyId })
       setHospitals(raw.map(toDisplayHospital))
     } else {
-      const results = await searchIndependentDoctors({ specialtyId })
-      setDoctors(results)
+      setDoctors(await searchIndependentDoctors({ specialtyId }))
     }
     setLoading(false)
   }, [mode, specialtyId])
 
   useEffect(() => { load() }, [load])
 
-  const withDistance = hospitals.map(h => {
-    if (!coords || h.latitude == null || h.longitude == null) return h
-    const km = distanceKm(coords, { latitude: h.latitude!, longitude: h.longitude! })
-    return { ...h, distance: formatDistance(km) }
-  })
+  const km = (h: DisplayHospital) =>
+    coords && h.latitude != null && h.longitude != null
+      ? distanceKm(coords, { latitude: h.latitude, longitude: h.longitude })
+      : null
+
+  const count = mode === 'hospitals' ? hospitals.length : doctors.length
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title={specialtyName} onBack={() => navigation.goBack()} />
-
-      <View style={[st.toggle, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-        {(['hospitals', 'doctors'] as Mode[]).map(m => (
-          <TouchableOpacity key={m} onPress={() => { haptics.tap(); setMode(m) }}
-            style={[st.toggleBtn, mode === m && { backgroundColor: t.accentBg }]}>
-            <Ionicons name={m === 'hospitals' ? 'business-outline' : 'medkit-outline'} size={14}
-              color={mode === m ? t.accent : t.textMuted} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: mode === m ? t.accent : t.textMuted }}>
-              {m === 'hospitals' ? 'Hospitals' : 'Independent Doctors'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    <Screen>
+      <AppBar
+        title={specialtyName}
+        sub={loading ? undefined : `${count} ${mode === 'hospitals' ? (count === 1 ? 'hospital' : 'hospitals') : (count === 1 ? 'doctor' : 'doctors')}`}
+        onBack={() => navigation.goBack()}
+      />
+      <Seg<Mode>
+        value={mode} onChange={m => { haptics.tap(); setMode(m) }}
+        options={[{ key: 'hospitals', label: 'Hospitals' }, { key: 'doctors', label: 'Independent doctors' }]}
+      />
 
       {loading ? (
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
-      ) : mode === 'hospitals' ? (
-        withDistance.length === 0 ? (
-          <Empty theme={t} icon="business-outline" title="No hospitals found"
-            sub={`No hospitals currently list ${specialtyName} as a specialty.`} />
-        ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}>
-            {withDistance.map(h => (
-              <HospitalCard key={String(h.id)} hospital={h}
-                onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
-            ))}
-          </ScrollView>
-        )
-      ) : doctors.length === 0 ? (
-        <Empty theme={t} icon="medkit-outline" title="No independent doctors found"
-          sub={`No independent doctors currently list ${specialtyName} and accept direct bookings.`} />
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          {doctors.map(d => (
-            <DoctorListItem key={d.userId} doctor={d}
-              onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
-          ))}
-        </ScrollView>
+        <Body>
+          <View style={{ height: 8 }} />
+          {mode === 'hospitals' ? (
+            hospitals.length === 0 ? (
+              <Card>
+                <Empty icon="business-outline" title="No hospitals list this yet"
+                  body={`No hospital currently offers ${specialtyName}. Independent doctors may still take you — try the other tab.`}
+                  action="See independent doctors" onAction={() => setMode('doctors')} />
+              </Card>
+            ) : (
+              <Card>
+                {hospitals.map((h, i) => (
+                  <View key={String(h.id)}>
+                    {i > 0 && <Hair />}
+                    <HospitalCard hospital={h} distanceKm={km(h)}
+                      onPress={() => { haptics.tap(); navigation.navigate('HospitalProfile', { hospital: h }) }} />
+                  </View>
+                ))}
+              </Card>
+            )
+          ) : doctors.length === 0 ? (
+            <Card>
+              <Empty icon="medkit-outline" title="No independent doctors yet"
+                body={`No independent doctor currently lists ${specialtyName}. Hospitals run their own ${specialtyName.toLowerCase()} clinics — try the other tab.`}
+                action="See hospitals" onAction={() => setMode('hospitals')} />
+            </Card>
+          ) : (
+            <>
+              <Card>
+                {doctors.map((d, i) => (
+                  <View key={d.userId}>
+                    {i > 0 && <Hair />}
+                    <DoctorListItem doctor={d}
+                      onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
+                  </View>
+                ))}
+              </Card>
+              <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
+                <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                  That is everyone. Independent doctors who list {specialtyName.toLowerCase()}; hospitals have
+                  their own clinics in the other tab.
+                </Text>
+              </View>
+            </>
+          )}
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-function Empty({ theme: t, icon, title, sub }: { theme: any; icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }) {
-  return (
-    <View style={st.empty}>
-      <Ionicons name={icon} size={44} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-      <Text style={[st.emptyTitle, { color: t.textPrimary }]}>{title}</Text>
-      <Text style={[st.emptySub, { color: t.textMuted }]}>{sub}</Text>
-    </View>
-  )
-}
-
-const st = StyleSheet.create({
-  safe:       { flex: 1 },
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:      { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  toggle:     { flexDirection: 'row', marginHorizontal: 20, borderRadius: 12, borderWidth: 1, padding: 4, gap: 4, marginBottom: 16 },
-  toggleBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
-  empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
-  emptySub:   { fontSize: 12, textAlign: 'center' },
-})

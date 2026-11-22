@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
 import { supabase } from '@queue/shared/lib/supabase'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Field, Notice, Btn,
+  BottomBar, Mono,
+} from '@queue/shared/components/q'
 
 interface Insurance {
   provider: string; plan_name: string; member_id: string; group_number: string
@@ -17,9 +18,9 @@ const PROVIDERS = ['NHIS', 'Hygeia HMO', 'Leadway Health', 'AXA Mansard', 'Relia
 export function InsuranceScreen({ navigation }: { navigation: any }) {
   const { theme: t } = useTheme()
   const [insurance, setInsurance] = useState<Insurance>({ provider: '', plan_name: '', member_id: '', group_number: '' })
-  const [loading, setLoading]     = useState(true)
-  const [saving, setSaving]       = useState(false)
-  const [userId, setUserId]       = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -35,9 +36,9 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
           .eq('user_id', profile.id)
           .single()
         if (data) setInsurance(data as Insurance)
-        // PGRST116 (no rows) is expected for new users — not an error
+        // PGRST116 (no rows) is expected for a new user, not an error.
       } catch {
-        // Network error — show empty form
+        // Network error -- show the empty form rather than a dead screen.
       } finally {
         setLoading(false)
       }
@@ -46,115 +47,94 @@ export function InsuranceScreen({ navigation }: { navigation: any }) {
   }, [])
 
   async function handleSave() {
-    if (!userId) { Alert.alert('Error', 'Still loading. Please wait.'); return }
-    if (!insurance.provider) { Alert.alert('Error', 'Please select an insurance provider.'); return }
-    if (!insurance.member_id.trim()) { Alert.alert('Error', 'Please enter your Member ID.'); return }
+    if (!userId) { Alert.alert('Still loading', 'Give it a moment and try again.'); return }
+    if (!insurance.provider) { Alert.alert('Provider needed', 'Please choose your insurance provider.'); return }
+    if (!insurance.member_id.trim()) { Alert.alert('Member ID needed', 'Please enter your member ID.'); return }
     setSaving(true)
     const { error } = await supabase.from('user_insurance').upsert({
-      user_id:      userId,
-      provider:     insurance.provider,
-      plan_name:    insurance.plan_name || null,
-      member_id:    insurance.member_id.trim(),
+      user_id: userId,
+      provider: insurance.provider,
+      plan_name: insurance.plan_name || null,
+      member_id: insurance.member_id.trim(),
       group_number: insurance.group_number || null,
-      updated_at:   new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
     setSaving(false)
-    if (error) {
-      Alert.alert('Save Failed', error.message)
-    } else {
-      Alert.alert('Saved', 'Your insurance details have been saved.')
-    }
+    if (error) Alert.alert('Could not save', error.message)
+    else Alert.alert('Saved', 'Your insurance details are saved.')
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Insurance Details" onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar title="Insurance / HMO" onBack={() => navigation.goBack()} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {loading ? (
-          <Text style={[styles.placeholder, { color: t.textMuted }]}>Loading…</Text>
-        ) : (
-          <>
-            <View style={[styles.infoBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Ionicons name="shield-outline" size={20} color="rgba(255,255,255,0.3)" style={{ marginBottom: 8 }} />
-              <Text style={[styles.infoText, { color: t.textSecondary }]}>
-                Add your HMO or insurance details so hospitals can verify your coverage when booking appointments.
-              </Text>
-            </View>
+      {loading ? (
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+          <Body keyboardShouldPersistTaps="handled">
+            <Notice tone="teal" icon="shield-checkmark-outline">
+              Hospitals that accept your HMO show &quot;Accepts HMO&quot; in search. Pre-authorisation can take
+              up to an hour, so add these details before you need them.
+            </Notice>
 
-            <Text style={[styles.label, { color: t.textSecondary }]}>Insurance Provider</Text>
-            <View style={styles.chips}>
-              {PROVIDERS.map(p => {
-                const active = insurance.provider === p
+            <SectionHead title="Provider" />
+            <Card>
+              {PROVIDERS.map((p, i) => {
+                const on = insurance.provider === p
                 return (
-                  <TouchableOpacity key={p} onPress={() => setInsurance(prev => ({ ...prev, provider: p }))}
-                    style={[styles.chip, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? t.accentBg : 'transparent' }]}>
-                    <Text style={[styles.chipText, { color: active ? t.accent : t.textSecondary }]}>{p}</Text>
-                  </TouchableOpacity>
+                  <View key={p}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="shield-outline"
+                      iconTone={on ? 'teal' : 'neutral'}
+                      tint={on}
+                      title={p}
+                      right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                      onPress={() => setInsurance(s => ({ ...s, provider: p }))}
+                    />
+                  </View>
                 )
               })}
+            </Card>
+
+            <SectionHead title="Your cover" />
+            <View style={{ paddingHorizontal: 16, gap: 14 }}>
+              <Field
+                label="Plan name"
+                value={insurance.plan_name}
+                onChangeText={v => setInsurance(s => ({ ...s, plan_name: v }))}
+                placeholder="e.g. Gold Plan, Comprehensive"
+              />
+              <Field
+                label="Member ID"
+                value={insurance.member_id}
+                onChangeText={v => setInsurance(s => ({ ...s, member_id: v }))}
+                placeholder="As printed on your card"
+                autoCapitalize="characters"
+              />
+              <Field
+                label="Group / policy number"
+                hint="Optional — employers and family plans usually have one"
+                value={insurance.group_number}
+                onChangeText={v => setInsurance(s => ({ ...s, group_number: v }))}
+                placeholder=""
+                autoCapitalize="characters"
+              />
             </View>
 
-            <Text style={[styles.label, { color: t.textSecondary }]}>Plan Name</Text>
-            <TextInput
-              value={insurance.plan_name}
-              onChangeText={v => setInsurance(prev => ({ ...prev, plan_name: v }))}
-              placeholder="e.g. Gold Plan, Comprehensive"
-              placeholderTextColor={t.textMuted}
-              style={[styles.input, { backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-            />
+            <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+              <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                These details are shared with a hospital only when you book there.
+              </Text>
+            </View>
+          </Body>
 
-            <Text style={[styles.label, { color: t.textSecondary }]}>Member ID *</Text>
-            <TextInput
-              value={insurance.member_id}
-              onChangeText={v => setInsurance(prev => ({ ...prev, member_id: v }))}
-              placeholder="Your member/enrollee ID"
-              placeholderTextColor={t.textMuted}
-              autoCapitalize="characters"
-              style={[styles.input, { backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-            />
-
-            <Text style={[styles.label, { color: t.textSecondary }]}>Group / Policy Number</Text>
-            <TextInput
-              value={insurance.group_number}
-              onChangeText={v => setInsurance(prev => ({ ...prev, group_number: v }))}
-              placeholder="Optional"
-              placeholderTextColor={t.textMuted}
-              style={[styles.input, { backgroundColor: t.cardBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-            />
-
-            <TouchableOpacity onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: t.accent, opacity: saving ? 0.6 : 1 }]}>
-              <Text style={[styles.saveBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>{saving ? 'Saving…' : 'Save Insurance Details'}</Text>
-            </TouchableOpacity>
-          </>
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <BottomBar>
+            <Btn grow label="Save insurance details" loading={saving} onPress={handleSave} />
+          </BottomBar>
+        </KeyboardAvoidingView>
+      )}
+    </Screen>
   )
 }
-
-// Layout-only (theme-independent) values -- colors are applied as inline overrides
-// above, since this StyleSheet is module-scope and useTheme() is a hook that can only
-// be called inside the component. Numbers match packages/shared/contexts/ThemeContext's
-// spacing/radius/font scale as closely as the original design allowed (a couple were
-// between two scale steps and got rounded to the nearest one, e.g. 17->16, 16->14).
-const styles = StyleSheet.create({
-  safe:          { flex: 1 },
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  backBtn:       { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title:         { fontSize: 16, fontWeight: '800', letterSpacing: -0.4 },
-  scroll:        { flex: 1, paddingHorizontal: 20, paddingTop: 12 },
-  placeholder:   { textAlign: 'center', paddingVertical: 40, fontSize: 12 },
-  infoBox:       { borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 20 },
-  infoText:      { fontSize: 12, lineHeight: 20 },
-  label:         { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
-  chips:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  chip:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  chipText:      { fontSize: 12, fontWeight: '600' },
-  input:         { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, fontSize: 14 },
-  saveBtn:       { borderRadius: 20, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
-  saveBtnText:   { fontSize: 14, fontWeight: '800' },
-})

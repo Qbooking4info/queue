@@ -40,7 +40,7 @@ function Chips<T extends string>({ options, value, onChange, label }: { options:
           <TouchableOpacity key={o.value} onPress={() => { haptics.tap(); onChange(o.value) }} accessibilityRole="radio" accessibilityState={{ checked: on }}
             style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 99, justifyContent: 'center', borderWidth: 1,
               borderColor: on ? t.accent : t.inputBorder, backgroundColor: on ? t.accent : t.inputBg }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: on ? (t.id === 'forest' ? '#081416' : '#FFFFFF') : t.textSecondary }}>{o.label}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: on ? (t.q.onPrimary) : t.textSecondary }}>{o.label}</Text>
           </TouchableOpacity>
         )
       })}
@@ -88,8 +88,10 @@ export function ProfileFields({ value, onChange, showDob = true, labelStyle }: {
 }) {
   const { theme: t } = useTheme()
   const set = (patch: Partial<ProfileValues>) => onChange({ ...value, ...patch })
+  // Sentence case, matching every other field label in the v4 kit. These sat
+  // next to kit Fields on the same form and shouted while they did not.
   const L = ({ children }: { children: string }) => (
-    <Text style={[{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: t.textMuted, marginBottom: 8 }, labelStyle]}>{children}</Text>
+    <Text style={[{ fontSize: 12.5, fontWeight: '600', color: t.q.ink70, marginBottom: 6 }, labelStyle]}>{children}</Text>
   )
   return (
     <View style={{ gap: 16 }}>

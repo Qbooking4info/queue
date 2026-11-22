@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput,
-  KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth, REGISTERED_VIA_AMBULANCE_PROVIDER } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
+import { PasswordInput } from '@queue/shared/components/ui/PasswordField'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Field, Btn, BottomBar, Notice,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
@@ -27,7 +27,6 @@ export function AmbulanceProviderRegisterScreen({ navigation }: Props) {
   const [fullName, setFullName] = useState('')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -67,76 +66,44 @@ export function AmbulanceProviderRegisterScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Create account"
+          onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={s.back}>
-            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-          </TouchableOpacity>
-
-          <View style={s.content}>
-            <Text style={[s.title, { color: t.textPrimary }]}>Create your account</Text>
-            <Text style={[s.sub, { color: t.textMuted }]}>
-              This will be the owner account for your ambulance service. Next you&apos;ll add
-              your service&apos;s details and your first unit.
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+            <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: t.q.ink }}>
+              Create your account
             </Text>
-
-            {error ? (
-              <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-                <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-                <Text style={[s.errorText, { color: t.danger }]}>{error}</Text>
-              </View>
-            ) : null}
-
-            <Field icon="person-outline" placeholder="Full name" value={fullName} onChange={setFullName} t={t} />
-            <Field icon="mail-outline"   placeholder="Email" value={email} onChange={setEmail} t={t} keyboard="email-address" />
-            <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={t.textMuted} />
-              <TextInput
-                value={password} onChangeText={setPassword}
-                placeholder="Password (min 8 chars)" placeholderTextColor={t.textMuted}
-                secureTextEntry={!showPass}
-                style={[s.inputText, { color: t.textPrimary, flex: 1 }]}
-              />
-              <TouchableOpacity onPress={() => setShowPass(v => !v)} accessibilityLabel={showPass ? 'Hide password' : 'Show password'} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={16} color={t.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <Button label="Continue" onPress={handleSubmit} loading={loading} style={{ marginTop: t.spacing.sm }} />
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, marginTop: 6 }}>
+              You become the fleet admin. Next you add your service's details and your first unit.
+              Crew accounts are created from Fleet, not here.
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
+
+          <Card style={{ marginTop: 12 }}>
+            <View style={{ padding: 14, gap: 14 }}>
+              <Field label="Full name" value={fullName} onChangeText={setFullName}
+                placeholder="e.g. Funmi Adebayo" autoCapitalize="words" autoCorrect={false} />
+              <Field label="Work email" value={email} onChangeText={setEmail}
+                placeholder="you@service.com" keyboardType="email-address"
+                autoCapitalize="none" autoCorrect={false} />
+              <View style={{ gap: 6 }}>
+                <CardLabel>Password</CardLabel>
+                <PasswordInput value={password} onChangeText={setPassword} newPassword />
+                <Text style={{ fontSize: 12, color: t.q.ink60 }}>At least 8 characters.</Text>
+              </View>
+            </View>
+          </Card>
+        </Body>
+
+        <BottomBar>
+          <Btn grow label="Continue" loading={loading} onPress={handleSubmit} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-function Field({ icon, placeholder, value, onChange, t, keyboard }: {
-  icon: React.ComponentProps<typeof Ionicons>['name']; placeholder: string; value: string
-  onChange: (v: string) => void; t: any; keyboard?: any
-}) {
-  return (
-    <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-      <Ionicons name={icon} size={16} color={t.textMuted} />
-      <TextInput
-        value={value} onChangeText={onChange} placeholder={placeholder}
-        placeholderTextColor={t.textMuted} keyboardType={keyboard ?? 'default'}
-        autoCapitalize={keyboard === 'email-address' ? 'none' : 'words'} autoCorrect={false}
-        style={[s.inputText, { color: t.textPrimary }]}
-      />
-    </View>
-  )
-}
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  back:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  content:     { flex: 1, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40 },
-  title:       { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
-  sub:         { fontSize: 15, lineHeight: 19, marginBottom: 20 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 15, flex: 1 },
-  input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
-  inputText:   { fontSize: 16, flex: 1 },
-})

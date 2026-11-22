@@ -1,61 +1,41 @@
 import { useEffect, useState } from 'react'
-import { View, ScrollView, TouchableOpacity, Clipboard, Switch, Image, ActivityIndicator } from 'react-native'
+import { View, Clipboard, Switch } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { clearCache } from '@queue/shared/lib/cache'
-import { pickAndUploadAvatar } from '@queue/shared/lib/avatar'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { biometricAvailable, getAppLockEnabled, setAppLockEnabled } from '@queue/shared/components/AppLock'
-import { Header, Card, ListRow, SegmentedControl, PrimaryButton } from '@queue/shared/components/ui/v3'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, Btn, Mono, CardLabel,
+} from '@queue/shared/components/q'
 
 interface Props { navigation?: any }
 
 export function ProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, signOut, refreshProfile } = useAuth()
+  const { theme: t, mode, toggleTheme } = useTheme()
+  const { user, signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const avatarUrl = (user as any)?.avatar_url as string | null
 
-  async function changePhoto(source: 'library' | 'camera') {
-    setUploading(true)
-    try {
-      const url = await pickAndUploadAvatar(source)
-      if (url) { await refreshProfile(); haptics.success() }
-    } catch (e) {
-      haptics.error()
-      Alert.alert('Profile picture', e instanceof Error ? e.message : 'Could not update your picture.')
-    } finally { setUploading(false) }
-  }
-  function askPhoto() {
-    haptics.tap()
-    Alert.alert('Profile picture', 'Choose a new picture', [
-      { text: 'Take photo', onPress: () => changePhoto('camera') },
-      { text: 'Choose from photos', onPress: () => changePhoto('library') },
-      { text: 'Cancel', style: 'cancel' },
-    ])
-  }
   const [canLock, setCanLock] = useState(false)
   const [lockOn, setLockOn] = useState(false)
   useEffect(() => { biometricAvailable().then(setCanLock); getAppLockEnabled().then(setLockOn) }, [])
 
-  // patient_code is the short ID a family member enters to link this account, and
-  // what the Queue Pass QR carries. patient_number is the hospital's record number.
+  // patient_code is the short ID a family member enters to link this account,
+  // and what the queue pass QR carries. patient_number is the hospital's own
+  // record number -- different thing, different audience.
   const patientCode = (user as any)?.patient_code ?? null
   const patientNumber = (user as any)?.patient_number ?? null
-  const initials = user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
-  const theme: 'light' | 'dark' = themeId === 'forest' ? 'dark' : 'light'
 
   function copyCode() {
     if (!patientCode) return
     Clipboard.setString(patientCode)
+    haptics.tap()
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -69,71 +49,115 @@ export function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header>
-          <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-            <ProfileAvatar size={68} editable />
-            <View style={{ flex: 1 }}>
-              <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{user?.full_name ?? 'Your profile'}</Text>
-              <TouchableOpacity onPress={copyCode} disabled={!patientCode} accessibilityRole="button" accessibilityLabel={patientCode ? `Patient ID ${patientCode}. Copy` : 'Patient ID'}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}>
-                <Text style={{ color: '#CCFBF1', fontSize: 13 }}>Patient ID {patientCode ?? '—'}</Text>
-                {patientCode && <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color="#CCFBF1" />}
-              </TouchableOpacity>
-            </View>
+    <Screen>
+      <AppBar title="Profile" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
+
+      <Body>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16 }}>
+          <ProfileAvatar size={64} editable />
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.4, color: t.q.ink }}>
+              {user?.full_name ?? 'Your profile'}
+            </Text>
+            <Text style={{ fontSize: 13, color: t.q.ink60 }}>{user?.phone ?? user?.email ?? ''}</Text>
           </View>
-        </Header>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-                <View style={{ padding: 20, gap: 14 }}>
-          <Card style={{ paddingVertical: 0 }}>
-            <ListRow icon="wallet-outline" title="Wallet" subtitle="Top up and pay for visits in one tap" onPress={() => navigation?.navigate('Wallet')} />
-            <ListRow icon="people-outline" title="Family" subtitle="Book and manage care for family members" onPress={() => navigation?.navigate('Dependents')} />
-            <ListRow icon="heart-outline" title="Health profile" subtitle="Allergies, conditions, blood group" onPress={() => navigation?.navigate('MedicalHistory')} />
-            <ListRow icon="shield-checkmark-outline" title="Insurance / HMO" onPress={() => navigation?.navigate('Insurance')} />
-            <ListRow icon="notifications-outline" title="Notifications" subtitle="Push, WhatsApp, SMS, email" last onPress={() => navigation?.navigate('Notifications')} />
-          </Card>
+        </View>
 
-          <Card style={{ gap: 10 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
-            <SegmentedControl<'light' | 'dark'> value={theme} onChange={v => { if (v !== theme) toggleTheme() }}
-              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
-          </Card>
-
-          <Card style={{ paddingVertical: 0 }}>
-            {canLock && (
-              <ListRow icon="finger-print-outline" title="Unlock with fingerprint or face"
-                subtitle={lockOn ? 'On · asks when you open Queue' : 'Off'}
-                trailing={<Switch value={lockOn} accessibilityLabel="Unlock with fingerprint or face"
-                  onValueChange={async v => { if (await setAppLockEnabled(v)) setLockOn(v) }}
-                  trackColor={{ true: t.accent, false: t.cardBorder }} thumbColor="#FFFFFF" />} />
-            )}
-            <ListRow icon="lock-closed-outline" title="Privacy & security" onPress={() => navigation?.navigate('PrivacySecurity')} />
-            <ListRow icon="help-circle-outline" title="Help & support" last onPress={() => navigation?.navigate('Support')} />
-          </Card>
-
-          {patientNumber && (
-            <Text style={{ fontSize: 12, color: t.textMuted, textAlign: 'center' }}>Hospital record number {patientNumber}</Text>
+        <Card>
+          <Row
+            icon="card-outline"
+            title="Patient ID"
+            sub={copied ? 'Copied' : 'Tap to copy — family members use this to link to you'}
+            right={<Mono size={15} weight="700">{patientCode ?? '—'}</Mono>}
+            onPress={patientCode ? copyCode : undefined}
+          />
+          {!!patientNumber && (
+            <>
+              <Hair />
+              <Row
+                icon="document-text-outline" iconTone="neutral"
+                title="Hospital record number"
+                sub="Used by the hospital, not for linking"
+                right={<Mono size={13} color={t.q.ink60}>{patientNumber}</Mono>}
+              />
+            </>
           )}
+        </Card>
 
+        <SectionHead title="Your care" />
+        <Card>
+          <Row icon="wallet-outline" title="Wallet" sub="Top up and pay for visits in one tap"
+            chevron onPress={() => navigation?.navigate('Wallet')} />
+          <Hair />
+          <Row icon="people-outline" title="Dependents" sub="Book and manage care for family"
+            chevron onPress={() => navigation?.navigate('Dependents')} />
+          <Hair />
+          <Row icon="heart-outline" title="Health profile" sub="Blood group, genotype, conditions, allergies"
+            chevron onPress={() => navigation?.navigate('MedicalHistory')} />
+          <Hair />
+          <Row icon="shield-checkmark-outline" title="Insurance / HMO" sub="Provider, plan and member ID"
+            chevron onPress={() => navigation?.navigate('Insurance')} />
+        </Card>
 
+        <SectionHead title="App" />
+        <Card>
+          <Row icon="notifications-outline" title="Notifications" sub="Push, WhatsApp, SMS, email"
+            chevron onPress={() => navigation?.navigate('Notifications')} />
+          <Hair />
+          {canLock && (
+            <>
+              <Row
+                icon="finger-print-outline"
+                title="Biometric unlock"
+                sub={lockOn ? 'On · asks when you open Queue' : 'Off'}
+                right={
+                  <Switch
+                    value={lockOn}
+                    accessibilityLabel="Unlock with fingerprint or face"
+                    onValueChange={async v => { if (await setAppLockEnabled(v)) setLockOn(v) }}
+                    trackColor={{ true: t.q.primary, false: t.q.line }}
+                    thumbColor="#FFFFFF"
+                  />
+                }
+              />
+              <Hair />
+            </>
+          )}
+          <Row icon="lock-closed-outline" title="Privacy & security" sub="Password and signed-in devices"
+            chevron onPress={() => navigation?.navigate('PrivacySecurity')} />
+          <Hair />
+          <Row icon="help-circle-outline" title="Help & support" sub="Chat, call or email us"
+            chevron onPress={() => navigation?.navigate('Support')} />
+        </Card>
+
+        <SectionHead title="Appearance" />
+        <View style={{ marginTop: -8 }}>
+          <Seg<'light' | 'dark'>
+            value={mode}
+            onChange={v => { if (v !== mode) toggleTheme() }}
+            options={[{ key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]}
+          />
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 20, gap: 12 }}>
           {!confirm ? (
-            <TouchableOpacity onPress={() => { haptics.tap(); setConfirm(true) }} accessibilityRole="button"
-              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
-            </TouchableOpacity>
+            <Btn label="Sign out" variant="secondary" onPress={() => { haptics.tap(); setConfirm(true) }} />
           ) : (
-            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirm(false)} /></View>
-                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={doSignOut} /></View>
+            <Card pad style={{ marginHorizontal: 0, gap: 12 }}>
+              <CardLabel>Sign out of your account?</CardLabel>
+              <Text style={{ fontSize: 13.5, lineHeight: 19, color: t.q.ink70 }}>
+                Your bookings stay where they are. You will need your password to sign back in.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Btn grow label="Cancel" variant="secondary" onPress={() => setConfirm(false)} />
+                <Btn grow label="Sign out" variant="danger" loading={signingOut} onPress={doSignOut} />
               </View>
             </Card>
           )}
 
           <DeleteAccount what="your profile, photo, family links and sign-in" />
         </View>
-      </ScrollView>
-    </View>
+      </Body>
+    </Screen>
   )
 }

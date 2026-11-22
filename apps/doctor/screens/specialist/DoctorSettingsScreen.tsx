@@ -1,11 +1,13 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, TouchableOpacity, Switch, ActivityIndicator, Linking, Modal, ScrollView } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { useState, useCallback } from 'react'
+import {
+  View, Switch, ActivityIndicator, Linking, Modal, ScrollView, Pressable,
+  KeyboardAvoidingView, Platform,
+} from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import {
@@ -13,7 +15,10 @@ import {
   getQualificationDocuments, uploadQualificationDocument, deleteQualificationDocument, QualificationDocument,
   getSpecialties, SpecialtyRow,
 } from '@queue/shared/lib/api'
-import { ShellScroll } from '@queue/shared/components/AppShell'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Field, Btn, BottomBar,
+  Empty, IconBtn, Seg,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: { goBack: () => void; canGoBack?: () => boolean; navigate: (name: string) => void } }
 
@@ -24,8 +29,8 @@ const DEFAULTS: DoctorProfileSettings = {
 }
 
 export function DoctorSettingsScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
-  const { user, doctorProfile, signOut } = useAuth()
+  const { theme: t, mode, toggleTheme } = useTheme()
+  const { signOut } = useAuth()
   const [form, setForm] = useState<DoctorProfileSettings>(DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -61,6 +66,7 @@ export function DoctorSettingsScreen({ navigation }: Props) {
     if (err) { haptics.error(); return }
     haptics.success()
     setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   async function handleUpload() {
@@ -88,192 +94,186 @@ export function DoctorSettingsScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={t.accent} />
-      </View>
+      <Screen>
+        <AppBar title="Settings & fees" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
+  const specialtyName = specialties.find(s => s.id === form.specialty_id)?.name
+
   return (
-    <>
-      <ShellScroll title="Settings" subtitle="What patients see when booking you directly" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Settings & fees" sub="What patients see when they book you directly"
+          onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
-        <Section theme={t} title="Direct bookings">
-          <ToggleRow theme={t} label="Accept virtual consults" sub="Patients can book a video call with you directly"
-            value={form.accepts_direct_virtual} onChange={v => set('accepts_direct_virtual', v)} />
-          {form.accepts_direct_virtual && (
-            <FeeRow theme={t} label="Virtual consultation fee (₦)" value={form.virtual_fee}
-              onChange={v => set('virtual_fee', v)} />
-          )}
-          <ToggleRow theme={t} label="Accept home visits" sub="Patients can request you visit their home"
-            value={form.accepts_direct_home_visit} onChange={v => set('accepts_direct_home_visit', v)} />
-          {form.accepts_direct_home_visit && (
-            <FeeRow theme={t} label="Home visit fee (₦)" value={form.home_visit_fee}
-              onChange={v => set('home_visit_fee', v)} />
-          )}
-          <ToggleRow theme={t} label="Show my phone number to patients" sub="Otherwise only visible after they've booked you"
-            value={form.show_phone_to_patients} onChange={v => set('show_phone_to_patients', v)} last />
-        </Section>
-
-        <Section theme={t} title="Public profile">
-          <FieldRow theme={t} label="Title" value={form.title ?? ''} onChange={v => set('title', v || null)} placeholder="e.g. Dr." />
-          <TouchableOpacity onPress={() => { haptics.tap(); setPickerOpen(true) }}
-            style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-            <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Medical Specialty</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10 }}>
-              <Text style={{ fontSize: 13, color: form.specialty_id ? t.textPrimary : t.textMuted }}>
-                {specialties.find(s => s.id === form.specialty_id)?.name ?? 'Select specialty…'}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color={t.textMuted} />
-            </View>
-          </TouchableOpacity>
-          <FieldRow theme={t} label="Level / Cadre" value={form.level ?? ''} onChange={v => set('level', v || null)}
-            placeholder="e.g. Consultant, Senior Registrar, MO" />
-          <FieldRow theme={t} label="Qualifications" value={form.qualification ?? ''} onChange={v => set('qualification', v || null)} placeholder="e.g. MBBS, FWACS" />
-          <FieldRow theme={t} label="Years of experience" value={form.years_experience?.toString() ?? ''}
-            onChange={v => set('years_experience', v ? Number(v.replace(/\D/g, '')) : null)} placeholder="e.g. 8" keyboardType="number-pad" />
-          <FieldRow theme={t} label="Bio" value={form.bio ?? ''} onChange={v => set('bio', v || null)} placeholder="Brief bio patients will see" multiline last />
-        </Section>
-
-        <Button label={saved ? 'Saved ✓' : 'Save Settings'} onPress={save} loading={saving} style={{ marginBottom: 20 }} />
-
-        <Section theme={t} title="Qualification documents">
-          {docs.length === 0 ? (
-            <Text style={{ fontSize: 12, color: t.textMuted, padding: 14 }}>
-              No documents uploaded yet. Upload certificates or licences so patients can verify your credentials.
-            </Text>
-          ) : docs.map(d => (
-            <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-              <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                onPress={() => d.url && Linking.openURL(d.url)}>
-                <Ionicons name="document-text-outline" size={16} color={t.accent} />
-                <Text numberOfLines={1} style={{ fontSize: 12, color: t.textPrimary, flex: 1 }}>{d.title}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(d.id)} accessibilityLabel={`Delete ${d.title}`} style={{ padding: 4 }}>
-                <Ionicons name="trash-outline" size={15} color={t.danger} />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TouchableOpacity onPress={handleUpload} disabled={uploading}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14 }}>
-            {uploading ? <ActivityIndicator size="small" color={t.accent} /> : (
-              <>
-                <Ionicons name="cloud-upload-outline" size={15} color={t.accent} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Upload document (PDF, JPG, PNG — max 10MB)</Text>
-              </>
+        <Body>
+          <SectionHead title="Direct bookings" />
+          <Card style={{ marginTop: 0 }}>
+            <ToggleRow label="Accept virtual consults" sub="Patients can book a video call with you directly"
+              value={!!form.accepts_direct_virtual} onToggle={v => set('accepts_direct_virtual', v)} theme={t} />
+            {form.accepts_direct_virtual && (
+              <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                <Field label="Virtual consultation fee (₦)" keyboardType="number-pad"
+                  value={form.virtual_fee?.toString() ?? ''}
+                  onChangeText={v => set('virtual_fee', v ? Number(v.replace(/\D/g, '')) : null)}
+                  placeholder="e.g. 6000" />
+              </View>
             )}
-          </TouchableOpacity>
-        </Section>
+            <ToggleRow label="Accept home visits" sub="Patients can ask you to visit their home"
+              value={!!form.accepts_direct_home_visit} onToggle={v => set('accepts_direct_home_visit', v)} theme={t} />
+            {form.accepts_direct_home_visit && (
+              <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                <Field label="Home visit fee (₦)" keyboardType="number-pad"
+                  value={form.home_visit_fee?.toString() ?? ''}
+                  onChangeText={v => set('home_visit_fee', v ? Number(v.replace(/\D/g, '')) : null)}
+                  placeholder="e.g. 20000" />
+              </View>
+            )}
+            <ToggleRow label="Show my phone number to patients"
+              sub="Otherwise it is only visible once they have booked you"
+              value={!!form.show_phone_to_patients} onToggle={v => set('show_phone_to_patients', v)} theme={t} last />
+          </Card>
 
-        <Section theme={t} title="App">
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name={themeId === 'forest' ? 'moon-outline' : 'sunny-outline'} size={14} color={t.textPrimary} />
-              <Text style={{ fontSize: 13, color: t.textPrimary }}>{themeId === 'forest' ? 'Dark theme' : 'Light theme'}</Text>
+          <SectionHead title="Public profile" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <Field label="Title" value={form.title ?? ''} onChangeText={v => set('title', v || null)} placeholder="e.g. Dr." />
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.q.ink70 }}>Medical specialty</Text>
+                <Pressable
+                  onPress={() => { haptics.tap(); setPickerOpen(true) }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Medical specialty: ${specialtyName ?? 'not chosen'}`}
+                  style={{
+                    minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                    backgroundColor: t.q.field, paddingHorizontal: 14,
+                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                  }}>
+                  <Text style={{ flex: 1, fontSize: 15, color: specialtyName ? t.q.ink : t.q.ink60 }}>
+                    {specialtyName ?? 'Choose your specialty'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={t.q.ink60} />
+                </Pressable>
+              </View>
+
+              <Field label="Level / cadre" value={form.level ?? ''} onChangeText={v => set('level', v || null)}
+                placeholder="e.g. Consultant, Senior Registrar, MO" />
+              <Field label="Qualifications" value={form.qualification ?? ''} onChangeText={v => set('qualification', v || null)}
+                placeholder="e.g. MBBS, FWACS" />
+              <Field label="Years of experience" keyboardType="number-pad"
+                value={form.years_experience?.toString() ?? ''}
+                onChangeText={v => set('years_experience', v ? Number(v.replace(/\D/g, '')) : null)}
+                placeholder="e.g. 8" />
+              <Field label="Bio" value={form.bio ?? ''} onChangeText={v => set('bio', v || null)}
+                placeholder="A short bio patients will see" multiline
+                style={{ minHeight: 96, textAlignVertical: 'top' }} />
             </View>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        </Section>
+          </Card>
 
-        {confirmSignOut ? (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity onPress={() => setConfirmSignOut(false)}
-              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }}>
-              <Text style={{ color: t.textPrimary, fontWeight: '700' }}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => signOut()}
-              style={{ flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }}>
-              <Text style={{ color: t.danger, fontWeight: '700' }}>Confirm Sign Out</Text>
-            </TouchableOpacity>
+          <SectionHead title="Qualification documents" />
+          <Card>
+            {docs.length === 0 ? (
+              <Empty icon="document-text-outline" title="Nothing uploaded yet"
+                body="Upload certificates or licences so patients can see your credentials are real." />
+            ) : docs.map((d, i) => (
+              <View key={d.id}>
+                {i > 0 && <Hair />}
+                <Row
+                  compact icon="document-text-outline" iconTone="teal"
+                  title={d.title}
+                  onPress={d.url ? () => Linking.openURL(d.url as string) : undefined}
+                  right={<IconBtn name="trash-outline" label={`Delete ${d.title}`} color={t.q.red}
+                    onPress={() => handleDelete(d.id)} />} />
+              </View>
+            ))}
+            <Hair />
+            <View style={{ padding: 14 }}>
+              <Btn label="Upload document" variant="secondary" icon="cloud-upload-outline"
+                loading={uploading} onPress={handleUpload} />
+              <Text style={{ fontSize: 11.5, color: t.q.ink60, marginTop: 8, textAlign: 'center' }}>
+                PDF, JPG or PNG · up to 10 MB
+              </Text>
+            </View>
+          </Card>
+
+          <SectionHead title="Appearance" />
+          <Seg<'light' | 'dark'>
+            value={mode === 'dark' ? 'dark' : 'light'}
+            onChange={v => { if (v !== (mode === 'dark' ? 'dark' : 'light')) toggleTheme() }}
+            options={[{ key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]} />
+
+          <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
+            {confirmSignOut ? (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Btn grow label="Cancel" variant="secondary" onPress={() => setConfirmSignOut(false)} />
+                <Btn grow label="Confirm sign out" variant="danger" onPress={() => { void signOut() }} />
+              </View>
+            ) : (
+              <Btn label="Sign out" variant="danger" onPress={() => { haptics.tap(); setConfirmSignOut(true) }} />
+            )}
           </View>
-        ) : (
-          <TouchableOpacity onPress={() => setConfirmSignOut(true)}
-            style={{ borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: t.dangerBorder, backgroundColor: t.dangerSubtle }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.danger }}>Sign out</Text>
-          </TouchableOpacity>
-        )}
-      </ShellScroll>
+        </Body>
+
+        <BottomBar>
+          <Btn grow label={saved ? 'Saved' : 'Save settings'} icon={saved ? 'checkmark' : undefined}
+            loading={saving} onPress={save} />
+        </BottomBar>
+      </Screen>
 
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: t.cardBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingTop: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: t.textPrimary }}>Select Specialty</Text>
-              <TouchableOpacity onPress={() => setPickerOpen(false)} accessibilityLabel="Close" hitSlop={8}>
-                <Ionicons name="close" size={20} color={t.textMuted} />
-              </TouchableOpacity>
+          <View style={{ backgroundColor: t.q.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+              <Text accessibilityRole="header" style={{ flex: 1, fontSize: 17, fontWeight: '700', color: t.q.ink }}>
+                Choose your specialty
+              </Text>
+              <IconBtn name="close" label="Close" onPress={() => setPickerOpen(false)} />
             </View>
-            <ScrollView style={{ padding: 8 }}>
-              {specialties.map(s => (
-                <TouchableOpacity key={s.id}
-                  onPress={() => { haptics.tap(); set('specialty_id', s.id); setPickerOpen(false) }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10,
-                    backgroundColor: form.specialty_id === s.id ? t.accentBg : 'transparent',
-                  }}>
-                  <Text style={{ fontSize: 18 }}>{s.icon ?? '🩺'}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: form.specialty_id === s.id ? t.accent : t.textPrimary, flex: 1 }}>{s.name}</Text>
-                  {form.specialty_id === s.id && <Ionicons name="checkmark" size={16} color={t.accent} />}
-                </TouchableOpacity>
+            <Hair inset={0} />
+            <ScrollView>
+              {specialties.map((s, i) => (
+                <View key={s.id}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    title={s.name}
+                    tint={form.specialty_id === s.id}
+                    right={form.specialty_id === s.id
+                      ? <Ionicons name="checkmark" size={18} color={t.q.primary} />
+                      : undefined}
+                    onPress={() => { haptics.tap(); set('specialty_id', s.id); setPickerOpen(false) }} />
+                </View>
               ))}
             </ScrollView>
           </View>
         </View>
       </Modal>
+    </KeyboardAvoidingView>
+  )
+}
+
+function ToggleRow({ label, sub, value, onToggle, theme: t, last }: {
+  label: string; sub: string; value: boolean; onToggle: (v: boolean) => void; theme: any; last?: boolean
+}) {
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 56 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', letterSpacing: -0.14, color: t.q.ink }}>{label}</Text>
+          <Text style={{ fontSize: 12.5, lineHeight: 16, color: t.q.ink60 }}>{sub}</Text>
+        </View>
+        <Switch
+          value={value} onValueChange={v => { haptics.tap(); onToggle(v) }}
+          accessibilityLabel={label}
+          trackColor={{ true: t.q.primary, false: t.q.line }}
+          thumbColor="#FFFFFF" />
+      </View>
+      {!last && <Hair />}
     </>
-  )
-}
-
-function Section({ theme: t, title, children }: { theme: any; title: string; children: React.ReactNode }) {
-  return (
-    <View style={{ marginBottom: 20, gap: 6 }}>
-      <Text accessibilityRole="header" style={{ fontSize: 16, fontWeight: '700', color: t.textPrimary }}>{title}</Text>
-      <View style={{ backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 14, overflow: 'hidden' }}>
-        {children}
-      </View>
-    </View>
-  )
-}
-
-function ToggleRow({ theme: t, label, sub, value, onChange, last }: {
-  theme: any; label: string; sub?: string; value: boolean; onChange: (v: boolean) => void; last?: boolean
-}) {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder }}>
-      <View style={{ flex: 1, paddingRight: 10 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: t.textPrimary }}>{label}</Text>
-        {sub && <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{sub}</Text>}
-      </View>
-      <Switch value={value} onValueChange={v => { haptics.tap(); onChange(v) }} trackColor={{ true: t.accent, false: t.cardBorder }} />
-    </View>
-  )
-}
-
-function FeeRow({ theme: t, label, value, onChange }: { theme: any; label: string; value: number | null; onChange: (v: number | null) => void }) {
-  return (
-    <View style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.cardBorder }}>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
-      <TextInput value={value?.toString() ?? ''} onChangeText={v => onChange(v ? Number(v.replace(/\D/g, '')) : null)}
-        keyboardType="number-pad" placeholder="e.g. 5000" placeholderTextColor={t.textMuted}
-        style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 13, color: t.textPrimary }} />
-    </View>
-  )
-}
-
-function FieldRow({ theme: t, label, value, onChange, placeholder, multiline, keyboardType, last }: {
-  theme: any; label: string; value: string; onChange: (v: string) => void; placeholder?: string
-  multiline?: boolean; keyboardType?: 'default' | 'number-pad'; last?: boolean
-}) {
-  return (
-    <View style={{ padding: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder }}>
-      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>{label}</Text>
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.textMuted}
-        multiline={multiline} keyboardType={keyboardType ?? 'default'}
-        style={{
-          borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10,
-          padding: 10, fontSize: 13, color: t.textPrimary, minHeight: multiline ? 70 : undefined,
-          textAlignVertical: multiline ? 'top' : 'center',
-        }} />
-    </View>
   )
 }

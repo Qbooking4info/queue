@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, DetailRow, Chip, Field,
+  Notice, Btn, BottomBar, Empty, Mono,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { useLocation } from '@queue/shared/contexts/LocationContext'
 import { getHospitals, createHospitalAppointment, addNotification, getHospitalHours, isOpenNow, getClinicsForHospital, getLinkedDependents, findEmergencyClinic, type LinkedDependent } from '@queue/shared/lib/api'
@@ -89,27 +91,34 @@ function BedSpaceAck({ selectedHospital, needsAck, acked, onToggle, t }: {
 }) {
   if (!selectedHospital || !needsAck) return null
   const isNone = selectedHospital.bed_space_status === 'none'
-  const color = isNone ? t.danger : '#FF8C42'
   return (
-    <View style={[s.bedSpaceWarnBox, { borderColor: color, backgroundColor: isNone ? t.dangerSubtle : 'rgba(255,140,66,0.08)' }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Ionicons name="warning-outline" size={17} color={color} />
-        <Text style={[s.bedSpaceWarnTitle, { color }]}>
-          {isNone ? 'No bed space right now' : 'Very limited bed space right now'}
-        </Text>
-      </View>
-      <Text style={[s.bedSpaceWarnText, { color: t.textSecondary }]}>
-        {selectedHospital.name} cannot guarantee a bed on arrival. Other emergencies who arrive first —
-        especially those triaged as more urgent — will be seen first. Basic first aid may still be given
-        as the hospital's capacity allows.
-      </Text>
-      <TouchableOpacity onPress={onToggle} style={s.ackRow}>
-        <View style={[s.ackCheckbox, { borderColor: acked ? color : t.cardBorder, backgroundColor: acked ? color : 'transparent' }]}>
-          {acked && <Ionicons name="checkmark" size={12} color="#fff" />}
+    <>
+      <Notice tone="red" icon="warning-outline">
+        {isNone ? 'No bed space right now. ' : 'Very limited bed space right now. '}
+        {selectedHospital.name} cannot guarantee a bed on arrival. Other emergencies who arrive first,
+        especially more urgent ones, are seen first. First aid may still be given as capacity allows.
+      </Notice>
+      {/* A tick, not a toggle switch: this is a thing the patient states, and
+          Continue stays locked until they do. */}
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: acked }}
+        accessibilityLabel="I understand and wish to proceed anyway"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, backgroundColor: t.q.surface, borderWidth: 1, borderColor: acked ? t.q.redFill : t.q.line }}>
+        <View style={{
+          width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+          borderColor: acked ? t.q.redFill : t.q.line,
+          backgroundColor: acked ? t.q.redFill : 'transparent',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          {acked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
         </View>
-        <Text style={[s.ackText, { color: t.textPrimary }]}>I understand and wish to proceed anyway</Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={{ flex: 1, fontSize: 13.5, color: t.q.ink }}>
+          I understand and wish to proceed anyway
+        </Text>
+      </Pressable>
+    </>
   )
 }
 
@@ -310,468 +319,345 @@ export function EmergencyBookingScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <Header title="Emergency booking" subtitle="Skip the queue · immediate attention" onBack={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)} />
+    <Screen>
+      <AppBar
+        title="Emergency booking"
+        sub="Today only"
+        onBack={() => step === 0 ? navigation.goBack() : setStep(p => p - 1)}
+      />
 
-      {/* Progress */}
-      <View style={s.progressRow}>
-        {STEPS.map((st, i) => (
-          <View key={st} style={{ flex: 1 }}>
-            <View style={[s.progressBar, { backgroundColor: i <= step ? t.danger : t.cardBorder }]} />
-            <Text style={[s.progressLabel, { color: i <= step ? t.danger : t.textMuted, fontWeight: i === step ? '700' : '400' }]}>
-              {st}
+      {/* Three equal segments, in red: this flow is not the ordinary booking
+          flow wearing a different word, and the rail says so at a glance. */}
+      <View
+        style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}
+        accessibilityLabel={`Step ${step + 1} of 3: ${STEPS[step]}`}>
+        {STEPS.map((label, i) => (
+          <View key={label} style={{ flex: 1, gap: 5 }}>
+            <View style={{ height: 3, borderRadius: 2, backgroundColor: i <= step ? t.q.redFill : t.q.line }} />
+            <Text style={{ fontSize: 11, fontWeight: i === step ? '700' : '500', color: i === step ? t.q.ink : t.q.ink60 }}>
+              {label}
             </Text>
           </View>
         ))}
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      {/* ── Step 0: Triage ───────────────────────────────────── */}
-      {step === 0 && (
-        <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          <View style={[s.alertBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Ionicons name="alert-circle-outline" size={20} color={t.statusBusy.text} />
-            <Text style={[s.alertText, { color: t.danger }]}>
-              If life-threatening, call <Text style={{ fontWeight: '900' }}>112</Text> immediately.
-            </Text>
-          </View>
 
-          <Text style={[s.label, { color: t.textMuted }]}>What's the issue? <Text style={{ color: t.danger }}>*</Text></Text>
-          <View style={s.symptomGrid}>
-            {SYMPTOMS.map(sym => (
-              <TouchableOpacity key={sym} onPress={() => setSymptom(symptom === sym ? '' : sym)}
-                style={[s.symptomChip, {
-                  borderColor:     symptom === sym ? t.danger : t.cardBorder,
-                  backgroundColor: symptom === sym ? t.dangerSubtle : t.cardBg,
-                }]}>
-                <Text style={[s.symptomText, { color: symptom === sym ? t.danger : t.textSecondary }]}>{sym}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* ── Step 0: what is wrong, and who for ─────────────────── */}
+        {step === 0 && (
+          <Body keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            <Notice tone="red" icon="alert-circle-outline">
+              If this is life-threatening, call 112 now. This holds a place at a hospital; it does not
+              send an ambulance by itself.
+            </Notice>
 
-          <Text style={[s.orDivider, { color: t.textMuted }]}>— or describe in your own words —</Text>
-          <TextInput
-            value={customSymptom} onChangeText={setCustomSymptom}
-            placeholder="Describe symptoms…" placeholderTextColor={t.textMuted}
-            multiline numberOfLines={3}
-            style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-          />
-
-          <Text style={[s.label, { color: t.textMuted }]}>Who needs care?</Text>
-          <View style={s.forRow}>
-            {[false, true].map(dep => (
-              <TouchableOpacity key={String(dep)} onPress={() => setForDependent(dep)}
-                style={[s.forBtn, {
-                  borderColor:     forDependent === dep ? t.accent : t.cardBorder,
-                  backgroundColor: forDependent === dep ? t.accentBg : t.cardBg,
-                }]}>
-                <Ionicons name={dep ? 'people-outline' : 'person-outline'} size={18} color={forDependent === dep ? t.accent : t.textMuted} style={{ marginBottom: 4 }} />
-                <Text style={[s.forBtnText, { color: forDependent === dep ? t.accent : t.textMuted }]}>
-                  {dep ? 'A dependent' : 'Myself'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {/* Linked (real-account) dependent selector */}
-          {forDependent && dependentsList.length > 0 && (
-            <View style={{ marginTop: 10 }}>
-              {dependentsList.map(d => (
-                <TouchableOpacity key={d.linkId} onPress={() => setSelectedDependentId(d.dependent.id)}
-                  style={[s.forBtn, {
-                    flexDirection: 'row', justifyContent: 'flex-start', gap: 10, marginBottom: 8,
-                    borderColor:     selectedDependentId === d.dependent.id ? t.accent : t.cardBorder,
-                    backgroundColor: selectedDependentId === d.dependent.id ? t.accentBg : t.cardBg,
-                  }]}>
-                  <Ionicons name="person-outline" size={16} color="rgba(255,255,255,0.6)" />
-                  <Text style={[s.forBtnText, { color: selectedDependentId === d.dependent.id ? t.accent : t.textMuted }]}>
-                    {d.dependent.full_name} ({d.relationship})
-                  </Text>
-                </TouchableOpacity>
+            <SectionHead title="What is the issue?" />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+              {SYMPTOMS.map(sym => (
+                <Chip
+                  key={sym}
+                  label={sym}
+                  on={symptom === sym}
+                  onPress={() => setSymptom(symptom === sym ? '' : sym)}
+                />
               ))}
             </View>
-          )}
-          {forDependent && dependentsList.length === 0 && (
-            <Text style={[s.noteInline, { color: t.textMuted, marginTop: 8 }]}>
-              No linked dependents yet. Link one in Profile › Dependents.
-            </Text>
-          )}
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      )}
 
-      {/* ── Step 1: Hospital & Doctor ─────────────────────────── */}
-      {step === 1 && (
-        <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
-          <Text style={[s.label, { color: t.textMuted, marginTop: 0 }]}>How will you get there?</Text>
-          <View style={s.slotRow}>
-            {ARRIVAL_OPTIONS.map(opt => (
-              <TouchableOpacity key={opt} onPress={() => setArrival(opt)}
-                style={[s.slotChip, {
-                  borderColor:     arrival === opt ? t.danger : t.cardBorder,
-                  backgroundColor: arrival === opt ? t.dangerSubtle : t.cardBg,
-                }]}>
-                <Text style={[s.slotText, { color: arrival === opt ? t.danger : t.textMuted, fontWeight: arrival === opt ? '700' : '400' }]}>
-                  {opt}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+              <Field
+                label="Or describe it in your own words"
+                value={customSymptom}
+                onChangeText={setCustomSymptom}
+                placeholder="Describe the symptoms…"
+                multiline
+                numberOfLines={3}
+                style={{ minHeight: 80, textAlignVertical: 'top' }}
+              />
+            </View>
 
-          {arrival === AMBULANCE_ARRIVAL ? (
-            <>
-              <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-                <Text style={[s.noteText, { color: t.danger }]}>
-                  We start looking for the nearest available ambulance as soon as you confirm, and show you when a crew accepts.
-                  The nearest available crew decides the receiving hospital based on your condition and
-                  bed capacity — a preference below is used only when it doesn't conflict with that.
-                </Text>
-              </View>
-
-              <Text style={[s.label, { color: t.textMuted }]}>Pickup location</Text>
-              {locationLoading ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator color={t.danger} />
-                  <Text style={[s.noteInline, { color: t.textMuted }]}>Getting your location…</Text>
+            <SectionHead title="Who needs care?" />
+            <Card>
+              <Row
+                icon="person-outline"
+                iconTone={!forDependent ? 'teal' : 'neutral'}
+                tint={!forDependent}
+                title="Me"
+                sub="This booking is for you"
+                right={!forDependent ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                onPress={() => setForDependent(false)}
+              />
+              <Hair />
+              <Row
+                icon="people-outline"
+                iconTone={forDependent ? 'teal' : 'neutral'}
+                tint={forDependent}
+                title="Someone I look after"
+                sub={dependentsList.length ? `${dependentsList.length} linked` : 'No dependents linked yet'}
+                right={forDependent ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                onPress={() => setForDependent(true)}
+              />
+              {forDependent && dependentsList.map(d => (
+                <View key={d.linkId}>
+                  <Hair />
+                  <Row
+                    icon="person-circle-outline"
+                    iconTone={selectedDependentId === d.dependent.id ? 'teal' : 'neutral'}
+                    tint={selectedDependentId === d.dependent.id}
+                    title={d.dependent.full_name}
+                    sub={d.relationship}
+                    right={selectedDependentId === d.dependent.id ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                    onPress={() => setSelectedDependentId(d.dependent.id)}
+                  />
                 </View>
-              ) : coords ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="location" size={14} color={t.accentDark} />
-                  <Text style={[s.noteInline, { color: t.textSecondary, marginTop: 0 }]}>
-                    Location found ({coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)})
-                  </Text>
+              ))}
+            </Card>
+
+            {forDependent && dependentsList.length === 0 && (
+              <Notice tone="amber">
+                No linked dependents yet. Link one in Profile, then Dependents.
+              </Notice>
+            )}
+          </Body>
+        )}
+
+        {/* ── Step 1: how you get there, and where ───────────────── */}
+        {step === 1 && (
+          <Body>
+            <SectionHead title="How will you get there?" />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+              {ARRIVAL_OPTIONS.map(opt => (
+                <Chip key={opt} label={opt} on={arrival === opt} onPress={() => setArrival(opt)} />
+              ))}
+            </View>
+
+            {arrival === AMBULANCE_ARRIVAL ? (
+              <>
+                <Notice tone="red" icon="car-outline">
+                  We start looking for the nearest available ambulance as soon as you confirm. The crew
+                  decides the receiving hospital from your condition and bed capacity — a preference
+                  below is used only where it does not conflict with that.
+                </Notice>
+
+                <SectionHead title="Pickup location" />
+                <Card>
+                  {locationLoading ? (
+                    <Row icon="location-outline" title="Getting your location…" sub="This takes a few seconds" />
+                  ) : coords ? (
+                    <Row
+                      icon="location" iconTone="green"
+                      title="Location found"
+                      sub={`${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`}
+                      pill="Shared" pillTone="green"
+                    />
+                  ) : (
+                    <Row
+                      icon="alert-circle-outline" iconTone="red"
+                      title={locationGranted ? 'Could not get a location fix' : 'Location permission is needed'}
+                      sub="The crew cannot be sent without it"
+                      right={<Btn label="Try again" variant="secondary" small onPress={requestLocation} />}
+                    />
+                  )}
+                </Card>
+
+                {/* Shown before anything is committed: whether help is actually
+                    near is the question someone in this flow is really asking. */}
+                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                  <NearbyAmbulances coords={coords} />
                 </View>
-              ) : (
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-                    <Text style={[s.noteInline, { color: t.danger, marginTop: 0 }]}>
-                      {locationGranted ? 'Could not get a location fix.' : 'Location permission is required.'}
+
+                <SectionHead title="Preferred hospital (optional)" />
+                {loadingHospitals ? (
+                  <ActivityIndicator color={t.q.red} style={{ marginTop: 8 }} />
+                ) : (
+                  <Card>
+                    {hospitals.map((h, i) => (
+                      <View key={String(h.id)}>
+                        {i > 0 && <Hair />}
+                        <Row
+                          icon="business-outline"
+                          iconTone={selectedHospital?.id === h.id ? 'red' : 'neutral'}
+                          tint={selectedHospital?.id === h.id}
+                          title={h.name}
+                          sub={h.specialty}
+                          right={selectedHospital?.id === h.id ? <Mono size={11} color={t.q.red}>SELECTED</Mono> : undefined}
+                          onPress={() => setSelectedHospital(selectedHospital?.id === h.id ? null : h)}
+                        />
+                      </View>
+                    ))}
+                  </Card>
+                )}
+                <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck}
+                  acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
+              </>
+            ) : arrival ? (
+              <>
+                <SectionHead title="Select a hospital" />
+                <Notice tone="amber">
+                  Bed space shown is not guaranteed by the time you arrive — other emergencies, especially
+                  more urgent ones, are seen first. First aid may still be given as capacity allows.
+                </Notice>
+
+                {loadingHospitals ? (
+                  <ActivityIndicator color={t.q.red} style={{ marginTop: 20 }} />
+                ) : hospitals.length === 0 ? (
+                  <Card>
+                    <Empty
+                      icon="alert-circle-outline"
+                      title="No hospital is open right now"
+                      body="If this is life-threatening, call 112 now instead of waiting on a booking."
+                    />
+                  </Card>
+                ) : (
+                  <Card>
+                    {hospitals.map((h, i) => {
+                      const bed = BED_SPACE_META[h.bed_space_status ?? '']
+                      return (
+                        <View key={String(h.id)}>
+                          {i > 0 && <Hair />}
+                          <Row
+                            icon="business-outline"
+                            iconTone={selectedHospital?.id === h.id ? 'red' : 'neutral'}
+                            tint={selectedHospital?.id === h.id}
+                            title={h.name}
+                            sub={[h.specialty, h.distance].filter(Boolean).join(' · ')}
+                            pill={bed?.label.replace('Bed space: ', 'Beds: ')}
+                            pillTone={h.bed_space_status === 'none' ? 'red'
+                              : h.bed_space_status === 'enough' ? 'green' : 'amber'}
+                            onPress={() => setSelectedHospital(h)}
+                          />
+                        </View>
+                      )
+                    })}
+                  </Card>
+                )}
+
+                {/* Only for the hospital actually selected, and only when its
+                    real-time status is none/very limited. Continue stays locked
+                    until it is ticked. */}
+                <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck}
+                  acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
+
+                {selectedHospital && (
+                  <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+                    <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                      A doctor is assigned by the hospital&apos;s front desk when you arrive.
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={requestLocation} style={[s.forBtn, { marginTop: 8, alignItems: 'center' }]}>
-                    <Text style={[s.forBtnText, { color: t.accent }]}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                )}
+              </>
+            ) : null}
+          </Body>
+        )}
 
-              {/* Shown before anything is committed: whether help is actually
-                  near, which is the question someone in this flow is really
-                  asking. */}
-              <NearbyAmbulances coords={coords} style={{ marginTop: 16 }} />
-
-              <Text style={[s.label, { color: t.textMuted }]}>Preferred hospital (optional)</Text>
-              {loadingHospitals ? (
-                <ActivityIndicator color={t.danger} style={{ marginTop: 8 }} />
+        {/* ── Step 2: confirm and pay ────────────────────────────── */}
+        {step === 2 && (
+          <Body>
+            <SectionHead title={isAmbulance ? 'Ambulance request' : 'Booking summary'} />
+            <Card>
+              {isAmbulance ? (
+                <>
+                  <DetailRow label="Preferred" value={selectedHospital?.name ?? 'Nearest crew decides'} />
+                  <DetailRow label="Condition" value={symptom || customSymptom || '—'} />
+                  <DetailRow label="Pickup"
+                    value={coords ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : '—'} mono last />
+                </>
               ) : (
-                hospitals.map(h => (
-                  <TouchableOpacity key={h.id}
-                    onPress={() => setSelectedHospital(selectedHospital?.id === h.id ? null : h)}
-                    style={[s.hospitalCard, {
-                      borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
-                      backgroundColor: selectedHospital?.id === h.id ? t.dangerSubtle : t.cardBg,
-                    }]}>
-                    <View style={s.hospitalTop}>
-                      <View style={[s.hospitalAvatar, { backgroundColor: h.avatarBg }]}>
-                        <Text style={[s.hospitalAvatarText]}>{h.avatar}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                        <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
-                      </View>
-                      {selectedHospital?.id === h.id && (
-                        <View style={[s.selectedCheck, { backgroundColor: t.danger }]}>
-                          <Ionicons name="checkmark" size={12} color="#fff" />
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))
+                <>
+                  <DetailRow label="Hospital" value={selectedHospital?.name ?? '—'} />
+                  <DetailRow label="Doctor" value="Assigned on arrival" />
+                  <DetailRow label="Arrival" value={arrival ?? '—'} />
+                  <DetailRow label="Condition" value={symptom || customSymptom || '—'} />
+                  <DetailRow label="Queue" value="Top of today's queue" last />
+                </>
               )}
-              <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck} acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
-              <View style={{ height: 20 }} />
-            </>
-          ) : arrival ? (
-          <>
-          <Text style={[s.label, { color: t.textMuted }]}>Select hospital</Text>
-          <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', marginTop: 0, marginBottom: 12 }]}>
-            <Text style={[s.noteText, { color: '#FFB547' }]}>
-              Bed space shown isn't guaranteed by the time you arrive — other emergencies, especially
-              those triaged as more urgent, are seen first. Basic first aid may still be given as the
-              hospital's capacity allows.
-            </Text>
-          </View>
-          {loadingHospitals ? (
-            <ActivityIndicator color={t.danger} style={{ marginTop: 20 }} />
-          ) : hospitals.length === 0 ? (
-            <View style={[s.noHospitalsBox, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
-              <Ionicons name="alert-circle-outline" size={28} color={t.danger} style={{ marginBottom: 8 }} />
-              <Text style={[s.noHospitalsTitle, { color: t.danger }]}>No hospitals currently available</Text>
-              <Text style={[s.noHospitalsText, { color: t.textMuted }]}>
-                Every hospital on Queue is closed right now. If this is life-threatening, call{' '}
-                <Text style={{ fontWeight: '800', color: t.danger }}>112</Text> immediately instead of waiting on a booking.
-              </Text>
-            </View>
-          ) : (
-            hospitals.map(h => (
-              <TouchableOpacity key={h.id}
-                onPress={() => setSelectedHospital(h)}
-                style={[s.hospitalCard, {
-                  borderColor:     selectedHospital?.id === h.id ? t.danger : t.cardBorder,
-                  backgroundColor: selectedHospital?.id === h.id ? t.dangerSubtle : t.cardBg,
-                }]}>
-                <View style={s.hospitalTop}>
-                  <View style={[s.hospitalAvatar, { backgroundColor: h.avatarBg }]}>
-                    <Text style={[s.hospitalAvatarText]}>{h.avatar}</Text>
+            </Card>
+
+            {isAmbulance ? (
+              <Notice tone="amber" icon="card-outline">
+                Ambulance fees are billed after the trip, from distance and time on scene — there is
+                nothing to pay now. The method below is used for that final charge.
+              </Notice>
+            ) : (
+              <>
+                <SectionHead title="Fee" />
+                <Card>
+                  <DetailRow label="Consultation" value={`₦${baseFee.toLocaleString('en-NG')}`} mono />
+                  <DetailRow label={`Emergency (${u.badge})`} value={`+₦${premium.toLocaleString('en-NG')}`} mono />
+                  <DetailRow label="Platform fee" value="₦500" mono />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, minHeight: 48 }}>
+                    <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: t.q.ink }}>Total</Text>
+                    <Mono size={17} weight="700" color={t.q.red}>₦{total.toLocaleString('en-NG')}</Mono>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Text style={[s.hospitalName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                      {h.verified && <Ionicons name="checkmark-circle" size={13} color="#0F766E" />}
-                    </View>
-                    <Text style={[s.hospitalSpec, { color: t.textMuted }]}>{h.specialty}</Text>
+                </Card>
+              </>
+            )}
+
+            <SectionHead title="Payment method" />
+            <Card>
+              {PAYMENT_OPTIONS.map((p, i) => {
+                const on = paymentMethod === p.id
+                return (
+                  <View key={p.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon={p.icon}
+                      iconTone={on ? 'red' : 'neutral'}
+                      tint={on}
+                      title={p.label}
+                      sub={p.sub}
+                      right={on ? <Mono size={11} color={t.q.red}>SELECTED</Mono> : undefined}
+                      onPress={() => setPaymentMethod(p.id)}
+                    />
                   </View>
-                  {selectedHospital?.id === h.id && (
-                    <View style={[s.selectedCheck, { backgroundColor: t.danger }]}>
-                      <Ionicons name="checkmark" size={12} color="#fff" />
-                    </View>
-                  )}
-                </View>
-                <View style={s.hospitalMeta}>
-                  {[
-                    ...(BED_SPACE_META[h.bed_space_status ?? ''] ? [BED_SPACE_META[h.bed_space_status ?? '']!] : []),
-                    { icon: 'alert-circle-outline' as const, label: 'Emergency', color: t.danger },
-                    { icon: 'time-outline' as const,         label: h.wait,      color: t.textSecondary },
-                    { icon: 'location-outline' as const,     label: h.distance,  color: t.textSecondary },
-                  ].map(m => (
-                    <View key={m.label} style={[s.metaChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                      <Ionicons name={m.icon} size={11} color={m.color} />
-                      <Text style={[s.metaText, { color: m.color, fontWeight: m.color === t.danger || m.color === '#FF8C42' ? '700' : '400' }]}>{m.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+                )
+              })}
+            </Card>
 
-          {/* Bed space acknowledgment -- only for the hospital actually selected, only when
-              its real-time status is None/Very limited. Continue stays locked until ticked. */}
-          <BedSpaceAck selectedHospital={selectedHospital} needsAck={needsBedSpaceAck} acked={bedSpaceAck} onToggle={() => setBedSpaceAck(a => !a)} t={t} />
-
-          {selectedHospital && (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
-              <Ionicons name="medical-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
-              <Text style={[s.noteInline, { color: t.textMuted, marginTop: 0, flex: 1 }]}>
-                A doctor will be assigned by the hospital's front desk when you arrive.
-              </Text>
-            </View>
-          )}
-          <View style={{ height: 20 }} />
-          </>
-          ) : null}
-        </ScrollView>
-      )}
-
-      {/* ── Step 2: Payment ───────────────────────────────────── */}
-      {step === 2 && (
-        <ScrollView style={s.stepScroll} showsVerticalScrollIndicator={false}>
-          {/* Summary */}
-          <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>
-              {isAmbulance ? 'Ambulance request summary' : 'Booking summary'}
-            </Text>
-            {(isAmbulance ? [
-              { label: 'Preferred hospital', value: selectedHospital?.name ?? 'Nearest crew decides' },
-              { label: 'Condition',          value: symptom || customSymptom || '—' },
-              { label: 'Pickup location',    value: coords ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : '—' },
-            ] : [
-              { label: 'Hospital',       value: selectedHospital?.name ?? '—' },
-              { label: 'Doctor',         value: 'Assigned on arrival' },
-              { label: 'Arrival',        value: arrival ?? '—' },
-              { label: 'Urgency',        value: u.label },
-              { label: 'Condition',      value: symptom || customSymptom || '—' },
-              { label: 'Queue priority', value: 'Top of queue' },
-            ]).map(row => (
-              <View key={row.label} style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-                <Text style={[s.summaryLabel, { color: t.textMuted }]}>{row.label}</Text>
-                <Text style={[s.summaryValue, { color: t.textPrimary }]} numberOfLines={2}>{row.value}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Fee breakdown */}
-          {isAmbulance ? (
-            <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)' }]}>
-              <Text style={[s.noteText, { color: '#FFB547' }]}>
-                Ambulance fees are billed after the trip completes, based on distance and time on scene —
-                there's nothing to pay now. Your payment method below is used for that final charge.
-              </Text>
-            </View>
-          ) : (
-            <View style={[s.summaryCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.summaryHeading, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Fee breakdown</Text>
-              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Base consultation</Text>
-                <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦{baseFee.toLocaleString()}</Text>
-              </View>
-              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Emergency premium ({u.badge})</Text>
-                <Text style={[s.summaryValue, { color: u.color }]}>+₦{premium.toLocaleString()}</Text>
-              </View>
-              <View style={[s.summaryRow, { borderBottomColor: t.cardBorder }]}>
-                <Text style={[s.summaryLabel, { color: t.textMuted }]}>Platform fee</Text>
-                <Text style={[s.summaryValue, { color: t.textPrimary }]}>₦500</Text>
-              </View>
-              <View style={s.totalRow}>
-                <Text style={[s.totalLabel, { color: t.textPrimary }]}>Total</Text>
-                <Text style={[s.totalValue, { color: u.color }]}>₦{total.toLocaleString()}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Payment method */}
-          <Text style={[s.label, { color: t.textMuted }]}>Payment method</Text>
-          {PAYMENT_OPTIONS.map(p => {
-            const active = paymentMethod === p.id
-            return (
-              <TouchableOpacity key={p.id} onPress={() => setPaymentMethod(p.id)}
-                style={[s.payRow, {
-                  backgroundColor: active ? t.dangerSubtle : t.cardBg,
-                  borderColor:     active ? t.dangerStrong  : t.cardBorder,
-                }]}>
-                <Ionicons name={p.icon} size={20} color={active ? t.danger : t.textSecondary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.payLabel, { color: active ? t.danger : t.textPrimary }]}>{p.label}</Text>
-                  <Text style={[s.paySub,   { color: t.textMuted }]}>{p.sub}</Text>
-                </View>
-                <View style={[s.payRadio, { borderColor: active ? t.danger : t.cardBorder, backgroundColor: active ? t.danger : 'transparent' }]}>
-                  {active && <Ionicons name="checkmark" size={11} color="#fff" />}
-                </View>
-              </TouchableOpacity>
-            )
-          })}
-
-          <View style={[s.noteBox, { backgroundColor: 'rgba(255,181,71,0.08)', borderColor: 'rgba(255,181,71,0.3)', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
-            <Ionicons name="flash-outline" size={14} color="#FFB547" style={{ marginTop: 1 }} />
-            <Text style={[s.noteText, { color: '#FFB547', flex: 1 }]}>
+            <Notice tone="amber" icon="flash-outline">
               {isAmbulance
                 ? 'Dispatch starts the moment you confirm — the nearest available crew is notified immediately.'
-                : 'Emergency bookings are placed at the top of the queue immediately after payment.'}
-            </Text>
-          </View>
+                : 'Emergency bookings go to the top of the queue immediately after payment.'}
+            </Notice>
 
-          {/* Available before anything is confirmed. If someone opens this screen
-              and decides they can't wait on the flow at all, the numbers are
-              already in front of them rather than three taps away. */}
-          <FallbackPanel />
-
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      )}
+            {/* Available before anything is confirmed. If someone opens this
+                screen and decides they cannot wait on the flow at all, the
+                numbers are already in front of them. */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+              <FallbackPanel />
+            </View>
+          </Body>
+        )}
       </KeyboardAvoidingView>
 
-      {/* CTA */}
       {!!submitError && (
-        <Text style={{ color: '#F87171', fontSize: 12, textAlign: 'center', paddingBottom: 6 }}>{submitError}</Text>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
+          <Text style={{ fontSize: 12, color: t.q.red, textAlign: 'center' }}>{submitError}</Text>
+        </View>
       )}
-      <View style={[s.cta, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-        {step > 0 && (
-          <TouchableOpacity onPress={() => setStep(p => p - 1)}
-            style={[s.backStepBtn, { borderColor: t.cardBorder, backgroundColor: t.cardBg, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-            <Ionicons name="arrow-back" size={14} color={t.textPrimary} />
-            <Text style={[s.backStepText, { color: t.textPrimary }]}>Back</Text>
-          </TouchableOpacity>
-        )}
+
+      <BottomBar meta={
+        step === 2 && !isAmbulance ? (
+          <>
+            <Mono size={12} color={t.q.ink60}>Total</Mono>
+            <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+            <Mono size={12} weight="700">₦{total.toLocaleString('en-NG')}</Mono>
+          </>
+        ) : undefined
+      }>
+        {step > 0 && <Btn label="Back" variant="secondary" onPress={() => setStep(p => p - 1)} />}
         {step < 2 ? (
-          <TouchableOpacity onPress={() => setStep(p => p + 1)} disabled={!canProceed()}
-            style={[s.nextBtn, { backgroundColor: canProceed() ? t.danger : t.inputBg, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
-            <Text style={[s.nextBtnText, { color: canProceed() ? '#fff' : t.textMuted }]}>Continue</Text>
-            <Ionicons name="arrow-forward" size={16} color={canProceed() ? '#fff' : t.textMuted} />
-          </TouchableOpacity>
+          <Btn grow label="Continue" disabled={!canProceed()} onPress={() => setStep(p => p + 1)} />
         ) : (
-          <TouchableOpacity onPress={handleConfirm} disabled={submitting}
-            style={[s.nextBtn, { backgroundColor: t.danger, flex: 1, opacity: submitting ? 0.6 : 1 }]}>
-            {submitting
-              ? <ActivityIndicator color="#fff" />
-              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="alert-circle-outline" size={15} color="#fff" /><Text style={[s.nextBtnText, { color: '#fff' }]}>{isAmbulance ? 'Confirm & Dispatch' : 'Confirm booking'}</Text></View>}
-          </TouchableOpacity>
+          <Btn
+            grow
+            variant="danger"
+            icon="alert-circle-outline"
+            label={isAmbulance ? 'Confirm & dispatch' : `Confirm · ₦${total.toLocaleString('en-NG')}`}
+            loading={submitting}
+            onPress={handleConfirm}
+          />
         )}
-      </View>
-    </SafeAreaView>
+      </BottomBar>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:              { flex: 1 },
-  header:            { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
-  backBtn:           { padding: 4, marginTop: 2 },
-  backArrow:         { fontSize: 22 },
-  headerTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerTitle:       { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
-  headerSub:         { fontSize: 11, marginTop: 2 },
-  progressRow:       { flexDirection: 'row', gap: 5, paddingHorizontal: 20, marginBottom: 4 },
-  progressBar:       { height: 3, borderRadius: 99, marginBottom: 3 },
-  progressLabel:     { fontSize: 9 },
-  stepScroll:        { flex: 1, paddingHorizontal: 20 },
-  label:             { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginTop: 16 },
-  emptyText:         { fontSize: 13, textAlign: 'center', marginTop: 20 },
-  noHospitalsBox:    { borderWidth: 1, borderRadius: 16, padding: 20, alignItems: 'center', marginTop: 16 },
-  noHospitalsTitle:  { fontSize: 14, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
-  noHospitalsText:   { fontSize: 12, textAlign: 'center', lineHeight: 18 },
-  // Alert
-  alertBanner:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, padding: 13, marginTop: 12, marginBottom: 4, borderWidth: 1 },
-  alertText:         { fontSize: 12, flex: 1, lineHeight: 17, fontWeight: '500' },
-  noteInline:        { fontSize: 11, lineHeight: 16, marginTop: 4 },
-  // Symptoms
-  symptomGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  symptomChip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  symptomText:       { fontSize: 11, fontWeight: '500' },
-  orDivider:         { fontSize: 11, textAlign: 'center', marginVertical: 12 },
-  textarea:          { borderRadius: 13, borderWidth: 1, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
-  forRow:            { flexDirection: 'row', gap: 8 },
-  forBtn:            { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', gap: 4 },
-  forBtnText:        { fontSize: 13, fontWeight: '600' },
-  // Hospital
-  hospitalCard:      { borderRadius: 18, padding: 14, borderWidth: 1.5, marginBottom: 10 },
-  hospitalTop:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  hospitalAvatar:    { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  hospitalAvatarText:{ fontSize: 12, fontWeight: '800', color: '#0F766E' },
-  hospitalName:      { fontSize: 14, fontWeight: '700' },
-  hospitalSpec:      { fontSize: 11, marginTop: 1 },
-  selectedCheck:     { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  hospitalMeta:      { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  metaChip:          { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  metaText:          { fontSize: 11 },
-  // Bed space warning
-  bedSpaceWarnBox:   { borderRadius: 14, borderWidth: 1.5, padding: 13, marginTop: 12 },
-  bedSpaceWarnTitle: { fontSize: 13, fontWeight: '800' },
-  bedSpaceWarnText:  { fontSize: 12, lineHeight: 17, marginTop: 6 },
-  ackRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  ackCheckbox:       { width: 20, height: 20, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  ackText:           { fontSize: 12, fontWeight: '600', flex: 1 },
-  // Arrival
-  slotRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  slotChip:          { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5 },
-  slotText:          { fontSize: 12 },
-  // Payment / Summary
-  summaryCard:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  summaryHeading:    { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  summaryRow:        { flexDirection: 'row', justifyContent: 'space-between', padding: 10, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  summaryLabel:      { fontSize: 12, flexShrink: 0 },
-  summaryValue:      { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
-  totalRow:          { flexDirection: 'row', justifyContent: 'space-between', padding: 12, paddingHorizontal: 14 },
-  totalLabel:        { fontSize: 14, fontWeight: '700' },
-  totalValue:        { fontSize: 15, fontWeight: '800' },
-  payRow:            { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 13, paddingHorizontal: 14, marginBottom: 8, borderWidth: 1.5 },
-  payLabel:          { fontSize: 13, fontWeight: '600' },
-  paySub:            { fontSize: 11, marginTop: 1 },
-  payRadio:          { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  noteBox:           { borderRadius: 12, padding: 13, borderWidth: 1, marginTop: 4 },
-  noteText:          { fontSize: 12, lineHeight: 18 },
-  // CTA
-  cta:               { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 20, borderTopWidth: 1 },
-  backStepBtn:       { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  backStepText:      { fontSize: 13, fontWeight: '600' },
-  nextBtn:           { padding: 15, borderRadius: 14, alignItems: 'center' },
-  nextBtnText:       { fontSize: 15, fontWeight: '700' },
-})

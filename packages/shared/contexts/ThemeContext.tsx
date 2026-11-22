@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { queuePalettes, brand, type QTokens } from '../theme/queueTokens'
 
 // Structural scale, not color -- identical across both palettes on purpose, and
 // mirrored (same numeric values) in web/src/contexts/ThemeContext.tsx's own `scale`
@@ -17,9 +18,42 @@ const scale = {
 // v3.1 palette (docs/handoff/QUEUE_V3_1_HANDOFF.md, "Design tokens"). The ids stay
 // 'forest' (dark) and 'clinical' (light) so every screen and saved preference keeps
 // working; only the values changed. Light is now the default.
+// The v4 handoff speaks in its own token names (surface/ink70/sel/field/...).
+// forest and clinical predate it, so each carries a `q` block that maps those
+// names onto the colours it already uses. That keeps the Theme shape identical
+// across all four palettes, so a component written for either vocabulary works
+// on any of them -- which is what lets the four apps be redesigned one at a
+// time instead of all at once.
+const forestQ: QTokens = {
+  bg: '#081416', surface: '#0F2326', elev: '#0F2326',
+  ink: '#E8F1F0', ink70: '#B8C7C9', ink60: '#94A3A6',
+  teal: '#5EEAD4', primary: '#2DD4BF', onPrimary: '#042F2E',
+  red: '#F87171', redFill: '#EF4444', redBg: 'rgba(248,113,113,0.14)',
+  amber: '#FBBF24', amberFill: '#D97706', amberBg: 'rgba(251,191,36,0.14)',
+  green: '#4ADE80', greenFill: '#10B981', greenBg: 'rgba(74,222,128,0.14)',
+  muted: 'rgba(148,163,166,0.14)', sel: 'rgba(45,212,191,0.14)',
+  field: '#0F2326', tab: '#0F2326', map: '#0B1D1F', road: '#17383B',
+  line: 'rgba(232,241,240,0.08)',
+}
+
+const clinicalQ: QTokens = {
+  bg: '#F8FAFC', surface: '#FFFFFF', elev: '#FFFFFF',
+  ink: '#0B1B1E', ink70: '#33464A', ink60: '#4B5B5E',
+  teal: '#134E4A', primary: '#0F766E', onPrimary: '#FFFFFF',
+  red: '#B91C1C', redFill: '#EF4444', redBg: 'rgba(239,68,68,0.14)',
+  amber: '#B45309', amberFill: '#F59E0B', amberBg: '#FEF3C7',
+  green: '#15803D', greenFill: '#16A34A', greenBg: '#DCFCE7',
+  muted: '#F1F5F9', sel: '#E6F4F2', field: '#FFFFFF', tab: '#FFFFFF',
+  map: '#E2E8E7', road: '#FFFFFF',
+  line: '#E3ECEB',
+}
+
 const forest = {
   id: 'forest',
   ...scale,
+  q: forestQ,
+  brand,
+  isDark: true,
   canvasBg:    '#081416',
   cardBg:      '#0F2326',
   cardBorder:  'rgba(232,241,240,0.08)',
@@ -63,6 +97,9 @@ const forest = {
 const clinical = {
   id: 'clinical',
   ...scale,
+  q: clinicalQ,
+  brand,
+  isDark: false,
   canvasBg:    '#F8FAFC',
   cardBg:      '#FFFFFF',
   cardBorder:  '#E3ECEB',
@@ -103,37 +140,68 @@ const clinical = {
 }
 
 export type Theme = typeof forest
-export const themes = { forest, clinical } as const
+export const themes = { forest, clinical, ...queuePalettes } as const
+export type ThemeId = keyof typeof themes
+
+/**
+ * A light/dark pair an app renders in. Passed to ThemeProvider so each app can
+ * move to the v4 handoff palettes on its own schedule; the default stays the
+ * v3.1 pair so an app that passes nothing is unchanged.
+ */
+export interface PalettePair { light: Theme; dark: Theme }
+
+export const V3_PALETTES: PalettePair = { light: clinical, dark: forest }
+export const V4_PALETTES: PalettePair = { light: queuePalettes.paper, dark: queuePalettes.ink }
 
 const THEME_STORAGE_KEY = 'queue:theme'
 
-interface ThemeCtx { theme: Theme; themeId: string; toggleTheme: () => void }
+interface ThemeCtx {
+  theme: Theme
+  themeId: string
+  /** 'light' | 'dark' -- which half of the pair is showing, regardless of palette set. */
+  mode: 'light' | 'dark'
+  toggleTheme: () => void
+}
 
-const Ctx = createContext<ThemeCtx>({ theme: clinical, themeId: 'clinical', toggleTheme: () => {} })
+const Ctx = createContext<ThemeCtx>({ theme: clinical, themeId: 'clinical', mode: 'light', toggleTheme: () => {} })
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeId] = useState<'forest' | 'clinical'>('clinical')
+interface ProviderProps {
+  children: React.ReactNode
+  /** Defaults to the v3.1 pair (clinical/forest). */
+  palettes?: PalettePair
+  /** Which half to show before anything is stored. */
+  defaultMode?: 'light' | 'dark'
+}
 
-  // MM6: Load persisted theme preference on startup
+export function ThemeProvider({ children, palettes = V3_PALETTES, defaultMode = 'light' }: ProviderProps) {
+  const [mode, setMode] = useState<'light' | 'dark'>(defaultMode)
+
+  // MM6: Load persisted theme preference on startup.
+  //
+  // The stored value is a palette id ('clinical', 'forest', 'paper', 'ink'),
+  // written by older builds too. Resolve it to a MODE rather than to a palette:
+  // a phone that stored 'forest' under the v3.1 patient app must come back as
+  // dark on the v4 palettes, not as the v3.1 dark palette inside a v4 app.
   useEffect(() => {
     AsyncStorage.getItem(THEME_STORAGE_KEY).then(saved => {
-      if (saved === 'forest' || saved === 'clinical') {
-        setThemeId(saved)
-      }
+      if (saved === 'forest' || saved === 'ink') setMode('dark')
+      else if (saved === 'clinical' || saved === 'paper') setMode('light')
     }).catch(() => {/* ignore storage errors */})
   }, [])
 
   function toggleTheme() {
-    setThemeId(prev => {
-      const next: 'forest' | 'clinical' = prev === 'forest' ? 'clinical' : 'forest'
+    setMode(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark'
       // MM6: Persist new theme preference
-      AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(() => {/* ignore storage errors */})
+      AsyncStorage.setItem(THEME_STORAGE_KEY, palettes[next].id).catch(() => {/* ignore storage errors */})
       return next
     })
   }
 
+  const theme = palettes[mode]
+
   return (
-    <Ctx.Provider value={{ theme: themes[themeId], themeId, toggleTheme }}>
+    <Ctx.Provider value={{ theme, themeId: theme.id, mode, toggleTheme }}>
       {children}
     </Ctx.Provider>
   )

@@ -1,35 +1,35 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { haptics } from '@queue/shared/lib/haptics'
 import { registerAmbulanceProvider } from '@queue/shared/lib/ambulance-admin-api'
 import { getHospitals } from '@queue/shared/lib/api'
 import type { HospitalWithDoctors } from '@queue/shared/lib/api'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Chip, Field,
+  Btn, BottomBar, Notice, SearchField, Empty,
+} from '@queue/shared/components/q'
 
 type ProviderType = 'hospital_fleet' | 'third_party'
 
 const PROVIDER_TYPE_OPTIONS: { value: ProviderType; label: string; icon: keyof typeof Ionicons.glyphMap; sub: string }[] = [
-  { value: 'third_party',   label: 'Independent', icon: 'car-outline',      sub: 'A private or government service, not tied to one hospital' },
-  { value: 'hospital_fleet', label: 'Hospital-owned', icon: 'business-outline', sub: 'Runs as this hospital\'s own ambulance service' },
+  { value: 'third_party',    label: 'Independent provider', icon: 'car-outline',      sub: 'You serve any hospital' },
+  { value: 'hospital_fleet', label: 'Hospital-owned',       icon: 'business-outline', sub: "Your fleet belongs to a hospital on Queue" },
 ]
 
-const OWNERSHIP_OPTIONS: { value: 'private' | 'government'; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'private',    label: 'Private',    icon: 'briefcase-outline' },
-  { value: 'government', label: 'Government', icon: 'shield-checkmark-outline' },
+const OWNERSHIP_OPTIONS: { value: 'private' | 'government'; label: string }[] = [
+  { value: 'private',    label: 'Private' },
+  { value: 'government', label: 'Government' },
 ]
 
 /**
- * "independent and hospital owned ambulances to work the same, have the
- * same registration process" -- one form for both. Account creation already
- * happened in AmbulanceProviderRegisterScreen; this collects the service's
- * own details and submits to POST /api/ambulances/register, which creates
- * the ambulance_providers row (hospital-linked or third_party) and this
+ * One form for both kinds of service. Account creation already happened in
+ * AmbulanceProviderRegisterScreen; this collects the service's own details
+ * and submits to POST /api/ambulances/register, which creates the
+ * ambulance_providers row (hospital-linked or third_party) and this
  * account's ambulance_provider_admins ('owner') row in one step. A
  * hospital-owned service picks its hospital here rather than signing in
  * with a hospital_admin account -- ambulance management lives in this app
@@ -102,148 +102,130 @@ export function AmbulanceProviderOnboardingScreen() {
 
   if (done) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Ionicons name="checkmark-circle" size={72} color={t.accentDark} style={{ marginBottom: 20 }} />
-          <Text style={[s.doneTitle, { color: t.textPrimary }]}>You&apos;re registered!</Text>
-          <Text style={[s.doneSub, { color: t.textMuted }]}>
-            {providerName} is now on Queue. Add your first ambulance from the Fleet tab to
-            start receiving requests.
+      <Screen>
+        <AppBar />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 }}>
+          <Ionicons name="checkmark-circle" size={64} color={t.q.green} />
+          <Text accessibilityRole="header" style={{ fontSize: 22, fontWeight: '700', color: t.q.ink, textAlign: 'center' }}>
+            You're registered
+          </Text>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, textAlign: 'center' }}>
+            {providerName} is on Queue. Add your first ambulance from the Fleet tab to start receiving
+            requests.
           </Text>
         </View>
-      </SafeAreaView>
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-          <Text style={[s.title, { color: t.textPrimary }]}>Your ambulance service</Text>
-          <Text style={[s.sub, { color: t.textMuted }]}>
-            This is what patients and hospitals will see when you&apos;re dispatched.
-          </Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Setup" sub="Your ambulance service" />
 
-          {error ? (
-            <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-              <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-              <Text style={[s.errorText, { color: t.danger }]}>{error}</Text>
-            </View>
-          ) : null}
-
-          <Text style={[s.label, { color: t.textMuted }]}>Type of service</Text>
-          <View style={s.typeRow}>
-            {PROVIDER_TYPE_OPTIONS.map(opt => {
-              const active = providerType === opt.value
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  onPress={() => setProviderType(opt.value)}
-                  style={[s.typeCard, { backgroundColor: active ? t.accentBgMid : t.cardBg, borderColor: active ? t.accentBorder : t.cardBorder }]}
-                >
-                  <Ionicons name={opt.icon} size={18} color={active ? t.accent : t.textMuted} />
-                  <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700', marginTop: 6 }}>{opt.label}</Text>
-                  <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 2, lineHeight: 14 }}>{opt.sub}</Text>
-                </TouchableOpacity>
-              )
-            })}
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+            <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: t.q.ink }}>
+              Your ambulance service
+            </Text>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, marginTop: 6 }}>
+              This is what patients and hospitals see when you are dispatched.
+            </Text>
           </View>
 
-          <Field icon="business-outline" placeholder="Service name (e.g. Lifeline Ambulance)" value={providerName} onChange={setProviderName} t={t} />
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
 
-          {providerType === 'hospital_fleet' ? (
-            <>
-              <Text style={[s.label, { color: t.textMuted }]}>Which hospital</Text>
-              <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                <Ionicons name="search-outline" size={16} color={t.textMuted} />
-                <TextInput
-                  value={hospitalQuery} onChangeText={t2 => { setHospitalQuery(t2); setSelectedHospital(null) }}
-                  placeholder="Search hospitals by name" placeholderTextColor={t.textMuted}
-                  style={[s.inputText, { color: t.textPrimary }]}
-                />
-                {hospitalSearching && <ActivityIndicator size="small" color={t.textMuted} />}
+          <SectionHead title="Type of service" />
+          <Card>
+            {PROVIDER_TYPE_OPTIONS.map((opt, i) => (
+              <View key={opt.value}>
+                {i > 0 && <Hair />}
+                <Row
+                  icon={opt.icon}
+                  iconTone={providerType === opt.value ? 'teal' : 'neutral'}
+                  title={opt.label}
+                  sub={opt.sub}
+                  tint={providerType === opt.value}
+                  right={providerType === opt.value
+                    ? <Ionicons name="checkmark-circle" size={20} color={t.q.primary} />
+                    : undefined}
+                  onPress={() => { haptics.tap(); setProviderType(opt.value) }} />
               </View>
-              {selectedHospital ? (
-                <View style={[s.selectedHospital, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                  <Ionicons name="checkmark-circle" size={16} color={t.accent} />
-                  <Text style={{ color: t.accent, fontSize: 15, fontWeight: '700', flex: 1 }}>{selectedHospital.name}</Text>
-                  <TouchableOpacity onPress={() => setSelectedHospital(null)}>
-                    <Ionicons name="close" size={16} color={t.accent} />
-                  </TouchableOpacity>
+            ))}
+          </Card>
+
+          <SectionHead title="Your service" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <Field label="Service name" value={providerName} onChangeText={setProviderName}
+                placeholder="e.g. Lifeline Ambulance" autoCapitalize="words" />
+              {providerType === 'third_party' && (
+                <View style={{ gap: 8 }}>
+                  <CardLabel>Ownership</CardLabel>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {OWNERSHIP_OPTIONS.map(opt => (
+                      <Chip key={opt.value} label={opt.label} on={ownership === opt.value}
+                        onPress={() => { haptics.tap(); setOwnership(opt.value) }} />
+                    ))}
+                  </View>
                 </View>
+              )}
+              <Field label="Contact phone" value={contactPhone} onChangeText={setContactPhone}
+                placeholder="+234 812 345 6789" keyboardType="phone-pad" autoCorrect={false} />
+              <Field label="Contact email (optional)" value={contactEmail} onChangeText={setContactEmail}
+                placeholder="dispatch@service.com" keyboardType="email-address"
+                autoCapitalize="none" autoCorrect={false} />
+            </View>
+          </Card>
+
+          {providerType === 'hospital_fleet' && (
+            <>
+              <SectionHead title="Which hospital" />
+              {selectedHospital ? (
+                <Card>
+                  <Row
+                    icon="business-outline" iconTone="teal" tint
+                    title={selectedHospital.name}
+                    sub={[selectedHospital.city, selectedHospital.state].filter(Boolean).join(', ') || null}
+                    right={<Btn label="Change" variant="secondary" small
+                      onPress={() => { setSelectedHospital(null); setHospitalQuery('') }} />} />
+                </Card>
               ) : (
-                hospitalResults.map(h => (
-                  <TouchableOpacity key={h.id} onPress={() => { setSelectedHospital(h); haptics.tap() }}
-                    style={[s.hospitalRow, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-                    <Text style={{ color: t.textPrimary, fontSize: 15, fontWeight: '600' }}>{h.name}</Text>
-                    {(h.city || h.state) && <Text style={{ color: t.textMuted, fontSize: 13, marginTop: 2 }}>{[h.city, h.state].filter(Boolean).join(', ')}</Text>}
-                  </TouchableOpacity>
-                ))
+                <>
+                  <SearchField value={hospitalQuery} onChangeText={setHospitalQuery}
+                    placeholder="Search hospitals by name" />
+                  {hospitalSearching ? (
+                    <ActivityIndicator color={t.q.primary} style={{ marginVertical: 20 }} />
+                  ) : hospitalResults.length === 0 ? (
+                    <Card>
+                      <Empty icon="business-outline" title="No hospitals found"
+                        body="Try a different name." />
+                    </Card>
+                  ) : (
+                    <Card>
+                      {hospitalResults.map((h, i) => (
+                        <View key={h.id}>
+                          {i > 0 && <Hair />}
+                          <Row
+                            icon="business-outline"
+                            title={h.name}
+                            sub={[h.city, h.state].filter(Boolean).join(', ') || null}
+                            chevron
+                            onPress={() => { haptics.tap(); setSelectedHospital(h) }} />
+                        </View>
+                      ))}
+                    </Card>
+                  )}
+                </>
               )}
             </>
-          ) : (
-            <>
-              <Text style={[s.label, { color: t.textMuted }]}>Ownership</Text>
-              <View style={s.ownershipRow}>
-                {OWNERSHIP_OPTIONS.map(opt => {
-                  const active = ownership === opt.value
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      onPress={() => setOwnership(opt.value)}
-                      style={[s.ownershipBtn, { backgroundColor: active ? t.accentBgMid : t.cardBg, borderColor: active ? t.accentBorder : t.cardBorder }]}
-                    >
-                      <Ionicons name={opt.icon} size={16} color={active ? t.accent : t.textMuted} />
-                      <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 15, fontWeight: '700' }}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  )
-                })}
-              </View>
-            </>
           )}
+        </Body>
 
-          <Field icon="call-outline" placeholder="Contact phone" value={contactPhone} onChange={setContactPhone} t={t} keyboard="phone-pad" />
-          <Field icon="mail-outline" placeholder="Contact email (optional)" value={contactEmail} onChange={setContactEmail} t={t} keyboard="email-address" />
-
-          <Button label="Register" onPress={handleSubmit} loading={submitting} style={{ marginTop: t.spacing.lg }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        <BottomBar>
+          <Btn grow label="Register service" loading={submitting} onPress={handleSubmit} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-function Field({ icon, placeholder, value, onChange, t, keyboard }: {
-  icon: React.ComponentProps<typeof Ionicons>['name']; placeholder: string; value: string
-  onChange: (v: string) => void; t: any; keyboard?: any
-}) {
-  return (
-    <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-      <Ionicons name={icon} size={16} color={t.textMuted} />
-      <TextInput
-        value={value} onChangeText={onChange} placeholder={placeholder}
-        placeholderTextColor={t.textMuted} keyboardType={keyboard ?? 'default'}
-        autoCapitalize={keyboard === 'email-address' ? 'none' : 'sentences'} autoCorrect={false}
-        style={[s.inputText, { color: t.textPrimary }]}
-      />
-    </View>
-  )
-}
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  title:       { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
-  sub:         { fontSize: 15, lineHeight: 19, marginBottom: 20 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 15, flex: 1 },
-  input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
-  inputText:   { fontSize: 16, flex: 1 },
-  label:       { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  typeRow:     { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  typeCard:    { flex: 1, borderRadius: 14, borderWidth: 1, padding: 13, alignItems: 'flex-start' },
-  ownershipRow:{ flexDirection: 'row', gap: 10, marginBottom: 16 },
-  ownershipBtn:{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 13 },
-  selectedHospital: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
-  hospitalRow: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
-  doneTitle:   { fontSize: 25, fontWeight: '800', letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
-  doneSub:     { fontSize: 15, lineHeight: 19, textAlign: 'center' },
-})

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native'
+import { View, ActivityIndicator, Clipboard } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Hair, SectionHead, Btn, BottomBar, qs,
+} from '@queue/shared/components/q'
 
 // Where a doctor lands between signing up and being linked to a hospital. That gap is
 // structural, not a bug: `doctors.hospital_id` is NOT NULL, so no row can exist for a
@@ -20,6 +22,7 @@ export function DoctorOnboardingScreen() {
   const { theme: t } = useTheme()
   const { user, refreshProfile, signOut } = useAuth()
   const [checking, setChecking] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   // The `users` row is inserted by signUp() *after* the auth state change has already
   // fired the profile load, so on the first render right after registering, `user` (and
@@ -38,74 +41,101 @@ export function DoctorOnboardingScreen() {
     setChecking(false)
   }
 
+  function copyCode() {
+    if (!user?.doctor_code) return
+    Clipboard.setString(user.doctor_code)
+    haptics.success(); setCopied(true); setTimeout(() => setCopied(false), 1500)
+  }
+
+  const STEPS = [
+    { title: 'A hospital links you', body: 'They enter your Doctor ID under Staff & doctors.' },
+    { title: 'Their queue appears on Home', body: 'You can be linked to several hospitals.' },
+    { title: 'Set your direct fees', body: 'Optional: video consults and home visits patients book themselves.' },
+  ]
+
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView contentContainerStyle={s.scroll}>
+    <Screen>
+      <AppBar />
 
-        <View style={[s.iconWrap, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-          <Ionicons name="checkmark-circle-outline" size={30} color={t.accent} />
-        </View>
-
-        <Text style={[s.title, { color: t.textPrimary }]}>You're all set up</Text>
-        <Text style={[s.sub, { color: t.textMuted }]}>
-          Your doctor account is ready. The last step is linking it to the hospital or
-          clinic you practise at — their admin does that from their Queue dashboard.
-        </Text>
-
-        <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.cardLabel, { color: t.textMuted }]}>Your Doctor ID</Text>
-          <View style={[s.codeBox, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-            {user?.doctor_code ? (
-              <Text selectable style={[s.code, { color: t.textPrimary }]}>{user.doctor_code}</Text>
-            ) : (
-              <ActivityIndicator color={t.accent} />
-            )}
+      <Body>
+        <View style={{ paddingHorizontal: 20, paddingTop: 8, alignItems: 'flex-start' }}>
+          <View style={{
+            width: 56, height: 56, borderRadius: 16, backgroundColor: t.q.sel,
+            alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+          }}>
+            <Ionicons name="checkmark-circle-outline" size={28} color={t.q.primary} />
           </View>
-          <Text style={[s.help, { color: t.textMuted }]}>
-            Share this with your hospital's admin. They'll enter it in their dashboard's
-            "Link Existing Doctor" flow. Tap and hold to copy.
+          <Text accessibilityRole="header" style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.7, color: t.q.ink }}>
+            You're all set up
+          </Text>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, marginTop: 8 }}>
+            Your doctor account is ready. The last step is linking it to the hospital or clinic you
+            practise at — their admin does that from their Queue dashboard.
           </Text>
         </View>
 
-        <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[s.cardTitle, { color: t.textPrimary }]}>What happens next</Text>
-          {[
-            'Send your Doctor ID to your hospital admin.',
-            'They link it — you can be linked to more than one hospital.',
-            'Come back here and tap "I\'ve been linked" to load your queue.',
-          ].map((line, i) => (
-            <View key={line} style={s.stepRow}>
-              <View style={[s.stepNum, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.stepNumText, { color: t.accent }]}>{i + 1}</Text>
+        <Card style={{ marginTop: 18 }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
+            <CardLabel>Your Doctor ID</CardLabel>
+            <View style={{
+              marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+              backgroundColor: t.q.field, paddingVertical: 18, minHeight: 64,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              {user?.doctor_code ? (
+                <View style={{ alignItems: 'center', gap: 14 }}>
+                  {/* White ground whatever the palette: a scanner needs the
+                      contrast, and an inverted code does not read. */}
+                  <View style={{ padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF' }}>
+                    <QRCode value={user.doctor_code} size={132} color="#0B1114" backgroundColor="#FFFFFF" />
+                  </View>
+                  <Text selectable style={[{ fontSize: 28, fontWeight: '800', letterSpacing: 6, color: t.q.ink }, qs.naira]}>
+                    {user.doctor_code}
+                  </Text>
+                </View>
+              ) : (
+                <ActivityIndicator color={t.q.primary} />
+              )}
+            </View>
+            <View style={{ marginTop: 10 }}>
+              <Btn label={copied ? 'Copied' : 'Copy ID'} variant="secondary"
+                icon={copied ? 'checkmark' : 'copy-outline'} onPress={copyCode} />
+            </View>
+            <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60, marginTop: 10 }}>
+              A hospital admin scans this, or types the code, to link you to their queue.
+            </Text>
+          </View>
+        </Card>
+
+        <SectionHead title="What happens next" />
+        <Card>
+          {STEPS.map((s, i) => (
+            <View key={s.title}>
+              {i > 0 && <Hair />}
+              <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingVertical: 12 }}>
+                <View style={{
+                  width: 24, height: 24, borderRadius: 12, backgroundColor: t.q.sel,
+                  alignItems: 'center', justifyContent: 'center', marginTop: 1,
+                }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: t.q.primary }}>{i + 1}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.q.ink }}>{s.title}</Text>
+                  <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60 }}>{s.body}</Text>
+                </View>
               </View>
-              <Text style={[s.stepText, { color: t.textMuted }]}>{line}</Text>
             </View>
           ))}
+        </Card>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
+          <Btn label="Sign out" variant="ghost" onPress={() => { void signOut() }} />
         </View>
+      </Body>
 
-        <Button label="I've been linked — check again" onPress={handleCheckAgain} loading={checking} size="lg" style={{ marginTop: t.spacing.sm }} />
-
-        <Button label="Sign out" onPress={() => { void signOut() }} variant="outline" size="lg" style={{ marginTop: t.spacing.md }} />
-
-      </ScrollView>
-    </SafeAreaView>
+      <BottomBar>
+        <Btn grow label="I've been linked — check again" loading={checking} onPress={handleCheckAgain} />
+      </BottomBar>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 32 },
-  iconWrap:    { width: 64, height: 64, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  title:       { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  sub:         { fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 22 },
-  card:        { borderRadius: 18, borderWidth: 1, padding: 18, marginBottom: 14 },
-  cardLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  cardTitle:   { fontSize: 14, fontWeight: '800', marginBottom: 12 },
-  codeBox:     { borderWidth: 1, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 10, minHeight: 60, justifyContent: 'center' },
-  code:        { fontSize: 24, fontFamily: 'monospace', fontWeight: '800', letterSpacing: 4 },
-  help:        { fontSize: 11, lineHeight: 16 },
-  stepRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  stepNum:     { width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  stepNumText: { fontSize: 11, fontWeight: '800' },
-  stepText:    { flex: 1, fontSize: 12, lineHeight: 18 },
-})

@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, ActivityIndicator, RefreshControl, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, DetailRow, Journey,
+  Stat, StatStrip, Btn, Empty, IconBtn,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { Alert } from '@queue/shared/contexts/AlertContext'
@@ -95,7 +96,7 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
   // inconsistency that silently breaks the day someone tightens RLS on this table
   // without knowing a mobile screen was relying on it staying permissive.
   const load = useCallback(async () => {
-    if (!hospitalId) return
+    if (!hospitalId) { setLoading(false); return }
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const jwt = session?.access_token
@@ -154,165 +155,188 @@ export function AmbulanceRequestsScreen({ navigation }: Props) {
   const active = requests.filter(r => ACTIVE_STATUSES.includes(r.status))
   const history = requests.filter(r => !ACTIVE_STATUSES.includes(r.status))
 
-  return (
-    <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Ambulance desk" subtitle="Patients being brought here" onBack={() => navigation.goBack()} />
+  // The ambulance journey, in the same rail language the patient and hospital
+  // screens share. Terminal states are not placed on it: a cancelled job never
+  // reached "arrived", and a rail that says it did is a lie at the worst moment.
+  const STOPS = ['Accepted', 'En route', 'On scene', 'Transport', 'Arrived']
+  const stopIndex = (status: string) =>
+    status === 'matched' ? 0
+    : status === 'en_route_to_patient' ? 1
+    : status === 'on_scene' ? 2
+    : status === 'transporting' ? 3
+    : status === 'arrived_at_destination' || status === 'completed' ? 4
+    : -1
 
-      <View style={st.linkRow}>
-        <TouchableOpacity onPress={() => navigation.navigate('AmbulanceAlerts')}
-          style={[st.linkBtn, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[st.linkText, { color: t.textPrimary }]}>Alerts</Text>
-        </TouchableOpacity>
-        {/* Fleet and coverage management used to hang off here. Managing
-            ambulances -- units, crew, shifts, coverage -- now happens only in
-            Queue Ambulance's operator console, including for a hospital that
-            owns its own fleet. This desk keeps what is genuinely hospital work:
-            inbound patients, and alerts for requests that found no unit. */}
-      </View>
+  // The one being brought here soonest leads, because that is the arrival the
+  // desk has to be ready for.
+  const lead = active.find(r => r.is_inbound) ?? active[0] ?? null
+  const rest = active.filter(r => r !== lead)
+  const inboundCount = active.filter(r => r.is_inbound).length
+  const soonest = active
+    .map(r => r.eta_seconds)
+    .filter((n): n is number => typeof n === 'number')
+    .reduce<number | null>((min, n) => (min == null || n < min ? n : min), null)
+
+  return (
+    <Screen>
+      <AppBar
+        title="Ambulance desk"
+        sub="Patients being brought here"
+        onBack={() => navigation.goBack()}
+        right={<IconBtn name="notifications-outline" label="Dispatcher alerts"
+          onPress={() => navigation.navigate('AmbulanceAlerts')} />}
+      />
 
       {loading ? (
-        <View style={st.center}><ActivityIndicator color={t.accent} /></View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
+          <StatStrip>
+            <Stat label="Coming here" value={inboundCount}
+              tone={inboundCount > 0 ? 'red' : undefined}
+              note={inboundCount ? 'inbound now' : 'none inbound'} />
+            <Stat label="Active jobs" value={active.length} note="including outbound" />
+            <Stat label="Soonest"
+              value={soonest != null ? Math.round(soonest / 60) : '—'}
+              unit={soonest != null ? 'min' : undefined}
+              note={soonest != null ? 'until arrival' : 'no ETA yet'} last />
+          </StatStrip>
+
           {!active.length ? (
-            <View style={[st.empty, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Ionicons name="medical-outline" size={32} color={t.textMuted} />
-              <Text style={[st.emptyText, { color: t.textSecondary }]}>No active ambulance jobs right now</Text>
-            </View>
+            <Card style={{ marginTop: 12 }}>
+              <Empty
+                icon="medical-outline"
+                title="No active ambulance jobs"
+                body="Patients being brought here, and transfers you have requested, appear here."
+              />
+            </Card>
           ) : (
-            <View style={{ gap: 8, marginBottom: active.length ? 24 : 0 }}>
-              {active.map(r => {
-                const name = safeName(r.patient?.full_name ?? r.dependent?.full_name ?? r.caller_patient_name)
-                const isCritical = (r.triage_level ?? 5) <= 2
-                const sc = statusTrio(t, r.status)
-                return (
-                  <View key={r.id} style={[st.card, {
-                    borderColor: isCritical ? t.dangerBorder : t.cardBorder,
-                    backgroundColor: isCritical ? t.dangerSubtle : t.cardBg,
-                  }]}>
-                    <View style={st.cardTop}>
-                      <View style={{ flex: 1 }}>
-                        <View style={st.nameRow}>
-                          <Text style={[st.name, { color: t.textPrimary }]}>{name}</Text>
-                          {r.triage_level != null && (
-                            <View style={[st.badge, { borderColor: r.triage_level <= 2 ? t.dangerBorder : t.statusBusy.border, backgroundColor: r.triage_level <= 2 ? t.dangerSubtle : t.statusBusy.bg }]}>
-                              <Text style={[st.badgeText, { color: r.triage_level <= 2 ? t.danger : t.statusBusy.text }]}>Triage {r.triage_level}</Text>
-                            </View>
-                          )}
-                          {r.is_inbound && (
-                            <View style={[st.badge, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                              <Text style={[st.badgeText, { color: t.accent }]}>Inbound</Text>
-                            </View>
-                          )}
-                          {r.is_own_fleet && (
-                            <View style={[st.badge, { borderColor: t.statusVirtual.border, backgroundColor: t.statusVirtual.bg }]}>
-                              <Text style={[st.badgeText, { color: t.statusVirtual.text }]}>Your fleet</Text>
-                            </View>
-                          )}
-                          {isCritical && (
-                            <View style={[st.badge, { borderColor: t.dangerBorder, backgroundColor: t.dangerStrong }]}>
-                              <Ionicons name="warning" size={10} color={t.danger} />
-                              <Text style={[st.badgeText, { color: t.danger }]}>CRITICAL</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[st.symptom, { color: t.textSecondary }]}>{r.symptom_description ?? 'No condition details provided'}</Text>
-                        <View style={st.metaRow}>
-                          {!!r.contact_phone && (
-                            <View style={st.metaItem}><Ionicons name="call-outline" size={11} color={t.textMuted} /><Text style={[st.metaText, { color: t.textMuted }]}>{r.contact_phone}</Text></View>
-                          )}
-                          <View style={st.metaItem}><Ionicons name="time-outline" size={11} color={t.textMuted} /><Text style={[st.metaText, { color: t.textMuted }]}>ETA {formatEta(r.eta_seconds)}</Text></View>
-                        </View>
-                        {!!r.pickup_address && (
-                          <View style={st.metaItem}><Ionicons name="location-outline" size={11} color={t.textMuted} /><Text style={[st.metaText, { color: t.textMuted }]} numberOfLines={1}>{r.pickup_address}</Text></View>
-                        )}
-                        {!!r.unit && (
-                          <Text style={[st.unitText, { color: t.textMuted }]}>
-                            {r.unit.provider?.name ?? 'Ambulance'} · {r.unit.call_sign ?? r.unit.plate_number} · {r.unit.vehicle_tier}
-                          </Text>
-                        )}
-                        <View style={st.metaItem}>
-                          <Ionicons name="business-outline" size={11} color={r.destination ? t.textMuted : t.statusBusy.text} />
-                          <Text style={[st.metaText, { color: r.destination ? t.textMuted : t.statusBusy.text }]} numberOfLines={1}>
-                            {r.destination?.name ?? 'Destination not chosen yet'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={[st.statusBadge, { borderColor: sc.border, backgroundColor: sc.bg }]}>
-                        <Text style={[st.statusText, { color: sc.text }]}>{STATUS_LABEL[r.status] ?? r.status}</Text>
-                      </View>
+            <>
+              {!!lead && (
+                <>
+                  <SectionHead title={lead.is_inbound ? 'Arriving here' : 'Live job'} />
+                  {stopIndex(lead.status) >= 0 && (
+                    <Journey steps={STOPS} activeIndex={stopIndex(lead.status)} />
+                  )}
+                  <Card>
+                    <Row
+                      icon="medical" iconTone={(lead.triage_level ?? 5) <= 2 ? 'red' : 'amber'}
+                      tint={(lead.triage_level ?? 5) <= 2}
+                      title={safeName(lead.patient?.full_name ?? lead.dependent?.full_name ?? lead.caller_patient_name)}
+                      sub={lead.symptom_description ?? 'No condition details given'}
+                      pill={lead.triage_level != null ? `P${lead.triage_level}` : STATUS_LABEL[lead.status] ?? lead.status}
+                      pillTone={(lead.triage_level ?? 5) <= 2 ? 'red' : 'amber'}
+                      pillSolid={(lead.triage_level ?? 5) <= 2}
+                    />
+                    <Hair />
+                    <DetailRow label="Status" value={STATUS_LABEL[lead.status] ?? lead.status} />
+                    <DetailRow label="Arrives in" value={formatEta(lead.eta_seconds)} mono />
+                    <DetailRow label="Unit" value={lead.unit
+                      ? [lead.unit.call_sign ?? lead.unit.plate_number, lead.unit.vehicle_tier, lead.unit.provider?.name].filter(Boolean).join(' · ')
+                      : 'Not assigned yet'} />
+                    <DetailRow label="Pickup" value={lead.pickup_address ?? 'Not given'} />
+                    <DetailRow label="Taking to" value={lead.destination?.name ?? 'Not chosen yet'} />
+                    <DetailRow label="Reference" value={lead.booking_ref} mono last />
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 14 }}>
+                      {!!lead.contact_phone && (
+                        <Btn label="Call the caller" variant="secondary" small icon="call-outline"
+                          onPress={() => Linking.openURL(`tel:${lead.contact_phone}`).catch(() => {})} />
+                      )}
+                      {lead.is_inbound && ['transporting', 'arrived_at_destination'].includes(lead.status) && (
+                        <Btn
+                          label="Patient received" small icon="checkmark-done"
+                          loading={receiving === lead.id}
+                          onPress={() => confirmReceived(lead)}
+                        />
+                      )}
                     </View>
-                    <Text style={[st.ref, { color: t.textMuted }]}>{r.booking_ref}</Text>
-                    {r.is_inbound && ['transporting', 'arrived_at_destination'].includes(r.status) && (
-                      <TouchableOpacity onPress={() => confirmReceived(r)} disabled={receiving === r.id}
-                        accessibilityRole="button" style={[st.receiveBtn, { backgroundColor: t.accent, opacity: receiving === r.id ? 0.6 : 1 }]}>
-                        {receiving === r.id
-                          ? <ActivityIndicator color="#fff" />
-                          : <><Ionicons name="checkmark-done" size={16} color="#fff" /><Text style={st.receiveText}>Patient received</Text></>}
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )
-              })}
-            </View>
+                  </Card>
+
+                  {/* The handoff puts "Assign a doctor" on this card. A transport
+                      request is not an appointment, and nothing links a crew's
+                      patient to a doctor until they are checked in, so the
+                      button would have nothing to write. Assign from the queue
+                      once the patient is through the door. */}
+                </>
+              )}
+
+              {rest.length > 0 && (
+                <>
+                  <SectionHead title={`Other active jobs · ${rest.length}`} />
+                  <Card>
+                    {rest.map((r, i) => {
+                      const critical = (r.triage_level ?? 5) <= 2
+                      return (
+                        <View key={r.id}>
+                          {i > 0 && <Hair />}
+                          <Row
+                            icon="medical-outline"
+                            iconTone={critical ? 'red' : 'neutral'}
+                            title={safeName(r.patient?.full_name ?? r.dependent?.full_name ?? r.caller_patient_name)}
+                            sub={[
+                              r.symptom_description,
+                              r.unit ? (r.unit.call_sign ?? r.unit.plate_number) : 'no unit yet',
+                              `ETA ${formatEta(r.eta_seconds)}`,
+                            ].filter(Boolean).join(' · ')}
+                            pill={r.is_inbound ? 'Inbound' : STATUS_LABEL[r.status] ?? r.status}
+                            pillTone={critical ? 'red' : r.is_inbound ? 'teal' : 'neutral'}
+                            pillSolid={critical}
+                          />
+                          {r.is_inbound && ['transporting', 'arrived_at_destination'].includes(r.status) && (
+                            <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                              <Btn label="Patient received" small icon="checkmark-done"
+                                loading={receiving === r.id} onPress={() => confirmReceived(r)} />
+                            </View>
+                          )}
+                        </View>
+                      )
+                    })}
+                  </Card>
+                </>
+              )}
+            </>
           )}
 
           {!!history.length && (
             <>
-              <Text style={[st.sectionLabel, { color: t.textSecondary }]}>RECENT HISTORY</Text>
-              <View style={{ gap: 8 }}>
-                {history.map(r => {
-                  const sc = statusTrio(t, r.status)
-                  return (
-                    <View key={r.id} style={[st.historyRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                      <Text style={[st.historyText, { color: t.textSecondary }]} numberOfLines={1}>
-                        {r.booking_ref} · {r.symptom_description ?? '—'}{r.disposition ? ` · ${DISPOSITION_LABEL[r.disposition] ?? r.disposition}` : ''}
-                      </Text>
-                      <View style={[st.statusBadge, { borderColor: sc.border, backgroundColor: sc.bg }]}>
-                        <Text style={[st.statusText, { color: sc.text }]}>{STATUS_LABEL[r.status] ?? r.status}</Text>
-                      </View>
-                    </View>
-                  )
-                })}
-              </View>
+              <SectionHead title="Recent history" />
+              <Card>
+                {history.map((r, i) => (
+                  <View key={r.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="time-outline" iconTone="neutral"
+                      dim
+                      title={r.symptom_description ?? r.booking_ref}
+                      sub={[r.booking_ref, r.disposition ? DISPOSITION_LABEL[r.disposition] ?? r.disposition : null]
+                        .filter(Boolean).join(' · ')}
+                      pill={STATUS_LABEL[r.status] ?? r.status}
+                      pillTone="neutral"
+                    />
+                  </View>
+                ))}
+              </Card>
             </>
           )}
-        </ScrollView>
+
+          {/* Fleet and coverage management used to hang off this screen.
+              Managing ambulances -- units, crew, shifts, coverage -- happens in
+              Queue Ambulance's operator console now, including for a hospital
+              that owns its own fleet. This desk keeps what is genuinely
+              hospital work: inbound patients, and alerts for requests that
+              found no unit. */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+            <Btn label="Dispatcher alerts" variant="secondary" icon="notifications-outline"
+              onPress={() => navigation.navigate('AmbulanceAlerts')} />
+          </View>
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  title: { fontSize: 18, fontWeight: '800' },
-  linkRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, flexWrap: 'wrap' },
-  linkBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  linkText: { fontSize: 12, fontWeight: '700' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', justifyContent: 'center', padding: 48, borderRadius: 16, borderWidth: 1, gap: 10 },
-  emptyText: { fontSize: 13, fontWeight: '600' },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 10, marginTop: 4 },
-  card: { borderRadius: 16, borderWidth: 1, padding: 14 },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  name: { fontSize: 14, fontWeight: '700' },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, borderWidth: 1 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
-  symptom: { fontSize: 12, marginTop: 4 },
-  metaRow: { flexDirection: 'row', gap: 12, marginTop: 4, flexWrap: 'wrap' },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  metaText: { fontSize: 11, flexShrink: 1 },
-  unitText: { fontSize: 11, marginTop: 4 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  ref: { fontSize: 11, marginTop: 8 },
-  historyRow: { borderRadius: 14, padding: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  historyText: { fontSize: 13, flex: 1 },
-  receiveBtn: { marginTop: 10, height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  receiveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-})

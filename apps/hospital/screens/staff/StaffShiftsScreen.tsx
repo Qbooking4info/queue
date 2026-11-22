@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { View, ScrollView, TouchableOpacity, Modal, RefreshControl } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { Header, Card, SegmentedControl, PrimaryButton, EmptyState, HeaderIconButton } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, Btn, BottomBar,
+  Empty, IconBtn, Initials, Mono,
+} from '@queue/shared/components/q'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
@@ -75,58 +77,79 @@ export function StaffShiftsScreen({ navigation }: { navigation: any }) {
   const weekLabel = `${week.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })} – ${addDays(week, 6).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}`
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title="Staff shifts" subtitle={weekLabel} onBack={() => navigation.goBack()}
-        right={canManage ? <HeaderIconButton icon="add" label="Add shift" onPress={() => setAdding(true)} /> : undefined}>
-        <SegmentedControl<'all' | 'mine'> onDark value={view} onChange={setView}
-          options={[{ value: 'all', label: 'Everyone' }, { value: 'mine', label: 'My shifts' }]} />
-      </Header>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 10 }}>
-        <TouchableOpacity onPress={() => { haptics.tap(); setWeek(w => addDays(w, -7)) }} accessibilityRole="button" accessibilityLabel="Previous week"
-          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="chevron-back" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
+    <Screen>
+      <AppBar
+        title="Staff shifts"
+        sub={weekLabel}
+        onBack={() => navigation.goBack()}
+        right={canManage ? <IconBtn name="add" label="Add shift" onPress={() => setAdding(true)} /> : undefined}
+      />
+
+      <Seg<'all' | 'mine'>
+        value={view} onChange={setView}
+        options={[{ key: 'all', label: 'Everyone' }, { key: 'mine', label: 'My shifts' }]}
+      />
+
+      {/* Week stepper. The middle target returns to this week rather than
+          making someone tap back an unknown number of times. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 6 }}>
+        <IconBtn name="chevron-back" label="Previous week"
+          onPress={() => { haptics.tap(); setWeek(w => addDays(w, -7)) }} />
         <TouchableOpacity onPress={() => { haptics.tap(); setWeek(startOfWeek(new Date())) }} accessibilityRole="button">
-          <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>This week</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.q.primary }}>This week</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { haptics.tap(); setWeek(w => addDays(w, 7)) }} accessibilityRole="button" accessibilityLabel="Next week"
-          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="chevron-forward" size={22} color={t.textPrimary} />
-        </TouchableOpacity>
+        <IconBtn name="chevron-forward" label="Next week"
+          onPress={() => { haptics.tap(); setWeek(w => addDays(w, 7)) }} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}>
-        {!shifts ? <SkeletonCard /> : visible.length === 0 ? (
-          <EmptyState icon="time-outline" title={view === 'mine' ? 'No shifts for you this week' : 'No shifts planned this week'}
-            body={canManage ? 'Tap + to plan who works when.' : 'Your admin plans the rota here.'}
-            action={canManage ? 'Add a shift' : undefined} onAction={canManage ? () => setAdding(true) : undefined} />
+
+      <Body refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+          tintColor={t.q.primary} colors={[t.q.primary]} />
+      }>
+        {!shifts ? (
+          <View style={{ marginHorizontal: 16 }}><SkeletonCard /></View>
+        ) : visible.length === 0 ? (
+          <Card style={{ marginTop: 12 }}>
+            <Empty
+              icon="time-outline"
+              title={view === 'mine' ? 'No shifts for you this week' : 'No shifts planned this week'}
+              body={canManage ? 'Plan who works when, so the rota is in one place.' : 'Your admin plans the rota here.'}
+              action={canManage ? 'Add a shift' : undefined}
+              onAction={canManage ? () => setAdding(true) : undefined}
+            />
+          </Card>
         ) : days.map(d => {
           const list = visible.filter(s => dayKey(new Date(s.starts_at)) === dayKey(d))
           if (!list.length) return null
           const isToday = dayKey(d) === todayKey
           return (
-            <View key={dayKey(d)} style={{ gap: 8 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: isToday ? t.accent : t.textPrimary }}>
-                {d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })}{isToday ? ' · Today' : ''}
-              </Text>
-              <Card style={{ paddingVertical: 0 }}>
+            <View key={dayKey(d)}>
+              <SectionHead title={`${d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })}${isToday ? ' · today' : ''}`} />
+              <Card>
                 {list.map((s, i) => {
-                  const now = Date.now(), live = new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() > now
+                  const now = Date.now()
+                  const live = new Date(s.starts_at).getTime() <= now && new Date(s.ends_at).getTime() > now
+                  const mine = s.user_id === user?.id
                   return (
-                    <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingVertical: 8,
-                      borderBottomWidth: i === list.length - 1 ? 0 : 1, borderBottomColor: t.cardBorder }}>
-                      <View style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: live ? t.statusSuccess.text : t.accent, marginVertical: 6 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{nameOf(s.user_id)}{s.user_id === user?.id ? ' (you)' : ''}</Text>
-                        <Text style={{ fontSize: 13, color: t.textMuted }}>{s.role_label} · {hm(s.starts_at)}–{hm(s.ends_at)}{live ? ' · On now' : ''}</Text>
-                        {!!s.notes && <Text style={{ fontSize: 12, color: t.textSecondary, marginTop: 2 }} numberOfLines={2}>{s.notes}</Text>}
-                      </View>
-                      {canManage && (
-                        <TouchableOpacity onPress={() => remove(s)} accessibilityRole="button" accessibilityLabel="Remove shift"
-                          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                          <Ionicons name="trash-outline" size={18} color={t.danger} />
-                        </TouchableOpacity>
-                      )}
+                    <View key={s.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        leading={<Initials name={nameOf(s.user_id)} size={40} />}
+                        tint={live}
+                        title={`${nameOf(s.user_id)}${mine ? ' (you)' : ''}`}
+                        sub={[s.role_label, s.notes].filter(Boolean).join(' · ')}
+                        right={
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Mono size={12} weight="700" color={live ? t.q.primary : t.q.ink70}>
+                              {hm(s.starts_at)}–{hm(s.ends_at)}
+                            </Mono>
+                            {canManage && (
+                              <IconBtn name="trash-outline" label={`Remove ${nameOf(s.user_id)}'s shift`}
+                                size={17} color={t.q.red} onPress={() => remove(s)} />
+                            )}
+                          </View>
+                        }
+                      />
                     </View>
                   )
                 })}
@@ -134,12 +157,19 @@ export function StaffShiftsScreen({ navigation }: { navigation: any }) {
             </View>
           )
         })}
-      </ScrollView>
+      </Body>
+
+      {canManage && (
+        <BottomBar>
+          <Btn grow label="Add shift" icon="add" onPress={() => setAdding(true)} />
+        </BottomBar>
+      )}
+
       {canManage && hospitalId && (
         <AddShiftSheet visible={adding} onClose={() => setAdding(false)} people={people} days={days} hospitalId={hospitalId}
           creatorId={user?.id} onSaved={() => { setAdding(false); load() }} />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
@@ -235,7 +265,7 @@ function AddShiftSheet({ visible, onClose, people, days, hospitalId, creatorId, 
             )}
             <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional) — ward, cover for…" placeholderTextColor={t.textMuted} maxLength={300}
               accessibilityLabel="Notes" style={{ minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, paddingHorizontal: 14, fontSize: 15, color: t.textPrimary }} />
-            <PrimaryButton label="Save shift" icon="checkmark" loading={busy} onPress={save} />
+            <Btn label="Save shift" icon="checkmark" loading={busy} onPress={save} />
           </ScrollView>
         </View>
       </View>

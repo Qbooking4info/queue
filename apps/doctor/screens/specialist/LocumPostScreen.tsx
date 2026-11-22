@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react'
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Text } from '@queue/shared/components/ui/Typography'
+import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { Header, Card, PrimaryButton, SectionTitle } from '@queue/shared/components/ui/v3'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth, type LinkedHospital } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtLocalDate } from '@queue/shared/lib/format'
 import { postLocumJob } from '@queue/shared/lib/api'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Hair, SectionHead, Seg, Chip, Field,
+  Btn, BottomBar, Empty, Mono,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
@@ -88,149 +90,136 @@ export function LocumPostScreen({ navigation }: Props) {
 
   if (hospitals.length === 0) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Post a job" onBack={() => navigation.goBack()} />
-        <View style={{ padding: 24, gap: 10 }}>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: t.textPrimary }}>
-            You are not attached to a hospital
-          </Text>
-          <Text style={{ fontSize: 14, color: t.textMuted, lineHeight: 20 }}>
-            A shift can only be advertised for a hospital you work at. Link yourself to
-            one from Hospitals, then come back.
-          </Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Post a job" onBack={() => navigation.goBack()} />
+        <Card style={{ marginTop: 12 }}>
+          <Empty
+            icon="business-outline"
+            title="You are not attached to a hospital"
+            body="A shift can only be advertised for a hospital you work at. Link yourself to one from Hospitals, then come back."
+            action="Open hospitals"
+            onAction={() => navigation.navigate('Hospitals')} />
+        </Card>
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title="Post a job" subtitle={doctorProfile?.fullName ?? undefined} onBack={() => navigation.goBack()} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Post a job"
+          sub={hospitals.find(h => h.hospitalId === hospitalId)?.hospitalName ?? undefined}
+          onBack={() => navigation.goBack()} />
 
-          <Card style={{ gap: 14 }}>
-            <SectionTitle title="Where" />
-            <Text style={[s.label, { color: t.textPrimary }]}>Hospital</Text>
-            <View style={s.wrapRow}>
-              {hospitals.map(h => (
-                <Chip key={h.hospitalId} on={hospitalId === h.hospitalId}
-                  label={h.hospitalName} onPress={() => setHospitalId(h.hospitalId)} theme={t} />
-              ))}
-            </View>
-            <Text style={[s.hint, { color: t.textMuted }]}>
-              Only hospitals you are attached to can be advertised. The state is taken
-              from the hospital, and every doctor in it is notified.
-            </Text>
+        <Seg<'locum' | 'full_time'>
+          value={kind} onChange={setKind}
+          options={[{ key: 'locum', label: 'Locum shift' }, { key: 'full_time', label: 'Full employment' }]} />
 
-            <Text style={[s.label, { color: t.textPrimary, marginTop: 4 }]}>LGA (optional)</Text>
-            <TextInput value={lga} onChangeText={setLga} placeholder="e.g. Ikeja"
-              placeholderTextColor={t.textMuted}
-              style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-          </Card>
-
-          <Card style={{ gap: 14 }}>
-            <SectionTitle title="What" />
-            <View style={s.row}>
-              <Chip on={kind === 'locum'} label="Locum shift" onPress={() => setKind('locum')} theme={t} />
-              <Chip on={kind === 'full_time'} label="Full employment" onPress={() => setKind('full_time')} theme={t} />
-            </View>
-
-            <Text style={[s.label, { color: t.textPrimary }]}>
-              {kind === 'locum' ? 'Date' : 'Start date'}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 8 }}>
-              {DATES.map(d => (
-                <Chip key={d.iso} on={date === d.iso} label={d.label} onPress={() => setDate(d.iso)} theme={t} small />
-              ))}
-            </ScrollView>
-
-            {kind === 'locum' && (
-              <>
-                <Text style={[s.label, { color: t.textPrimary }]}>From</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 8 }}>
-                  {TIMES.map(x => <Chip key={x} on={start === x} label={x} onPress={() => setStart(x)} theme={t} small />)}
-                </ScrollView>
-                <Text style={[s.label, { color: t.textPrimary }]}>To</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ gap: 8 }}>
-                  {TIMES.map(x => <Chip key={x} on={end === x} label={x} onPress={() => setEnd(x)} theme={t} small />)}
-                </ScrollView>
-              </>
-            )}
-          </Card>
-
-          <Card style={{ gap: 12 }}>
-            <SectionTitle title="Pay" />
-            <Text style={[s.label, { color: t.textPrimary }]}>Rate per hour (₦)</Text>
-            <TextInput value={rate} onChangeText={setRate} keyboardType="number-pad"
-              placeholder="e.g. 5000" placeholderTextColor={t.textMuted}
-              style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary, fontSize: 18, fontWeight: '700' }]} />
-
-            {kind === 'locum' && (
-              <View style={[s.total, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: t.textMuted }}>
-                    {hours ?? 0} hours × ₦{rateNum.toLocaleString()}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-                    {end <= start ? 'Runs past midnight' : 'Same day'}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: t.accent }}>
-                  ₦{(total ?? 0).toLocaleString()}
-                </Text>
+        <Body keyboardShouldPersistTaps="handled">
+          <SectionHead title="Where" />
+          <Card>
+            <View style={{ padding: 14, gap: 12 }}>
+              <CardLabel>Hospital</CardLabel>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {hospitals.map(h => (
+                  <Chip key={h.hospitalId} label={h.hospitalName} on={hospitalId === h.hospitalId}
+                    onPress={() => { haptics.tap(); setHospitalId(h.hospitalId) }} />
+                ))}
               </View>
-            )}
-            {kind === 'full_time' && (
-              <Text style={[s.hint, { color: t.textMuted }]}>
-                Quoted per hour. Doctors can counter with their own rate.
+              <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60 }}>
+                Only hospitals you are attached to can be advertised. The state comes from the hospital,
+                and every doctor in it is notified.
               </Text>
-            )}
+              <Field label="Area or LGA (optional)" value={lga} onChangeText={setLga} placeholder="e.g. Ikeja" />
+            </View>
           </Card>
 
-          <Card style={{ gap: 10 }}>
-            <SectionTitle title="Anything else (optional)" />
-            <TextInput value={notes} onChangeText={setNotes} multiline textAlignVertical="top"
-              placeholder="Department, what the shift covers, who to report to…"
-              placeholderTextColor={t.textMuted}
-              style={[s.input, { minHeight: 90, backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
+          <SectionHead title={kind === 'locum' ? 'When' : 'Start date'} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+            {DATES.map(d => (
+              <Chip key={d.iso} label={d.label} on={date === d.iso}
+                onPress={() => { haptics.tap(); setDate(d.iso) }} />
+            ))}
+          </ScrollView>
+
+          {kind === 'locum' && (
+            <>
+              <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 }}>
+                <CardLabel>From</CardLabel>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+                {TIMES.map(x => (
+                  <Chip key={x} label={x} on={start === x} onPress={() => { haptics.tap(); setStart(x) }} />
+                ))}
+              </ScrollView>
+              <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 }}>
+                <CardLabel>To</CardLabel>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+                {TIMES.map(x => (
+                  <Chip key={x} label={x} on={end === x} onPress={() => { haptics.tap(); setEnd(x) }} />
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          <SectionHead title="Pay" />
+          <Card>
+            <View style={{ padding: 14, gap: 12 }}>
+              <Field label="Rate per hour (₦)" value={rate} onChangeText={setRate} keyboardType="number-pad"
+                placeholder="e.g. 5000" style={{ fontSize: 18, fontWeight: '700' }} />
+              {kind === 'locum' ? (
+                <>
+                  <Hair inset={0} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Mono size={12} color={t.q.ink60}>
+                        {hours ?? 0} hours × ₦{rateNum.toLocaleString()}
+                      </Mono>
+                      <Text style={{ fontSize: 11, color: t.q.ink60, marginTop: 2 }}>
+                        {end <= start ? 'Runs past midnight' : 'Same day'}
+                      </Text>
+                    </View>
+                    <Mono size={20} weight="700" color={t.q.primary}>₦{(total ?? 0).toLocaleString()}</Mono>
+                  </View>
+                </>
+              ) : (
+                <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60 }}>
+                  Quoted per hour. Doctors can counter with their own rate.
+                </Text>
+              )}
+            </View>
           </Card>
 
-          <PrimaryButton label={busy ? 'Posting…' : 'Post and notify'} onPress={submit} loading={busy} disabled={!canPost} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <SectionHead title="Anything else" />
+          <Card>
+            <View style={{ padding: 14, gap: 6 }}>
+              <CardLabel>Details (optional)</CardLabel>
+              <TextInput value={notes} onChangeText={setNotes} multiline textAlignVertical="top"
+                placeholder="Department, what the shift covers, who to report to…"
+                placeholderTextColor={t.q.ink60}
+                accessibilityLabel="Details"
+                style={{
+                  minHeight: 96, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                  backgroundColor: t.q.field, padding: 12, fontSize: 14, lineHeight: 20, color: t.q.ink,
+                }} />
+            </View>
+          </Card>
+        </Body>
+
+        <BottomBar meta={
+          <Mono size={12} weight="600" color={t.q.ink70}>
+            {kind === 'locum' && total != null
+              ? `₦${total.toLocaleString()} for ${hours ?? 0} h`
+              : rateNum > 0 ? `₦${rateNum.toLocaleString()} per hour` : 'Set a rate'}
+          </Mono>
+        }>
+          <Btn grow label="Post and notify" loading={busy} disabled={!canPost} onPress={submit} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-function Chip({ on, label, onPress, theme: t, small }: {
-  on: boolean; label: string; onPress: () => void; theme: any; small?: boolean
-}) {
-  return (
-    <TouchableOpacity onPress={() => { haptics.tap(); onPress() }}
-      accessibilityRole="button" accessibilityState={{ selected: on }}
-      style={{
-        paddingHorizontal: small ? 11 : 14, paddingVertical: small ? 7 : 10,
-        borderRadius: 99, borderWidth: 1,
-        borderColor: on ? t.accentBorder : t.cardBorder,
-        backgroundColor: on ? t.accentBg : t.inputBg,
-      }}>
-      <Text style={{ fontSize: small ? 12 : 13, fontWeight: '700', color: on ? t.accent : t.textMuted }}>{label}</Text>
-    </TouchableOpacity>
-  )
-}
-
-const s = StyleSheet.create({
-  label: { fontSize: 14, fontWeight: '700' },
-  hint:  { fontSize: 12, lineHeight: 17 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
-  row:     { flexDirection: 'row', gap: 8 },
-  wrapRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  total: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 14, borderWidth: 1, padding: 14,
-  },
-})

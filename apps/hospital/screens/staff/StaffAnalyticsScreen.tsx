@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Dimensions } from 'react-native'
+import { View, ActivityIndicator, RefreshControl } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Hair, SectionHead, Seg, Stat, StatStrip, Mono,
+} from '@queue/shared/components/q'
 import { useTheme }  from '@queue/shared/contexts/ThemeContext'
 import { useAuth }   from '@queue/shared/contexts/AuthContext'
 import { supabase }  from '@queue/shared/lib/supabase'
@@ -16,12 +16,24 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 type Range = 'today' | 'week' | 'month' | 'year'
 
 interface DoctorWaitConsultStats { doctorId: string; doctorName: string; avgWaitMinutes: number | null; avgConsultMinutes: number | null; sampleSize: number }
+interface Collected { collected: number; refunded: number; payout: number; count: number }
 interface Stats {
   total: number; completed: number; cancelled: number; pending: number
   avgWaitMinutes: number | null; avgConsultMinutes: number | null
   doctorStats: DoctorWaitConsultStats[]
+  /** What the fee maths says the completed appointments were worth. */
+  revenue?: number | null
+  /** What actually arrived through Queue. Null for a clinic-scoped caller --
+   *  payments carry no clinic, and attributing the hospital's takings to one
+   *  clinic would be worse than saying nothing. */
+  collected?: Collected | null
 }
 interface SpecialtyRow { name: string; count: number; pct: number }
+
+/** Naira, or an em dash where there is no figure rather than a confident 0. */
+function money(n: number | null | undefined): string {
+  return n == null ? '—' : `₦${Math.round(n).toLocaleString('en-NG')}`
+}
 
 function fmtMinutes(m: number | null): string {
   if (m == null) return '—'
@@ -134,168 +146,191 @@ export function StaffAnalyticsScreen({ navigation }: Props) {
   ]
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Analytics" subtitle="Appointments, revenue and trends" onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}>
-        <SegmentedControl<Range> onDark value={range} onChange={setRange}
-          options={RANGES.map(r => ({ value: r.key, label: r.label }))} />
-      </Header>
+    <Screen>
+      <AppBar
+        title="Analytics"
+        sub="Appointments and trends"
+        onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined}
+      />
+      <Seg<Range>
+        value={range} onChange={setRange}
+        options={RANGES.map(r => ({ key: r.key, label: r.label }))}
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
-          {/* KPI grid */}
-          <View style={s.kpiGrid}>
-            {[
-              { label: 'Total',      value: stats.total,     color: t.accent },
-              { label: 'Completed',  value: stats.completed, color: t.accentDark },
-              { label: 'Cancelled',  value: stats.cancelled, color: t.danger },
-              { label: 'Show-up %', value: `${showUp}%`,    color: t.info },
-            ].map(k => (
-              <View key={k.label} style={[s.kpiCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.kpiValue, { color: k.color }]}>{k.value}</Text>
-                <Text style={[s.kpiLabel, { color: t.textMuted }]}>{k.label}</Text>
-              </View>
-            ))}
-          </View>
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
+          <SectionHead title="Selected period" />
+          <StatStrip>
+            <Stat label="Appointments" value={stats.total} note={`${stats.completed} completed`} />
+            <Stat label="Show-up" value={`${showUp}%`}
+              tone={showUp < 80 ? 'amber' : undefined}
+              note={`${stats.cancelled} cancelled`} />
+            <Stat label="Avg wait" value={stats.avgWaitMinutes ?? '—'}
+              unit={stats.avgWaitMinutes != null ? 'min' : undefined}
+              note={stats.avgConsultMinutes != null ? `${stats.avgConsultMinutes} min consult` : 'no consults timed'}
+              last />
+          </StatStrip>
 
-          {/* Wait time / consultation time -- checked_in_at -> consult_started_at -> consult_ended_at,
-              same numbers that drive each doctor's live queue wait estimate. Was already coming back
-              on this same /api/appointments/stats response; only the KPI tiles read it before. */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-            <View style={[s.typeCard, { backgroundColor: t.infoSubtle, flex: 1 }]}>
-              <Text style={[s.typeCount, { color: t.info }]}>{fmtMinutes(stats.avgWaitMinutes)}</Text>
-              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Wait Time</Text>
+          {/* Two money figures, never merged into one. "Earned" is the fee
+              maths over completed appointments; "collected" is what actually
+              came through Queue. They differ whenever a patient pays at the
+              desk, a payment fails, or a booking is refunded -- and a single
+              number would quietly report income the hospital never received. */}
+          <SectionHead title="Money" />
+          <Card>
+            <StatStrip>
+              <Stat label="Earned" value={money(stats.revenue ?? null)}
+                note="completed appointments" />
+              {stats.collected
+                ? <Stat label="Collected in Queue" value={money(stats.collected.collected)}
+                    note={`${stats.collected.count} paid online`} last />
+                : <Stat label="Collected in Queue" value="—"
+                    note="hospital-wide figure only" last />}
+            </StatStrip>
+            {!!stats.collected && (stats.collected.refunded > 0 || stats.collected.payout > 0) && (
+              <>
+                <Hair inset={0} />
+                <StatStrip>
+                  <Stat label="Your payout" value={money(stats.collected.payout)} note="after platform fee" />
+                  <Stat label="Refunded" value={money(stats.collected.refunded)}
+                    tone={stats.collected.refunded > 0 ? 'amber' : undefined}
+                    note="returned to patients" last />
+                </StatStrip>
+              </>
+            )}
+            <Hair inset={0} />
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+              <Text style={{ fontSize: 11.5, lineHeight: 16, color: t.q.ink60 }}>
+                Earned is what the bookings were worth. Collected is what reached Queue — anything paid
+                at your desk is in the first figure and not the second.
+              </Text>
             </View>
-            <View style={[s.typeCard, { backgroundColor: t.accentBgMid, flex: 1 }]}>
-              <Text style={[s.typeCount, { color: t.accent }]}>{fmtMinutes(stats.avgConsultMinutes)}</Text>
-              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Consultation</Text>
-            </View>
-          </View>
+          </Card>
 
-          {/* Visit type split */}
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
-            <Text style={[s.cardTitle, { color: t.textPrimary }]}>Visit Type Split</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+          <SectionHead title="Visit type" />
+          <Card pad style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+              <View style={{ width: `${Math.round((inperson / total) * 100)}%`, backgroundColor: t.q.primary }} />
+              <View style={{ flex: 1, backgroundColor: t.q.amberFill }} />
+            </View>
+            <View style={{ gap: 8 }}>
               {[
-                { label: 'In-person', count: inperson, color: t.accent },
-                { label: 'Virtual',   count: virtual,  color: t.info },
+                { label: 'In person', count: inperson, color: t.q.primary },
+                { label: 'Video', count: virtual, color: t.q.amberFill },
               ].map(tp => (
-                <View key={tp.label} style={[s.typeCard, { backgroundColor: `${tp.color}12`, flex: 1 }]}>
-                  <Text style={[s.typeCount, { color: tp.color }]}>{tp.count}</Text>
-                  <Text style={[s.typeLabel, { color: t.textMuted }]}>{tp.label}</Text>
-                  <Text style={[s.typePct, { color: t.textMuted }]}>{Math.round(tp.count / total * 100)}%</Text>
+                <View key={tp.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: tp.color }} />
+                  <Text style={{ flex: 1, fontSize: 13, color: t.q.ink }}>{tp.label}</Text>
+                  <Mono size={13} weight="700">{tp.count}</Mono>
+                  <Mono size={12} color={t.q.ink60}>{Math.round((tp.count / total) * 100)}%</Mono>
                 </View>
               ))}
             </View>
-            <View style={{ height: 8, borderRadius: 99, overflow: 'hidden', flexDirection: 'row' }}>
-              <View style={{ width: `${Math.round(inperson / total * 100)}%`, backgroundColor: t.accent }} />
-              <View style={{ flex: 1, backgroundColor: t.info }} />
-            </View>
-          </View>
+          </Card>
 
-          {/* Top specialties */}
           {specialty.length > 0 && (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
-              <Text style={[s.cardTitle, { color: t.textPrimary }]}>Top Specialties</Text>
-              <View style={{ gap: 10 }}>
-                {specialty.map((sp, i) => (
-                  <View key={sp.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text style={[s.specName, { color: t.textMuted }]} numberOfLines={1}>{sp.name}</Text>
-                    <View style={{ flex: 1, height: 8, backgroundColor: `${t.cardBorder}`, borderRadius: 99, overflow: 'hidden' }}>
-                      <View style={{ width: `${sp.pct}%`, height: '100%', backgroundColor: SPEC_COLORS[i] ?? t.accent, borderRadius: 99 }} />
+            <>
+              <SectionHead title="Top specialties" />
+              <Card pad style={{ gap: 10 }}>
+                {specialty.map(sp => (
+                  <View key={sp.name} style={{ gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, color: t.q.ink }}>{sp.name}</Text>
+                      <Mono size={13} weight="700">{sp.count}</Mono>
+                      <Mono size={12} color={t.q.ink60}>{sp.pct}%</Mono>
                     </View>
-                    <Text style={[s.specPct, { color: t.textPrimary }]}>{sp.pct}%</Text>
+                    {/* One colour, length carries the value: a different hue per
+                        row would imply the specialties are categories being
+                        compared on something other than size. */}
+                    <View style={{ height: 6, borderRadius: 3, backgroundColor: t.q.muted, overflow: 'hidden' }}>
+                      <View style={{ width: `${sp.pct}%`, height: '100%', backgroundColor: t.q.primary }} />
+                    </View>
                   </View>
                 ))}
-              </View>
-            </View>
+              </Card>
+            </>
           )}
 
-          {/* Wait & consultation time by doctor -- same source data as the two KPI tiles
-              above, broken out per doctor so an admin can see which doctors run long
-              consults or keep patients waiting, not just the aggregate. Web renders this
-              as a <table> with overflow-x scroll; four short columns read fine as stacked
-              rows at phone width, so no horizontal scroll needed here. */}
           {!!stats.doctorStats.length && (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
-              <Text style={[s.cardTitle, { color: t.textPrimary, marginBottom: 4 }]}>Wait &amp; Consultation Time by Doctor</Text>
-              <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 14 }}>Selected period · averaged per doctor</Text>
-              <View style={[s.doctorTableHead, { borderBottomColor: t.cardBorder }]}>
-                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1.4 }]}>DOCTOR</Text>
-                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1, textAlign: 'right' }]}>WAIT</Text>
-                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 1, textAlign: 'right' }]}>CONSULT</Text>
-                <Text style={[s.doctorTableHeadText, { color: t.textMuted, flex: 0.7, textAlign: 'right' }]}>VISITS</Text>
-              </View>
-              {stats.doctorStats.map(d => (
-                <View key={d.doctorId} style={[s.doctorTableRow, { borderBottomColor: t.cardBorder }]}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: t.textPrimary, flex: 1.4 }} numberOfLines={1}>{d.doctorName}</Text>
-                  <Text style={{ fontSize: 12.5, color: t.textSecondary, flex: 1, textAlign: 'right' }}>{fmtMinutes(d.avgWaitMinutes)}</Text>
-                  <Text style={{ fontSize: 12.5, color: t.textSecondary, flex: 1, textAlign: 'right' }}>{fmtMinutes(d.avgConsultMinutes)}</Text>
-                  <Text style={{ fontSize: 12.5, color: t.textMuted, flex: 0.7, textAlign: 'right' }}>{d.sampleSize}</Text>
+            <>
+              <SectionHead title="By doctor" />
+              <Card>
+                <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 }}>
+                  <Text style={{ flex: 1.4, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, color: t.q.ink60 }}>DOCTOR</Text>
+                  <Text style={{ flex: 1, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, color: t.q.ink60, textAlign: 'right' }}>WAIT</Text>
+                  <Text style={{ flex: 1, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, color: t.q.ink60, textAlign: 'right' }}>CONSULT</Text>
+                  <Text style={{ flex: 0.7, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, color: t.q.ink60, textAlign: 'right' }}>VISITS</Text>
                 </View>
-              ))}
-            </View>
+                {stats.doctorStats.map((d, i) => (
+                  <View key={d.doctorId}>
+                    <Hair />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11 }}>
+                      <Text numberOfLines={1} style={{ flex: 1.4, fontSize: 13, fontWeight: '600', color: t.q.ink }}>
+                        {d.doctorName}
+                      </Text>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Mono size={12.5} color={t.q.ink70}>{fmtMinutes(d.avgWaitMinutes)}</Mono>
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Mono size={12.5} color={t.q.ink70}>{fmtMinutes(d.avgConsultMinutes)}</Mono>
+                      </View>
+                      <View style={{ flex: 0.7, alignItems: 'flex-end' }}>
+                        <Mono size={12.5} color={t.q.ink60}>{d.sampleSize}</Mono>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            </>
           )}
 
-          {/* Monthly bookings YTD bar chart */}
           {ytdMonths.length > 0 && (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.cardTitle, { color: t.textPrimary }]}>Monthly Bookings (YTD)</Text>
-              {(() => {
-                const maxV = Math.max(...ytdCounts, 1)
-                const barMaxH = 100
-                return (
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 130, marginTop: 8 }}>
-                    {ytdMonths.map((m, i) => {
-                      const h = Math.max((ytdCounts[i] / maxV) * barMaxH, 4)
-                      const isLast = i === ytdMonths.length - 1
-                      return (
-                        <View key={m} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-                          <Text style={[s.barVal, { color: t.textMuted }]}>{ytdCounts[i]}</Text>
-                          <View style={{ width: '100%', height: h, borderRadius: 4, backgroundColor: isLast ? t.accent : `${t.accent}60` }} />
-                          <Text style={[s.barLabel, { color: t.textMuted }]}>{m}</Text>
-                        </View>
-                      )
-                    })}
-                  </View>
-                )
-              })()}
-            </View>
+            <>
+              <SectionHead title="Bookings this year" />
+              <Card pad>
+                {(() => {
+                  const maxV = Math.max(...ytdCounts, 1)
+                  return (
+                    <View style={{ gap: 8 }}>
+                      {/* Every bar is measured against the same maximum, and the
+                          maximum is printed, so a tall bar cannot be read as a
+                          bigger number than it is. */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Mono size={10.5} color={t.q.ink60}>0</Mono>
+                        <Mono size={10.5} color={t.q.ink60}>{maxV} max</Mono>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 120 }}>
+                        {ytdMonths.map((m, i) => {
+                          const h = Math.max((ytdCounts[i] / maxV) * 96, 3)
+                          const isLast = i === ytdMonths.length - 1
+                          return (
+                            <View key={m} style={{ flex: 1, alignItems: 'center', gap: 4 }}
+                              accessibilityLabel={`${m}: ${ytdCounts[i]} bookings`}>
+                              <Mono size={9} color={t.q.ink60}>{ytdCounts[i]}</Mono>
+                              <View style={{
+                                width: '100%', height: h, borderRadius: 3,
+                                backgroundColor: isLast ? t.q.primary : t.q.sel,
+                              }} />
+                              <Text style={{ fontSize: 9, color: t.q.ink60 }}>{m}</Text>
+                            </View>
+                          )
+                        })}
+                      </View>
+                    </View>
+                  )
+                })()}
+              </Card>
+            </>
           )}
-        </ScrollView>
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  header:      { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
-  title:       { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  rangeBtn:    { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  rangeBtnText: { fontSize: 12, fontWeight: '700' },
-  kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
-  kpiCard:     { flexBasis: '47%', flexGrow: 1, borderRadius: 14, borderWidth: 1, padding: 14 },
-  kpiValue:    { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  kpiLabel:    { fontSize: 11, marginTop: 3 },
-  card:        { borderRadius: 16, borderWidth: 1, padding: 16 },
-  cardTitle:   { fontSize: 14, fontWeight: '700', marginBottom: 14 },
-  typeCard:    { borderRadius: 12, padding: 14 },
-  typeCount:   { fontSize: 24, fontWeight: '800' },
-  typeLabel:   { fontSize: 11, marginTop: 2 },
-  typePct:     { fontSize: 11 },
-  specName:    { width: 90, fontSize: 12, fontWeight: '500' },
-  specPct:     { width: 30, textAlign: 'right', fontSize: 12, fontWeight: '700' },
-  barVal:      { fontSize: 9, fontWeight: '700' },
-  barLabel:    { fontSize: 9 },
-  doctorTableHead: { flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, marginBottom: 4 },
-  doctorTableHeadText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  doctorTableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
-})

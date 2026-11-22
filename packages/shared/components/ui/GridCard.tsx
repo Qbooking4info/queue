@@ -32,7 +32,7 @@ export function GridCard({
   onPress: () => void
 }) {
   const { theme: t } = useTheme()
-  const dark = t.id === 'forest'
+  const dark = t.isDark
   const hasRating = typeof rating === 'number' && rating > 0
 
   return (

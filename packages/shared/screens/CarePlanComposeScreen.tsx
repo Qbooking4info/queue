@@ -1,17 +1,15 @@
 import { useState } from 'react'
-import {
-  View, ScrollView, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform,
-} from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { Text } from '../components/ui/Typography'
-import { Card, Header, PrimaryButton, SectionTitle } from '../components/ui/v3'
+import { View, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 import { Alert } from '../contexts/AlertContext'
 import { haptics } from '../lib/haptics'
 import { fmtLocalDate } from '../lib/format'
-import { createCarePlan, type CarePlanCadence, type NewCarePlanTask } from '../lib/api'
+import { createCarePlan, type NewCarePlanTask } from '../lib/api'
 import { SchedulePicker, type Schedule } from '../components/ui/SchedulePicker'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Hair, SectionHead, Chip, Field,
+  Btn, BottomBar, IconBtn, Mono,
+} from '../components/q'
 
 interface Props {
   navigation: any
@@ -108,168 +106,130 @@ export function CarePlanComposeScreen({ navigation, route }: Props) {
 
     if (!res.ok) { haptics.error(); Alert.alert('Could not save', res.error); return }
     haptics.success()
-    Alert.alert('Plan shared', `${patientName ?? 'Your patient'} can see it in My Care now.`)
+    Alert.alert('Plan shared', `${patientName ?? 'Your patient'} can see it in My care now.`)
     navigation.goBack()
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title="Care plan" subtitle={patientName} onBack={() => navigation.goBack()} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
-      >
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+      <Screen>
+        <AppBar title="New care plan" sub={patientName} onBack={() => navigation.goBack()} />
 
-          <Card style={{ gap: 14 }}>
-            <SectionTitle title="The plan" />
-            <Field label="Title" value={title} onChangeText={setTitle} placeholder="e.g. Blood pressure control" theme={t} />
-            <Field label="Condition (optional)" value={condition} onChangeText={setCondition} placeholder="e.g. Hypertension" theme={t} />
-
-            <View style={{ gap: 8 }}>
-              <Text style={[s.label, { color: t.textPrimary }]}>The whole plan runs for</Text>
-              <View style={s.row}>
-                {[2, 4, 8, 12].map(w => (
-                  <Chip key={w} on={weeks === w} label={`${w} wks`} onPress={() => setWeeks(w)} theme={t} />
-                ))}
-                <Chip on={weeks === null} label="Ongoing" onPress={() => setWeeks(null)} theme={t} />
+        <Body keyboardShouldPersistTaps="handled">
+          <SectionHead title="The plan" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <Field label="Plan name" value={title} onChangeText={setTitle}
+                placeholder="e.g. Blood pressure control" />
+              <Field label="Condition (optional)" value={condition} onChangeText={setCondition}
+                placeholder="e.g. Hypertension" />
+              <View style={{ gap: 8 }}>
+                <CardLabel>Runs for</CardLabel>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[2, 4, 8, 12].map(w => (
+                    <Chip key={w} label={`${w} weeks`} on={weeks === w}
+                      onPress={() => { haptics.tap(); setWeeks(w) }} />
+                  ))}
+                  <Chip label="Ongoing" on={weeks === null}
+                    onPress={() => { haptics.tap(); setWeeks(null) }} />
+                </View>
               </View>
             </View>
           </Card>
 
-          <Card style={{ gap: 14 }}>
-            <SectionTitle title="What the patient should do" />
-
+          <SectionHead title={`Daily tasks · ${filled.length}`} />
+          <Card>
             {tasks.map((x, i) => (
-              <View key={x.id} style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TextInput
-                    value={x.title}
-                    onChangeText={v => setTask(x.id, { title: v })}
-                    placeholder={`Task ${i + 1}`}
-                    placeholderTextColor={t.textMuted}
-                    style={[s.input, { flex: 1, backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                  />
-                  {tasks.length > 1 && (
-                    <TouchableOpacity
-                      onPress={() => setTasks(l => l.filter(y => y.id !== x.id))}
-                      accessibilityRole="button" accessibilityLabel={`Remove task ${i + 1}`} hitSlop={8}
-                    >
-                      <Ionicons name="close-circle" size={21} color={t.textMuted} />
-                    </TouchableOpacity>
+              <View key={x.id}>
+                {i > 0 && <Hair />}
+                <View style={{ padding: 14, gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={x.title}
+                      onChangeText={v => setTask(x.id, { title: v })}
+                      placeholder={`Task ${i + 1}`}
+                      placeholderTextColor={t.q.ink60}
+                      accessibilityLabel={`Task ${i + 1}`}
+                      style={{
+                        flex: 1, minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: t.q.line,
+                        backgroundColor: t.q.field, paddingHorizontal: 12, fontSize: 15, color: t.q.ink,
+                      }} />
+                    {tasks.length > 1 && (
+                      <IconBtn name="close" label={`Remove task ${i + 1}`}
+                        onPress={() => setTasks(l => l.filter(y => y.id !== x.id))} />
+                    )}
+                  </View>
+
+                  {/* How often, not when. The patient sets the clock times -- and
+                      the weekday or day of the month -- in their own app: a doctor
+                      cannot know when this person eats or sleeps, and a reminder at
+                      the wrong hour gets dismissed until it is ignored altogether. */}
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Chip label="Repeating" on={x.cadence !== 'once'}
+                      onPress={() => { haptics.tap(); setTask(x.id, { cadence: 'daily' }) }} />
+                    <Chip label="Once, on a date" on={x.cadence === 'once'}
+                      onPress={() => { haptics.tap(); setTask(x.id, { cadence: 'once', timesPerPeriod: 1, durationWeeks: null }) }} />
+                  </View>
+
+                  {x.cadence !== 'once' && (
+                    <SchedulePicker compact value={x} onChange={next => setTask(x.id, next)} />
+                  )}
+
+                  {x.cadence === 'once' && (
+                    <TextInput
+                      value={x.dueOn}
+                      onChangeText={v => setTask(x.id, { dueOn: v })}
+                      placeholder="Due date — YYYY-MM-DD"
+                      placeholderTextColor={t.q.ink60}
+                      accessibilityLabel="Due date"
+                      style={{
+                        minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: t.q.line,
+                        backgroundColor: t.q.field, paddingHorizontal: 12, fontSize: 15, color: t.q.ink,
+                      }} />
                   )}
                 </View>
-
-                {/* How often, not when. The patient sets the clock times -- and
-                    the weekday or day of the month -- in their own app: a doctor
-                    cannot know when this person eats or sleeps, and a reminder at
-                    the wrong hour gets dismissed until it is ignored altogether. */}
-                <View style={s.row}>
-                  <Chip on={x.cadence !== 'once'} label="Repeating"
-                    onPress={() => setTask(x.id, { cadence: 'daily' })} theme={t} small />
-                  <Chip on={x.cadence === 'once'} label="Once, on a date"
-                    onPress={() => setTask(x.id, { cadence: 'once', timesPerPeriod: 1, durationWeeks: null })} theme={t} small />
-                </View>
-
-                {x.cadence !== 'once' && (
-                  <SchedulePicker
-                    compact
-                    value={x}
-                    onChange={next => setTask(x.id, next)}
-                  />
-                )}
-
-                {x.cadence === 'once' && (
-                  <TextInput
-                    value={x.dueOn}
-                    onChangeText={v => setTask(x.id, { dueOn: v })}
-                    placeholder="Due date — YYYY-MM-DD"
-                    placeholderTextColor={t.textMuted}
-                    style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                  />
-                )}
               </View>
             ))}
-
-            <TouchableOpacity onPress={() => addTask()} accessibilityRole="button"
-              style={[s.addBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-              <Ionicons name="add" size={16} color={t.accent} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>Add a task</Text>
-            </TouchableOpacity>
-
-            <View style={{ gap: 8 }}>
-              <Text style={[s.hint, { color: t.textMuted }]}>Common tasks</Text>
-              <View style={[s.row, { flexWrap: 'wrap' }]}>
-                {COMMON.map(c => (
-                  <Chip key={c} on={false} label={c} onPress={() => addTask(c)} theme={t} small />
-                ))}
-              </View>
+            <Hair />
+            <View style={{ padding: 14 }}>
+              <Btn label="Add a task" variant="secondary" icon="add" onPress={() => addTask()} />
             </View>
           </Card>
 
-          <Card style={{ gap: 10 }}>
-            <SectionTitle title="Notes for the patient (optional)" />
-            <TextInput
-              value={notes} onChangeText={setNotes} multiline textAlignVertical="top"
-              placeholder="Anything they should know alongside the tasks"
-              placeholderTextColor={t.textMuted}
-              style={[s.input, { minHeight: 90, backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-            />
+          <SectionHead title="Common tasks" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+            {COMMON.map(c => (
+              <Chip key={c} label={c} onPress={() => { haptics.tap(); addTask(c) }} />
+            ))}
+          </View>
+
+          <SectionHead title="Notes for the patient" />
+          <Card>
+            <View style={{ padding: 14, gap: 6 }}>
+              <CardLabel>Optional</CardLabel>
+              <TextInput
+                value={notes} onChangeText={setNotes} multiline textAlignVertical="top"
+                placeholder="Anything they should know alongside the tasks"
+                placeholderTextColor={t.q.ink60}
+                accessibilityLabel="Notes for the patient"
+                style={{
+                  minHeight: 96, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                  backgroundColor: t.q.field, padding: 12, fontSize: 14, lineHeight: 20, color: t.q.ink,
+                }} />
+            </View>
           </Card>
+        </Body>
 
-          <PrimaryButton
-            label={saving ? 'Sharing…' : 'Share with patient'}
-            onPress={save} loading={saving} disabled={!canSave}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        <BottomBar meta={
+          <Mono size={12} weight="600" color={t.q.ink70}>
+            {filled.length} task{filled.length === 1 ? '' : 's'} · {weeks ? `${weeks} weeks` : 'ongoing'}
+          </Mono>
+        }>
+          <Btn grow label="Start plan" loading={saving} disabled={!canSave} onPress={save} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-function Field({ label, value, onChangeText, placeholder, theme: t }: {
-  label: string; value: string; onChangeText: (v: string) => void; placeholder: string; theme: any
-}) {
-  return (
-    <View style={{ gap: 7 }}>
-      <Text style={[s.label, { color: t.textPrimary }]}>{label}</Text>
-      <TextInput
-        value={value} onChangeText={onChangeText}
-        placeholder={placeholder} placeholderTextColor={t.textMuted}
-        style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-      />
-    </View>
-  )
-}
-
-function Chip({ on, label, onPress, theme: t, small }: {
-  on: boolean; label: string; onPress: () => void; theme: any; small?: boolean
-}) {
-  return (
-    <TouchableOpacity
-      onPress={() => { haptics.tap(); onPress() }}
-      accessibilityRole="button" accessibilityState={{ selected: on }}
-      style={{
-        paddingHorizontal: small ? 11 : 14,
-        paddingVertical: small ? 7 : 9,
-        borderRadius: 99, borderWidth: 1,
-        borderColor: on ? t.accentBorder : t.cardBorder,
-        backgroundColor: on ? t.accentBg : t.inputBg,
-      }}
-    >
-      <Text style={{ fontSize: small ? 12 : 13, fontWeight: '700', color: on ? t.accent : t.textMuted }}>{label}</Text>
-    </TouchableOpacity>
-  )
-}
-
-const s = StyleSheet.create({
-  label: { fontSize: 14, fontWeight: '700' },
-  hint:  { fontSize: 12, fontWeight: '600' },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
-  row:   { flexDirection: 'row', gap: 8 },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 11, borderRadius: 12, borderWidth: 1,
-  },
-})

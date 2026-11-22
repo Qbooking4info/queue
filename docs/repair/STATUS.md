@@ -1,8 +1,60 @@
 # Repair campaign — status
 
-**Last updated:** 2026-10-13 17:10 WAT · **Overall:** in progress · **Current batch:** 2 (critical security + safety) — code done, awaiting approval to apply migrations and deploy.
+**Last updated:** 2026-10-31 00:45 WAT · **Overall:** in progress · **Current batch:** 2 (critical security + safety) — code done, awaiting approval to apply migrations and deploy.
 
 ## RESUME HERE
+
+**2026-11-10 — queue review.** Numbering engine reviewed end to end and found sound:
+`renumber_doctor_queue()` renumbers the whole set with `row_number()` (contiguous, no gaps or
+duplicates, departures close up), serialised by `pg_advisory_xact_lock` per (doctor, date);
+emergencies tier first; `in_progress` is pinned. Three findings, all handled:
+
+- **Fixed:** an OPD patient checks in with no doctor (that is the model), so `queue_position`
+  stays null and every queue screen sorted null as `Infinity` — putting whoever arrived *first*
+  at the bottom of the front desk's list, below people who had not turned up. New shared
+  `packages/shared/lib/queueOrder.ts` (3 bands: numbered / arrived / not yet here), used by the
+  front desk and both doctor screens; `web/src/app/api/appointments/queue/route.ts` carries its
+  own copy (web is outside the workspace). `checked_in_at` added to the front-desk fetch.
+- **Fixed before applying:** `move_appointment_in_queue()` kept its own copy of the ordering key
+  and was left on `checked_in_at` by migration `20261031000001`, which had changed
+  `renumber_doctor_queue()` to `COALESCE(requeued_at, checked_in_at)`. The two would have
+  disagreed about queue order for any patient back from the lab. Both now share the key.
+- **Confirmed, user decision 2026-11-10:** patient self-move stays **later-only** (a patient may
+  give up their place, never take one); staff may move either way. Now pinned by 13 tests in
+  `web/src/app/api/appointments/[id]/queue-position/route.test.ts`. OPD numbering stays
+  staff-assigned — only the sort was wrong, and that is fixed.
+
+Green: web vitest 198/198, shared jest 68/68, all typechecks clean, eslint 356 (unchanged).
+
+
+**2026-11-08 — booking flow: five pages to three.** `apps/client/screens/BookingFlowScreen.tsx`.
+Nothing removed; the consultation-type page became a segmented toggle on the hospital page, and
+"about your visit" merged with "pick a time" (the clinic you choose is what decides which slots
+exist, so they were never two decisions). `STEP_DETAILS`/`STEP_SCHEDULE` are now both `STEP_VISIT`,
+so every existing guard and effect still reads clearly. `canAdvance()` enforces both halves, and a
+new `blockingReason()` names the first missing field under the CTA so a merged page cannot read as
+a dead end. Progress bar now matches the pages one for one. Typechecks + 185 web / 60 shared tests
+green. **Not device-tested** — needs a Metro restart (CI=1 disables watch) and a run through the
+flow, including the HospitalProfile and reschedule entry points.
+
+
+**2026-10-31 — Tier 0 of the product research report (REP-120..123 in `ISSUES.md`).**
+Code is done and green; the database half is written and **not applied**.
+
+- Shipped in code: SMS fallback behind the two unmissable queue notifications (inert until
+  `PATIENT_SMS_URL` is set); honest `sent_via`; `aheadOfYou`/`emergenciesAhead`/`asOf` on the
+  queue-position route; hours-and-minutes wait copy and a staleness stamp on the patient card;
+  `leave_queue`/`return_to_queue` API actions.
+- **Awaiting approval:** `supabase/migrations/20261031000001_queue_fairness_and_wait_estimate.sql`
+  (lab-return ordering key, `return_to_queue()` RPC, consult median over finished consults only,
+  wait median conditioned on weekday x hour). Parsed with libpg_query; executed nowhere.
+  Until it is applied, the lab-return ordering defect is still live in production.
+- **Open decision for the user:** `app_config.lab_return_credit_minutes` (default 30) is a product
+  choice, not a research finding.
+- Green at 00:45: web vitest 185/185, shared jest 60/60, all four app typechecks + web tsc clean,
+  web build OK. `npx eslint` 356 errors (was 359 before this batch; the gap to the 329 baseline of
+  2026-10-13 comes from the uncommitted 27-28 Oct work, not from this one).
+
 
 0. **Another Claude session is working in this same checkout.** At 15:13–15:19 WAT it switched the branch
    from `main` to `fix/audit-2026-10-13` and committed d7f65fd, 688540e, f7a5179; it also has untracked

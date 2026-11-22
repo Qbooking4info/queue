@@ -151,11 +151,18 @@ export async function POST(req: NextRequest) {
   }
 
   // Guarded on the current status so two concurrent deliveries cannot both win.
+  // 'failed' is accepted as well as 'pending': the reconcile cron records
+  // Paystack's "abandoned" verdict as failed so the row stops sitting in limbo,
+  // but an abandoned checkout can still be completed from the same link
+  // afterwards. A genuine success must always win over an earlier write-off, or
+  // the money is lost silently. The amount is re-checked above, so a row failed
+  // for a mismatch can only come back if the amount is now right. 'refunded' is
+  // deliberately not in the list.
   const { data: updated, error: updateErr } = await db
     .from('payments')
     .update({ status: 'success', ...settled } as never)
     .eq('id', payment.id)
-    .eq('status', 'pending')
+    .in('status', ['pending', 'failed'])
     .select('id')
 
   // one_success_payment_per_appointment (20261013300002): another charge for the same

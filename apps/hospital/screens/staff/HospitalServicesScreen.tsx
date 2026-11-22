@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Switch, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Seg, Btn, BottomBar, Empty, IconBtn, Mono,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -120,94 +121,134 @@ export function HospitalServicesScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Services" subtitle="Specialties, services and prices" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TouchableOpacity
-          onPress={() => tab === 'services' ? setEditing('new') : setAddingSpecialty(true)}
-          style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
-          <Ionicons name="add" size={16} color="#0F766E" />
-          <Text style={[s.addBtnText, { color: '#0F766E' }]}>{tab === 'services' ? 'Add Service' : 'Add Specialty'}</Text>
-        </TouchableOpacity>
-      
-        </View>} />
+    <Screen>
+      <AppBar
+        title="Services & prices"
+        sub="What you offer and what it costs"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={
+          <IconBtn
+            name="add"
+            label={tab === 'services' ? 'Add service' : 'Add specialty'}
+            onPress={() => tab === 'services' ? setEditing('new') : setAddingSpecialty(true)}
+          />
+        }
+      />
 
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
-        {(['services', 'specialties'] as const).map(tb => (
-          <TouchableOpacity key={tb} onPress={() => setTab(tb)}
-            style={[s.tab, { borderColor: tab === tb ? t.accent : t.cardBorder, backgroundColor: tab === tb ? `${t.accent}18` : t.cardBg }]}>
-            <Text style={[s.tabText, { color: tab === tb ? t.accent : t.textMuted }]}>
-              {tb === 'services' ? `Services (${services.length})` : `Specialties (${registered.length})`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Seg<'services' | 'specialties'>
+        value={tab} onChange={setTab}
+        options={[
+          { key: 'services', label: `Services · ${services.length}` },
+          { key: 'specialties', label: `Specialties · ${registered.length}` },
+        ]}
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
           {tab === 'services' ? (
             services.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="medkit-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No services yet</Text>
-              </View>
-            ) : services.map(svc => (
-              <View key={svc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.svcName, { color: t.textPrimary }]}>{svc.name}</Text>
-                    {svc.specialty_name && <Text style={{ fontSize: 11, color: t.accent, marginTop: 2 }}>{svc.specialty_name}</Text>}
+              <Card style={{ marginTop: 12 }}>
+                <Empty
+                  icon="medkit-outline"
+                  title="No services yet"
+                  body="A service is something a patient books and pays for — a consultation, a scan, a dental check."
+                  action="Add the first one"
+                  onAction={() => setEditing('new')}
+                />
+              </Card>
+            ) : (
+              <Card>
+                {services.map((svc, i) => (
+                  <View key={svc.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="medkit-outline"
+                      iconTone={svc.is_active ? 'teal' : 'neutral'}
+                      dim={!svc.is_active}
+                      title={svc.name}
+                      sub={[
+                        svc.specialty_name,
+                        svc.duration_mins != null ? `${svc.duration_mins} min` : null,
+                        svc.description,
+                      ].filter(Boolean).join(' · ')}
+                      right={
+                        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                          {svc.base_price != null && (
+                            <Mono size={13} weight="700">₦{svc.base_price.toLocaleString('en-NG')}</Mono>
+                          )}
+                          {svc.virtual_price != null && (
+                            <Mono size={11} color={t.q.ink60}>video ₦{svc.virtual_price.toLocaleString('en-NG')}</Mono>
+                          )}
+                        </View>
+                      }
+                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
+                      <Btn label="Edit" variant="secondary" small onPress={() => setEditing(svc)} />
+                      <Btn label="Delete" variant="ghost" small onPress={() => setConfirmDeleteService(svc)} />
+                      <View style={{ flex: 1 }} />
+                      <Text style={{ fontSize: 12, color: t.q.ink60 }}>
+                        {svc.is_active ? 'Bookable' : 'Hidden'}
+                      </Text>
+                      <Switch
+                        value={svc.is_active}
+                        onValueChange={() => toggleServiceActive(svc)}
+                        disabled={busy}
+                        accessibilityLabel={`${svc.name} bookable`}
+                        trackColor={{ true: t.q.primary, false: t.q.line }}
+                        thumbColor="#FFFFFF"
+                      />
+                    </View>
                   </View>
-                  <Switch value={svc.is_active} onValueChange={() => toggleServiceActive(svc)} trackColor={{ true: t.accent }} disabled={busy} />
-                </View>
-                {svc.description && <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 8 }} numberOfLines={2}>{svc.description}</Text>}
-                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {svc.base_price != null && (
-                    <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}><Text style={[s.badgeText, { color: t.accent }]}>In-person ₦{svc.base_price.toLocaleString()}</Text></View>
-                  )}
-                  {svc.virtual_price != null && (
-                    <View style={[s.badge, { backgroundColor: t.statusVirtual.bg }]}><Text style={[s.badgeText, { color: t.statusVirtual.text }]}>Virtual ₦{svc.virtual_price.toLocaleString()}</Text></View>
-                  )}
-                  {svc.duration_mins != null && (
-                    <View style={[s.badge, { backgroundColor: 'rgba(122,144,137,0.14)' }]}><Text style={[s.badgeText, { color: t.textMuted }]}>{svc.duration_mins} min</Text></View>
-                  )}
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => setEditing(svc)} style={[s.smallBtn, { flex: 1, borderColor: t.cardBorder }]}>
-                    <Text style={[s.smallBtnText, { color: t.textPrimary }]}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmDeleteService(svc)} style={[s.smallBtn, { flex: 1, borderColor: 'rgba(239,68,68,0.3)' }]}>
-                    <Text style={[s.smallBtnText, { color: t.danger }]}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+                ))}
+              </Card>
+            )
           ) : (
             registered.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="ribbon-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No specialties registered</Text>
-              </View>
-            ) : registered.map(sp => (
-              <View key={sp.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, flexDirection: 'row', alignItems: 'center' }]}>
-                <Ionicons name="medical-outline" size={18} color={t.accent} style={{ marginRight: 10 }} />
-                <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{sp.name}</Text>
-                <TouchableOpacity onPress={() => setConfirmRemoveSpecialty(sp)} disabled={busy}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            ))
+              <Card style={{ marginTop: 12 }}>
+                <Empty
+                  icon="ribbon-outline"
+                  title="No specialties registered"
+                  body="Specialties are what patients filter by when they search for care."
+                  action="Add a specialty"
+                  onAction={() => setAddingSpecialty(true)}
+                />
+              </Card>
+            ) : (
+              <Card>
+                {registered.map((sp, i) => (
+                  <View key={sp.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="medical-outline"
+                      title={sp.name}
+                      right={
+                        <Btn label="Remove" variant="ghost" small disabled={busy}
+                          onPress={() => setConfirmRemoveSpecialty(sp)} />
+                      }
+                    />
+                  </View>
+                ))}
+              </Card>
+            )
           )}
-        </ScrollView>
+        </Body>
       )}
+
+      <BottomBar>
+        <Btn
+          grow
+          label={tab === 'services' ? 'Add service' : 'Add specialty'}
+          icon="add"
+          onPress={() => tab === 'services' ? setEditing('new') : setAddingSpecialty(true)}
+        />
+      </BottomBar>
 
       {editing && (
         <ServiceModal
@@ -219,40 +260,51 @@ export function HospitalServicesScreen({ navigation }: Props) {
       )}
 
       {addingSpecialty && (
-        <View style={s.overlay}>
-          <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={[s.modalTitle, { color: t.textPrimary }]}>Add Specialty</Text>
-              <TouchableOpacity onPress={() => setAddingSpecialty(false)} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+        }}>
+          <View style={{
+            backgroundColor: t.q.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            paddingTop: 16, paddingBottom: 28, maxHeight: '80%',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
+              <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.q.ink }}>Add a specialty</Text>
+              <IconBtn name="close" label="Close" onPress={() => setAddingSpecialty(false)} />
             </View>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {allSpecialties.filter(sp => !registered.some(r => r.id === sp.id)).map(sp => (
-                <TouchableOpacity key={sp.id} onPress={() => addSpecialty(sp.id)} disabled={busy}
-                  style={[s.doctorRow, { borderColor: t.cardBorder, borderWidth: 1, borderRadius: 10, marginBottom: 6, paddingHorizontal: 10 }]}>
-                  <Ionicons name="medical-outline" size={16} color={t.accent} style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 13, color: t.textPrimary, flex: 1 }}>{sp.name}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add</Text>
-                </TouchableOpacity>
-              ))}
+            <ScrollView style={{ maxHeight: 420 }}>
+              <Card>
+                {allSpecialties.filter(sp => !registered.some(r => r.id === sp.id)).map((sp, i) => (
+                  <View key={sp.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon="medical-outline"
+                      title={sp.name}
+                      right={<Text style={{ fontSize: 13, fontWeight: '700', color: t.q.primary }}>Add</Text>}
+                      onPress={busy ? undefined : () => addSpecialty(sp.id)}
+                    />
+                  </View>
+                ))}
+              </Card>
             </ScrollView>
           </View>
         </View>
       )}
 
       {confirmRemoveSpecialty && (
-        <ConfirmDialog theme={t} title="Remove Specialty"
-          message={`Remove ${confirmRemoveSpecialty.name} from your hospital's specialties?`}
+        <ConfirmDialog theme={t} title="Remove this specialty?"
+          message={`${confirmRemoveSpecialty.name} will no longer show on your hospital for patients searching by specialty.`}
           confirmLabel="Remove" onCancel={() => setConfirmRemoveSpecialty(null)}
           onConfirm={() => removeSpecialty(confirmRemoveSpecialty.id)} />
       )}
 
       {confirmDeleteService && (
-        <ConfirmDialog theme={t} title="Delete Service"
-          message={`Delete "${confirmDeleteService.name}"? This can't be undone.`}
+        <ConfirmDialog theme={t} title="Delete this service?"
+          message={`"${confirmDeleteService.name}" will stop being bookable. This cannot be undone.`}
           confirmLabel="Delete" onCancel={() => setConfirmDeleteService(null)}
           onConfirm={() => deleteService(confirmDeleteService.id)} />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 

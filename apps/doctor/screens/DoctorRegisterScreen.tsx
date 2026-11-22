@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { REGISTERED_VIA_DOCTOR } from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
 import { ProfileFields, EMPTY_PROFILE, profileProblem, type ProfileValues } from '@queue/shared/components/ui/ProfileFields'
 import { PasswordInput, PasswordChecklist, TermsCheckbox, passwordProblem, cleanReferral } from '@queue/shared/components/ui/PasswordField'
+import {
+  Screen, AppBar, Body, Field, Notice, Btn, BottomBar, SectionHead, Card, CardLabel,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
@@ -51,7 +51,6 @@ export function DoctorRegisterScreen({ navigation }: Props) {
     // afterwards always loses that race and lands the new doctor on the "not a doctor"
     // screen instead of onboarding. (Same ordering bug, same fix, as hospital sign-up.)
     setPendingDoctorOnboarding(true)
-    // No date of birth: it's a patient-care field, not part of a clinician's identity.
     const err = await signUp(
       email.trim().toLowerCase(), pass, fullName.trim(), phone.trim(), profile.dob, REGISTERED_VIA_DOCTOR,
       { referralCode: referral ? cleanReferral(referral) : undefined, acceptedTermsAt: new Date().toISOString(),
@@ -69,116 +68,72 @@ export function DoctorRegisterScreen({ navigation }: Props) {
     // authenticated tree, which reads pendingDoctorOnboarding and opens onboarding.
   }
 
-  const fields = [
-    { label: 'Full name',        value: fullName, onChange: setFullName, placeholder: 'Dr. Adaeze Okonkwo', keyboardType: 'default',       autoCapitalize: 'words', secure: false },
-    { label: 'Work email',       value: email,    onChange: setEmail,    placeholder: 'you@hospital.com',   keyboardType: 'email-address', autoCapitalize: 'none',  secure: false },
-    { label: 'Phone number',     value: phone,    onChange: setPhone,    placeholder: '+234 812 345 6789',  keyboardType: 'phone-pad',     autoCapitalize: 'none',  secure: false },
-  ]
-
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Create account"
+          onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
-          {navigation?.canGoBack?.() && (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-              <Ionicons name="arrow-back" size={14} color={t.accent} />
-              <Text style={[s.backText, { color: t.accent }]}>Back</Text>
-            </TouchableOpacity>
-          )}
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
+            <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: t.q.ink }}>
+              Create your doctor account
+            </Text>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, marginTop: 6 }}>
+              One account, linkable to any number of hospitals afterwards.
+            </Text>
+          </View>
 
-          <Text style={[s.title, { color: t.textPrimary }]}>Create your doctor account</Text>
-          <Text style={[s.sub,   { color: t.textMuted   }]}>
-            One account, linkable to any number of hospitals afterwards.
-          </Text>
-
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-
-            {fields.map(f => (
-              <View key={f.label} style={s.fieldWrap}>
-                <Text style={[s.label, { color: t.textMuted }]}>{f.label}</Text>
-                <TextInput
-                  value={f.value}
-                  onChangeText={f.onChange}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={t.textMuted}
-                  keyboardType={f.keyboardType as any}
-                  autoCapitalize={f.autoCapitalize as any}
-                  autoCorrect={false}
-                  style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                />
-              </View>
-            ))}
-
-            <View style={s.fieldWrap}>
+          <SectionHead title="You" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <Field label="Full name" value={fullName} onChangeText={setFullName}
+                placeholder="Dr. Adaeze Okonkwo" autoCapitalize="words" autoCorrect={false} />
+              <Field label="Work email" value={email} onChangeText={setEmail}
+                placeholder="you@hospital.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+              <Field label="Phone number" value={phone} onChangeText={setPhone}
+                placeholder="+234 812 345 6789" keyboardType="phone-pad" autoCapitalize="none" autoCorrect={false} />
               <ProfileFields value={profile} onChange={setProfile} />
             </View>
+          </Card>
 
-            <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: t.textMuted }]}>Password</Text>
-              <PasswordInput value={pass} onChangeText={setPass} newPassword />
-              <PasswordChecklist password={pass} />
-            </View>
-
-            <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: t.textMuted }]}>Confirm password</Text>
-              <PasswordInput value={confirm} onChangeText={setConfirm} accessibilityLabel="Confirm password" newPassword />
-              {!!confirm && confirm !== pass && <Text style={{ fontSize: 12, color: t.danger, marginTop: 6 }}>Passwords don't match yet</Text>}
-            </View>
-
-            <View style={s.fieldWrap}>
-              <Text style={[s.label, { color: t.textMuted }]}>Referral code (optional)</Text>
-              <TextInput value={referral} onChangeText={v => setReferral(cleanReferral(v))} placeholder="Who referred you to Queue?"
-                placeholderTextColor={t.textMuted} autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Referral code"
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-            </View>
-
-            <TermsCheckbox checked={agreed} onChange={setAgreed} />
-
-            {!!error && (
-              <View style={[s.errBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-                <Text style={[s.errText, { color: t.danger }]}>{error}</Text>
+          <SectionHead title="Password" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <View style={{ gap: 6 }}>
+                <CardLabel>Password</CardLabel>
+                <PasswordInput value={pass} onChangeText={setPass} newPassword />
+                <PasswordChecklist password={pass} />
               </View>
-            )}
+              <View style={{ gap: 6 }}>
+                <CardLabel>Confirm password</CardLabel>
+                <PasswordInput value={confirm} onChangeText={setConfirm} accessibilityLabel="Confirm password" newPassword />
+                {!!confirm && confirm !== pass && (
+                  <Text style={{ fontSize: 12, color: t.q.red }}>Passwords do not match yet</Text>
+                )}
+              </View>
+              <Field label="Referral code (optional)" value={referral}
+                onChangeText={v => setReferral(cleanReferral(v))}
+                placeholder="Who referred you to Queue?" autoCapitalize="characters" autoCorrect={false} />
+            </View>
+          </Card>
 
-            <Button label="Create account" onPress={handleRegister} loading={busy} disabled={!agreed} size="lg" style={{ marginTop: t.spacing.md }} />
-
+          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+            <TermsCheckbox checked={agreed} onChange={setAgreed} />
           </View>
 
-          <View style={s.footer}>
-            <Text style={[s.footerText, { color: t.textMuted }]}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={[s.footerLink, { color: t.accent }]}>Sign in</Text>
-            </TouchableOpacity>
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingTop: 18 }}>
+            <Text style={{ fontSize: 13, color: t.q.ink60 }}>Already have an account? </Text>
+            <Btn label="Sign in" variant="ghost" small onPress={() => navigation.navigate('Login')} />
           </View>
+        </Body>
 
-          <Text style={[s.terms, { color: t.textMuted }]}>
-            By creating an account you agree to our Terms of Service and Privacy Policy.
-          </Text>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        <BottomBar>
+          <Btn grow label="Create account" loading={busy} disabled={!agreed} onPress={handleRegister} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-const s = StyleSheet.create({
-  safe:      { flex: 1 },
-  scroll:    { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24 },
-  backBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 20 },
-  backText:  { fontSize: 14, fontWeight: '600' },
-  title:     { fontSize: 24, fontWeight: '900', letterSpacing: -0.8 },
-  sub:       { fontSize: 13, marginTop: 4, marginBottom: 24 },
-  card:      { borderRadius: 20, borderWidth: 1, padding: 20, gap: 14, marginBottom: 20 },
-  fieldWrap: { gap: 6 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
-  passRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
-  passInput: { flex: 1, paddingVertical: 11, fontSize: 14 },
-  errBox:    { borderWidth: 1, borderRadius: 10, padding: 10 },
-  errText:   { color: '#F87171', fontSize: 12 },
-  footer:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  footerText:{ fontSize: 13 },
-  footerLink:{ fontSize: 13, fontWeight: '700' },
-  terms:     { fontSize: 11, textAlign: 'center', lineHeight: 16, paddingHorizontal: 12 },
-})

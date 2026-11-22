@@ -57,3 +57,22 @@ export function visitTypeIcon(type: string | null | undefined): 'videocam-outlin
   if (type === 'home_visit') return 'home-outline'
   return 'business-outline'
 }
+
+/**
+ * The arrival window a booking was given: "09:00 – 09:30", or just the start
+ * where there is no window.
+ *
+ * appointments.end_time is copied from the booked time_slot (20261121000003).
+ * A walk-in has no slot and therefore no window, and so does every booking
+ * made before that migration -- both correctly fall back to the single time
+ * rather than inventing a span, because a patient told "09:00 – 09:30" when
+ * nobody promised 09:30 is a patient who turns up late.
+ */
+export function arrivalWindow(
+  a: { start_time?: string | null; end_time?: string | null } | null | undefined,
+): string | null {
+  const start = a?.start_time?.slice(0, 5)
+  if (!start) return null
+  const end = a?.end_time?.slice(0, 5)
+  return end && end !== start ? `${start} – ${end}` : start
+}

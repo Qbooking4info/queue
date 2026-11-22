@@ -1,37 +1,35 @@
 import { useCallback, useState } from 'react'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { haptics } from '@queue/shared/lib/haptics'
-import { View, ScrollView, RefreshControl } from 'react-native'
+import { View, RefreshControl } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { todayLocalDate } from '@queue/shared/lib/format'
-import { KpiCard, Card, SectionTitle, ListRow, PrimaryButton, SegmentedControl } from '@queue/shared/components/ui/v3'
-import {
-  TopBar, TopBarButton, SectionHead, HeroCard, HeroBody, CountTile,
-  StatGrid, QuickRow, QuickTile,
-} from '@queue/shared/components/ui/home'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
-import { getMyDoctorStats, setMyAvailability, ringPatient, type DoctorAvailability } from '@queue/shared/lib/api'
-import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, DayBar, Stat, StatStrip,
+  Seg, Btn, BottomBar, Initials, Mono, Notice,
+} from '@queue/shared/components/q'
+import {
+  getMyDoctorStats, setMyAvailability, ringPatient, getHospitalHours,
+  type DoctorAvailability, type DayHours,
+} from '@queue/shared/lib/api'
+import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import { useOpenLocumJobs } from '@queue/shared/hooks/useOpenLocumJobs'
+import { compareQueueEntries } from '@queue/shared/lib/queueOrder'
 
 // Next patient in today's queue: emergencies first, then whoever is checked in, then by position.
 interface NextPatient {
   id: string; patient_name: string | null; reason: string | null; urgency: string | null
   status: string; start_time: string; queue_position: number | null; type: string
 }
-interface Vitals { bp_systolic: number | null; bp_diastolic: number | null; weight_kg: number | null; blood_sugar: number | null }
 const WAITING = ['pending', 'confirmed', 'checked_in']
 const rank = (a: NextPatient) => (a.urgency === 'emergency' ? 0 : 10) + (a.status === 'checked_in' ? 0 : 5)
 
 interface Props { navigation: any }
-
-function longDate(d = new Date()) {
-  return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })
-}
 
 export function DoctorDashboardScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
@@ -39,68 +37,66 @@ export function DoctorDashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true)
   const [todayCount, setTodayCount] = useState(0)
   const [pendingDirect, setPendingDirect] = useState(0)
-  const [monthCompleted, setMonthCompleted] = useState(0)
+  const [pendingReferrals, setPendingReferrals] = useState(0)
   const [avgConsultSecs, setAvgConsultSecs] = useState<number | null>(null)
+  const [hours, setHours] = useState<DayHours[] | null>(null)
   const [reloadTick, setReloadTick] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [availability, setAvailability] = useState<DoctorAvailability>('on_duty')
   const [next, setNext] = useState<NextPatient | null>(null)
-  const [vitals, setVitals] = useState<Vitals | null>(null)
   const [waitingCount, setWaitingCount] = useState(0)
   const [ringing, setRinging] = useState(false)
+  const unread = useUnreadMessages('doctor')
+  const openJobs = useOpenLocumJobs(true)
 
   useFocusEffect(useCallback(() => {
     let cancelled = false
     async function load() {
       if (!refreshing) setLoading(true)
       const today = todayLocalDate()
-      const monthStart = today.slice(0, 7) + '-01'
 
       const queries = [
         supabase.from('appointments').select('*', { count: 'exact', head: true })
           .eq('doctor_user_id', user?.id ?? '').eq('status', 'pending').eq('approval_status', 'pending_review'),
-        supabase.from('appointments').select('*', { count: 'exact', head: true })
-          .eq('doctor_user_id', user?.id ?? '').eq('status', 'completed').gte('appointment_date', monthStart),
       ]
       if (doctorProfile) {
         queries.push(
           supabase.from('appointments').select('*', { count: 'exact', head: true })
             .eq('doctor_id', doctorProfile.doctorId).eq('appointment_date', today).neq('status', 'cancelled'),
+          // Referrals addressed to this doctor that the receiving hospital has
+          // not decided yet -- the Inbox tab's own figure, shown here so Home
+          // says what is waiting without opening it.
+          supabase.from('appointments').select('*', { count: 'exact', head: true })
+            .eq('doctor_id', doctorProfile.doctorId).eq('booking_mode', 'referral')
+            .eq('approval_status', 'pending_approval'),
         )
       }
 
-      const [results, stats, availRes, queueRes] = await Promise.all([
+      const [results, stats, availRes, queueRes, hrs] = await Promise.all([
         Promise.all(queries),
         doctorProfile ? getMyDoctorStats() : Promise.resolve(null),
         doctorProfile ? supabase.from('doctors').select('availability_status').eq('id', doctorProfile.doctorId).maybeSingle() : Promise.resolve({ data: null }),
         doctorProfile ? supabase.rpc('get_doctor_queue', { p_doctor_id: doctorProfile.doctorId, p_date: today, p_today: today }) : Promise.resolve({ data: [] }),
+        doctorProfile ? getHospitalHours(doctorProfile.hospitalId).catch(() => null) : Promise.resolve(null),
       ])
       const waiting = (((queueRes as any).data ?? []) as NextPatient[]).filter(a => WAITING.includes(a.status))
-        .sort((a, b) => rank(a) - rank(b) || (a.queue_position ?? 999) - (b.queue_position ?? 999))
-      const first = waiting[0] ?? null
-      const v = first ? (await supabase.from('vitals_audit_log').select('bp_systolic, bp_diastolic, weight_kg, blood_sugar')
-        .eq('appointment_id', first.id).order('recorded_at', { ascending: false }).limit(1).maybeSingle()).data : null
+        .sort((a, b) => rank(a) - rank(b) || compareQueueEntries(a, b))
       if (cancelled) return
       setPendingDirect(results[0].count ?? 0)
-      setMonthCompleted(results[1].count ?? 0)
-      setTodayCount(doctorProfile ? (results[2]?.count ?? 0) : 0)
+      setTodayCount(doctorProfile ? (results[1]?.count ?? 0) : 0)
+      setPendingReferrals(doctorProfile ? (results[2]?.count ?? 0) : 0)
       setAvgConsultSecs(stats?.avgConsultSecs ?? null)
+      setHours(hrs)
       const av = (availRes as any).data?.availability_status
       if (av === 'on_duty' || av === 'on_break' || av === 'off_duty') setAvailability(av)
       setWaitingCount(waiting.length)
-      setNext(first)
-      setVitals((v as Vitals | null) ?? null)
+      setNext(waiting[0] ?? null)
       setLoading(false)
       setRefreshing(false)
     }
     load()
     return () => { cancelled = true }
   }, [user?.id, doctorProfile, reloadTick]))
-
-  const firstName = (doctorProfile?.fullName ?? user?.full_name ?? '').split(' ')[0] || 'there'
-
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   async function changeAvailability(v: DoctorAvailability) {
     const prev = availability
@@ -119,117 +115,179 @@ export function DoctorDashboardScreen({ navigation }: Props) {
     else { haptics.success(); Alert.alert('Patient called', `${next.patient_name ?? 'The patient'} is being rung now.`) }
   }
 
-  const canCall = availability === 'on_duty'
-  const vitalsLine = vitals ? [
-    vitals.bp_systolic && vitals.bp_diastolic ? `BP ${vitals.bp_systolic}/${vitals.bp_diastolic}` : null,
-    vitals.weight_kg ? `${vitals.weight_kg} kg` : null,
-    vitals.blood_sugar ? `Sugar ${vitals.blood_sugar}` : null,
-  ].filter(Boolean).join(' · ') : ''
+  const name = doctorProfile?.fullName ?? user?.full_name ?? 'Doctor'
+  const displayName = /^dr\b/i.test(name) ? name : `Dr ${name}`
+  const hospitalName = doctorProfile
+    ? doctorProfile.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName ?? null
+    : null
+  const today_ = hours?.find(h => h.day === new Date().getDay())
+  const canCall = availability === 'on_duty' && !!next
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <TopBar
-        avatar={<ProfileAvatar size={40} name={doctorProfile?.fullName} onPress={() => navigation.navigate('SpecialistProfile')} />}
-        eyebrow={longDate()}
-        title={`${greeting}, Dr. ${firstName}`}
-        onAvatarPress={() => navigation.navigate('SpecialistProfile')}
-        right={<TopBarButton icon="person-circle-outline" label="Your profile"
-          onPress={() => navigation.navigate('SpecialistProfile')} />}
-      />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 40, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent} onRefresh={() => { setRefreshing(true); setReloadTick(n => n + 1) }} />}>
-        {/* Duty status moved out of the header and onto the page, where the
-            rest of the controls now live. */}
-        {doctorProfile && (
-          <SegmentedControl<DoctorAvailability> value={availability} onChange={changeAvailability}
-            options={[{ value: 'on_duty', label: 'On duty' }, { value: 'on_break', label: 'Break' }, { value: 'off_duty', label: 'Off' }]} />
-        )}
-        {loading ? (
-          <View style={{ gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
-        ) : (
-          <>
-            {doctorProfile && (
-              <HeroCard
-                eyebrow={next
-                  ? (next.urgency === 'emergency' ? 'EMERGENCY · NEXT' : 'NEXT PATIENT')
-                  : 'WAITING ROOM'}
-                status={{
-                  label: availability === 'on_duty' ? 'Accepting patients'
-                       : availability === 'on_break' ? 'On a break' : 'Not accepting',
-                  icon: availability === 'on_duty' ? 'checkmark-circle' : 'pause-circle',
-                }}
-                onPress={next ? () => navigation.navigate('PatientConsult', { appointmentId: next.id }) : undefined}
-                footer={[
-                  { label: "Today's schedule", icon: 'calendar-outline', onPress: () => navigation.navigate('Appointments') },
-                  { label: 'Open queue', icon: 'list-outline', onPress: () => navigation.navigate('Queue') },
-                ]}
-              >
-                <HeroBody
-                  leading={<CountTile value={waitingCount} label="waiting" />}
-                  title={next ? (next.patient_name ?? 'Patient') : 'No patients waiting'}
-                  subtitle={next
-                    ? [next.start_time ? next.start_time.slice(0, 5) : null, next.reason].filter(Boolean).join(' · ') || null
-                    : 'Patients appear here as soon as they check in.'}
-                  meta={next && canCall ? 'Tap to open the consultation' : null}
-                />
-              </HeroCard>
-            )}
+    <Screen>
+      <AppBar>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 10, paddingVertical: 12 }}>
+          <Initials name={name} size={44} tint="#7C2D12" />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.27, color: t.q.ink }}>
+              {displayName}
+            </Text>
+            <Text numberOfLines={1} style={{ fontSize: 13, color: t.q.ink60 }}>
+              {hospitalName ?? 'Direct bookings only'}
+            </Text>
+          </View>
+          <Btn label="Profile" variant="secondary" small onPress={() => navigation.navigate('SpecialistProfile')} />
+        </View>
+      </AppBar>
 
-            <View style={{ gap: 10 }}>
-              <SectionHead title="Today at a glance" action="Insights"
-                onAction={() => navigation.navigate('DoctorAnalytics')} />
-              <StatGrid items={[
-                { label: "Patients today", value: todayCount,
-                  onPress: doctorProfile ? () => navigation.navigate('Queue') : undefined },
-                { label: 'Pending requests', value: pendingDirect,
-                  onPress: () => navigation.navigate('Appointments') },
-                { label: 'Completed this month', value: monthCompleted,
-                  onPress: () => navigation.navigate('Appointments') },
-                // Muted when there is nothing yet, so an empty figure does not
-                // read as a real measurement of zero.
-                avgConsultSecs == null
-                  ? { label: 'Avg. consult time', value: '— no data yet', muted: true }
-                  : { label: 'Avg. consult time', value: `${Math.round(avgConsultSecs / 60)}m`,
-                      onPress: () => navigation.navigate('Queue') },
-              ]} />
+      {/* The session bar is the active hospital's opening hours. A hospital that
+          has not set hours gets no bar rather than an invented 08:00-18:00 day. */}
+      {today_ && !today_.closed && (
+        <DayBar label="Session" opensAt={today_.open.slice(0, 5)} closesAt={today_.close.slice(0, 5)} />
+      )}
+
+      {loading && !next && todayCount === 0 ? (
+        <View style={{ paddingHorizontal: 16, gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
+      ) : (
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} tintColor={t.q.primary} colors={[t.q.primary]}
+            onRefresh={() => { setRefreshing(true); setReloadTick(n => n + 1) }} />
+        }>
+          {doctorProfile && (
+            <View style={{ paddingTop: 2 }}>
+              {/* Three states, not a switch: "on a break" is a real value in
+                  `doctors.availability_status` and the front desk schedules
+                  around it, so collapsing it into on/off would lose it. */}
+              <Seg<DoctorAvailability>
+                value={availability} onChange={changeAvailability}
+                options={[
+                  { key: 'on_duty', label: 'On duty' },
+                  { key: 'on_break', label: 'On a break' },
+                  { key: 'off_duty', label: 'Off duty' },
+                ]} />
+              <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60, marginTop: 4, marginHorizontal: 20 }}>
+                {availability === 'on_duty' ? 'Patients are being assigned to you.'
+                  : availability === 'on_break' ? 'The front desk can see you are away from your room.'
+                  : 'No new patients will be assigned to you.'}
+              </Text>
             </View>
+          )}
 
-            {!doctorProfile && (
-              <Card style={{ gap: 8, backgroundColor: t.accentBg, borderColor: t.accentBorder }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.accent }}>Not linked to a hospital yet</Text>
-                <Text style={{ fontSize: 13, color: t.textSecondary, lineHeight: 19 }}>
-                  You can still accept direct virtual consults and home visits from patients. Turn those on in Settings,
-                  or share your Doctor ID with a hospital to also see their queue here.
-                </Text>
-                <PrimaryButton variant="ghost" height={48} icon="qr-code-outline" label="View your Doctor ID"
-                  onPress={() => navigation.navigate('Hospitals')} />
+          <SectionHead title="Today at a glance" action="Analytics"
+            onAction={() => navigation.navigate('DoctorAnalytics')} />
+          <Card>
+            <StatStrip>
+              <Stat
+                label="Patients today" value={todayCount}
+                note={waitingCount ? `${waitingCount} waiting` : 'nobody waiting'}
+                onPress={doctorProfile ? () => navigation.navigate('Queue') : undefined} />
+              <Stat
+                label="Pending requests" value={pendingDirect}
+                tone={pendingDirect > 0 ? 'amber' : undefined}
+                note="video & home"
+                onPress={() => navigation.navigate('Appointments')} />
+              {/* Muted dash rather than a 0, so an empty figure does not read as
+                  a real measurement of zero. */}
+              <Stat
+                label="Avg consult"
+                value={avgConsultSecs == null ? '—' : Math.round(avgConsultSecs / 60)}
+                unit={avgConsultSecs == null ? undefined : 'min'}
+                note={avgConsultSecs == null ? 'no consults yet' : 'all time'}
+                last
+                onPress={() => navigation.navigate('DoctorAnalytics')} />
+            </StatStrip>
+          </Card>
+
+          {(next != null || pendingReferrals > 0) && (
+            <>
+              <SectionHead title="Needs you now" />
+              <Card>
+                {next && (
+                  <Row
+                    icon={next.urgency === 'emergency' ? 'alert-circle' : 'person-outline'}
+                    iconTone={next.urgency === 'emergency' ? 'red' : 'teal'}
+                    number={next.queue_position ?? undefined}
+                    title={next.patient_name ?? 'Patient'}
+                    sub={[
+                      next.urgency === 'emergency' ? 'Brought forward as an emergency' : null,
+                      next.reason,
+                      next.start_time ? next.start_time.slice(0, 5) : null,
+                    ].filter(Boolean).join(' · ') || 'Next in your queue'}
+                    titleColor={next.urgency === 'emergency' ? t.q.red : undefined}
+                    chevron
+                    onPress={() => navigation.navigate('PatientConsult', { appointmentId: next.id })} />
+                )}
+                {pendingReferrals > 0 && (
+                  <>
+                    {next && <Hair />}
+                    <Row
+                      icon="file-tray-outline" iconTone="amber"
+                      title={`${pendingReferrals} referral${pendingReferrals === 1 ? '' : 's'} addressed to you`}
+                      sub="Still waiting on the hospital's decision"
+                      right={<Mono size={13} weight="700" color={t.q.amber}>{pendingReferrals}</Mono>}
+                      chevron
+                      onPress={() => navigation.navigate('ReferralInbox')} />
+                  </>
+                )}
               </Card>
-            )}
+            </>
+          )}
 
-            <View style={{ gap: 12 }}>
-              <SectionHead title="Quick actions" />
-              <QuickRow>
-                <QuickTile icon="calendar-clear" label="Availability" color="#4FD1B0"
-                  onPress={() => navigation.navigate('Settings')} />
-                <QuickTile icon="videocam" label="Start call" color="#7C9BF2"
-                  onPress={() => navigation.navigate('Queue')} />
-                <QuickTile icon="document-text" label="Prescribe" color="#F0B254"
-                  onPress={() => navigation.navigate('Queue')} />
-                <QuickTile icon="people" label="Patients" color="#6EE7C0"
-                  onPress={() => navigation.navigate('Appointments')} />
-              </QuickRow>
+          {!doctorProfile && (
+            <View>
+              <Notice tone="teal" icon="information-circle-outline">
+                You are not linked to a hospital yet, so there is no queue here. You can still take direct
+                video consults and home visits — turn those on in Settings & fees, or give your Doctor ID
+                to a hospital admin to be added to their queue.
+              </Notice>
+              <View style={{ paddingHorizontal: 16 }}>
+                <Btn label="View your Doctor ID" variant="secondary" icon="qr-code-outline"
+                  onPress={() => navigation.navigate('Hospitals')} />
+              </View>
             </View>
+          )}
 
-            {/* The rest of the menu still belongs somewhere, just not as four
-                more taps competing with the tiles above. */}
-            <Card style={{ paddingVertical: 0 }}>
-              <ListRow icon="chatbubble-ellipses-outline" title="Messages" subtitle="Chat consults with your patients" onPress={() => navigation.navigate('Messages')} />
-              <ListRow icon="business-outline" title="Hospitals & Doctor ID" onPress={() => navigation.navigate('Hospitals')} />
-              <ListRow icon="cash-outline" title="Settings & fees" last onPress={() => navigation.navigate('Settings')} />
-            </Card>
-          </>
-        )}
-      </ScrollView>
-    </View>
+          <SectionHead title="Quick actions" />
+          <Card>
+            <Row icon="chatbubble-outline" title="Chat consults"
+              sub={unread > 0 ? `${unread} unread from your patients` : 'Patients and your hospitals'}
+              pill={unread > 0 ? String(unread) : undefined} pillTone="red"
+              chevron onPress={() => navigation.navigate('Messages')} />
+            <Hair />
+            <Row icon="business-outline" title="Hospitals & Doctor ID"
+              sub={doctorProfile
+                ? `${doctorProfile.linkedHospitals.length} linked`
+                : 'Link yourself to a hospital'}
+              chevron onPress={() => navigation.navigate('Hospitals')} />
+            <Hair />
+            <Row icon="briefcase-outline" title="Locum board"
+              sub={openJobs > 0 ? `${openJobs} open shift${openJobs === 1 ? '' : 's'} near you` : 'Shifts and posts'}
+              pill={openJobs > 0 ? String(openJobs) : undefined} pillTone="teal"
+              chevron onPress={() => navigation.navigate('LocumBoard')} />
+            <Hair />
+            <Row icon="trending-up-outline" title="My analytics" sub="Visits, wait times, show-up"
+              chevron onPress={() => navigation.navigate('DoctorAnalytics')} />
+            <Hair />
+            <Row icon="options-outline" title="Settings & fees" sub="Availability, fees, virtual care"
+              chevron onPress={() => navigation.navigate('Settings')} />
+          </Card>
+        </Body>
+      )}
+
+      {doctorProfile && (
+        <BottomBar meta={<>
+          <Mono size={12} weight="600" color={t.q.primary}>
+            {next ? (next.patient_name ?? 'Patient') : 'Nobody waiting'}
+          </Mono>
+          <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+          <Mono size={12} weight="600">{waitingCount} waiting</Mono>
+        </>}>
+          <Btn grow label="Open queue" onPress={() => navigation.navigate('Queue')} />
+          {canCall && (
+            <Btn label="Call in" variant="secondary" icon="megaphone-outline" loading={ringing} onPress={callIn} />
+          )}
+        </BottomBar>
+      )}
+    </Screen>
   )
 }

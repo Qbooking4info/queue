@@ -1,10 +1,12 @@
 import { useState, useCallback, useMemo } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, ScrollView, TouchableOpacity, Pressable, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Chip, Pill, Btn, BottomBar, Empty,
+  IconBtn, Mono,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -121,93 +123,132 @@ export function HospitalScheduleScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Doctor schedule" subtitle="Shifts by week" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TouchableOpacity onPress={() => setShowSetSchedule(true)} style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
-          <Ionicons name="calendar-outline" size={14} color="#0F766E" />
-          <Text style={[s.addBtnText, { color: '#0F766E' }]}>Set Schedule</Text>
-        </TouchableOpacity>
-      
-        </View>} />
+    <Screen>
+      <AppBar
+        title="Doctor schedule"
+        sub={`Week of ${fmtLocalDate(weekStart)}`}
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<IconBtn name="calendar-outline" label="Generate schedule" onPress={() => setShowSetSchedule(true)} />}
+      />
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 10 }}>
-        <TouchableOpacity onPress={() => shiftWeek(-1)} accessibilityLabel="Previous week" hitSlop={8}><Ionicons name="chevron-back" size={20} color={t.textPrimary} /></TouchableOpacity>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Week of {fmtLocalDate(weekStart)}</Text>
-        <TouchableOpacity onPress={() => shiftWeek(1)} accessibilityLabel="Next week" hitSlop={8}><Ionicons name="chevron-forward" size={20} color={t.textPrimary} /></TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 }}>
+        <IconBtn name="chevron-back" label="Previous week" onPress={() => shiftWeek(-1)} />
+        <Text style={{ fontSize: 14, fontWeight: '700', color: t.q.ink }}>
+          {weekDays[0]?.date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+          {' – '}
+          {weekDays[6]?.date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+        </Text>
+        <IconBtn name="chevron-forward" label="Next week" onPress={() => shiftWeek(1)} />
       </View>
 
-      {/* Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 10 }}>
-        <Chip theme={t} label="All doctors" active={!doctorId} onPress={() => setDoctorId(null)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}>
+        <Chip label="All doctors" on={!doctorId} onPress={() => setDoctorId(null)} />
         {doctors.map(d => (
-          <Chip key={d.id} theme={t} label={d.full_name} active={doctorId === d.id} onPress={() => setDoctorId(d.id)} />
+          <Chip key={d.id} label={d.full_name} on={doctorId === d.id} onPress={() => setDoctorId(d.id)} />
         ))}
       </ScrollView>
+
       {clinicModel === 'multi' && clinics.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 12 }}>
-          <Chip theme={t} label="All clinics" active={!clinicId} onPress={() => setClinicId(null)} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+          <Chip label="All clinics" on={!clinicId} onPress={() => setClinicId(null)} />
           {clinics.map(c => (
-            <Chip key={c.id} theme={t} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(c.id)} />
+            <Chip key={c.id} label={c.name} on={clinicId === c.id} onPress={() => setClinicId(c.id)} />
           ))}
         </ScrollView>
       )}
 
-      {/* Day tabs */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 12, marginBottom: 10 }}>
+      {/* The week, as seven targets with their booking counts on them, so the
+          busy day is visible before tapping into it. */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 10, gap: 4 }}>
         {weekDays.map((wd, i) => {
           const count = (schedule[wd.iso] ?? []).length
-          const active = i === selectedDayIdx
+          const on = i === selectedDayIdx
           return (
-            <TouchableOpacity key={wd.iso} onPress={() => setSelectedDayIdx(i)}
-              style={[s.dayTab, { backgroundColor: active ? `${t.accent}18` : 'transparent', borderColor: active ? t.accent : 'transparent' }]}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: active ? t.accent : t.textMuted }}>{DAY_NAMES[i]}</Text>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: active ? t.accent : t.textPrimary, marginTop: 2 }}>{wd.date.getDate()}</Text>
-              {count > 0 && <View style={[s.countDot, { backgroundColor: active ? t.accent : t.textMuted }]}><Text style={s.countDotText}>{count}</Text></View>}
-            </TouchableOpacity>
+            <Pressable
+              key={wd.iso}
+              onPress={() => setSelectedDayIdx(i)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`${DAY_NAMES[i]} ${wd.date.getDate()}, ${count} booked`}
+              style={{
+                flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, gap: 1,
+                backgroundColor: on ? t.q.sel : 'transparent',
+                borderWidth: 1, borderColor: on ? t.q.primary : 'transparent',
+              }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: on ? t.q.primary : t.q.ink60 }}>
+                {DAY_NAMES[i]}
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: on ? t.q.primary : t.q.ink }}>
+                {wd.date.getDate()}
+              </Text>
+              <Text style={{ fontSize: 9.5, color: count ? (on ? t.q.primary : t.q.ink60) : 'transparent' }}>
+                {count || 0}
+              </Text>
+            </Pressable>
           )
         })}
       </View>
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <Body>
           {daySlots.length === 0 ? (
-            <View style={s.empty}>
-              <Ionicons name="calendar-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No appointments this day</Text>
-            </View>
-          ) : daySlots.map(slot => {
-            const expanded = expandedId === slot.id
-            const color = doctorColor(slot.doc)
-            return (
-              <TouchableOpacity key={slot.id} onPress={() => setExpandedId(expanded ? null : slot.id)}
-                style={[s.slotRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={[s.timeCol, { borderLeftColor: color }]}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: t.textPrimary }}>{slot.time}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{slot.patient}</Text>
-                  <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 1 }}>{slot.doc}</Text>
-                  {expanded && (
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                      <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}><Text style={[s.badgeText, { color: t.accent }]}>{slot.type}</Text></View>
-                      <View style={[s.badge, { backgroundColor: 'rgba(122,144,137,0.14)' }]}><Text style={[s.badgeText, { color: t.textMuted }]}>{slot.status}</Text></View>
-                      {slot.urgency === 'emergency' && (
-                        <View style={[s.badge, { backgroundColor: t.dangerBg }]}><Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text></View>
-                      )}
-                    </View>
-                  )}
-                </View>
-                <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={t.textMuted} />
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
+            <Card style={{ marginTop: 6 }}>
+              <Empty
+                icon="calendar-outline"
+                title="Nothing booked that day"
+                body="Generate slots for a doctor and patients can start booking them."
+                action="Generate schedule"
+                onAction={() => setShowSetSchedule(true)}
+              />
+            </Card>
+          ) : (
+            <Card>
+              {daySlots.map((slot, i) => {
+                const expanded = expandedId === slot.id
+                return (
+                  <View key={slot.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      leading={
+                        <View style={{ width: 52, alignItems: 'flex-start' }}>
+                          <Mono size={13} weight="700">{slot.time}</Mono>
+                        </View>
+                      }
+                      title={slot.patient}
+                      sub={slot.doc}
+                      pill={slot.urgency === 'emergency' ? 'Emergency' : undefined}
+                      pillTone="red"
+                      pillSolid={slot.urgency === 'emergency'}
+                      right={
+                        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={t.q.ink60} />
+                      }
+                      onPress={() => setExpandedId(expanded ? null : slot.id)}
+                    />
+                    {expanded && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
+                        <Pill label={slot.type} tone="teal" />
+                        <Pill label={slot.status.replace(/_/g, ' ')} tone="neutral" />
+                      </View>
+                    )}
+                  </View>
+                )
+              })}
+            </Card>
+          )}
+        </Body>
       )}
+
+      <BottomBar>
+        <Btn grow label="Generate schedule" icon="calendar-outline"
+          onPress={() => setShowSetSchedule(true)} />
+      </BottomBar>
 
       {showSetSchedule && (
         <SetScheduleModal
@@ -216,18 +257,10 @@ export function HospitalScheduleScreen({ navigation }: Props) {
           onDone={() => { setShowSetSchedule(false); loadSchedule() }}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
-function Chip({ theme: t, label, active, onPress }: { theme: any; label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity onPress={onPress}
-      style={[s.filterChip, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? `${t.accent}18` : t.cardBg }]}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: active ? t.accent : t.textMuted }} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
-  )
-}
 
 const WEEKDAY_OPTIONS = [
   { key: 1, label: 'Mon' }, { key: 2, label: 'Tue' }, { key: 3, label: 'Wed' }, { key: 4, label: 'Thu' },

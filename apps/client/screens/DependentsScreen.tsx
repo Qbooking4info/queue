@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Pressable, KeyboardAvoidingView } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, ActivityIndicator, Modal, Pressable, KeyboardAvoidingView } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { Button } from '@queue/shared/components/ui/Button'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Field, Chip, Btn, Empty,
+  IconBtn, MONO,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics }  from '@queue/shared/lib/haptics'
 import {
@@ -132,191 +133,163 @@ export function DependentsScreen({ navigation }: Props) {
   const canSelfUnlink = myAge !== null && myAge >= 18
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <Header title="Dependents" onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar
+        title="Dependents"
+        onBack={() => navigation.goBack()}
+        right={<IconBtn name="person-add-outline" label="Link a dependent" onPress={() => openLink('caretaker')} />}
+      />
 
-      {/* Link-by-ID Modal */}
+      {/* Link-by-ID sheet */}
       <Modal visible={linkOpen} animationType="slide" transparent onRequestClose={() => setLinkOpen(false)}>
-        <Pressable style={s.overlay} onPress={() => setLinkOpen(false)} />
-        <View style={[s.sheet, { backgroundColor: t.cardBg }]}>
-          <View style={[s.sheetHandle, { backgroundColor: t.inputBorder }]} />
-          <Text style={[s.sheetTitle, { color: t.textPrimary }]}>
-            {linkMode === 'dependent' ? 'Add a caretaker' : "Link a dependent's account"}
+        <Pressable
+          accessibilityLabel="Close" accessibilityRole="button"
+          onPress={() => setLinkOpen(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
+        />
+        <View style={{
+          backgroundColor: t.q.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          padding: 20, paddingBottom: 30, gap: 14,
+        }}>
+          <View style={{ width: 40, height: 4, borderRadius: 99, alignSelf: 'center', backgroundColor: t.q.line }} />
+          <Text style={{ fontSize: 18, fontWeight: '800', letterSpacing: -0.4, color: t.q.ink }}>
+            {linkMode === 'dependent' ? 'Add a caretaker' : 'Link a dependent'}
           </Text>
 
           {step === 'code' ? (
             <>
-              <Text style={[s.helpText, { color: t.textMuted }]}>
+              <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink60 }}>
                 {linkMode === 'dependent'
-                  ? "Ask your caretaker for their 6-character Patient ID (shown on their profile) and enter it here."
-                  : 'Ask them for their 6-character Patient ID (shown on their profile) and enter it here.'}
+                  ? 'Ask your caretaker for the six-character Patient ID on their profile.'
+                  : 'Ask them for the six-character Patient ID on their profile.'}
               </Text>
-              <Text style={[s.fieldLabel, { color: t.textMuted }]}>Patient ID</Text>
-              <TextInput
-                value={code} onChangeText={v => setCode(v.toUpperCase())}
-                placeholder="e.g. K7M3QX" placeholderTextColor={t.textMuted}
-                autoCapitalize="characters" maxLength={6}
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary,
-                  fontFamily: 'monospace', fontSize: 18, letterSpacing: 3, textAlign: 'center' }]}
+              <Field
+                label="Patient ID"
+                value={code}
+                onChangeText={v => setCode(v.toUpperCase())}
+                placeholder="K7M3QX"
+                autoCapitalize="characters"
+                maxLength={6}
+                error={error || undefined}
+                style={{ fontFamily: MONO, fontSize: 20, letterSpacing: 4, textAlign: 'center' }}
               />
-              {!!error && <Text style={s.errorText}>{error}</Text>}
-              <TouchableOpacity onPress={handleLookup} disabled={busy}
-                style={[s.saveBtn, { backgroundColor: t.accent, opacity: busy ? 0.6 : 1 }]}>
-                <Text style={s.saveBtnText}>{busy ? 'Looking up…' : 'Look Up'}</Text>
-              </TouchableOpacity>
+              <Btn label={busy ? 'Looking up…' : 'Look up'} loading={busy} onPress={handleLookup} />
             </>
           ) : (
             <>
-              <Text style={[s.helpText, { color: t.textMuted }]}>
-                Found <Text style={{ fontWeight: '700', color: t.textPrimary }}>{resolvedName}</Text>. What's your relationship to them?
+              <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink60 }}>
+                Found <Text style={{ fontWeight: '700', color: t.q.ink }}>{resolvedName}</Text>.
+                {' '}What is your relationship to them?
               </Text>
-              <View style={s.pillRow}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {RELATIONSHIPS.map(r => (
-                  <TouchableOpacity key={r.value} onPress={() => setRelationship(r.value)}
-                    style={[s.pill, { flexDirection: 'row', alignItems: 'center', gap: 4, borderColor: relationship === r.value ? t.accent : t.cardBorder, backgroundColor: relationship === r.value ? t.accentBg : t.inputBg }]}>
-                    <Ionicons name={RELATION_ICONS[r.value]} size={12} color={relationship === r.value ? t.accent : t.textMuted} />
-                    <Text style={[s.pillText, { color: relationship === r.value ? t.accent : t.textMuted, fontWeight: relationship === r.value ? '700' : '400' }]}>
-                      {r.label}
-                    </Text>
-                  </TouchableOpacity>
+                  <Chip
+                    key={r.value}
+                    label={r.label}
+                    icon={RELATION_ICONS[r.value]}
+                    on={relationship === r.value}
+                    onPress={() => setRelationship(r.value)}
+                  />
                 ))}
               </View>
-              {!!error && <Text style={s.errorText}>{error}</Text>}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
-                <TouchableOpacity onPress={() => { setStep('code'); setError('') }}
-                  style={[s.backBtn, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>
-                  <Text style={[s.backBtnText, { color: t.textMuted }]}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleConfirmLink} disabled={busy}
-                  style={[s.saveBtn, { flex: 1, marginTop: 0, backgroundColor: t.accent, opacity: busy ? 0.6 : 1 }]}>
-                  <Text style={s.saveBtnText}>{busy ? 'Linking…' : 'Confirm & Link'}</Text>
-                </TouchableOpacity>
+              {!!error && <Text style={{ fontSize: 12.5, color: t.q.red }}>{error}</Text>}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Btn label="Back" variant="secondary" onPress={() => { setStep('code'); setError('') }} />
+                <Btn grow label={busy ? 'Linking…' : 'Confirm & link'} loading={busy} onPress={handleConfirmLink} />
               </View>
             </>
           )}
-          <View style={{ height: 10 }} />
         </View>
       </Modal>
 
       {loading ? (
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          {/* Managed by -- shown only when this account is itself a linked dependent */}
-          {managedBy && (
-            <View style={[s.managedByCard, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-              <Text style={[s.managedByLabel, { color: t.accent }]}>MANAGED BY</Text>
-              <Text style={[s.depName, { color: t.textPrimary, marginTop: 4 }]}>{managedBy.caretaker.full_name}</Text>
-              <Text style={[s.depMeta, { color: t.textMuted }]}>{managedBy.relationship}</Text>
-              {canSelfUnlink ? (
-                <Button
-                  label="Unlink my account" onPress={confirmUnlinkSelf}
-                  loading={unlinking === managedBy.linkId} variant="danger" style={{ marginTop: 12 }}
-                />
-              ) : (
-                <Text style={[s.helpText, { color: t.textMuted, marginTop: 10, marginBottom: 0 }]}>
-                  You can unlink your own account once you turn 18.
-                </Text>
-              )}
-            </View>
-          )}
-
-          {/* No caretaker yet -- every patient has the option to add one, not just minors */}
-          {!managedBy && (
-            <View style={[s.noCaretakerRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.noCaretakerText, { color: t.textMuted }]}>No caretaker linked</Text>
-              <TouchableOpacity onPress={() => openLink('dependent')}
-                style={[s.addBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.addBtnText, { color: t.accent }]}>+ Add a caretaker</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {managing.length === 0 && !managedBy ? (
-            <View style={[s.emptyCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Ionicons name="people-outline" size={40} color={t.textMuted} style={{ marginBottom: 12, opacity: 0.4 }} />
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No dependents yet</Text>
-              <Text style={[s.emptySub, { color: t.textMuted }]}>
-                Link a family member's account so you can book and manage appointments on their behalf.
+          <Body keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+              <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60 }}>
+                Book and manage care for the people you look after.
               </Text>
-              <TouchableOpacity onPress={() => openLink('caretaker')}
-                style={[s.emptyAddBtn, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                <Text style={[s.emptyAddBtnText, { color: t.accent }]}>+ Link by ID</Text>
-              </TouchableOpacity>
             </View>
-          ) : managing.length > 0 && (
-            <>
-              <Text style={[s.countText, { color: t.textMuted }]}>{managing.length} dependent{managing.length !== 1 ? 's' : ''}</Text>
-              {managing.map(d => (
-                <View key={d.linkId} style={[s.depCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <View style={[s.depAvatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                    <Ionicons name={RELATION_ICONS[d.relationship] ?? 'person-outline'} size={22} color={t.accent} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.depName, { color: t.textPrimary }]}>{d.dependent.full_name}</Text>
-                    <Text style={[s.depMeta, { color: t.textMuted }]}>{d.relationship}</Text>
-                  </View>
-                  {unlinking === d.linkId || switching === d.dependent.id ? (
-                    <ActivityIndicator color={t.accent} size="small" />
-                  ) : (
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <TouchableOpacity onPress={() => handleSwitch(d.dependent.id)}>
-                        <Text style={[s.switchLink, { color: t.accent }]}>Switch to account</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => confirmUnlink(d.linkId, d.dependent.full_name)}>
-                        <Text style={[s.unlinkLink]}>Unlink</Text>
-                      </TouchableOpacity>
+
+            <SectionHead title="People you manage" />
+            {managing.length === 0 ? (
+              <Card>
+                <Empty
+                  icon="people-outline"
+                  title="No dependents yet"
+                  body="Link a family member's account so you can book and manage visits for them."
+                  action="Link by Patient ID"
+                  onAction={() => openLink('caretaker')}
+                />
+              </Card>
+            ) : (
+              <Card>
+                {managing.map((d, i) => (
+                  <View key={d.linkId}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon={RELATION_ICONS[d.relationship] ?? 'person-outline'}
+                      title={d.dependent.full_name}
+                      sub={d.relationship}
+                      right={
+                        unlinking === d.linkId || switching === d.dependent.id
+                          ? <ActivityIndicator color={t.q.primary} size="small" />
+                          : <Btn label="Switch" variant="secondary" small onPress={() => handleSwitch(d.dependent.id)} />
+                      }
+                    />
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 10, alignItems: 'flex-end' }}>
+                      <Btn
+                        label="Unlink"
+                        variant="ghost"
+                        small
+                        onPress={() => confirmUnlink(d.linkId, d.dependent.full_name)}
+                      />
                     </View>
-                  )}
-                </View>
-              ))}
-            </>
-          )}
-        </ScrollView>
+                  </View>
+                ))}
+              </Card>
+            )}
+
+            <SectionHead title="Managed by" />
+            {managedBy ? (
+              <Card>
+                <Row
+                  icon="shield-checkmark-outline"
+                  title={managedBy.caretaker.full_name}
+                  sub={managedBy.relationship}
+                  right={
+                    canSelfUnlink
+                      ? <Btn label="Unlink" variant="secondary" small loading={unlinking === managedBy.linkId}
+                          onPress={confirmUnlinkSelf} />
+                      : undefined
+                  }
+                />
+                {!canSelfUnlink && (
+                  <>
+                    <Hair />
+                    <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                      <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60 }}>
+                        You can unlink your own account once you turn 18.
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </Card>
+            ) : (
+              <Card>
+                <Row
+                  icon="person-add-outline" iconTone="neutral"
+                  title="No caretaker linked"
+                  sub="If someone else books for you, add their Patient ID here"
+                  right={<Btn label="Add" variant="secondary" small onPress={() => openLink('dependent')} />}
+                />
+              </Card>
+            )}
+          </Body>
         </KeyboardAvoidingView>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:           { flex: 1 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  title:          { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  addBtn:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
-  addBtnText:     { fontSize: 12, fontWeight: '700' },
-  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheet:          { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 30 },
-  sheetHandle:    { width: 40, height: 4, borderRadius: 99, alignSelf: 'center', marginBottom: 16 },
-  sheetTitle:     { fontSize: 18, fontWeight: '800', letterSpacing: -0.5, marginBottom: 10 },
-  helpText:       { fontSize: 12, lineHeight: 18, marginBottom: 14 },
-  fieldLabel:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  input:          { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
-  pillRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  pill:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
-  pillText:       { fontSize: 12 },
-  errorText:      { color: '#F87171', fontSize: 12, marginTop: 8 },
-  saveBtn:        { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 18 },
-  saveBtnText:    { color: '#fff', fontSize: 14, fontWeight: '700' },
-  backBtn:        { borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, paddingHorizontal: 22 },
-  backBtnText:    { fontSize: 14, fontWeight: '700' },
-  emptyCard:      { borderRadius: 20, borderWidth: 1, padding: 36, alignItems: 'center' },
-  emptyTitle:     { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  emptySub:       { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  emptyAddBtn:    { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99, borderWidth: 1 },
-  emptyAddBtnText:{ fontSize: 13, fontWeight: '700' },
-  countText:      { fontSize: 11, marginBottom: 12 },
-  depCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 14, marginBottom: 8, borderWidth: 1 },
-  depAvatar:      { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  depName:        { fontSize: 14, fontWeight: '700' },
-  depMeta:        { fontSize: 11, marginTop: 2, textTransform: 'capitalize' },
-  unlinkLink:     { fontSize: 12, fontWeight: '700', color: '#EF4444' },
-  switchLink:     { fontSize: 12, fontWeight: '700' },
-  managedByCard:  { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 20 },
-  managedByLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  noCaretakerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 20 },
-  noCaretakerText:{ fontSize: 12 },
-})

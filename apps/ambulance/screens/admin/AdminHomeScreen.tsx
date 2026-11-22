@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Linking } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ActivityIndicator, RefreshControl, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Card, KpiCard } from '@queue/shared/components/ui/v3'
-import { IconOrb, TonePill } from './adminBits'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import {
   getFleet, getFleetRequests,
   type FleetUnit, type FleetRequestRow,
 } from '@queue/shared/lib/ambulance-admin-api'
 import { TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Seg, Stat, StatStrip,
+  Journey, Empty, Mono, Notice, type PillTone,
+} from '@queue/shared/components/q'
 
 const ACTIVE_STATUSES: TransportStatus[] = [
   'requested', 'scheduled', 'searching', 'matched',
@@ -18,6 +19,16 @@ const ACTIVE_STATUSES: TransportStatus[] = [
 ]
 
 const POLL_INTERVAL_MS = 15_000
+
+// The five crew-driven steps, same vocabulary as the crew app's own run bar.
+const RUN_STEPS = ['Accepted', 'En route', 'On scene', 'Transport', 'Arrived']
+const STEP_OF: Record<string, number> = {
+  matched: 0,
+  en_route_to_patient: 1,
+  on_scene: 2,
+  transporting: 3,
+  arrived_at_destination: 4,
+}
 
 function embeddedName(x: { full_name: string } | { full_name: string }[] | null): string | null {
   return (Array.isArray(x) ? x[0]?.full_name : x?.full_name) ?? null
@@ -27,13 +38,28 @@ function embeddedUnit(u: FleetRequestRow['unit']): { plate_number: string; call_
   return Array.isArray(u) ? u[0] ?? null : u
 }
 
+function embeddedDest(d: FleetRequestRow['destination']): { name: string } | null {
+  return (Array.isArray(d) ? d[0] : d) ?? null
+}
+
+/** "Ikoyi -> LUTH", or just the pickup while the crew has not chosen yet. */
+function route(pickup: string | null, destName: string | null): string | null {
+  const from = pickup?.split(',')[0]?.trim() || null
+  if (from && destName) return `${from} → ${destName}`
+  return destName ? `→ ${destName}` : from
+}
+
 function isToday(iso: string): boolean {
   const d = new Date(iso), now = new Date()
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
 }
 
-// triageColor() tinted a bespoke triage badge; <TonePill> now carries triage via the
-// theme's own status tones, leaving the helper with no callers.
+function triageTone(level: number | null): PillTone {
+  if (level == null) return 'neutral'
+  if (level <= 2) return 'red'
+  if (level === 3) return 'amber'
+  return 'neutral'
+}
 
 export function AdminHomeScreen() {
   const { theme: t } = useTheme()
@@ -74,141 +100,132 @@ export function AdminHomeScreen() {
     : null
   const unitsAvailable = units.filter(u => u.visible_to_dispatch).length
 
+  // A rig that is on duty but has stopped reporting is the one thing an operator
+  // has to be told without going looking: dispatch drops it after 120s and the
+  // fleet silently shrinks.
+  const silent = units.filter(u => u.on_duty && !u.visible_to_dispatch)
+
   if (loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar large title={providerName ?? 'Fleet'} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
   const list = tab === 'active' ? active : history
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-      >
-        <Text style={[s.title, { color: t.textPrimary }]}>{providerName ?? 'Dispatcher'}</Text>
-        <Text style={[s.subtitle, { color: t.textMuted }]}>
-          {providerAdminProfile?.providerType === 'hospital_fleet' ? 'Hospital fleet' : 'Independent operator'}
-        </Text>
+    <Screen>
+      <AppBar
+        large
+        title={providerName ?? 'Fleet'}
+        sub={providerAdminProfile?.providerType === 'hospital_fleet' ? 'Hospital fleet' : 'Independent operator'}
+        right={<Mono size={12} color={t.q.ink60}>
+          {new Date().toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+        </Mono>} />
 
-        <View style={s.statGrid}>
-          <KpiCard
-            icon="alert-circle-outline" label="Active calls"
-            value={active.length} trend="Open right now"
-            trendTone={active.length ? 'down' : 'muted'}
-            highlight={active.length > 0}
-          />
-          <KpiCard
-            icon="bus-outline" label="Units ready"
-            value={unitsAvailable} trend={`Of ${units.length} in fleet`}
-          />
-        </View>
-        <View style={s.statGrid}>
-          <KpiCard
-            icon="timer-outline" label="Avg response"
-            value={avgResponseMin != null ? `${avgResponseMin} min` : '—'} trend="Dispatched today"
-          />
-          <KpiCard
-            icon="calendar-outline" label="Calls today"
-            value={todayRequests.length} trend="Midnight to now"
-          />
-        </View>
+      <Body refreshControl={
+        <RefreshControl refreshing={refreshing} tintColor={t.q.primary} colors={[t.q.primary]}
+          onRefresh={() => { setRefreshing(true); load() }} />
+      }>
+        <Card>
+          <StatStrip>
+            <Stat label="Active calls" value={active.length}
+              tone={active.length > 0 ? 'red' : undefined}
+              note={active.length ? 'open right now' : 'nothing running'} />
+            <Stat label="Units ready" value={unitsAvailable}
+              tone={unitsAvailable === 0 && units.length > 0 ? 'amber' : undefined}
+              note={`of ${units.length} in the fleet`} />
+            <Stat label="Avg response" value={avgResponseMin ?? '—'}
+              unit={avgResponseMin != null ? 'min' : undefined}
+              note="dispatched today" last />
+          </StatStrip>
+          <Hair inset={0} />
+          <StatStrip>
+            <Stat label="Calls today" value={todayRequests.length} note="midnight to now" />
+            <Stat label="Completed" value={history.length} note="all time" last />
+          </StatStrip>
+        </Card>
 
-        <View style={[s.tabRow, { borderColor: t.cardBorder }]}>
-          {(['active', 'history'] as const).map(k => (
-            <TouchableOpacity key={k} onPress={() => setTab(k)} style={[s.tabBtn, tab === k && { backgroundColor: t.accentBgMid }]}>
-              <Text style={{ color: tab === k ? t.accent : t.textMuted, fontSize: 15, fontWeight: '700' }}>
-                {k === 'active' ? `Active (${active.length})` : `History (${history.length})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {silent.length > 0 && (
+          <Notice tone="amber" icon="warning-outline">
+            {silent.length === 1
+              ? `${silent[0].call_sign ?? silent[0].plate_number} is on duty but has stopped reporting${silent[0].seconds_since_ping != null ? ` (${Math.round(silent[0].seconds_since_ping / 60)} min ago)` : ''}. Dispatch cannot send it a job.`
+              : `${silent.length} units are on duty but have stopped reporting. Dispatch cannot send them jobs.`}
+          </Notice>
+        )}
+
+        <Seg<'active' | 'history'>
+          value={tab} onChange={setTab}
+          options={[
+            { key: 'active', label: `Active · ${active.length}` },
+            { key: 'history', label: `History · ${history.length}` },
+          ]} />
 
         {list.length === 0 ? (
-          <View style={[s.emptyBox, { borderColor: t.cardBorder }]}>
-            <Ionicons name={tab === 'active' ? 'checkmark-done-outline' : 'time-outline'} size={30} color={t.textMuted} style={{ marginBottom: 8 }} />
-            <Text style={[s.emptyText, { color: t.textMuted }]}>
-              {tab === 'active' ? 'No active jobs right now' : 'No completed jobs yet'}
-            </Text>
-          </View>
-        ) : (
-          list.map(r => {
-            const unit = embeddedUnit(r.unit)
-            const name = embeddedName(r.patient) ?? embeddedName(r.dependent) ?? r.caller_patient_name ?? 'Unregistered caller'
-            return (
-              <Card key={r.id} style={{ marginBottom: 10 }}>
-                <View style={s.row}>
-                  <TonePill
-                    label={r.triage_level ? `Triage ${r.triage_level}` : r.request_type === 'scheduled' ? 'Scheduled' : 'Untriaged'}
-                    tone={r.triage_level == null
-                      ? (r.request_type === 'scheduled' ? 'info' : 'neutral')
-                      : r.triage_level <= 2 ? 'danger' : 'warn'}
-                    dot={r.triage_level != null && r.triage_level <= 2}
-                  />
-                  <Text style={[s.bookingRef, { color: t.textSecondary }]}>{r.booking_ref}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
-                  <IconOrb
-                    name={r.triage_level ? 'alert-circle-outline' : 'calendar-outline'}
-                    size={40}
-                    color={r.triage_level && r.triage_level <= 2 ? t.danger : t.accent}
-                  />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[s.name, { color: t.textPrimary }]}>{name}</Text>
-                <Text style={[s.statusLine, { color: t.accent }]}>{TRANSPORT_STATUS_LABEL[r.status] ?? r.status}</Text>
-                {r.symptom_description && (
-                  <Text style={[s.detailText, { color: t.textSecondary }]}>{r.symptom_description}</Text>
-                )}
-                <View style={s.metaRow}>
-                  {unit && (
-                    <View style={s.detailRow}>
-                      <Ionicons name="car-outline" size={12} color={t.textMuted} />
-                      <Text style={[s.detailText, { color: t.textMuted }]}>{unit.call_sign ?? unit.plate_number}</Text>
-                    </View>
-                  )}
-                  {r.pickup_address && (
-                    <View style={s.detailRow}>
-                      <Ionicons name="location-outline" size={12} color={t.textMuted} />
-                      <Text style={[s.detailText, { color: t.textMuted }]} numberOfLines={1}>{r.pickup_address}</Text>
-                    </View>
-                  )}
-                  {r.contact_phone && (
-                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${r.contact_phone}`)} style={s.detailRow}>
-                      <Ionicons name="call-outline" size={12} color={t.accent} />
-                      <Text style={[s.detailText, { color: t.accent }]}>{r.contact_phone}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+          <Card>
+            <Empty
+              icon={tab === 'active' ? 'checkmark-done-outline' : 'time-outline'}
+              title={tab === 'active' ? 'No active calls' : 'No finished calls yet'}
+              body={tab === 'active'
+                ? 'Jobs offered to your units show up here as soon as a crew accepts one.'
+                : 'Completed and cancelled calls stay here.'} />
+          </Card>
+        ) : list.map(r => {
+          const unit = embeddedUnit(r.unit)
+          const dest = embeddedDest(r.destination)
+          const name = embeddedName(r.patient) ?? embeddedName(r.dependent) ?? r.caller_patient_name ?? 'Unregistered caller'
+          const step = STEP_OF[r.status]
+          return (
+            <Card key={r.id} style={{ marginTop: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12 }}>
+                <Mono size={12} weight="700" style={{ flex: 1 }}>{r.booking_ref}</Mono>
+                <Mono size={11} color={t.q.ink60}>
+                  {new Date(r.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </Mono>
+              </View>
+              <Row
+                icon={r.triage_level != null && r.triage_level <= 2 ? 'alert-circle' : r.request_type === 'scheduled' ? 'calendar-outline' : 'person-outline'}
+                iconTone={triageTone(r.triage_level)}
+                title={name}
+                sub={[
+                  TRANSPORT_STATUS_LABEL[r.status] ?? r.status,
+                  unit ? (unit.call_sign ?? unit.plate_number) : 'no unit yet',
+                  route(r.pickup_address, dest?.name ?? null),
+                ].filter(Boolean).join(' · ')}
+                pill={r.triage_level != null ? `P${r.triage_level}` : r.request_type === 'scheduled' ? 'Scheduled' : 'Untriaged'}
+                pillTone={triageTone(r.triage_level)}
+                pillSolid={r.triage_level != null && r.triage_level <= 2} />
+              {!!r.symptom_description && (
+                <>
+                  <Hair />
+                  <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                    <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70 }}>{r.symptom_description}</Text>
                   </View>
-                </View>
-              </Card>
-            )
-          })
-        )}
-      </ScrollView>
-    </SafeAreaView>
+                </>
+              )}
+              {step != null && (
+                <>
+                  <Hair />
+                  <Journey flat label="This run" steps={RUN_STEPS} activeIndex={step} />
+                </>
+              )}
+              {!!r.contact_phone && (
+                <>
+                  <Hair />
+                  <Row compact icon="call-outline" iconTone="teal" title={r.contact_phone} sub="Caller"
+                    onPress={() => Linking.openURL(`tel:${r.contact_phone}`).catch(() => {})} />
+                </>
+              )}
+            </Card>
+          )
+        })}
+
+      </Body>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:     { flex: 1 },
-  title:    { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
-  subtitle: { fontSize: 15, marginTop: 2, marginBottom: 16 },
-  statGrid: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  tabRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3, marginBottom: 14, gap: 3 },
-  tabBtn:   { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
-  card:     { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12 },
-  row:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  bookingRef: { fontSize: 13 },
-  name:       { fontSize: 17, fontWeight: '700' },
-  statusLine: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2, marginBottom: 4 },
-  detailText: { fontSize: 14 },
-  detailRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
-  emptyBox:   { borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', padding: 32, alignItems: 'center' },
-  emptyText:  { fontSize: 15 },
-})

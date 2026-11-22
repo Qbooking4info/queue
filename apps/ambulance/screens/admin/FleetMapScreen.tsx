@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ActivityIndicator, ScrollView } from 'react-native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { subscribeToUnitLocation, getUnitLocation } from '@queue/shared/lib/ambulance-api'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import type { MyUnit } from '@queue/shared/lib/crew-api'
+import {
+  Screen, AppBar, Card, Row, Hair, Empty, Mono,
+} from '@queue/shared/components/q'
 
 const POLL_INTERVAL_MS = 20_000
 // Lagos, as a sane default center when the fleet is empty -- same fallback
@@ -16,9 +17,7 @@ const FALLBACK_REGION = { latitude: 6.5244, longitude: 3.3792, latitudeDelta: 0.
 interface UnitPos { lat: number; lng: number; recordedAt: string }
 
 /**
- * "the admin manages his fleets and can see their activities and locations"
- * -- nothing in the existing system shows a fleet operator their whole
- * fleet's live position at once. This is that screen.
+ * The fleet's live position, all units at once.
  *
  * Doubles as the "mock map" for testing: a freshly registered unit has a
  * home base (geocoded from the address given when it was added) but no live
@@ -95,52 +94,64 @@ export function FleetMapScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar large title="Fleet map" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Fleet Map</Text>
-        <Text style={[s.sub, { color: t.textMuted }]}>
-          {units.length === 0
-            ? 'No units yet — add one from the Fleet tab'
-            : `${liveCount} of ${units.length} unit${units.length !== 1 ? 's' : ''} reporting a live position`}
-        </Text>
-      </View>
+    <Screen>
+      <AppBar
+        large
+        title="Fleet map"
+        sub={units.length === 0
+          ? 'No units yet — add one from Fleet'
+          : `${units.length} unit${units.length === 1 ? '' : 's'} · ${liveCount} reporting live`}
+        right={<Mono size={12} color={t.q.ink60}>
+          {new Date().toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false })}
+        </Mono>} />
 
-      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 16, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: t.cardBorder }}>
-        <HospitalsMap markers={markers} initialRegion={initialRegion} style={{ flex: 1 }} interactive />
-      </View>
+      {units.length === 0 ? (
+        <Card style={{ marginTop: 12 }}>
+          <Empty icon="map-outline" title="Nothing to plot yet"
+            body="Add an ambulance from the Fleet tab and it appears here at its home base straight away." />
+        </Card>
+      ) : (
+        <>
+          <View style={{
+            flex: 1, marginHorizontal: 16, marginBottom: 12, borderRadius: 16,
+            overflow: 'hidden', borderWidth: 1, borderColor: t.q.line,
+          }}>
+            <HospitalsMap markers={markers} initialRegion={initialRegion} style={{ flex: 1 }} interactive />
+          </View>
 
-      {units.length > 0 && (
-        <ScrollView style={s.legend} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
-          {withPos.map(({ unit, isLive }) => (
-            <View key={unit.ambulance_id} style={[s.legendRow, { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-              <Ionicons
-                name={isLive ? (unit.visible_to_dispatch ? 'radio-outline' : 'warning-outline') : unit.on_duty ? 'time-outline' : 'moon-outline'}
-                size={13}
-                color={isLive ? (unit.visible_to_dispatch ? t.accentDark : t.statusBusy.text) : t.textMuted}
-              />
-              <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 }}>{unit.call_sign ?? unit.plate_number}</Text>
-              <Text style={{ color: t.textMuted, fontSize: 13 }}>
-                {isLive ? (unit.visible_to_dispatch ? 'Live' : 'Stale') : unit.on_duty ? 'On duty · home base' : 'Home base'}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
+          <ScrollView style={{ maxHeight: 190 }} contentContainerStyle={{ paddingBottom: 8 }}>
+            <Card>
+              {withPos.map(({ unit, isLive }, i) => (
+                <View key={unit.ambulance_id}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    compact
+                    icon={isLive
+                      ? (unit.visible_to_dispatch ? 'radio-outline' : 'warning-outline')
+                      : unit.on_duty ? 'time-outline' : 'moon-outline'}
+                    iconTone={isLive ? (unit.visible_to_dispatch ? 'green' : 'amber') : 'neutral'}
+                    title={unit.call_sign ?? unit.plate_number}
+                    sub={unit.seconds_since_ping != null ? `last fix ${unit.seconds_since_ping}s ago` : 'never reported'}
+                    pill={isLive
+                      ? (unit.visible_to_dispatch ? 'Moving' : 'Stale')
+                      : unit.on_duty ? 'No signal' : 'Home base'}
+                    pillTone={isLive ? (unit.visible_to_dispatch ? 'green' : 'amber') : 'neutral'} />
+                </View>
+              ))}
+            </Card>
+          </ScrollView>
+        </>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:   { flex: 1 },
-  title:  { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
-  sub:    { fontSize: 14, marginTop: 2 },
-  legend: { paddingHorizontal: 16, maxHeight: 150 },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
-})

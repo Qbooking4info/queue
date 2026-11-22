@@ -1,32 +1,49 @@
 import { useState, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity } from 'react-native'
+import { View } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton, ServiceTile } from '@queue/shared/components/ui/v3'
-import { useAuth }  from '@queue/shared/contexts/AuthContext'
-import { supabase } from '@queue/shared/lib/supabase'
-import { haptics }  from '@queue/shared/lib/haptics'
+import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
-import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
 import { getMyHospital } from '@queue/shared/lib/admin-api'
+import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg,
+} from '@queue/shared/components/q'
+import type { Ionicons } from '@expo/vector-icons'
 
 const ROLE_LABEL: Record<string, string> = {
-  front_desk: 'Front Desk', clinic_admin: 'Clinic Admin', hospital_admin: 'Hospital Admin',
+  front_desk: 'Front desk',
+  clinic_admin: 'Clinic admin',
+  hospital_admin: 'Hospital admin',
+}
+
+interface Item {
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  label: string
+  sub: string
+  onPress: () => void
 }
 
 interface Props { navigation: any }
 
+/**
+ * Every module this role can open, grouped by what it is for.
+ *
+ * It was a grid of equal tiles. A grid says every destination is equally
+ * likely, which is wrong: a front desk opens the ambulance desk many times a
+ * day and hospital settings twice a year. Rows in named groups put them in
+ * order and leave room to say what each one holds.
+ */
 export function StaffMoreScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
-  const { staffProfile, signOut } = useAuth()
-  const [hospitalName,   setHospitalName]   = useState<string | null>(null)
-  const [clinicModel,    setClinicModel]    = useState<string | null>(null)
-  const [signingOut,     setSigningOut]      = useState(false)
-  const [confirmVisible, setConfirmVisible]  = useState(false)
+  const { theme: t, mode, toggleTheme } = useTheme()
+  const { staffProfile } = useAuth()
+  const [hospitalName, setHospitalName] = useState<string | null>(null)
+  const [clinicModel, setClinicModel] = useState<string | null>(null)
+  const unread = useUnreadMessages('hospital')
 
   const isAdmin = staffProfile?.role === 'hospital_admin'
   const isClinicAdmin = staffProfile?.role === 'clinic_admin'
-  const initials = staffProfile?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'
+  const isFrontDesk = staffProfile?.role === 'front_desk'
 
   useEffect(() => {
     if (!staffProfile?.hospitalId) return
@@ -35,108 +52,94 @@ export function StaffMoreScreen({ navigation }: Props) {
     })
   }, [staffProfile?.hospitalId])
 
-  async function handleSignOut() {
-    setSigningOut(true)
-    await signOut()
-  }
-
-  const menuItems = [
-    { icon: 'people-circle-outline', label: 'Patients', sub: 'Everyone who has visited', onPress: () => navigation.navigate('Patients') },
-    { icon: 'chatbubbles-outline', label: 'Messages', sub: 'Patients, doctors, crews', onPress: () => navigation.navigate('HospitalMessages') },
+  const operations: Item[] = [
+    // Mirrors web's dashboard/ambulances role gate (admin / owner / front_desk).
+    ...(isAdmin || isFrontDesk ? [
+      { icon: 'medical-outline' as const, label: 'Ambulance desk', sub: 'Patients being brought here', onPress: () => navigation.navigate('AmbulanceRequests') },
+      { icon: 'medkit-outline' as const, label: 'Request ambulance', sub: 'Transfer a patient out', onPress: () => navigation.navigate('RequestAmbulance') },
+    ] : []),
+    { icon: 'bed-outline', label: 'Ward & triage capacity', sub: 'What patients and crews are told', onPress: () => navigation.navigate('Beds') },
     ...(isAdmin || isClinicAdmin ? [
-      { icon: 'videocam-outline', label: 'Virtual Care', sub: 'Video consultations', onPress: () => navigation.navigate('VirtualCare') },
+      { icon: 'videocam-outline' as const, label: 'Virtual care', sub: 'Video consultations', onPress: () => navigation.navigate('VirtualCare') },
     ] : []),
-    { icon: 'time-outline', label: 'Staff shifts', sub: isAdmin ? 'Plan the weekly rota' : 'Your shifts and the rota', onPress: () => navigation.navigate('StaffShifts') },
-    // Staff Management also holds doctor-linking (see StaffManagementScreen's
-    // own role check for what a sub-admin can and can't do once inside it) --
-    // a clinic's own sub-admin needs to reach it to add a doctor to their
-    // clinic, same as web's clinic-detail page already lets them.
-    ...(isAdmin || isClinicAdmin ? [
-      { icon: 'people-outline', label: 'Staff & doctors', sub: 'Invite, link and manage', onPress: () => navigation.navigate('StaffManagement') },
-    ] : []),
-    // Mirrors web's dashboard/ambulances/page.tsx role gate (admin/owner/front_desk) --
-    // front_desk had no management menu item at all before this; Ambulances is now the
-    // first one that role sees. Alerts/Coverage/Fleet are reached from inside that
-    // screen (same hub-and-spoke shape as the web page's own button row), not listed
-    // here separately.
-    ...(isAdmin || staffProfile?.role === 'front_desk' ? [
-      { icon: 'medical-outline', label: 'Ambulance desk', sub: 'Inbound patients and alerts', onPress: () => navigation.navigate('AmbulanceRequests') },
-      { icon: 'medkit-outline', label: 'Request ambulance', sub: 'Dispatch for a patient here', onPress: () => navigation.navigate('RequestAmbulance') },
-    ] : []),
-    ...(isAdmin ? [
-      { icon: 'analytics-outline', label: 'Analytics', sub: 'Trends and revenue', onPress: () => navigation.navigate('StaffAnalytics') },
-      // Only hospitals onboarded with the multi-clinic model have clinics to manage --
-      // mirrors web's Sidebar.tsx, which hides its own Clinics nav item the same way.
-      ...(clinicModel === 'multi' ? [
-        { icon: 'business-outline', label: 'Clinics', sub: 'Departments and admins', onPress: () => navigation.navigate('HospitalClinics') },
-      ] : []),
-      { icon: 'medkit-outline', label: 'Services', sub: 'Specialties and prices', onPress: () => navigation.navigate('HospitalServices') },
-      { icon: 'calendar-outline', label: 'Doctor schedule', sub: 'Shifts and availability', onPress: () => navigation.navigate('HospitalSchedule') },
-      { icon: 'settings-outline', label: 'Hospital settings', sub: 'Profile, hours, payments', onPress: () => navigation.navigate('HospitalSettings') },
-    ] : []),
+    { icon: 'flask-outline', label: 'Laboratory', sub: 'Tests ordered here, and filing results', onPress: () => navigation.navigate('LabOrders') },
+    { icon: 'people-circle-outline', label: 'Patients', sub: 'Search records', onPress: () => navigation.navigate('Patients') },
+    {
+      icon: 'chatbubbles-outline',
+      label: 'Messages',
+      sub: unread > 0 ? `${unread} unread · patients, doctors and crews` : 'Patients, doctors and crews',
+      onPress: () => navigation.navigate('HospitalMessages'),
+    },
   ]
 
-  // v3.1 All Modules (h-menu): identity in the teal header, a grid of every module this
-  // role can open (hidden when it can't), then the same account block as the other apps.
+  const admin: Item[] = [
+    // Staff management also holds doctor-linking, so a clinic's own sub-admin
+    // needs it to add a doctor to their clinic -- same as web's clinic detail.
+    ...(isAdmin || isClinicAdmin ? [
+      { icon: 'people-outline' as const, label: 'Staff & doctors', sub: 'Invite, link and manage', onPress: () => navigation.navigate('StaffManagement') },
+    ] : []),
+    { icon: 'time-outline', label: 'Staff shifts', sub: isAdmin ? 'Plan the weekly rota' : 'Your shifts and the rota', onPress: () => navigation.navigate('StaffShifts') },
+    ...(isAdmin ? [
+      { icon: 'calendar-outline' as const, label: 'Doctor schedule', sub: 'Slots and working days', onPress: () => navigation.navigate('HospitalSchedule') },
+      // Only multi-clinic hospitals have clinics to manage -- mirrors web's
+      // Sidebar, which hides its own Clinics item the same way.
+      ...(clinicModel === 'multi' ? [
+        { icon: 'business-outline' as const, label: 'Clinics', sub: 'Departments and their admins', onPress: () => navigation.navigate('HospitalClinics') },
+      ] : []),
+      { icon: 'pricetags-outline' as const, label: 'Services & prices', sub: 'Specialties and what they cost', onPress: () => navigation.navigate('HospitalServices') },
+      { icon: 'analytics-outline' as const, label: 'Analytics', sub: 'Appointments, revenue and trends', onPress: () => navigation.navigate('StaffAnalytics') },
+      { icon: 'settings-outline' as const, label: 'Hospital settings', sub: 'Hours, fees, payout', onPress: () => navigation.navigate('HospitalSettings') },
+    ] : []),
+    { icon: 'person-circle-outline', label: 'My profile', sub: 'Role, clinic and sign out', onPress: () => navigation.navigate('FrontDeskProfile') },
+  ]
+
+  const group = (items: Item[]) => (
+    <Card>
+      {items.map((item, i) => (
+        <View key={item.label}>
+          {i > 0 && <Hair />}
+          <Row icon={item.icon} title={item.label} sub={item.sub} chevron onPress={item.onPress} />
+        </View>
+      ))}
+    </Card>
+  )
+
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header>
-        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <ProfileAvatar size={60} editable name={staffProfile?.name} />
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>{staffProfile?.name ?? 'Staff'}</Text>
-            <Text numberOfLines={1} style={{ color: '#CCFBF1', fontSize: 13, marginTop: 2 }}>
-              {ROLE_LABEL[staffProfile?.role ?? ''] ?? 'Staff'}{hospitalName ? ` · ${hospitalName}` : ''}
-            </Text>
-          </View>
+    <Screen>
+      <AppBar large title="More" />
+
+      <Body>
+        <Card>
+          <Row
+            leading={<ProfileAvatar size={44} editable name={staffProfile?.name} />}
+            title={staffProfile?.name ?? 'Staff'}
+            sub={[ROLE_LABEL[staffProfile?.role ?? ''] ?? 'Staff', hospitalName].filter(Boolean).join(' · ')}
+            chevron
+            onPress={() => navigation.navigate('FrontDeskProfile')}
+          />
+        </Card>
+
+        <SectionHead title="Operations" />
+        {group(operations)}
+
+        <SectionHead title="Admin" />
+        {group(admin)}
+
+        <SectionHead title="Appearance" />
+        <View style={{ marginTop: -8 }}>
+          <Seg<'light' | 'dark'>
+            value={mode}
+            onChange={v => { if (v !== mode) toggleTheme() }}
+            options={[{ key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]}
+          />
         </View>
-      </Header>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        <View style={{ padding: 20, gap: 14 }}>
-          {menuItems.length > 0 && (
-            <>
-              <SectionTitle title="All modules" />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                {menuItems.map(item => (
-                  <View key={item.label} style={{ flexBasis: '47%', flexGrow: 1 }}>
-                    <ServiceTile icon={item.icon as any} label={item.label} sublabel={item.sub} onPress={item.onPress} />
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
 
-          <SectionTitle title="Account" />
-          <Card style={{ paddingVertical: 0 }}>
-            <ListRow icon="person-circle-outline" title="My profile" subtitle="Role, clinic and sign out" last
-              onPress={() => navigation.navigate('FrontDeskProfile')} />
-          </Card>
-
-          <Card style={{ gap: 10 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
-            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
-              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
-              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
-          </Card>
-
-          {!confirmVisible ? (
-            <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }} accessibilityRole="button"
-              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
-            </TouchableOpacity>
-          ) : (
-            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirmVisible(false)} /></View>
-                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={handleSignOut} /></View>
-              </View>
-            </Card>
-          )}
-
-          <DeleteAccount what="your staff profile, photo and sign-in (the hospital itself stays)" />
+        <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
+          <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+            Signing out, and deleting your staff account, live on your profile.
+          </Text>
         </View>
-      </ScrollView>
-    </View>
+      </Body>
+    </Screen>
   )
 }

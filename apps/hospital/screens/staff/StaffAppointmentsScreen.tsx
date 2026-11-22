@@ -1,18 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, ScrollView, ActivityIndicator, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header, EmptyState } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Chip, SearchField, Btn,
+  Empty, Initials, type PillTone,
+} from '@queue/shared/components/q'
 import { startConversation } from '@queue/shared/lib/chat'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
-import { Button } from '@queue/shared/components/ui/Button'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
 import { RescheduleModal } from '@queue/shared/components/RescheduleModal'
 import { rescheduleHospitalAppointment } from '@queue/shared/lib/api'
@@ -191,113 +191,122 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
   ]
 
   return (
-    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Appointments" subtitle={staffProfile?.name ?? undefined} />
+    <Screen>
+      <AppBar large title="Appointments" />
 
-      {/* Tab filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabContent}>
+      <SearchField value={search} onChangeText={setSearch} placeholder="Search patient or booking ref…" />
+
+      <ScrollView
+        horizontal showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
         {TABS.map(tb => (
-          <TouchableOpacity key={tb.key} onPress={() => setTab(tb.key)}
-            accessibilityRole="button" accessibilityState={{ selected: tab === tb.key }}
-            style={[s.tab, tab === tb.key ? { backgroundColor: t.accent, borderColor: t.accent } : { borderColor: t.cardBorder, backgroundColor: t.cardBg }]}>
-            <Text style={[s.tabText, { color: tab === tb.key ? (t.id === 'forest' ? '#081416' : '#FFFFFF') : t.textSecondary }]}>{tb.label}</Text>
-          </TouchableOpacity>
+          <Chip key={tb.key} label={tb.label} on={tab === tb.key} onPress={() => setTab(tb.key)} />
         ))}
       </ScrollView>
 
-      {/* Search */}
-      <View style={[s.searchWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-        <Ionicons name="search-outline" size={14} color={t.textMuted} style={{ marginRight: 6 }} />
-        <TextInput
-          value={search} onChangeText={setSearch}
-          placeholder="Search patient or booking ref…"
-          placeholderTextColor={t.textMuted}
-          style={[s.searchInput, { color: t.textPrimary }]}
-          clearButtonMode="while-editing"
-        />
-      </View>
-
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true) }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
           {filtered.length === 0 ? (
-            <EmptyState icon="calendar-outline" title={search ? 'No matches' : tab === 'pending' ? 'No pending approvals' : 'No appointments'}
-              body={search ? `No results for "${search}"` : tab === 'pending' ? 'All bookings are up to date.' : 'Nothing here yet.'} />
-          ) : filtered.map(appt => {
-            const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
-            const meta = STATUS_META[dispStatus] ?? { label: dispStatus, color: sc.no_show.text, bg: sc.no_show.bg }
-            const isLoading = actioning === appt.id
-            const canApprove = appt.approval_status === 'pending_approval'
-            const isEmergency = appt.urgency === 'emergency'
+            <Card style={{ marginTop: 12 }}>
+              <Empty
+                icon="calendar-outline"
+                title={search ? 'Nothing matches that' : tab === 'pending' ? 'Nothing to approve' : 'No appointments'}
+                body={search
+                  ? `Nothing matches “${search}”.`
+                  : tab === 'pending' ? 'Every booking is up to date.' : 'Nothing here yet.'}
+              />
+            </Card>
+          ) : (
+            <Card>
+              {filtered.map((appt, i) => {
+                const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
+                const isLoading = actioning === appt.id
+                const canApprove = appt.approval_status === 'pending_approval'
+                const canReschedule = ['pending', 'confirmed'].includes(appt.status)
+                const isEmergency = appt.urgency === 'emergency'
 
-            return (
-              <View key={appt.id} style={[s.card, { backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg, borderColor: isEmergency ? t.danger : t.cardBorder, borderLeftWidth: isEmergency ? 4 : 1 }]}>
-                <View style={s.cardTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in'}</Text>
-                    <Text style={[s.cardMeta, { color: t.textMuted }]}>
-                      {fmtDate(appt.appointment_date)} · {fmt12(appt.start_time)}
-                    </Text>
-                    {appt.doctor && <Text style={[s.cardMeta, { color: t.textMuted }]}>Dr. {appt.doctor.full_name}</Text>}
-                    {appt.clinic && <Text style={[s.cardMeta, { color: t.textMuted }]}>{appt.clinic.name}</Text>}
-                    {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
-                  </View>
-                  <View style={{ gap: 6, alignItems: 'flex-end' }}>
-                    <View style={[s.badge, { backgroundColor: meta.bg }]}>
-                      <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
-                    </View>
-                    {isEmergency && (
-                      <View style={[s.badge, { backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
-                        <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
+                const pill: { label: string; tone: PillTone; solid?: boolean } =
+                  isEmergency ? { label: 'Emergency', tone: 'red', solid: true }
+                  : dispStatus === 'pending_approval' ? { label: 'Awaiting', tone: 'amber', solid: true }
+                  : dispStatus === 'in_progress' ? { label: 'In progress', tone: 'teal', solid: true }
+                  : dispStatus === 'checked_in' ? { label: 'Checked in', tone: 'teal' }
+                  : dispStatus === 'confirmed' ? { label: 'Confirmed', tone: 'green' }
+                  : dispStatus === 'completed' ? { label: 'Seen', tone: 'neutral' }
+                  : dispStatus === 'no_show' ? { label: 'No show', tone: 'neutral' }
+                  : { label: dispStatus.replace(/_/g, ' '), tone: 'neutral' }
+
+                return (
+                  <View key={appt.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      leading={<Initials name={appt.patient?.full_name ?? appt.walkin_patient_name} size={40} />}
+                      tint={isEmergency}
+                      title={appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in'}
+                      sub={[
+                        appt.clinic?.name,
+                        `${fmtDate(appt.appointment_date)} · ${fmt12(appt.start_time)}`,
+                        appt.doctor?.full_name,
+                        appt.booking_ref,
+                      ].filter(Boolean).join(' · ')}
+                      pill={pill.label}
+                      pillTone={pill.tone}
+                      pillSolid={pill.solid}
+                    />
+
+                    {(canApprove || canReschedule || !!appt.patient?.id) && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
+                        {canApprove && (
+                          <>
+                            <Btn label="Approve" small loading={isLoading} disabled={!!actioning}
+                              onPress={() => handleApprove(appt)} />
+                            <Btn label="Decline" variant="secondary" small disabled={!!actioning}
+                              onPress={() => handleReject(appt)} />
+                          </>
+                        )}
+                        {/* Moving the visit is only safe before the patient is in
+                            a queue: once checked in, the queue trigger owns the
+                            ordering (the route re-checks status anyway). */}
+                        {canReschedule && (
+                          <Btn label="Reschedule" variant="secondary" small icon="calendar-outline"
+                            disabled={!!actioning} onPress={() => setRescheduling(appt)} />
+                        )}
+                        {!!appt.patient?.id && (
+                          <Btn
+                            label="Message" variant="secondary" small icon="chatbubble-ellipses-outline"
+                            onPress={async () => {
+                              haptics.tap()
+                              const r = await startConversation('patient', appt.patient!.id, appt.id)
+                              if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+                              else Alert.alert('Messages', r.notReady
+                                ? 'Messaging is being switched on. Please check back soon.'
+                                : r.error)
+                            }}
+                          />
+                        )}
                       </View>
                     )}
-                    {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
-                    {!!appt.patient?.id && (
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Message ${appt.patient.full_name ?? 'patient'}`}
-                        onPress={async () => {
-                          haptics.tap()
-                          const r = await startConversation('patient', appt.patient!.id, appt.id)
-                          if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
-                          else Alert.alert('Messages', r.notReady ? 'Messaging is being switched on. Please check back soon.' : r.error)
-                        }}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: 99, backgroundColor: t.accentBg }}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={14} color={t.accent} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Message</Text>
-                      </TouchableOpacity>
+
+                    {!!appt.reason && (
+                      <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                        <Text numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60 }}>
+                          {appt.reason}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                </View>
-                {canApprove && (
-                  <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-                    <Button label="Reject" onPress={() => handleReject(appt)} loading={isLoading} disabled={!!actioning} variant="danger" size="sm" style={{ flex: 1 }} />
-                    <Button
-                      label="Approve" onPress={() => handleApprove(appt)} loading={isLoading}
-                      disabled={!!actioning} variant="success" icon="checkmark" size="sm" style={{ flex: 2 }}
-                    />
-                  </View>
-                )}
-                {/* Moving the visit is only safe before the patient is in a queue:
-                    once they have checked in the queue trigger owns the ordering,
-                    and the route re-checks the status in its UPDATE anyway. */}
-                {['pending', 'confirmed'].includes(appt.status) && (
-                  <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-                    <Button
-                      label="Reschedule" onPress={() => setRescheduling(appt)}
-                      disabled={!!actioning} variant="outline" icon="calendar-outline" size="sm" style={{ flex: 1 }}
-                    />
-                  </View>
-                )}
-              </View>
-            )
-          })}
-        </ScrollView>
+                )
+              })}
+            </Card>
+          )}
+        </Body>
       )}
 
       {rescheduling && (
@@ -313,30 +322,6 @@ export function StaffAppointmentsScreen({ navigation }: Props) {
           }}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:       { flex: 1 },
-  header:     { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
-  title:      { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  tabScroll:  { flexGrow: 0 },
-  tabContent: { paddingHorizontal: 16, gap: 8, paddingTop: 14, paddingBottom: 8 },
-  tab:        { paddingHorizontal: 16, minHeight: 40, justifyContent: 'center', borderRadius: 99, borderWidth: 1 },
-  tabText:    { fontSize: 13, fontWeight: '700' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
-  card:       { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
-  cardTop:    { flexDirection: 'row', gap: 10, padding: 14 },
-  patientName: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
-  cardMeta:   { fontSize: 11, marginTop: 3 },
-  reason:     { fontSize: 11, marginTop: 3, fontStyle: 'italic' },
-  badge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  badgeText:  { fontSize: 10, fontWeight: '700' },
-  ref:        { fontSize: 9, fontWeight: '600', marginTop: 2 },
-  actions:    { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: 1 },
-  empty:      { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
-})

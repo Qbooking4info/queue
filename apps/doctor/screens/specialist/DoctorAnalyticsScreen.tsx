@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Modal } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, ActivityIndicator, RefreshControl, Modal, TouchableOpacity } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -10,6 +10,10 @@ import { haptics } from '@queue/shared/lib/haptics'
 import { fmtLocalDate, fmtDate, todayLocalDate } from '@queue/shared/lib/format'
 import { getMyDoctorAnalytics, type DoctorAnalyticsStats } from '@queue/shared/lib/api'
 import { CalendarPicker } from '@queue/shared/components/CalendarPicker'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Hair, SectionHead, Stat, StatStrip,
+  Btn, Notice, Mono, Empty,
+} from '@queue/shared/components/q'
 
 type PeriodMode = 'today' | 'week' | 'month' | 'year' | 'date' | 'pickedMonth'
 type VisitType = 'all' | 'in-person' | 'virtual' | 'home_visit'
@@ -87,7 +91,11 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
   useFocusEffect(useCallback(() => { load() }, [load]))
 
   const showUp = stats.total > 0 ? Math.round(stats.completed / stats.total * 100) : 0
-  const typeTotal = stats.byType.inPerson + stats.byType.virtual + stats.byType.homeVisit || 1
+  const typeSum = stats.byType.inPerson + stats.byType.virtual + stats.byType.homeVisit
+  // Divide-by-zero guard only. The bar itself is hidden when the sum is 0 --
+  // with `|| 1` the last segment's flex:1 painted a full "home visit" bar out
+  // of no data at all.
+  const typeTotal = typeSum || 1
 
   // Labels carry the resolved value for the two custom modes, so the pill reads
   // "12 Mar 2026" rather than a generic "Custom date" once one is applied.
@@ -120,27 +128,21 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
     })),
   ]
 
+  const periodLabel = PERIOD_OPTIONS.find(o => o.key === periodMode)?.label ?? ''
+  const hospitalLabel = HOSPITAL_OPTIONS.find(o => o.key === hospitalFilter)?.label ?? 'All practice'
+
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={[s.header, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-        {navigation.canGoBack?.() ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" hitSlop={8}>
-            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-          </TouchableOpacity>
-        ) : null}
-        <Text style={[s.title, { color: t.textPrimary }]}>My Analytics</Text>
-      </View>
+    <Screen>
+      <AppBar large title="My analytics" sub={`${hospitalLabel} · ${periodLabel}`}
+        onBack={navigation.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
       {/* Three filters on one row: when, what kind of visit, and which hospital.
           Dropdowns rather than chip rows -- the period list alone has six entries
           including two that open pickers, which never fit as chips and forced a
           horizontal scroll that hid the later options off-screen. */}
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
         <Dropdown
-          label="Period"
-          icon="calendar-outline"
-          value={periodMode}
-          options={PERIOD_OPTIONS}
+          label="Period" icon="calendar-outline" value={periodMode} options={PERIOD_OPTIONS}
           onChange={key => {
             haptics.tap()
             // The two custom entries open a picker instead of selecting directly;
@@ -148,153 +150,150 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
             if (key === 'date') { setShowDatePicker(true); return }
             if (key === 'pickedMonth') { setShowMonthPicker(true); return }
             setPeriodMode(key)
-          }}
-        />
+          }} />
         <Dropdown
-          label="Consultation type"
-          icon="medkit-outline"
-          value={visitType}
-          options={VISIT_TYPE_OPTIONS}
-          onChange={key => { haptics.tap(); setVisitType(key) }}
-        />
+          label="Consultation type" icon="medkit-outline" value={visitType} options={VISIT_TYPE_OPTIONS}
+          onChange={key => { haptics.tap(); setVisitType(key) }} />
         <Dropdown
-          label="Hospital"
-          icon="business-outline"
-          value={hospitalFilter}
-          options={HOSPITAL_OPTIONS}
+          label="Hospital" icon="business-outline" value={hospitalFilter} options={HOSPITAL_OPTIONS}
           onChange={key => { haptics.tap(); setHospitalFilter(key) }}
-          disabled={HOSPITAL_OPTIONS.length <= 1}
-        />
+          disabled={HOSPITAL_OPTIONS.length <= 1} />
       </View>
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
-          {error ? (
-            <View style={[s.card, { backgroundColor: t.dangerSubtle, borderColor: t.danger, marginBottom: 12 }]}>
-              <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
-            </View>
-          ) : null}
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
 
-          {/* KPI grid */}
-          <View style={s.kpiGrid}>
-            {[
-              { label: 'Total Visits', value: stats.total,       color: t.accent },
-              { label: 'Completed',    value: stats.completed,   color: t.accentDark },
-              { label: 'Cancelled',    value: stats.cancelled,   color: t.danger },
-              { label: 'No-Show',      value: stats.noShow,      color: t.statusBusy.text },
-              { label: 'Upcoming',     value: stats.open,        color: t.info },
-              { label: 'Show-up %',    value: `${showUp}%`,      color: t.info },
-              { label: 'Patients Seen', value: stats.uniquePatients, color: t.accent },
-            ].map(k => (
-              <View key={k.label} style={[s.kpiCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.kpiValue, { color: k.color }]}>{k.value}</Text>
-                <Text style={[s.kpiLabel, { color: t.textMuted }]}>{k.label}</Text>
-              </View>
-            ))}
-          </View>
+          {stats.total === 0 && !error ? (
+            <Card style={{ marginTop: 12 }}>
+              <Empty icon="trending-up-outline" title="No visits in this period"
+                body="Change the period or the filters above to see further back." />
+            </Card>
+          ) : (
+            <>
+              <Card style={{ marginTop: 12 }}>
+                <StatStrip>
+                  <Stat label="Total visits" value={stats.total} note="booked" />
+                  <Stat label="Patients seen" value={stats.uniquePatients} note="unique people" />
+                  <Stat label="Show-up" value={`${showUp}%`} note={`${stats.completed} completed`} last />
+                </StatStrip>
+                <Hair inset={0} />
+                <StatStrip>
+                  <Stat label="No-show" value={stats.noShow} tone={stats.noShow > 0 ? 'amber' : undefined} note="did not arrive" />
+                  <Stat label="Cancelled" value={stats.cancelled} note="called off" />
+                  <Stat label="Upcoming" value={stats.open} note="still to happen" last />
+                </StatStrip>
+              </Card>
 
-          {/* Wait / consult time */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-            <View style={[s.typeCard, { backgroundColor: t.infoSubtle, flex: 1 }]}>
-              <Text style={[s.typeCount, { color: t.info }]}>{fmtMinutes(stats.avgWaitMinutes)}</Text>
-              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Patient Wait</Text>
-            </View>
-            <View style={[s.typeCard, { backgroundColor: t.accentBgMid, flex: 1 }]}>
-              <Text style={[s.typeCount, { color: t.accent }]}>{fmtMinutes(stats.avgConsultMinutes)}</Text>
-              <Text style={[s.typeLabel, { color: t.textMuted }]}>Avg Consultation</Text>
-            </View>
-          </View>
+              <SectionHead title="How long people wait" />
+              <Card>
+                <StatStrip>
+                  <Stat label="Avg patient wait" value={fmtMinutes(stats.avgWaitMinutes)}
+                    note="check-in to called" />
+                  <Stat label="Avg consultation" value={fmtMinutes(stats.avgConsultMinutes)}
+                    note="start to end" last />
+                </StatStrip>
+              </Card>
 
-          {/* Rating */}
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }]}>
-            <View style={[s.ratingBadge, { backgroundColor: `${t.accent}18` }]}>
-              <Ionicons name="star" size={20} color={t.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.cardTitle, { color: t.textPrimary, marginBottom: 2 }]}>
-                {stats.rating.avg != null ? stats.rating.avg.toFixed(1) : '—'} average rating
-              </Text>
-              <Text style={{ fontSize: 14, color: t.textMuted }}>
-                {stats.rating.count} review{stats.rating.count === 1 ? '' : 's'} in this period
-              </Text>
-            </View>
-          </View>
-
-          {/* Visit type split -- only meaningful when not already filtered to one type */}
-          {visitType === 'all' && (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, marginBottom: 12 }]}>
-              <Text style={[s.cardTitle, { color: t.textPrimary }]}>Visit Type Split</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                {[
-                  { label: 'Physical',   count: stats.byType.inPerson,  color: t.accent },
-                  { label: 'Virtual',    count: stats.byType.virtual,   color: t.info },
-                  { label: 'Home Visit', count: stats.byType.homeVisit, color: t.statusApproval.text },
-                ].map(tp => (
-                  <View key={tp.label} style={[s.typeCard, { backgroundColor: `${tp.color}12`, flex: 1 }]}>
-                    <Text style={[s.typeCount, { color: tp.color }]}>{tp.count}</Text>
-                    <Text style={[s.typeLabel, { color: t.textMuted }]} numberOfLines={1}>{tp.label}</Text>
-                    <Text style={[s.typePct, { color: t.textMuted }]}>{Math.round(tp.count / typeTotal * 100)}%</Text>
+              <SectionHead title="Rating" />
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: t.q.sel, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="star" size={18} color={t.q.primary} />
                   </View>
-                ))}
-              </View>
-              <View style={{ height: 8, borderRadius: 99, overflow: 'hidden', flexDirection: 'row' }}>
-                <View style={{ width: `${Math.round(stats.byType.inPerson / typeTotal * 100)}%`, backgroundColor: t.accent }} />
-                <View style={{ width: `${Math.round(stats.byType.virtual / typeTotal * 100)}%`, backgroundColor: t.info }} />
-                <View style={{ flex: 1, backgroundColor: t.statusApproval.text }} />
-              </View>
-            </View>
-          )}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.q.ink }}>
+                      {stats.rating.avg != null ? `${stats.rating.avg.toFixed(1)} average` : 'No rating yet'}
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: t.q.ink60, marginTop: 2 }}>
+                      {stats.rating.count} review{stats.rating.count === 1 ? '' : 's'} in this period
+                    </Text>
+                  </View>
+                </View>
+              </Card>
 
-          {/* Monthly bookings YTD bar chart */}
-          {stats.monthly.length > 0 && (
-            <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.cardTitle, { color: t.textPrimary }]}>Monthly Visits (YTD)</Text>
-              {(() => {
-                const maxV = Math.max(...stats.monthly.map(m => m.count), 1)
-                const barMaxH = 100
-                return (
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 130, marginTop: 8 }}>
-                    {stats.monthly.map((m, i) => {
-                      const h = Math.max((m.count / maxV) * barMaxH, 4)
-                      const isLast = i === stats.monthly.length - 1
-                      return (
-                        <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-                          <Text style={[s.barVal, { color: t.textMuted }]}>{m.count}</Text>
-                          <View style={{ width: '100%', height: h, borderRadius: 4, backgroundColor: isLast ? t.accent : `${t.accent}60` }} />
-                          <Text style={[s.barLabel, { color: t.textMuted }]}>{m.month}</Text>
+              {visitType === 'all' && (
+                <>
+                  <SectionHead title="Visit type split" />
+                  <Card>
+                    <View style={{ padding: 14, gap: 12 }}>
+                      <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: t.q.muted }}>
+                        {typeSum > 0 && (
+                          <>
+                            <View style={{ width: `${Math.round(stats.byType.inPerson / typeTotal * 100)}%`, backgroundColor: t.q.primary }} />
+                            <View style={{ width: `${Math.round(stats.byType.virtual / typeTotal * 100)}%`, backgroundColor: '#5B9EFF' }} />
+                            <View style={{ flex: 1, backgroundColor: t.q.amberFill }} />
+                          </>
+                        )}
+                      </View>
+                      {[
+                        { label: 'In person', count: stats.byType.inPerson, color: t.q.primary },
+                        { label: 'Video', count: stats.byType.virtual, color: '#5B9EFF' },
+                        { label: 'Home visit', count: stats.byType.homeVisit, color: t.q.amberFill },
+                      ].map(tp => (
+                        <View key={tp.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: tp.color }} />
+                          <Text style={{ flex: 1, fontSize: 13, color: t.q.ink70 }}>{tp.label}</Text>
+                          <Mono size={13} weight="700">{tp.count}</Mono>
+                          <Mono size={12} color={t.q.ink60}>{typeSum > 0 ? Math.round(tp.count / typeTotal * 100) : 0}%</Mono>
                         </View>
-                      )
-                    })}
-                  </View>
-                )
-              })()}
-            </View>
+                      ))}
+                    </View>
+                  </Card>
+                </>
+              )}
+
+              {stats.monthly.length > 0 && (
+                <>
+                  <SectionHead title="Visits by month" />
+                  <Card>
+                    <View style={{ padding: 14 }}>
+                      <CardLabel>This year so far</CardLabel>
+                      {(() => {
+                        const maxV = Math.max(...stats.monthly.map(m => m.count), 1)
+                        return (
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 130, marginTop: 12 }}>
+                            {stats.monthly.map((m, i) => {
+                              const h = Math.max((m.count / maxV) * 100, 4)
+                              const isLast = i === stats.monthly.length - 1
+                              return (
+                                <View key={m.month} style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.q.ink60 }}>{m.count}</Text>
+                                  <View style={{ width: '100%', height: h, borderRadius: 3, backgroundColor: isLast ? t.q.primary : t.q.muted }} />
+                                  <Text style={{ fontSize: 10, color: t.q.ink60 }}>{m.month}</Text>
+                                </View>
+                              )
+                            })}
+                          </View>
+                        )
+                      })()}
+                    </View>
+                  </Card>
+                </>
+              )}
+            </>
           )}
-        </ScrollView>
+        </Body>
       )}
 
       {showDatePicker && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
-          <View style={s.overlay}>
-            <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 14 }]}>Pick a Date</Text>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <View style={{ width: '100%', maxWidth: 380, borderRadius: 18, borderWidth: 1, borderColor: t.q.line, backgroundColor: t.q.surface, padding: 20 }}>
+              <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: t.q.ink, marginBottom: 14 }}>
+                Pick a date
+              </Text>
               <CalendarPicker value={pickedDate} onChange={setPickedDate} maxDate={todayLocalDate()} theme={t} />
-              <View style={s.pickerBtnRow}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={[s.pickerBtn, { borderColor: t.cardBorder }]}>
-                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 16 }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setPeriodMode('date'); setShowDatePicker(false) }}
-                  style={[s.pickerBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 16 }}>Apply</Text>
-                </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <Btn grow label="Cancel" variant="secondary" onPress={() => setShowDatePicker(false)} />
+                <Btn grow label="Apply" onPress={() => { setPeriodMode('date'); setShowDatePicker(false) }} />
               </View>
             </View>
           </View>
@@ -303,58 +302,32 @@ export function DoctorAnalyticsScreen({ navigation }: Props) {
 
       {showMonthPicker && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setShowMonthPicker(false)}>
-          <View style={s.overlay}>
-            <View style={[s.pickerCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[s.title, { color: t.textPrimary, fontSize: 20, marginBottom: 16 }]}>Pick a Month</Text>
-              <View style={s.monthStepper}>
-                <TouchableOpacity onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)) }} hitSlop={10}>
-                  <Ionicons name="chevron-back" size={20} color={t.textPrimary} />
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <View style={{ width: '100%', maxWidth: 380, borderRadius: 18, borderWidth: 1, borderColor: t.q.line, backgroundColor: t.q.surface, padding: 20 }}>
+              <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '700', color: t.q.ink, marginBottom: 16 }}>
+                Pick a month
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous month" hitSlop={10}
+                  onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)) }}>
+                  <Ionicons name="chevron-back" size={20} color={t.q.ink} />
                 </TouchableOpacity>
-                <Text style={[s.monthStepperLabel, { color: t.textPrimary }]}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: t.q.ink }}>
                   {MONTH_NAMES_FULL[pickedMonth.getMonth()]} {pickedMonth.getFullYear()}
                 </Text>
-                <TouchableOpacity onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)) }} hitSlop={10}>
-                  <Ionicons name="chevron-forward" size={20} color={t.textPrimary} />
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next month" hitSlop={10}
+                  onPress={() => { haptics.tap(); setPickedMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)) }}>
+                  <Ionicons name="chevron-forward" size={20} color={t.q.ink} />
                 </TouchableOpacity>
               </View>
-              <View style={s.pickerBtnRow}>
-                <TouchableOpacity onPress={() => setShowMonthPicker(false)} style={[s.pickerBtn, { borderColor: t.cardBorder }]}>
-                  <Text style={{ color: t.textMuted, fontWeight: '600', fontSize: 16 }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setPeriodMode('pickedMonth'); setShowMonthPicker(false) }}
-                  style={[s.pickerBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                  <Text style={{ color: t.accent, fontWeight: '800', fontSize: 16 }}>Apply</Text>
-                </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <Btn grow label="Cancel" variant="secondary" onPress={() => setShowMonthPicker(false)} />
+                <Btn grow label="Apply" onPress={() => { setPeriodMode('pickedMonth'); setShowMonthPicker(false) }} />
               </View>
             </View>
           </View>
         </Modal>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  header:      { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
-  title:       { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  kpiGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
-  kpiCard:     { flexBasis: '31%', flexGrow: 1, borderRadius: 14, borderWidth: 1, padding: 12 },
-  kpiValue:    { fontSize: 23, fontWeight: '800', letterSpacing: -0.4 },
-  kpiLabel:    { fontSize: 12, marginTop: 3 },
-  card:        { borderRadius: 16, borderWidth: 1, padding: 16 },
-  cardTitle:   { fontSize: 16, fontWeight: '700' },
-  typeCard:    { borderRadius: 12, padding: 14 },
-  typeCount:   { fontSize: 25, fontWeight: '800' },
-  typeLabel:   { fontSize: 12, marginTop: 2 },
-  typePct:     { fontSize: 13 },
-  ratingBadge: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  barVal:      { fontSize: 10, fontWeight: '700' },
-  barLabel:    { fontSize: 10 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  pickerCard:  { width: '100%', maxWidth: 380, borderRadius: 18, borderWidth: 1, padding: 20 },
-  pickerBtnRow:{ flexDirection: 'row', gap: 10, marginTop: 16 },
-  pickerBtn:   { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: 'center' },
-  monthStepper:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
-  monthStepperLabel: { fontSize: 17, fontWeight: '800' },
-})

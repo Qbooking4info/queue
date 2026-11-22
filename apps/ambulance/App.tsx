@@ -2,21 +2,20 @@ import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
 import React from 'react'
 import * as Sentry from '@sentry/react-native'
-import { NavigationContainer, DarkTheme } from '@react-navigation/native'
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { View, ActivityIndicator, TouchableOpacity } from 'react-native'
-import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { View, ActivityIndicator } from 'react-native'
 
-import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
+import { ThemeProvider, useTheme, V4_PALETTES } from '@queue/shared/contexts/ThemeContext'
 import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth }   from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
+import { useDeviceRegistration }   from '@queue/shared/hooks/useDeviceRegistration'
 import { usePushNotifications }    from '@queue/shared/hooks/usePushNotifications'
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
@@ -39,6 +38,7 @@ import { CrewMessagesScreen } from './screens/crew/CrewMessagesScreen'
 import { CrewTrackScreen } from './screens/crew/CrewTrackScreen'
 import { ChatScreen } from '@queue/shared/screens/ChatScreen'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import { QTabBar } from '@queue/shared/components/q'
 
 import { AmbulanceProviderRegisterScreen } from './screens/AmbulanceProviderRegisterScreen'
 import { AmbulanceProviderOnboardingScreen } from './screens/onboarding/AmbulanceProviderOnboardingScreen'
@@ -55,10 +55,6 @@ const CrewStackN = createNativeStackNavigator()
 const AdminTab    = createBottomTabNavigator()
 const AdminStackN = createNativeStackNavigator()
 const OnboardStk  = createNativeStackNavigator()
-
-function TabIcon({ name, color, size }: any) {
-  return <Ionicons name={name} color={color} size={size ?? 22} />
-}
 
 // Crew accounts are provisioned by the fleet or hospital that employs them -- there's no
 // self-registration here, so registerRoute is null to hide the shared login screen's
@@ -82,7 +78,7 @@ function CrewAuthStack() {
   const { theme: t } = useTheme()
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <AuthStack.Screen name="Login" component={LoginScreen} initialParams={LOGIN_PARAMS} />
       <AuthStack.Screen name="AmbulanceProviderRegister" component={AmbulanceProviderRegisterScreen} />
     </AuthStack.Navigator>
@@ -91,30 +87,26 @@ function CrewAuthStack() {
 
 function CrewTabs() {
   const unread = useUnreadMessages('crew')
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <CrewTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 80 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-    }}
-      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
-      <CrewTab.Screen name="CrewHome"    component={CrewHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'medkit' : 'medkit-outline'} {...p} />, tabBarLabel: 'Jobs' }} />
-      <CrewTab.Screen name="CrewMessages" component={CrewMessagesScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages',
-        tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 } }} />
-      <CrewTab.Screen name="CrewProfile" component={CrewProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    <CrewTab.Navigator
+      // Same custom bar as the other three apps: the selected tab is marked by
+      // a rule on its own top edge, which the default bar cannot draw.
+      tabBar={props => <QTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <CrewTab.Screen name="CrewHome"     component={CrewHomeScreen}     options={{ tabBarLabel: 'Run' }} />
+      <CrewTab.Screen name="CrewMessages" component={CrewMessagesScreen}
+        options={{ tabBarLabel: 'Messages', tabBarBadge: unread > 0 ? '' : undefined }} />
+      <CrewTab.Screen name="CrewProfile"  component={CrewProfileScreen}  options={{ tabBarLabel: 'Crew' }} />
     </CrewTab.Navigator>
   )
 }
 
 // Tabs plus pushed screens (chat threads).
 function CrewStack() {
+  const { theme: t } = useTheme()
   return (
     <CrewStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <CrewStackN.Screen name="CrewTabs" component={CrewTabs} />
       <CrewStackN.Screen name="Chat"     component={ChatScreen as any} />
       <CrewStackN.Screen name="Track"    component={CrewTrackScreen as any} />
@@ -137,28 +129,23 @@ function ProviderOnboardingStack() {
 // dispatcher_alerts is scoped to a request's destination hospital, not to a
 // provider, so it has nothing to show either kind. That stays hospital-side.
 function AdminTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <AdminTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 80 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-    }}
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
-      <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />, tabBarLabel: 'Home' }} />
-      <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'car-sport' : 'car-sport-outline'} {...p} />, tabBarLabel: 'Fleet' }} />
-      <AdminTab.Screen name="FleetMap"     component={FleetMapScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'map' : 'map-outline'} {...p} />, tabBarLabel: 'Map' }} />
-      <AdminTab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />, tabBarLabel: 'Profile' }} />
+    <AdminTab.Navigator
+      tabBar={props => <QTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <AdminTab.Screen name="AdminHome"    component={AdminHomeScreen}    options={{ tabBarLabel: 'Home' }} />
+      <AdminTab.Screen name="AdminFleet"   component={AdminFleetScreen}   options={{ tabBarLabel: 'Fleet' }} />
+      <AdminTab.Screen name="FleetMap"     component={FleetMapScreen}     options={{ tabBarLabel: 'Map' }} />
+      <AdminTab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </AdminTab.Navigator>
   )
 }
 
 function AdminStack() {
+  const { theme: t } = useTheme()
   return (
     <AdminStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <AdminStackN.Screen name="AdminTabs" component={AdminTabs} />
       <AdminStackN.Screen name="ProviderSettings" component={ProviderSettingsScreen as any} />
       <AdminStackN.Screen name="Chat" component={ChatScreen as any} />
@@ -174,6 +161,7 @@ function AppNavigator() {
   } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  useDeviceRegistration(user?.id, 'ambulance')
 
   if (loading) {
     return (
@@ -233,10 +221,15 @@ function AppNavigator() {
 // for every screen at once rather than per-screen.
 function ThemedNav({ children }: { children: React.ReactNode }) {
   const { theme: t } = useTheme()
+  // The ambulance app defaults to the DARK palette, but a crew member can
+  // switch to light -- so the navigator theme follows the palette rather than
+  // being pinned, or a light palette flashes dark on every push.
+  const base = t.isDark ? DarkTheme : DefaultTheme
   const navTheme = {
-    ...DarkTheme,
+    ...base,
+    dark: t.isDark,
     colors: {
-      ...DarkTheme.colors,
+      ...base.colors,
       background: t.canvasBg,
       card:       t.cardBg,
       text:       t.textPrimary,
@@ -255,7 +248,7 @@ function App() {
   const fontsReady = useQueueFonts()
   if (!fontsReady) return null
   return (
-    <ThemeProvider>
+    <ThemeProvider palettes={V4_PALETTES} defaultMode="dark">
       <AlertProvider>
         <AuthProvider>
           <LocationProvider>

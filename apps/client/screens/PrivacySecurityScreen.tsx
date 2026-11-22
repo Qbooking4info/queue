@@ -1,21 +1,35 @@
-import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { useCallback, useState } from 'react'
+import { View, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { Button } from '@queue/shared/components/ui/Button'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Btn, Notice, Initials, Empty, Mono,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase }  from '@queue/shared/lib/supabase'
 import { deleteAccount } from '@queue/shared/lib/api'
 import { PasswordInput, PasswordChecklist, passwordProblem } from '@queue/shared/components/ui/PasswordField'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import {
+  listMyDevices, forgetDevice, signOutOtherDevices, getInstallId, type UserDevice,
+} from '@queue/shared/lib/devices'
+import { haptics } from '@queue/shared/lib/haptics'
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 
 interface Props { navigation: any }
+
+/** "2 hours ago", "yesterday", "12 Mar" — enough to recognise a device by. */
+function lastSeen(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000))
+  if (mins < 2) return 'in use now'
+  if (mins < 60) return `${mins} min ago`
+  if (mins < 48 * 60) return mins < 24 * 60 ? `${Math.floor(mins / 60)} h ago` : 'yesterday'
+  return new Date(iso).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
+}
 
 export function PrivacySecurityScreen({ navigation }: Props) {
   const { theme: t }      = useTheme()
@@ -27,6 +41,22 @@ export function PrivacySecurityScreen({ navigation }: Props) {
   const [pwError,    setPwError]    = useState('')
   const [pwSuccess,  setPwSuccess]  = useState(false)
   const [saving,     setSaving]     = useState(false)
+  const [devices, setDevices] = useState<UserDevice[]>([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [installId, setInstallId] = useState<string | null>(null)
+  const [endingOthers, setEndingOthers] = useState(false)
+
+  const loadDevices = useCallback(async () => {
+    const [list, id] = await Promise.all([
+      listMyDevices().catch(() => [] as UserDevice[]),
+      getInstallId().catch(() => null),
+    ])
+    setDevices(list)
+    setInstallId(id)
+    setDevicesLoading(false)
+  }, [])
+
+  useFocusEffect(useCallback(() => { loadDevices() }, [loadDevices]))
 
   // MC1: Verify current password before allowing the update
   async function handleChangePassword() {
@@ -73,82 +103,102 @@ export function PrivacySecurityScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Privacy & Security" onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar title="Privacy & security" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Body keyboardShouldPersistTaps="handled">
+          <Card>
+            <Row
+              leading={<Initials name={user?.full_name} size={44} />}
+              title={user?.full_name ?? '—'}
+              sub={user?.email ?? user?.phone ?? '—'}
+              pill="Verified" pillTone="green"
+            />
+          </Card>
 
-        {/* Account info */}
-        <View style={[s.accountCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={[s.accountAvatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={[s.accountAvatarText, { color: t.accent }]}>
-              {user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() ?? '?'}
-            </Text>
+          <SectionHead title="Change password" />
+          <Card pad style={{ gap: 14 }}>
+            {[
+              { label: 'Current password', value: currentPw, set: setCurrentPw },
+              { label: 'New password', value: newPw, set: setNewPw },
+              { label: 'Confirm password', value: confirmPw, set: setConfirmPw },
+            ].map(f => (
+              <View key={f.label} style={{ gap: 6 }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.q.ink70 }}>{f.label}</Text>
+                <PasswordInput
+                  value={f.value}
+                  onChangeText={f.set}
+                  accessibilityLabel={f.label}
+                  newPassword={f.label !== 'Current password'}
+                />
+                {f.label === 'New password' && <PasswordChecklist password={newPw} />}
+              </View>
+            ))}
+
+            {!!pwError && <Text style={{ fontSize: 12.5, color: t.q.red }}>{pwError}</Text>}
+            {pwSuccess && <Text style={{ fontSize: 12.5, color: t.q.green }}>Password changed.</Text>}
+
+            <Btn label="Update password" loading={saving} onPress={handleChangePassword} />
+          </Card>
+
+          <SectionHead title={devices.length ? `Devices · ${devices.length}` : 'Devices'} />
+          {devicesLoading ? (
+            <ActivityIndicator color={t.q.primary} style={{ marginVertical: 20 }} />
+          ) : devices.length === 0 ? (
+            <Card>
+              <Empty icon="phone-portrait-outline" title="Only this one so far"
+                body="Each device you open Queue on is listed here, with when it was last used." />
+            </Card>
+          ) : (
+            <Card>
+              {devices.map((d, i) => {
+                const isThis = d.install_id === installId
+                return (
+                  <View key={d.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      icon={d.platform === 'web' ? 'desktop-outline' : 'phone-portrait-outline'}
+                      iconTone={isThis ? 'teal' : 'neutral'}
+                      title={d.label ?? 'Unknown device'}
+                      sub={[d.app ? `Queue ${d.app}` : null, lastSeen(d.last_seen_at)].filter(Boolean).join(' · ')}
+                      pill={isThis ? 'This device' : undefined}
+                      pillTone="teal"
+                      right={isThis ? undefined
+                        : <Btn label="Forget" variant="secondary" small
+                            onPress={async () => { await forgetDevice(d.id); loadDevices() }} />} />
+                  </View>
+                )
+              })}
+            </Card>
+          )}
+
+          {/* Said plainly, because the difference matters: forgetting a device
+              removes it from this list and nothing else. Ending sessions is the
+              action that actually locks someone out, and the auth layer only
+              offers it all-at-once. */}
+          <Notice tone="neutral" icon="information-circle-outline">
+            Forgetting a device only removes it from this list — it does not sign that device out. To do
+            that, end the other sessions below.
+          </Notice>
+
+          <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 12 }}>
+            <Btn label="Sign out everywhere else" variant="secondary" icon="log-out-outline"
+              loading={endingOthers}
+              onPress={async () => {
+                setEndingOthers(true)
+                const err = await signOutOtherDevices()
+                setEndingOthers(false)
+                if (err) { haptics.error(); Alert.alert('Could not do that', err); return }
+                haptics.success()
+                Alert.alert('Done', 'Every other device has been signed out. This one stays signed in.')
+                loadDevices()
+              }} />
+            <Btn label="Sign out of all devices" variant="danger" icon="log-out-outline" onPress={() => signOut()} />
+            <DeleteAccount what="your profile, photo, family links and sign-in" />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.accountName, { color: t.textPrimary }]}>{user?.full_name ?? '—'}</Text>
-            <Text style={[s.accountEmail, { color: t.textMuted }]}>{user?.email ?? '—'}</Text>
-          </View>
-          <View style={[s.verifiedBadge, { backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-            <Ionicons name="checkmark-circle" size={11} color={t.accent} />
-            <Text style={[s.verifiedText, { color: t.accent }]}>Verified</Text>
-          </View>
-        </View>
-
-        {/* Change password */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Change password</Text>
-        <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          {[
-            { label: 'Current password', value: currentPw, set: setCurrentPw },
-            { label: 'New password',     value: newPw,     set: setNewPw     },
-            { label: 'Confirm password', value: confirmPw, set: setConfirmPw },
-          ].map(f => (
-            <View key={f.label} style={s.fieldWrap}>
-              <Text style={[s.fieldLabel, { color: t.textMuted }]}>{f.label}</Text>
-              <PasswordInput value={f.value} onChangeText={f.set} accessibilityLabel={f.label} newPassword={f.label !== 'Current password'} />
-              {f.label === 'New password' && <PasswordChecklist password={newPw} />}
-            </View>
-          ))}
-
-          {!!pwError   && <Text style={s.errorText}>{pwError}</Text>}
-          {pwSuccess   && <Text style={s.successText}>Password changed successfully.</Text>}
-
-          <Button label="Update password" onPress={handleChangePassword} loading={saving} />
-        </View>
-
-        {/* MM12: Privacy preference toggles removed — they were static decorations with no backing state */}
-
-        {/* Danger zone */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Account</Text>
-        {/* MH8: navigation.goBack() removed — session becoming null drives navigation automatically */}
-        <Button label="Sign out of all devices" onPress={() => signOut()} variant="danger" icon="log-out-outline" />
-        <DeleteAccount what="your profile, photo, family links and sign-in" />
-      </ScrollView>
+        </Body>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:             { flex: 1 },
-  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  back:             { fontSize: 22 },
-  title:            { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  accountCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 14, marginBottom: 20, borderWidth: 1 },
-  accountAvatar:    { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  accountAvatarText:{ fontSize: 16, fontWeight: '800' },
-  accountName:      { fontSize: 14, fontWeight: '700' },
-  accountEmail:     { fontSize: 11, marginTop: 2 },
-  verifiedBadge:    { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  verifiedText:     { fontSize: 10, fontWeight: '700' },
-  sectionTitle:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginTop: 4 },
-  card:             { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 16 },
-  fieldWrap:        { marginBottom: 12 },
-  fieldLabel:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  input:            { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
-  errorText:        { color: '#F87171', fontSize: 12, marginBottom: 8 },
-  successText:      { color: '#4ADE80', fontSize: 12, marginBottom: 8 },
-  dangerBtn:        { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 13, borderWidth: 1 },
-  dangerBtnText:    { fontSize: 13, fontWeight: '600' },
-})

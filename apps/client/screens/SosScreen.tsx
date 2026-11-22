@@ -1,27 +1,30 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, Linking, ScrollView } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Pressable, Linking } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
+import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { getFreshFix, geocodePickup } from '@queue/shared/lib/fresh-location'
 import { supabase } from '@queue/shared/lib/supabase'
 import { requestAmbulance } from '@queue/shared/lib/ambulance-api'
 import { haptics } from '@queue/shared/lib/haptics'
 import { HoldButton } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Field, Notice, Btn, BottomBar, IconBtn,
+} from '@queue/shared/components/q'
 
-// v3.1 "dispatch first": one hold sends the request with the caller's location.
-// Triage is asked while the crew is being found, never before. Until the server can
-// accept triage answers after the fact, an SOS dispatches as triage 2 / ALS -- the
-// safe default that never under-sends a vehicle.
+// "Dispatch first": one hold sends the request with the caller's location.
+// Triage is asked while the crew is being found, never before. Until the server
+// can accept triage answers after the fact, an SOS dispatches as triage 2 / ALS
+// -- the safe default that never under-sends a vehicle.
 const WHO = ['Me', 'Family member', 'Someone else'] as const
-const RELATIONSHIP: Record<typeof WHO[number], 'self' | 'relative' | 'bystander'> = { 'Me': 'self', 'Family member': 'relative', 'Someone else': 'bystander' }
-
-const RED_DEEP = '#7F1D1D'
+const RELATIONSHIP: Record<typeof WHO[number], 'self' | 'relative' | 'bystander'> = {
+  'Me': 'self', 'Family member': 'relative', 'Someone else': 'bystander',
+}
 
 interface Props { navigation: any }
 
 export function SosScreen({ navigation }: Props) {
+  const { theme: t } = useTheme()
   const { user } = useAuth()
   const [who, setWho] = useState<typeof WHO[number]>('Me')
   const [state, setState] = useState<'idle' | 'locating' | 'sending' | 'error'>('idle')
@@ -45,16 +48,16 @@ export function SosScreen({ navigation }: Props) {
       setNeedsSettings(located.reason === 'permission_denied')
       setNoFix(true)
       setError(located.reason === 'permission_denied'
-        ? "Queue can't see your location. Type where you are below, allow location in Settings, or call 112 or 767 now."
-        : "We couldn't get your location. Type where you are below, or call 112 or 767 now.")
+        ? 'Queue cannot see your location. Type where you are below, allow location in Settings, or call 112 or 767 now.'
+        : 'We could not get your location. Type where you are below, or call 112 or 767 now.')
       setHoldKey(k => k + 1)
       return
     }
     await dispatch(located.fix)
   }
 
-  // Typed-address fallback. The words the caller typed go to the crew as the pickup
-  // address; the geocoded point only steers dispatch to the right area.
+  // Typed-address fallback. The words the caller typed go to the crew as the
+  // pickup address; the geocoded point only steers dispatch to the right area.
   async function sendTyped() {
     haptics.heavy()
     const address = typedAddress.trim()
@@ -63,7 +66,7 @@ export function SosScreen({ navigation }: Props) {
     const point = session ? await geocodePickup(address, session.access_token) : null
     if (!point) {
       setState('error')
-      setError("We couldn't find that place. Add the street and area (e.g. \"12 Allen Ave, Ikeja\"), or call 112 or 767 now.")
+      setError('We could not find that place. Add the street and area (for example "12 Allen Ave, Ikeja"), or call 112 or 767 now.')
       return
     }
     await dispatch(point, address)
@@ -81,7 +84,10 @@ export function SosScreen({ navigation }: Props) {
         contactPhone: user?.phone ?? undefined,
         requesterRelationship: RELATIONSHIP[who],
         symptomDescription: 'SOS',
-        ...(typed ? { pickupAddress: typed, pickupNotes: 'GPS unavailable: location typed by caller, pin is approximate. Call the caller to confirm.' } : {}),
+        ...(typed ? {
+          pickupAddress: typed,
+          pickupNotes: 'GPS unavailable: location typed by caller, pin is approximate. Call the caller to confirm.',
+        } : {}),
       })
       navigation.replace('SosTriage', { requestId: req.id })
     } catch (e) {
@@ -91,84 +97,105 @@ export function SosScreen({ navigation }: Props) {
     }
   }
 
+  const busy = state === 'locating' || state === 'sending'
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF5F5' }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20, gap: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close"
-            style={{ width: 48, height: 48, borderRadius: 99, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FECACA', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="close" size={20} color={RED_DEEP} />
-          </TouchableOpacity>
-          <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '800', color: RED_DEEP }}>Emergency SOS</Text>
+    // The one screen that keeps a colour of its own. Everything else on the
+    // emergency path is ordinary canvas with red accents; this is the page
+    // somebody opens in a panic, so the whole surface says what it is.
+    <Screen style={{ backgroundColor: t.q.redBg }}>
+      <AppBar
+        title="Emergency SOS"
+        onBack={undefined}
+        right={<IconBtn name="close" label="Close" color={t.q.red} onPress={() => navigation.goBack()} />}
+      />
+
+      <Body>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70 }}>
+            We find the nearest ambulance crew and share your location with them. If someone is not
+            breathing, call 112 now as well.
+          </Text>
         </View>
 
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: RED_DEEP }}>Who needs help?</Text>
-          <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', gap: 8 }}>
-            {WHO.map(w => {
-              const sel = w === who
-              return (
-                <TouchableOpacity key={w} onPress={() => { haptics.tap(); setWho(w) }} accessibilityRole="radio" accessibilityState={{ selected: sel }}
-                  style={{ flex: 1, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
-                    backgroundColor: sel ? RED_DEEP : '#FFFFFF', borderWidth: sel ? 0 : 1, borderColor: '#FECACA' }}>
-                  <Text style={{ fontSize: 13, fontWeight: sel ? '700' : '500', color: sel ? '#FFFFFF' : RED_DEEP, textAlign: 'center' }}>{w}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          <CardLabel>Who needs help?</CardLabel>
+        </View>
+        <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
+          {WHO.map(w => {
+            const on = w === who
+            return (
+              <Pressable
+                key={w}
+                onPress={() => { haptics.tap(); setWho(w) }}
+                accessibilityRole="radio" accessibilityState={{ selected: on }}
+                style={{
+                  flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center',
+                  paddingHorizontal: 6, borderRadius: 14,
+                  backgroundColor: on ? t.q.red : t.q.surface,
+                  borderWidth: 1, borderColor: on ? t.q.red : t.q.line,
+                }}>
+                <Text style={{ fontSize: 13, fontWeight: on ? '700' : '500', color: on ? '#FFFFFF' : t.q.ink, textAlign: 'center' }}>
+                  {w}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
 
-        <View style={{ alignItems: 'center', gap: 12, marginTop: 8 }}>
-          {state === 'locating' || state === 'sending' ? (
-            <View style={{ alignItems: 'center', gap: 10, paddingVertical: 60 }}>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: RED_DEEP }}>{state === 'locating' ? 'Finding your location…' : 'Sending SOS…'}</Text>
-              <Text style={{ fontSize: 14, color: RED_DEEP }}>{state === 'locating' ? 'This takes a few seconds' : 'Sharing your location with nearby crews'}</Text>
+        <View style={{ alignItems: 'center', gap: 14, paddingTop: 28, paddingHorizontal: 24 }}>
+          {busy ? (
+            <View style={{ alignItems: 'center', gap: 8, paddingVertical: 56 }}>
+              <Text accessibilityLiveRegion="polite" style={{ fontSize: 22, fontWeight: '800', color: t.q.red }}>
+                {state === 'locating' ? 'Finding your location…' : 'Sending SOS…'}
+              </Text>
+              <Text style={{ fontSize: 14, color: t.q.ink70 }}>
+                {state === 'locating' ? 'This takes a few seconds' : 'Sharing your location with nearby crews'}
+              </Text>
             </View>
           ) : (
             <HoldButton key={holdKey} label="SOS" onComplete={send} />
           )}
-          <Text style={{ fontSize: 14, color: RED_DEEP, textAlign: 'center', lineHeight: 20, maxWidth: 320 }}>
-            Hold for 2 seconds. Letting go early sends nothing. We share your location as soon as it sends.
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70, textAlign: 'center', maxWidth: 320 }}>
+            Hold for two seconds. Letting go early sends nothing.
           </Text>
-          {state === 'error' && (
-            <View accessibilityRole="alert" style={{ alignSelf: 'stretch', backgroundColor: '#FEE2E2', borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontSize: 14, color: RED_DEEP, lineHeight: 20 }}>{error}</Text>
-              {noFix && (
-                <View style={{ marginTop: 10, gap: 8 }}>
-                  <TextInput
-                    value={typedAddress}
-                    onChangeText={setTypedAddress}
-                    placeholder="Street, area or landmark"
-                    accessibilityLabel="Where are you?"
-                    autoCapitalize="words"
-                    style={{ minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFFFFF', paddingHorizontal: 12, fontSize: 15, color: RED_DEEP }}
-                  />
-                  <TouchableOpacity onPress={sendTyped} disabled={typedAddress.trim().length < 3}
-                    accessibilityRole="button" accessibilityState={{ disabled: typedAddress.trim().length < 3 }}
-                    style={{ minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: typedAddress.trim().length < 3 ? '#FCA5A5' : '#B91C1C' }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>Send SOS to this place</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {needsSettings && (
-                <TouchableOpacity onPress={() => Linking.openSettings()} accessibilityRole="button" style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: RED_DEEP, textDecorationLine: 'underline' }}>Open settings</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
         </View>
 
-        <View style={{ marginTop: 'auto', flexDirection: 'row', gap: 8 }}>
-          {[['112', 'Call 112'], ['767', 'Lagos 767']].map(([num, label]) => (
-            <TouchableOpacity key={num} onPress={() => Linking.openURL(`tel:${num}`)} accessibilityRole="button" accessibilityLabel={label}
-              style={{ flex: 1, height: 52, borderRadius: 13, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#B91C1C', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: '#B91C1C' }}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        {state === 'error' && (
+          <>
+            <Notice tone="red">{error}</Notice>
+            {noFix && (
+              <Card pad style={{ gap: 10 }}>
+                <Field
+                  label="Where are you?"
+                  value={typedAddress}
+                  onChangeText={setTypedAddress}
+                  placeholder="Street, area or landmark"
+                  autoCapitalize="words"
+                />
+                <Btn
+                  label="Send SOS to this place"
+                  variant="danger"
+                  disabled={typedAddress.trim().length < 3}
+                  onPress={sendTyped}
+                />
+              </Card>
+            )}
+            {needsSettings && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+                <Btn label="Open settings" variant="secondary" small onPress={() => Linking.openSettings()} />
+              </View>
+            )}
+          </>
+        )}
+      </Body>
+
+      <BottomBar>
+        <Btn grow label="Call 112" variant="danger" icon="call"
+          onPress={() => Linking.openURL('tel:112').catch(() => {})} />
+        <Btn grow label="Call 767" variant="secondary" icon="call-outline"
+          onPress={() => Linking.openURL('tel:767').catch(() => {})} />
+      </BottomBar>
+    </Screen>
   )
 }

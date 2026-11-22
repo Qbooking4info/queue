@@ -21,15 +21,29 @@ import { todayLocalDate } from '@/lib/dashboard-utils'
 // under an advisory lock per (doctor, day). Computing them here in JS raced two
 // concurrent check-ins against each other (both could read "0 others ahead" before
 // either write landed) and produced duplicate queue_position values.
+// A booking a hospital has not approved yet must not reach the queue: checking
+// it in would put the patient in front of a doctor on the strength of a request
+// nobody accepted. The database guard only makes 'rejected' final, so this is
+// the only place the distinction is enforced.
+const UNAPPROVED = ['pending_approval', 'pending_review']
+
 export async function checkInAppointment(
   db: ReturnType<typeof createAdminClient>, appointmentId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data: appt, error: fetchErr } = await db
     .from('appointments')
-    .select('status')
+    .select('status, approval_status')
     .eq('id', appointmentId)
     .single()
   if (fetchErr || !appt) return { ok: false, error: 'Appointment not found' }
+
+  const approval = (appt as { approval_status?: string | null }).approval_status
+  if (approval && UNAPPROVED.includes(approval)) {
+    return { ok: false, error: 'This booking is still waiting for the hospital to approve it.' }
+  }
+  if (approval === 'rejected') {
+    return { ok: false, error: 'This booking was rejected and cannot be checked in.' }
+  }
 
   const checkInDate = todayLocalDate()
 

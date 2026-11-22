@@ -1,35 +1,34 @@
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, Linking, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, Linking, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { Button } from '@queue/shared/components/ui/Button'
-import { useAuth }  from '@queue/shared/contexts/AuthContext'
+import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Field, Btn, Mono, CardLabel,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
 const FAQS = [
-  { q: 'How do I book an appointment?', a: 'Go to the Search tab or tap a hospital on the Home screen. Select a doctor, choose a date and time slot, fill in your details and confirm payment.' },
-  { q: 'Can I book for a family member?', a: 'Yes. During the booking flow, choose "A dependent" in the Booking for step. You can add dependents in Profile › Manage dependents.' },
-  { q: 'How do I cancel or reschedule?', a: 'Open the appointment in the Bookings tab and tap Reschedule or Cancel. Nothing is charged when you book — you pay at the hospital — so cancelling costs you nothing.' },
-  { q: 'What payment methods are accepted?', a: 'We accept debit/credit cards, bank transfer, USSD, and HMO insurance. You can switch your payment method before confirming.' },
-  { q: 'How does the virtual consultation work?', a: 'Choose "Virtual" when selecting consultation type. A video room link will be sent to you 5 minutes before your slot. Join from the Bookings tab.' },
-  { q: 'Is my health data secure?', a: 'Yes. All data is encrypted in transit and at rest. We comply with NDPR (Nigeria Data Protection Regulation) and never share identifiable data without consent.' },
-  { q: 'What is the emergency booking premium?', a: 'Marking a booking as Emergency carries a 2× fee and places you at the top of the queue — the same whether you start from the red banner on Home or flag a regular booking as Emergency during Details. Either way, a doctor is prioritized for you at the hospital.' },
-  { q: 'How do I get a refund?', a: 'Queue does not take payment for bookings — you pay the hospital directly when you are seen. There is nothing to refund if you cancel.' },
+  { q: 'How do I book an appointment?', a: 'Open Find care, or tap a hospital on Home. Choose a doctor or let the hospital assign one, pick a date and arrival window, then confirm.' },
+  { q: 'Can I book for a family member?', a: 'Yes. In the booking flow, choose them under "Who is this for?". You add people in Profile, then Dependents.' },
+  { q: 'How do I cancel or reschedule?', a: 'Open the appointment and tap Cancel or Reschedule. Cancel before your window and nothing is charged.' },
+  { q: 'Why did my number change?', a: 'Emergencies are seen first. When one arrives, everyone behind moves back by one — your place in the ordinary queue is not lost, and the live queue screen says how many were brought forward.' },
+  { q: 'What payment methods are accepted?', a: 'Card, bank transfer, USSD, your Queue wallet, and HMO insurance where the hospital accepts it.' },
+  { q: 'How does a video visit work?', a: 'Book a virtual visit and join from the appointment when your window comes. The doctor calls you — you do not need to be at the hospital.' },
+  { q: 'Is my health data secure?', a: 'Yes. Data is encrypted in transit and at rest. We comply with the NDPR and never share identifiable data without your consent.' },
+  { q: 'What is the emergency premium?', a: 'An emergency booking carries a higher fee and places you at the top of today’s queue, whichever way you start it.' },
+  { q: 'How do I get a refund?', a: 'A cancelled or rejected booking is refunded to your wallet. If you paid at the hospital, the hospital refunds you directly.' },
 ]
 
 export function SupportScreen({ navigation }: Props) {
-  const { theme: t }      = useTheme()
-  const { user }          = useAuth()
+  const { theme: t } = useTheme()
+  const { user } = useAuth()
   const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const [query, setQuery]    = useState('')
-  const [sent, setSent]      = useState(false)
+  const [query, setQuery] = useState('')
   const [sending, setSending] = useState(false)
 
   async function handleSend() {
@@ -37,137 +36,109 @@ export function SupportScreen({ navigation }: Props) {
     setSending(true)
     const { error } = await supabase.from('support_tickets').insert({
       user_id: user?.id ?? null,
-      email:   user?.email ?? null,
+      email: user?.email ?? null,
       message: query.trim(),
     })
     setSending(false)
     if (error) {
       haptics.error()
-      Alert.alert('Failed to send', 'Could not send your message. Please try again.')
+      Alert.alert('Could not send', 'Your message did not go through. Please try again.')
       return
     }
     haptics.success()
-    Alert.alert('Message received', "Your message has been received. We'll get back to you within 24 hours.")
-    setSent(true)
+    Alert.alert('Message received', 'We will get back to you within 24 hours.')
     setQuery('')
   }
 
-  function handleContact(label: string) {
-    if (label === 'Call us')   { Linking.openURL('tel:+2347007838383'); return }
-    if (label === 'Email us')  { Linking.openURL('mailto:support@queueapp.ng'); return }
-    if (label === 'WhatsApp')  { Linking.openURL('https://wa.me/2347007838383'); return }
-    if (label === 'Live chat') { Alert.alert('Coming soon', 'Live chat is not yet available. Use WhatsApp or email for faster support.'); return }
-  }
-
-  const CONTACT_OPTIONS = [
-    { icon: 'chatbubbles-outline' as const, label: 'Live chat',  sub: 'Typically replies in minutes',   color: t.accent,   bg: t.accentBg,   border: t.accentBorder },
-    { icon: 'call-outline' as const,        label: 'Call us',    sub: '+234 700 QUEUE (78383)',           color: '#38BDF8', bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.3)' },
-    { icon: 'mail-outline' as const,        label: 'Email us',   sub: 'support@queueapp.ng',             color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' },
-    { icon: 'logo-whatsapp' as const,       label: 'WhatsApp',   sub: 'Chat on WhatsApp',                color: '#4ADE80', bg: 'rgba(74,222,128,0.1)', border: 'rgba(74,222,128,0.3)' },
-  ]
+  const open = (url: string) => Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open that.'))
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Support & Help" onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar title="Support & help" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.4, color: t.q.ink }}>
+              How can we help?
+            </Text>
+            <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink60, marginTop: 4 }}>
+              Our support team is available 8am–10pm daily.
+            </Text>
+          </View>
 
-        {/* Hero */}
-        <View style={[s.heroCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Ionicons name="happy-outline" size={32} color={t.accent} style={{ marginBottom: 8 }} />
-          <Text style={[s.heroTitle, { color: t.textPrimary }]}>How can we help?</Text>
-          <Text style={[s.heroSub, { color: t.textMuted }]}>Our support team is available 8AM–10PM daily.</Text>
-        </View>
+          <Card>
+            {/* A phone number and an address, shown as text as well as linked:
+                a tel: or mailto: link does not open on every device, and a
+                number you can read is one you can dial by hand. */}
+            <Row
+              icon="call-outline"
+              title="Call us"
+              sub="8am–10pm daily"
+              right={<Mono size={13} weight="700">+234 700 78383</Mono>}
+              onPress={() => open('tel:+2347007838383')}
+            />
+            <Hair />
+            <Row
+              icon="logo-whatsapp" iconTone="green"
+              title="WhatsApp"
+              sub="Usually the fastest reply"
+              chevron
+              onPress={() => open('https://wa.me/2347007838383')}
+            />
+            <Hair />
+            <Row
+              icon="mail-outline"
+              title="Email us"
+              sub="support@queueapp.ng"
+              chevron
+              onPress={() => open('mailto:support@queueapp.ng')}
+            />
+          </Card>
 
-        {/* Contact options */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Contact us</Text>
-        <View style={s.contactGrid}>
-          {CONTACT_OPTIONS.map(opt => (
-            <TouchableOpacity key={opt.label} onPress={() => handleContact(opt.label)} style={[s.contactCard, { backgroundColor: opt.bg, borderColor: opt.border }]}>
-              <Ionicons name={opt.icon} size={24} color={opt.color} style={{ marginBottom: 6 }} />
-              <Text style={[s.contactLabel, { color: opt.color }]}>{opt.label}</Text>
-              <Text style={[s.contactSub, { color: t.textMuted }]} numberOfLines={1}>{opt.sub}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <SectionHead title="Send us a message" />
+          <Card pad style={{ gap: 12 }}>
+            <Field
+              label="What has gone wrong?"
+              value={query}
+              onChangeText={setQuery}
+              multiline
+              numberOfLines={4}
+              placeholder="Tell us what happened, and which booking it was about…"
+              style={{ minHeight: 100, textAlignVertical: 'top' }}
+            />
+            <Btn label="Send message" loading={sending} disabled={!query.trim()} onPress={handleSend} />
+          </Card>
 
-        {/* Send a message */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Send a message</Text>
-        <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          {sent ? (
-            <View style={{ alignItems: 'center', padding: 12 }}>
-              <Ionicons name="checkmark-circle" size={28} color={t.accent} style={{ marginBottom: 8 }} />
-              <Text style={[s.sentTitle, { color: t.textPrimary }]}>Message sent!</Text>
-              <Text style={[s.sentSub, { color: t.textMuted }]}>We'll get back to you within 24 hours.</Text>
-              <TouchableOpacity onPress={() => setSent(false)} style={[s.sendAgainBtn, { borderColor: t.cardBorder }]}>
-                <Text style={[s.sendAgainText, { color: t.accent }]}>Send another message</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <TextInput
-                value={query} onChangeText={setQuery}
-                placeholder="Describe your issue or question…"
-                placeholderTextColor={t.textMuted}
-                multiline numberOfLines={4}
-                style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-              />
-              <Button label="Send message" onPress={handleSend} loading={sending} disabled={!query.trim()} />
-            </>
-          )}
-        </View>
+          <SectionHead title="Frequently asked" />
+          <Card>
+            {FAQS.map((f, i) => {
+              const on = openFaq === i
+              return (
+                <View key={f.q}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    icon={on ? 'chevron-down' : 'help-circle-outline'}
+                    iconTone="neutral"
+                    title={f.q}
+                    onPress={() => setOpenFaq(on ? null : i)}
+                  />
+                  {on && (
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingLeft: 62 }}>
+                      <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70 }}>{f.a}</Text>
+                    </View>
+                  )}
+                </View>
+              )
+            })}
+          </Card>
 
-        {/* FAQs */}
-        <Text style={[s.sectionTitle, { color: t.textMuted }]}>Frequently asked questions</Text>
-        {FAQS.map((faq, i) => (
-          <TouchableOpacity key={i} onPress={() => setOpenFaq(openFaq === i ? null : i)}
-            style={[s.faqItem, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={s.faqHeader}>
-              <Text style={[s.faqQ, { color: t.textPrimary, flex: 1 }]}>{faq.q}</Text>
-              <Text style={[s.faqArrow, { color: t.textMuted }]}>{openFaq === i ? '▲' : '▼'}</Text>
-            </View>
-            {openFaq === i && (
-              <Text style={[s.faqA, { color: t.textSecondary, borderTopColor: t.cardBorder }]}>{faq.a}</Text>
-            )}
-          </TouchableOpacity>
-        ))}
-
-        {/* App info */}
-        <View style={[s.appInfo, { borderTopColor: t.cardBorder }]}>
-          <Text style={[s.appInfoText, { color: t.textMuted }]}>Queue · v1.0.0 · queueapp.ng</Text>
-          <Text style={[s.appInfoText, { color: t.textMuted }]}>Made with love in Nigeria</Text>
-        </View>
-      </ScrollView>
+          <View style={{ alignItems: 'center', paddingTop: 20, gap: 2 }}>
+            <CardLabel>Queue</CardLabel>
+            <Mono size={11} color={t.q.ink60}>v1.0.0 · queueapp.ng · Made in Nigeria</Mono>
+          </View>
+        </Body>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:           { flex: 1 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  back:           { fontSize: 22 },
-  title:          { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  heroCard:       { borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center', marginBottom: 20 },
-  heroTitle:      { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
-  heroSub:        { fontSize: 12, marginTop: 4, textAlign: 'center' },
-  sectionTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginTop: 4 },
-  contactGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  contactCard:    { width: '47%', borderRadius: 16, borderWidth: 1, padding: 14, alignItems: 'flex-start' },
-  contactLabel:   { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  contactSub:     { fontSize: 10 },
-  card:           { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 16 },
-  textarea:       { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 100, textAlignVertical: 'top', marginBottom: 10 },
-  sentTitle:      { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  sentSub:        { fontSize: 12, textAlign: 'center', marginBottom: 12 },
-  sendAgainBtn:   { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
-  sendAgainText:  { fontSize: 12, fontWeight: '600' },
-  faqItem:        { borderRadius: 14, borderWidth: 1, marginBottom: 7, overflow: 'hidden' },
-  faqHeader:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 13 },
-  faqQ:           { fontSize: 13, fontWeight: '600', lineHeight: 19 },
-  faqArrow:       { fontSize: 11, marginTop: 2 },
-  faqA:           { fontSize: 12, lineHeight: 19, borderTopWidth: 1, padding: 13, paddingTop: 10 },
-  appInfo:        { alignItems: 'center', paddingTop: 20, borderTopWidth: 1, gap: 4 },
-  appInfoText:    { fontSize: 11 },
-})

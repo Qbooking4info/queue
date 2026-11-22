@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
+import { View, ActivityIndicator, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { getIndependentDoctorProfile, IndependentDoctorProfile, getHospitalById } from '@queue/shared/lib/api'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
+import { getIndependentDoctorProfile, getHospitalById, type IndependentDoctorProfile } from '@queue/shared/lib/api'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { haptics } from '@queue/shared/lib/haptics'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, DetailRow, Btn, BottomBar,
+  Stat, StatStrip, Empty, Mono,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: any }
 
@@ -32,152 +34,150 @@ export function DoctorProfileScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={st.center}><ActivityIndicator color={t.accent} size="large" /></View>
-      </SafeAreaView>
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} size="large" />
+        </View>
+      </Screen>
     )
   }
 
   if (!doctor) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={st.center}>
-          <Text style={{ color: t.textPrimary, fontSize: 14, fontWeight: '700' }}>Doctor not found</Text>
-        </View>
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Doctor" onBack={() => navigation.goBack()} />
+        <Card style={{ marginTop: 16 }}>
+          <Empty icon="person-outline" title="We could not find this doctor"
+            body="They may have left the platform, or the link is out of date."
+            action="Back" onAction={() => navigation.goBack()} />
+        </Card>
+      </Screen>
     )
   }
 
-  const initials = doctor.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  const direct = doctor.acceptsDirectVirtual || doctor.acceptsDirectHomeVisit
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Doctor" onBack={() => navigation.goBack()} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={st.profileCard}>
-          <View style={[st.avatar, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Text style={{ fontSize: 26, fontWeight: '800', color: t.accent }}>{initials}</Text>
-          </View>
-          <Text style={[st.name, { color: t.textPrimary }]}>{doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}</Text>
-          {doctor.specialty && (
-            <Text style={[st.specialty, { color: t.accent }]}>
-              {doctor.specialty.name}{doctor.level ? ` · ${doctor.level}` : ''}
+    <Screen>
+      <AppBar title="Doctor" onBack={() => navigation.goBack()} />
+
+      <Body>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14 }}>
+          <EntityAvatar size={56} kind="doctor" uri={doctor.avatarUrl} gender={doctor.gender} label={doctor.fullName} />
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.4, color: t.q.ink }}>
+              {doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}
             </Text>
-          )}
-          {doctor.qualification && <Text style={[st.qual, { color: t.textMuted }]}>{doctor.qualification}</Text>}
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60 }}>
+              {[
+                doctor.specialty?.name ?? 'General practice',
+                doctor.level,
+                doctor.yearsExperience != null ? `${doctor.yearsExperience} years` : null,
+              ].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
         </View>
 
-        {doctor.bio && (
-          <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[st.sectionTitle, { color: t.textMuted }]}>ABOUT</Text>
-            <Text style={{ fontSize: 13, lineHeight: 20, color: t.textSecondary, padding: 14 }}>{doctor.bio}</Text>
-          </View>
+        {/* What it costs to be seen, by route. Only the routes this doctor
+            actually offers are drawn -- an empty "Home visit" cell would read
+            as "free", which is the opposite of the truth. */}
+        {direct && (
+          <StatStrip>
+            {doctor.acceptsDirectVirtual && (
+              <Stat label="Video" value={doctor.virtualFee != null ? `₦${doctor.virtualFee.toLocaleString('en-NG')}` : '—'}
+                last={!doctor.acceptsDirectHomeVisit} />
+            )}
+            {doctor.acceptsDirectHomeVisit && (
+              <Stat label="Home visit" value={doctor.homeVisitFee != null ? `₦${doctor.homeVisitFee.toLocaleString('en-NG')}` : '—'} last />
+            )}
+          </StatStrip>
         )}
 
-        <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Text style={[st.sectionTitle, { color: t.textMuted }]}>DETAILS</Text>
-          {doctor.yearsExperience != null && <Row label="Experience" value={`${doctor.yearsExperience} years`} theme={t} />}
-          {doctor.phone && <Row label="Phone" value={doctor.phone} theme={t} />}
-        </View>
+        {!!doctor.bio && (
+          <>
+            <SectionHead title="About" />
+            <Card pad>
+              <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70 }}>{doctor.bio}</Text>
+            </Card>
+          </>
+        )}
 
         {doctor.hospitals.length > 0 && (
-          <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[st.sectionTitle, { color: t.textMuted }]}>PRACTICES AT</Text>
-            {doctor.hospitals.map(h => (
-              <TouchableOpacity key={h.id} onPress={() => viewHospital(h.id)} disabled={openingHospitalId !== null}
-                style={[st.row, { borderBottomColor: t.cardBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="business-outline" size={15} color={t.accent} />
-                  <Text style={{ fontSize: 13, color: t.textPrimary }}>{h.name}</Text>
+          <>
+            <SectionHead title="Practises at" />
+            <Card>
+              {doctor.hospitals.map((h, i) => (
+                <View key={h.id}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    icon="business-outline"
+                    title={h.name}
+                    sub={direct ? null : 'Book through this hospital'}
+                    right={openingHospitalId === h.id ? <ActivityIndicator size="small" color={t.q.ink60} /> : undefined}
+                    chevron={openingHospitalId !== h.id}
+                    onPress={() => viewHospital(h.id)}
+                  />
                 </View>
-                {openingHospitalId === h.id ? (
-                  <ActivityIndicator size="small" color={t.textMuted} />
-                ) : (
-                  <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+              ))}
+            </Card>
+          </>
         )}
 
-        {doctor.documents.length > 0 && (
-          <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={[st.sectionTitle, { color: t.textMuted }]}>QUALIFICATIONS & CREDENTIALS</Text>
-            {doctor.documents.map(d => (
-              <TouchableOpacity key={d.id} disabled={!d.url} onPress={() => d.url && Linking.openURL(d.url)}
-                style={[st.row, { borderBottomColor: t.cardBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="document-text-outline" size={15} color={t.accent} />
-                  <Text style={{ fontSize: 13, color: t.textPrimary }}>{d.title}</Text>
+        <SectionHead title="Qualifications & credentials" />
+        <Card>
+          {!!doctor.qualification && <DetailRow label="Degrees" value={doctor.qualification} />}
+          {!!doctor.level && <DetailRow label="Cadre" value={doctor.level} />}
+          {doctor.yearsExperience != null && <DetailRow label="Experience" value={`${doctor.yearsExperience} years`} />}
+          {!!doctor.phone && <DetailRow label="Phone" value={doctor.phone} mono />}
+          {doctor.documents.length > 0
+            ? doctor.documents.map((d, i) => (
+                <View key={d.id}>
+                  <Row
+                    icon="document-text-outline"
+                    title={d.title}
+                    sub={d.url ? 'Tap to open' : 'Not shared publicly'}
+                    right={d.url ? undefined : <Mono size={11} color={t.q.ink60}>PRIVATE</Mono>}
+                    chevron={!!d.url}
+                    onPress={d.url ? () => Linking.openURL(d.url!) : undefined}
+                  />
+                  {i < doctor.documents.length - 1 && <Hair />}
                 </View>
-                <Ionicons name="open-outline" size={14} color={t.textMuted} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+              ))
+            : (!doctor.qualification && !doctor.level && doctor.yearsExperience == null) && (
+                <Empty icon="document-text-outline" title="Nothing published yet"
+                  body="This doctor has not added credentials to their public profile." />
+              )}
+        </Card>
+      </Body>
 
-      {doctor.acceptsDirectVirtual || doctor.acceptsDirectHomeVisit ? (
-        <View style={[st.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
-          {doctor.acceptsDirectVirtual && (
-            <TouchableOpacity
-              onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
-              style={[st.bookBtn, { backgroundColor: t.accent }]}>
-              <Ionicons name="videocam-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-              <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
-                Book Virtual{doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString()}` : ''}
-              </Text>
-            </TouchableOpacity>
-          )}
+      {direct ? (
+        <BottomBar>
           {doctor.acceptsDirectHomeVisit && (
-            <TouchableOpacity
+            <Btn
+              label="Home visit" variant="secondary" icon="home-outline"
               onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'home_visit' }) }}
-              style={[st.bookBtn, { backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.accentBorder }]}>
-              <Ionicons name="home-outline" size={15} color={t.accent} />
-              <Text style={[st.bookBtnText, { color: t.accent }]}>
-                Book Home Visit{doctor.homeVisitFee ? ` · ₦${doctor.homeVisitFee.toLocaleString()}` : ''}
-              </Text>
-            </TouchableOpacity>
+            />
           )}
-        </View>
+          {doctor.acceptsDirectVirtual && (
+            <Btn
+              grow icon="videocam-outline"
+              label={`Book video${doctor.virtualFee ? ` · ₦${doctor.virtualFee.toLocaleString('en-NG')}` : ''}`}
+              onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'virtual' }) }}
+            />
+          )}
+          {!doctor.acceptsDirectVirtual && doctor.acceptsDirectHomeVisit && (
+            <Btn
+              grow icon="home-outline"
+              label={`Request home visit${doctor.homeVisitFee ? ` · ₦${doctor.homeVisitFee.toLocaleString('en-NG')}` : ''}`}
+              onPress={() => { haptics.tap(); navigation.navigate('DirectBooking', { doctor, visitType: 'home_visit' }) }}
+            />
+          )}
+        </BottomBar>
       ) : doctor.hospitals.length > 0 ? (
-        <View style={[st.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
-          <TouchableOpacity
-            onPress={() => viewHospital(doctor.hospitals[0].id)}
-            style={[st.bookBtn, { backgroundColor: t.accent }]}>
-            <Ionicons name="business-outline" size={15} color={t.id === 'forest' ? '#061208' : '#fff'} />
-            <Text style={[st.bookBtnText, { color: t.id === 'forest' ? '#061208' : '#fff' }]}>
-              Book via {doctor.hospitals[0].name}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <BottomBar meta={<Mono size={12} color={t.q.ink60}>Booked through the hospital, at its price</Mono>}>
+          <Btn grow label={`Book via ${doctor.hospitals[0].name}`} onPress={() => viewHospital(doctor.hospitals[0].id)} />
+        </BottomBar>
       ) : null}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-function Row({ label, value, theme: t }: { label: string; value: string; theme: any }) {
-  return (
-    <View style={[st.row, { borderBottomColor: t.cardBorder }]}>
-      <Text style={{ fontSize: 12, color: t.textMuted }}>{label}</Text>
-      <Text style={{ fontSize: 12, fontWeight: '700', color: t.textPrimary }}>{value}</Text>
-    </View>
-  )
-}
-
-const st = StyleSheet.create({
-  safe:         { flex: 1 },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
-  profileCard:  { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20 },
-  avatar:       { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 12 },
-  name:         { fontSize: 19, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  specialty:    { fontSize: 13, fontWeight: '700', marginTop: 4 },
-  qual:         { fontSize: 12, marginTop: 3, textAlign: 'center' },
-  section:      { marginHorizontal: 20, marginBottom: 12, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14 },
-  row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  footer:       { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
-  bookBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 14, paddingVertical: 13 },
-  bookBtnText:  { fontSize: 13, fontWeight: '700' },
-})

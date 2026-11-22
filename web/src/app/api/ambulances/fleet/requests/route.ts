@@ -42,7 +42,8 @@ async function handleGET(req: NextRequest) {
       created_at, matched_at, completed_at,
       patient:users!transport_requests_patient_id_fkey(full_name),
       dependent:dependents(full_name),
-      unit:ambulances!inner(id, plate_number, call_sign, vehicle_tier, provider_id)
+      unit:ambulances!inner(id, plate_number, call_sign, vehicle_tier, provider_id),
+      destination:hospitals!transport_requests_destination_hospital_id_fkey(id, name)
     `)
     .eq('unit.provider_id', providerId)
     .order('created_at', { ascending: false })

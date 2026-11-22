@@ -98,7 +98,7 @@ export function HomeCarousel({ slides }: { slides: Slide[] }) {
 
 function SlideCard({ slide, width }: { slide: Slide; width: number }) {
   const { theme: t } = useTheme()
-  const dark = t.id === 'forest'
+  const dark = t.isDark
   const alert = slide.tone === 'alert'
 
   // Light mode uses a pale mint wash with dark teal text, matching the

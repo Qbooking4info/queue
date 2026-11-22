@@ -1,19 +1,18 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
-import { Card } from '@queue/shared/components/ui/v3'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
-import { TonePill } from './adminBits'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, Btn,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
 export function AdminProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, mode, toggleTheme } = useTheme()
   const { providerAdminProfile, user, signOut } = useAuth()
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -30,72 +29,64 @@ export function AdminProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={[s.title, { color: t.textPrimary }]}>Profile</Text>
+    <Screen>
+      <AppBar large title="Profile" />
 
-        <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
+      <Body>
+        <Card>
           {/* alignItems lives on this inner View, never on the Card itself --
               a Card given alignItems shrink-wraps instead of filling its row. */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <ProfileAvatar name={user?.full_name ?? '—'} size={52} editable />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 }}>
+            <ProfileAvatar name={user?.full_name ?? '—'} size={60} editable />
             <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }} numberOfLines={1}>
+              <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.27, color: t.q.ink }}>
                 {user?.full_name ?? '—'}
               </Text>
-              {!!orgName && (
-                <Text style={{ fontSize: 13, color: t.textMuted }} numberOfLines={1}>{orgName}</Text>
-              )}
-              <TonePill label={roleLabel} tone="ok" />
+              <Text numberOfLines={1} style={{ fontSize: 13, color: t.q.ink60 }}>
+                {[roleLabel, orgName].filter(Boolean).join(' · ')}
+              </Text>
             </View>
           </View>
+          {!!user?.phone && (
+            <>
+              <Hair />
+              <Row compact icon="call-outline" title={user.phone} sub="Your phone" />
+            </>
+          )}
         </Card>
 
-        <Card style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', padding: 0 }}>
-          <TouchableOpacity onPress={() => navigation.navigate('ProviderSettings')} style={s.linkRow}>
-            <Ionicons name="options-outline" size={16} color={t.textPrimary} />
-            <Text style={[s.linkText, { color: t.textPrimary }]}>Service settings</Text>
-            <Ionicons name="chevron-forward" size={16} color={t.textMuted} />
-          </TouchableOpacity>
+        <SectionHead title="Your service" />
+        <Card>
+          <Row icon="options-outline" title="Service settings" sub="Coverage, hours and caps"
+            chevron onPress={() => navigation.navigate('ProviderSettings')} />
+          <Hair />
+          <Row icon="car-sport-outline" title="Your fleet" sub="Ambulances, crews and shifts"
+            chevron onPress={() => navigation.navigate('AdminFleet')} />
         </Card>
 
-        <Card style={{ marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', padding: 0 }}>
-          <View style={[s.row, { borderBottomWidth: 0 }]}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>
-              {themeId === 'forest' ? 'Dark' : 'Light'} mode
-            </Text>
-            <Switch value={themeId === 'forest'} onValueChange={toggleTheme} trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        </Card>
+        <SectionHead title="Appearance" />
+        <Seg<'light' | 'dark'>
+          value={mode === 'dark' ? 'dark' : 'light'}
+          onChange={v => { if (v !== (mode === 'dark' ? 'dark' : 'light')) toggleTheme() }}
+          options={[{ key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]} />
 
-        {confirmVisible ? (
-          <View style={[s.section, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={[s.sectionTitle, { color: t.danger, borderBottomColor: 'rgba(255,92,92,0.15)' }]}>CONFIRM SIGN OUT</Text>
-            <View style={{ flexDirection: 'row', gap: 10, padding: 12 }}>
-              <Button label="Cancel" onPress={() => setConfirmVisible(false)} variant="outline" style={{ flex: 1 }} />
-              <Button label="Sign out" onPress={() => { haptics.tap(); handleSignOut() }} loading={signingOut} variant="danger" style={{ flex: 1 }} />
-            </View>
-          </View>
-        ) : (
-          <Button label="Sign out" onPress={() => setConfirmVisible(true)} variant="danger" style={{ marginHorizontal: 16 }} />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        <View style={{ paddingHorizontal: 16, paddingTop: 18, gap: 12 }}>
+          {confirmVisible ? (
+            <Card>
+              <View style={{ padding: 14, gap: 12 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: t.q.ink }}>Sign out of your account?</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Btn grow label="Cancel" variant="secondary" onPress={() => setConfirmVisible(false)} />
+                  <Btn grow label="Sign out" variant="danger" loading={signingOut}
+                    onPress={() => { haptics.tap(); handleSignOut() }} />
+                </View>
+              </View>
+            </Card>
+          ) : (
+            <Btn label="Sign out" variant="danger" onPress={() => setConfirmVisible(true)} />
+          )}
+        </View>
+      </Body>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:          { flex: 1 },
-  title:         { fontSize: 32, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  profileCard:   { marginHorizontal: 16, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, marginBottom: 12 },
-  name:          { fontSize: 23, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
-  roleBadge:     { marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1 },
-  roleBadgeText: { fontSize: 14, fontWeight: '700' },
-  orgName:       { marginTop: 8, fontSize: 15, fontWeight: '600' },
-  section:       { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginHorizontal: 16, marginBottom: 12 },
-  sectionTitle:  { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14 },
-  rowLabel:      { fontSize: 15 },
-  linkRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
-  linkText:      { fontSize: 15, fontWeight: '600', flex: 1 },
-})

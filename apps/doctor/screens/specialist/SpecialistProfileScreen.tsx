@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity, Clipboard } from 'react-native'
+import { View, Clipboard } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
@@ -7,10 +7,13 @@ import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
 import { todayLocalDate } from '@queue/shared/lib/format'
-import { Header, Card, ListRow, SectionTitle, SegmentedControl, PrimaryButton, KpiCard } from '@queue/shared/components/ui/v3'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
 import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
 import { DeleteAccount } from '@queue/shared/components/DeleteAccount'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Stat, StatStrip,
+  Seg, Btn, Mono, qs,
+} from '@queue/shared/components/q'
 
 interface Props { navigation?: any }
 
@@ -27,23 +30,20 @@ interface DoctorDetails {
   specialty:        { name: string } | null
 }
 
-interface Stats {
-  today:     number
-  thisMonth: number
-  completed: number
-}
+interface Stats { today: number; thisMonth: number; completed: number }
 
 export function SpecialistProfileScreen({ navigation }: Props) {
-  const { theme: t, themeId, toggleTheme } = useTheme()
+  const { theme: t, mode, toggleTheme } = useTheme()
   const { user, doctorProfile, signOut } = useAuth()
-  const [doctor,       setDoctor]       = useState<DoctorDetails | null>(null)
-  const [stats,        setStats]        = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
-  const [loading,      setLoading]      = useState(true)
-  const [signingOut,   setSigningOut]   = useState(false)
+  const [doctor,  setDoctor]  = useState<DoctorDetails | null>(null)
+  const [stats,   setStats]   = useState<Stats>({ today: 0, thisMonth: 0, completed: 0 })
+  const [loading, setLoading] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (!doctorProfile) return
+    if (!doctorProfile) { setLoading(false); return }
 
     async function fetch() {
       const [{ data: doc }, statsRes] = await Promise.all([
@@ -53,24 +53,20 @@ export function SpecialistProfileScreen({ navigation }: Props) {
           .eq('id', doctorProfile!.doctorId)
           .single() as any,
         (async () => {
-          const today   = todayLocalDate()
+          const today = todayLocalDate()
           const monthStart = today.slice(0, 7) + '-01'
-
           const [todayRes, monthRes, completedRes] = await Promise.all([
             supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('doctor_id', doctorProfile!.doctorId).eq('appointment_date', today).neq('status', 'cancelled'),
             supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('doctor_id', doctorProfile!.doctorId).gte('appointment_date', monthStart).neq('status', 'cancelled'),
             supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('doctor_id', doctorProfile!.doctorId).eq('status', 'completed'),
           ])
-
           return { today: todayRes.count ?? 0, thisMonth: monthRes.count ?? 0, completed: completedRes.count ?? 0 }
         })(),
       ])
-
       setDoctor(doc as DoctorDetails)
       setStats(statsRes)
       setLoading(false)
     }
-
     fetch()
   }, [doctorProfile])
 
@@ -79,117 +75,144 @@ export function SpecialistProfileScreen({ navigation }: Props) {
     await signOut()
   }
 
-  const initials = doctor?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    ?? user?.full_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    ?? '?'
-
-  const [copied, setCopied] = useState(false)
   function copyCode() {
     if (!user?.doctor_code) return
     Clipboard.setString(user.doctor_code)
     haptics.success(); setCopied(true); setTimeout(() => setCopied(false), 1500)
   }
-  const value = (v: string, accent?: boolean) =>
-    <Text style={{ fontSize: 14, fontWeight: '600', color: accent ? t.accent : t.textPrimary }}>{v}</Text>
 
-  // v3.1 Doctor Profile & Earnings (d-me): identity + Doctor ID in the teal header,
-  // the same grouped-row layout as the patient Profile.
+  const name = doctor?.full_name ?? user?.full_name ?? 'Your profile'
+  const line = [doctor?.specialty ? (doctor.specialty as any).name : null, doctor?.qualification]
+    .filter(Boolean).join(' · ') || 'Doctor'
+
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      {/* Pushed from the top-bar avatar now that Profile is no longer a tab,
-          so it needs its own way back -- a tab screen never did. */}
-      <Header onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}>
-        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <ProfileAvatar size={68} editable variant="doctor" name={doctor?.full_name ?? user?.full_name} />
-          <View style={{ flex: 1 }}>
-            <Text accessibilityRole="header" numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>
-              {doctor?.full_name ?? user?.full_name ?? 'Your profile'}
-            </Text>
-            <Text numberOfLines={1} style={{ color: '#CCFBF1', fontSize: 13 }}>
-              {[doctor?.specialty ? (doctor.specialty as any).name : null, doctor?.qualification].filter(Boolean).join(' · ') || 'Doctor'}
-            </Text>
-            {user?.doctor_code && (
-              <TouchableOpacity onPress={copyCode} accessibilityRole="button" accessibilityLabel={`Doctor ID ${user.doctor_code}. Copy`}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}>
-                <Text style={{ color: '#CCFBF1', fontSize: 13 }}>Doctor ID {user.doctor_code}</Text>
-                <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color="#CCFBF1" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Header>
+    <Screen>
+      <AppBar title="Profile" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
       {loading ? (
-        <View style={{ padding: 20, gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
+        <View style={{ paddingHorizontal: 16, gap: 12 }}><SkeletonCard /><SkeletonCard /></View>
       ) : (
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        <View style={{ padding: 20, gap: 14 }}>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <KpiCard label="Today" value={stats.today} onPress={navigation ? () => navigation.navigate('Queue') : undefined} />
-            <KpiCard label="This month" value={stats.thisMonth} />
-            <KpiCard label="Completed" value={stats.completed} />
-          </View>
+        <Body>
+          <Card style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', padding: 14 }}>
+              <ProfileAvatar size={64} editable variant="doctor" name={name} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text accessibilityRole="header" numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.27, color: t.q.ink }}>
+                  {name}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: 13, color: t.q.ink60, marginTop: 2 }}>{line}</Text>
+              </View>
+            </View>
+            <Hair />
+            {/* The Doctor ID is how a hospital admin links this account, so it is
+                read aloud and typed in far more than it is tapped. Mono, spaced,
+                and copyable. */}
+            <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+              <CardLabel>Your Doctor ID</CardLabel>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                <Text selectable style={[{ flex: 1, fontSize: 24, fontWeight: '800', letterSpacing: 4, color: t.q.ink }, qs.naira]}>
+                  {user?.doctor_code ?? '—'}
+                </Text>
+                <Btn label={copied ? 'Copied' : 'Copy'} variant="secondary" small
+                  icon={copied ? 'checkmark' : 'copy-outline'} onPress={copyCode} />
+              </View>
+              <Text style={{ fontSize: 12, lineHeight: 17, color: t.q.ink60, marginTop: 8 }}>
+                A hospital admin types this into Staff & doctors to link you to their queue.
+              </Text>
+            </View>
+          </Card>
+
+          <Card>
+            <StatStrip>
+              <Stat label="Today" value={stats.today}
+                onPress={navigation ? () => navigation.navigate('Queue') : undefined} />
+              <Stat label="This month" value={stats.thisMonth} note="booked" />
+              <Stat label="Seen" value={stats.completed} note="all time" last />
+            </StatStrip>
+          </Card>
 
           {(doctor?.avg_rating ?? 0) > 0 && (
-            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {[0, 1, 2, 3, 4].map(i => (
-                <Ionicons key={i} name="star" size={18} color={i < Math.round(doctor!.avg_rating!) ? t.starColor : t.cardBorder} />
-              ))}
-              <Text style={{ fontSize: 14, color: t.textSecondary, marginLeft: 4 }}>
-                {doctor!.avg_rating!.toFixed(1)} · {doctor!.review_count ?? 0} reviews
-              </Text>
-            </Card>
-          )}
-
-          <SectionTitle title="Practice" />
-          <Card style={{ paddingVertical: 0 }}>
-            <ListRow icon="briefcase-outline" title="Experience" trailing={value(doctor?.years_experience ? `${doctor.years_experience} years` : '—')} />
-            <ListRow icon="cash-outline" title="Consultation fee" trailing={value(doctor?.consultation_fee ? `₦${doctor.consultation_fee.toLocaleString()}` : '—')} />
-            {doctor?.accepts_virtual && (
-              <ListRow icon="videocam-outline" title="Virtual fee" trailing={value(doctor?.virtual_fee ? `₦${doctor.virtual_fee.toLocaleString()}` : '—')} />
-            )}
-            <ListRow icon="globe-outline" title="Virtual consultations" last trailing={value(doctor?.accepts_virtual ? 'On' : 'Off', !!doctor?.accepts_virtual)} />
-          </Card>
-
-          {doctor?.bio && (
-            <Card style={{ gap: 6 }}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>About</Text>
-              <Text style={{ fontSize: 14, lineHeight: 20, color: t.textSecondary }}>{doctor.bio}</Text>
-            </Card>
-          )}
-
-          <Card style={{ paddingVertical: 0 }}>
-            {navigation && <ListRow icon="business-outline" title="Hospitals & Doctor ID" subtitle="Linked hospitals and your QR" onPress={() => navigation.navigate('Hospitals')} />}
-            {navigation && <ListRow icon="bar-chart-outline" title="My analytics" subtitle="Visits, wait times, ratings" onPress={() => navigation.navigate('DoctorAnalytics')} />}
-            {navigation && <ListRow icon="settings-outline" title="Settings & fees" subtitle="Availability, fees, virtual care" last onPress={() => navigation.navigate('Settings')} />}
-          </Card>
-
-          <Card style={{ gap: 10 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>Appearance</Text>
-            <SegmentedControl<'light' | 'dark'> value={themeId === 'forest' ? 'dark' : 'light'}
-              onChange={v => { if (v !== (themeId === 'forest' ? 'dark' : 'light')) toggleTheme() }}
-              options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
-          </Card>
-
-          {!confirmVisible ? (
-            <TouchableOpacity onPress={() => { haptics.tap(); setConfirmVisible(true) }} accessibilityRole="button"
-              style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: t.danger, fontSize: 15, fontWeight: '700' }}>Sign out</Text>
-            </TouchableOpacity>
-          ) : (
-            <Card style={{ gap: 12, borderColor: t.dangerBorder }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Sign out of your account?</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}><PrimaryButton label="Cancel" variant="ghost" height={48} onPress={() => setConfirmVisible(false)} /></View>
-                <View style={{ flex: 1 }}><PrimaryButton label="Sign out" variant="danger" height={48} loading={signingOut} onPress={handleSignOut} /></View>
+            <Card>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 14 }}>
+                {[0, 1, 2, 3, 4].map(i => (
+                  <Ionicons key={i} name="star" size={18}
+                    color={i < Math.round(doctor!.avg_rating!) ? '#F59E0B' : t.q.line} />
+                ))}
+                <Text style={{ fontSize: 13, color: t.q.ink70, marginLeft: 6 }}>
+                  {doctor!.avg_rating!.toFixed(1)} · {doctor!.review_count ?? 0} reviews
+                </Text>
               </View>
             </Card>
           )}
 
-          <DeleteAccount what="your doctor profile, photo and sign-in, and removes you from hospital rosters" />
-        </View>
-      </ScrollView>
+          <SectionHead title="Fees" action="Edit" onAction={navigation ? () => navigation.navigate('Settings') : undefined} />
+          <Card>
+            <Row title="Consultation fee" compact
+              right={<Mono size={14} weight="700">{doctor?.consultation_fee ? `₦${doctor.consultation_fee.toLocaleString()}` : '—'}</Mono>} />
+            <Hair />
+            <Row title="Virtual fee" compact
+              subColor={t.q.ink60}
+              sub={doctor?.accepts_virtual ? undefined : 'Virtual consults are off'}
+              right={<Mono size={14} weight="700">{doctor?.virtual_fee ? `₦${doctor.virtual_fee.toLocaleString()}` : '—'}</Mono>} />
+            <Hair />
+            <Row title="Experience" compact
+              right={<Mono size={14} weight="700">{doctor?.years_experience ? `${doctor.years_experience} yrs` : '—'}</Mono>} />
+          </Card>
+
+          {!!doctor?.bio && (
+            <>
+              <SectionHead title="About" />
+              <Card>
+                <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Text style={{ fontSize: 13, lineHeight: 20, color: t.q.ink70 }}>{doctor.bio}</Text>
+                </View>
+              </Card>
+            </>
+          )}
+
+          <SectionHead title="Your practice" />
+          <Card>
+            {!!navigation && (
+              <>
+                <Row icon="business-outline" title="Hospitals & Doctor ID" sub="Linked hospitals and clinics"
+                  chevron onPress={() => navigation.navigate('Hospitals')} />
+                <Hair />
+                <Row icon="briefcase-outline" title="Locum board" sub="Shifts and your own posts"
+                  chevron onPress={() => navigation.navigate('LocumBoard')} />
+                <Hair />
+                <Row icon="trending-up-outline" title="My analytics" sub="Visits, wait times, ratings"
+                  chevron onPress={() => navigation.navigate('DoctorAnalytics')} />
+                <Hair />
+                <Row icon="options-outline" title="Settings & fees" sub="Availability, fees, virtual care"
+                  chevron onPress={() => navigation.navigate('Settings')} />
+              </>
+            )}
+          </Card>
+
+          <SectionHead title="Appearance" />
+          <Seg<'light' | 'dark'>
+            value={mode === 'dark' ? 'dark' : 'light'}
+            onChange={v => { if (v !== (mode === 'dark' ? 'dark' : 'light')) toggleTheme() }}
+            options={[{ key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]} />
+
+          <View style={{ paddingHorizontal: 16, paddingTop: 18, gap: 12 }}>
+            {!confirmVisible ? (
+              <Btn label="Sign out" variant="danger" onPress={() => { haptics.tap(); setConfirmVisible(true) }} />
+            ) : (
+              <Card>
+                <View style={{ padding: 14, gap: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.q.ink }}>Sign out of your account?</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Btn grow label="Cancel" variant="secondary" onPress={() => setConfirmVisible(false)} />
+                    <Btn grow label="Sign out" variant="danger" loading={signingOut} onPress={handleSignOut} />
+                  </View>
+                </View>
+              </Card>
+            )}
+            <DeleteAccount what="your doctor profile, photo and sign-in, and removes you from hospital rosters" />
+          </View>
+        </Body>
       )}
-    </View>
+    </Screen>
   )
 }

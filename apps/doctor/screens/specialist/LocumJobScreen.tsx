@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, RefreshControl } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import {
+  View, ActivityIndicator, Linking, RefreshControl, KeyboardAvoidingView, Platform,
+} from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { Header, Card, PrimaryButton, SectionTitle, EmptyState } from '@queue/shared/components/ui/v3'
 import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { haptics } from '@queue/shared/lib/haptics'
@@ -13,6 +12,10 @@ import {
   getLocumJob, respondToLocum, selectLocumDoctor, cancelLocumJob,
   type LocumJob, type LocumResponse,
 } from '@queue/shared/lib/api'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Stat, StatStrip,
+  Field, Btn, BottomBar, Empty, Mono, Notice, Pill,
+} from '@queue/shared/components/q'
 import { money, shiftLine } from './LocumBoardScreen'
 
 interface Props {
@@ -97,201 +100,184 @@ export function LocumJobScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Shift" onBack={() => navigation.goBack()} />
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Locum job" onBack={() => navigation.goBack()} />
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
+      </Screen>
     )
   }
 
   if (!job) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Shift" onBack={() => navigation.goBack()} />
-        <EmptyState icon="alert-circle-outline" title="Post not found" body="It may have been cancelled." />
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Locum job" onBack={() => navigation.goBack()} />
+        <Card style={{ marginTop: 12 }}>
+          <Empty icon="alert-circle-outline" title="Post not found" body="It may have been cancelled." />
+        </Card>
+      </Screen>
     )
   }
 
   const closed = job.status !== 'open'
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title={job.hospital?.name ?? 'Shift'}
-        subtitle={[job.lga, job.state].filter(Boolean).join(', ')}
-        onBack={() => navigation.goBack()} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar
+          title="Locum job"
+          sub={isPoster ? 'Your post' : (job.poster?.full_name ? `Posted by ${job.poster.full_name}` : undefined)}
+          onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent}
-          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />}>
-
-        <Card style={{ gap: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={[st.pill, { backgroundColor: t.accentBg }]}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: t.accent }}>
-                {job.employment_type === 'full_time' ? 'FULL TIME' : 'LOCUM'}
-              </Text>
-            </View>
-            {closed && (
-              <Text style={{ fontSize: 11, fontWeight: '800', color: t.textMuted, textTransform: 'uppercase' }}>
-                {job.status}
-              </Text>
-            )}
-          </View>
-
-          <Text style={{ fontSize: 15, color: t.textSecondary }}>{shiftLine(job)}</Text>
-
-          <View style={[st.money, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: t.textMuted }}>Rate</Text>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: t.textPrimary }}>
-                {money(job.rate_per_hour)}<Text style={{ fontSize: 13, color: t.textMuted }}>/hr</Text>
-              </Text>
-            </View>
-            {job.total_amount != null && (
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>{job.hours} hours</Text>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: t.accent }}>{money(job.total_amount)}</Text>
-              </View>
-            )}
-          </View>
-
-          {!!job.notes && <Text style={{ fontSize: 14, color: t.textSecondary, lineHeight: 20 }}>{job.notes}</Text>}
-          {!isPoster && !!job.poster?.full_name && (
-            <Text style={{ fontSize: 12, color: t.textMuted }}>Posted by {job.poster.full_name}</Text>
-          )}
-        </Card>
-
-        {/* ── Responder's side ── */}
-        {!isPoster && (
-          mine ? (
-            <Card style={{ gap: 8 }}>
-              <SectionTitle title="Your response" />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>
-                {mine.kind === 'accept' ? 'You accepted the posted rate' : `You asked for ${money(mine.effectiveRate)}/hr`}
-              </Text>
-              {mine.selectedAt ? (
-                <Text style={{ fontSize: 14, color: t.accent, fontWeight: '700' }}>
-                  You were selected — they have your phone number.
-                </Text>
-              ) : (
-                <Text style={{ fontSize: 13, color: t.textMuted }}>
-                  Waiting on the poster. You can change your mind by replying again.
-                </Text>
-              )}
-            </Card>
-          ) : closed ? (
-            <Card><Text style={{ fontSize: 14, color: t.textMuted }}>This post is closed.</Text></Card>
-          ) : (
-            <Card style={{ gap: 12 }}>
-              <SectionTitle title="Your reply" />
-              <PrimaryButton label={`Accept ${money(job.rate_per_hour)}/hr`} onPress={() => respond('accept')} disabled={busy} />
-
-              <Text style={[s.label, { color: t.textPrimary, marginTop: 4 }]}>Or ask for more</Text>
-              <TextInput value={counter} onChangeText={setCounter} keyboardType="number-pad"
-                placeholder={`Higher than ${job.rate_per_hour}`} placeholderTextColor={t.textMuted}
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-              <TextInput value={message} onChangeText={setMessage}
-                placeholder="A note with your reply (optional)" placeholderTextColor={t.textMuted}
-                style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-              <PrimaryButton label="Send counter offer" variant="ghost" onPress={() => respond('counter')} disabled={busy || !counter} />
-            </Card>
-          )
-        )}
-
-        {/* ── Poster's side ── */}
-        {isPoster && (
-          <Card style={{ gap: 14 }}>
-            <SectionTitle title={`${responses.length} ${responses.length === 1 ? 'response' : 'responses'}`} />
-            {responses.length === 0 ? (
-              <Text style={{ fontSize: 14, color: t.textMuted }}>
-                Nobody has replied yet. Doctors in {job.state} have been notified.
-              </Text>
-            ) : (
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} tintColor={t.q.primary} colors={[t.q.primary]}
+            onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />
+        }>
+          <Card style={{ marginTop: 12 }}>
+            <Row
+              icon={job.employment_type === 'full_time' ? 'business-outline' : 'moon-outline'}
+              iconTone="teal"
+              title={job.hospital?.name ?? 'Hospital'}
+              sub={[[job.lga, job.state].filter(Boolean).join(', ') || null, shiftLine(job)].filter(Boolean).join(' · ')}
+              pill={closed ? (job.status === 'filled' ? 'Filled' : 'Closed') : job.employment_type === 'full_time' ? 'Employment' : 'Locum'}
+              pillTone={closed ? 'neutral' : 'teal'} />
+            <Hair inset={0} />
+            <StatStrip>
+              <Stat label="Rate" value={money(job.rate_per_hour)} note="per hour" />
+              {job.total_amount != null
+                ? <Stat label="Total" value={money(job.total_amount)} note={`${job.hours} hours`} last />
+                : <Stat label="Hours" value={job.hours ?? '—'} note="per shift" last />}
+            </StatStrip>
+            {!!job.notes && (
               <>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>
-                  Cheapest first, then whoever replied soonest.
-                </Text>
-                {responses.map(r => (
-                  <View key={r.id} style={[st.resp, { borderColor: r.selectedAt ? t.accent : t.cardBorder }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <EntityAvatar size={42} kind="doctor" uri={r.avatarUrl} label={r.fullName} />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }} numberOfLines={1}>
-                          {r.fullName}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: t.textMuted }}>
-                          {r.kind === 'accept' ? 'Accepted your rate' : 'Asked for more'}
-                          {' · '}
-                          {new Date(r.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 17, fontWeight: '800', color: r.kind === 'accept' ? t.accent : t.textPrimary }}>
-                        {money(r.effectiveRate)}
-                      </Text>
-                    </View>
-
-                    {!!r.message && (
-                      <Text style={{ fontSize: 13, color: t.textSecondary, marginTop: 8 }}>{r.message}</Text>
-                    )}
-
-                    {r.selectedAt && r.phone ? (
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                        <TouchableOpacity onPress={() => contact(r.phone!, 'call')} accessibilityRole="button"
-                          style={[st.contact, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                          <Ionicons name="call" size={15} color={t.accent} />
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>{r.phone}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => contact(r.phone!, 'whatsapp')} accessibilityRole="button"
-                          accessibilityLabel={`WhatsApp ${r.fullName}`}
-                          style={[st.contact, { backgroundColor: '#25D36618', borderColor: '#25D36655' }]}>
-                          <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#25D366' }}>WhatsApp</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity onPress={() => pick(r)} disabled={busy} accessibilityRole="button"
-                        style={[st.select, { borderColor: t.accentBorder, backgroundColor: t.accentBg }]}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: t.accent }}>
-                          Select and see phone number
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
+                <Hair inset={0} />
+                <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <CardLabel>Details</CardLabel>
+                  <Text style={{ fontSize: 13, lineHeight: 20, color: t.q.ink70, marginTop: 6 }}>{job.notes}</Text>
+                </View>
               </>
             )}
-
-            {!closed && (
-              <PrimaryButton label="Cancel this post" variant="danger" disabled={busy}
-                onPress={() => Alert.alert('Cancel post?', 'Doctors will no longer see it.', [
-                  { text: 'Keep it', style: 'cancel' },
-                  { text: 'Cancel post', style: 'destructive', onPress: async () => {
-                    setBusy(true); const err = await cancelLocumJob(jobId); setBusy(false)
-                    if (err) { Alert.alert('Could not cancel', err); return }
-                    await load()
-                  } },
-                ])} />
-            )}
           </Card>
+
+          {/* ── Responder's side ── */}
+          {!isPoster && (
+            mine ? (
+              <>
+                <SectionHead title="Your reply" />
+                <Card>
+                  <Row
+                    icon={mine.selectedAt ? 'checkmark-circle' : 'time-outline'}
+                    iconTone={mine.selectedAt ? 'green' : 'amber'}
+                    title={mine.kind === 'accept'
+                      ? 'You accepted the posted rate'
+                      : `You asked for ${money(mine.effectiveRate)}/hr`}
+                    sub={mine.selectedAt
+                      ? 'You were selected — they have your phone number'
+                      : 'Waiting on the poster. Reply again to change your mind.'} />
+                </Card>
+              </>
+            ) : closed ? (
+              <Notice tone="neutral">This post is closed.</Notice>
+            ) : (
+              <>
+                <SectionHead title="Your reply" />
+                <Card>
+                  <View style={{ padding: 14, gap: 14 }}>
+                    <Btn label={`Accept ${money(job.rate_per_hour)}/hr`} loading={busy}
+                      onPress={() => respond('accept')} />
+                    <Hair inset={0} />
+                    <Field label="Or ask for more (₦ per hour)" keyboardType="number-pad"
+                      value={counter} onChangeText={setCounter}
+                      placeholder={`Higher than ${job.rate_per_hour}`} />
+                    <Field label="A note with your reply (optional)"
+                      value={message} onChangeText={setMessage}
+                      placeholder="e.g. I can start an hour earlier" />
+                    <Btn label="Send counter offer" variant="secondary"
+                      disabled={busy || !counter} onPress={() => respond('counter')} />
+                  </View>
+                </Card>
+              </>
+            )
+          )}
+
+          {/* ── Poster's side ── */}
+          {isPoster && (
+            <>
+              <SectionHead title={`Replies · ${responses.length}`} />
+              {responses.length === 0 ? (
+                <Card>
+                  <Empty icon="people-outline" title="Nobody has replied yet"
+                    body={`Doctors in ${job.state} have been notified.`} />
+                </Card>
+              ) : (
+                <>
+                  {responses.map(r => (
+                    <Card key={r.id} style={{ marginTop: 12 }}>
+                      <Row
+                        leading={<EntityAvatar size={40} kind="doctor" uri={r.avatarUrl} label={r.fullName} />}
+                        title={r.fullName}
+                        sub={[
+                          r.kind === 'accept' ? 'Accepted your rate' : 'Asked for more',
+                          new Date(r.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }),
+                        ].join(' · ')}
+                        right={<Mono size={14} weight="700"
+                          color={r.kind === 'accept' ? t.q.primary : t.q.ink}>{money(r.effectiveRate)}</Mono>} />
+                      {!!r.message && (
+                        <>
+                          <Hair />
+                          <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                            <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70 }}>{r.message}</Text>
+                          </View>
+                        </>
+                      )}
+                      <Hair />
+                      {r.selectedAt && r.phone ? (
+                        <View style={{ padding: 14, gap: 10 }}>
+                          <Pill label="Selected" tone="green" />
+                          <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <Btn grow label={r.phone} variant="secondary" icon="call"
+                              onPress={() => contact(r.phone as string, 'call')} />
+                            <Btn label="WhatsApp" variant="secondary" icon="logo-whatsapp"
+                              onPress={() => contact(r.phone as string, 'whatsapp')} />
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={{ padding: 14 }}>
+                          <Btn label="Select and see phone number" variant="secondary"
+                            disabled={busy} onPress={() => pick(r)} />
+                        </View>
+                      )}
+                    </Card>
+                  ))}
+                  <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+                    <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                      Cheapest first, then whoever replied soonest. Selecting someone shares their phone
+                      number with you.
+                    </Text>
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </Body>
+
+        {isPoster && !closed && (
+          <BottomBar meta={
+            <Mono size={12} weight="600" color={t.q.ink60}>
+              {responses.length} {responses.length === 1 ? 'reply' : 'replies'}
+            </Mono>
+          }>
+            <Btn grow label="Close this post" variant="danger" loading={busy}
+              onPress={() => Alert.alert('Close this post?', 'Doctors will no longer see it.', [
+                { text: 'Keep it', style: 'cancel' },
+                { text: 'Close post', style: 'destructive', onPress: async () => {
+                  setBusy(true); const err = await cancelLocumJob(jobId); setBusy(false)
+                  if (err) { Alert.alert('Could not close it', err); return }
+                  await load()
+                } },
+              ])} />
+          </BottomBar>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
-
-const s = StyleSheet.create({
-  label: { fontSize: 14, fontWeight: '700' },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
-})
-
-const st = StyleSheet.create({
-  pill:  { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99 },
-  money: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
-  resp:  { borderRadius: 14, borderWidth: 1.5, padding: 12 },
-  contact: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
-  },
-  select: { alignItems: 'center', paddingVertical: 11, borderRadius: 12, borderWidth: 1, marginTop: 10 },
-})

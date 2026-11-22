@@ -1,74 +1,83 @@
-// Real, DB-backed specialty picker -- distinct from HomeScreen's SpecialtyGrid,
-// which drives its own static local array (data/index.ts) and filters the
-// already-fetched hospital list client-side by name. This one uses the real
-// specialties.id, so results (hospitals or doctors) come from a real,
-// server-side ID filter rather than a fuzzy name/substring match.
+// Real, DB-backed specialty picker -- distinct from the static local array in
+// data/index.ts. This one uses the real specialties.id, so results come from a
+// server-side ID filter rather than a fuzzy name match.
 import { useEffect, useState } from 'react'
-import { View, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { getSpecialties, SpecialtyRow } from '@queue/shared/lib/api'
+import { getSpecialties, type SpecialtyRow } from '@queue/shared/lib/api'
+import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Screen, AppBar, Body, Card, Row, Hair, SearchField, Empty } from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
 export function SpecialtyBrowseScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
   const [specialties, setSpecialties] = useState<SpecialtyRow[]>([])
+  /** doctors per specialty id. The handoff prints a count under each row; this
+   *  is the one count we can state truthfully from a single query. */
+  const [counts, setCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
 
   useEffect(() => {
     getSpecialties().then(list => { setSpecialties(list); setLoading(false) })
+    supabase.from('doctors').select('specialty_id').eq('is_active', true).then(({ data }) => {
+      const tally: Record<string, number> = {}
+      for (const d of (data ?? []) as { specialty_id: string | null }[]) {
+        if (d.specialty_id) tally[d.specialty_id] = (tally[d.specialty_id] ?? 0) + 1
+      }
+      setCounts(tally)
+    })
   }, [])
 
-  const filtered = specialties.filter(s => !q.trim() || s.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const needle = q.trim().toLowerCase()
+  const filtered = specialties.filter(s => !needle || s.name.toLowerCase().includes(needle))
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Browse by Specialty" onBack={() => navigation.goBack()} />
-      <Text style={[st.sub, { color: t.textMuted }]}>
-        Pick a specialty to see hospitals that offer it, or doctors who specialize in it.
-      </Text>
-
-      <View style={[st.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-        <Ionicons name="search-outline" size={15} color={t.textMuted} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Search specialties…" placeholderTextColor={t.textMuted}
-          style={[st.input, { color: t.textPrimary }]} />
-      </View>
+    <Screen>
+      <AppBar title="Browse by specialty" onBack={() => navigation.goBack()} />
+      <SearchField value={q} onChangeText={setQ} placeholder="Search specialties…" />
 
       {loading ? (
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <View style={st.grid}>
-            {filtered.map(s => (
-              <TouchableOpacity key={s.id}
-                onPress={() => { haptics.tap(); navigation.navigate('SpecialtyResults', { specialtyId: s.id, specialtyName: s.name }) }}
-                style={[st.tile, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={st.icon}>{s.icon ?? '🩺'}</Text>
-                <Text numberOfLines={2} style={[st.label, { color: t.textPrimary }]}>{s.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
+        <Body>
+          <View style={{ height: 6 }} />
+          {filtered.length === 0 ? (
+            <Card>
+              <Empty icon="search-outline" title="No specialty matches that"
+                body="Try a shorter word, or clear the search to see all of them." />
+            </Card>
+          ) : (
+            <Card>
+              {filtered.map((s, i) => {
+                const n = counts[s.id]
+                return (
+                  <View key={s.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      leading={
+                        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: t.q.sel, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 18 }}>{s.icon ?? '🩺'}</Text>
+                        </View>
+                      }
+                      title={s.name}
+                      sub={n ? `${n} ${n === 1 ? 'doctor' : 'doctors'}` : null}
+                      chevron
+                      onPress={() => {
+                        haptics.tap()
+                        navigation.navigate('SpecialtyResults', { specialtyId: s.id, specialtyName: s.name })
+                      }}
+                    />
+                  </View>
+                )
+              })}
+            </Card>
+          )}
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe:      { flex: 1 },
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  title:     { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  sub:       { fontSize: 12, paddingHorizontal: 20, marginBottom: 14 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 16 },
-  input:     { flex: 1, fontSize: 13 },
-  grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 20 },
-  tile:      { width: '30%', aspectRatio: 1, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 6 },
-  icon:      { fontSize: 26 },
-  label:     { fontSize: 11, fontWeight: '700', textAlign: 'center' },
-})

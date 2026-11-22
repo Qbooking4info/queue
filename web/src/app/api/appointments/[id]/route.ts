@@ -26,10 +26,40 @@ type Action =
   | { action: 'update_consult_notes'; notes?: string | null; diagnosis?: string | null; investigations?: string | null; prescription?: string | null; treatmentPlan?: string | null }
   | { action: 'ring' }
   | { action: 'reschedule'; date: string; startTime: string; reason?: string }
+  | { action: 'leave_queue'; reason?: string }
+  | { action: 'return_to_queue' }
 
 const DOCTOR_ACTIONS: Action['action'][] = [
   'start_consultation', 'end_consultation', 'update_consult_notes', 'ring', 'mark_no_show',
+  // A doctor is the one who sends a patient for a test mid-consultation, and
+  // the one who takes them back afterwards.
+  'leave_queue', 'return_to_queue',
 ]
+
+// approve/reject stay hospital-staff actions: the desk owns the slot, so it
+// owns the booking decision, and a doctor approving arbitrary bookings into
+// their own clinic would route around whoever is managing the day.
+//
+// One exception, and only one. A REFERRAL addressed to a named doctor is a
+// clinical question asked of that doctor -- "will you take this patient" --
+// and they are the only person who can answer it. Routing that through the
+// front desk made the receiving doctor's inbox read-only, which is why the v4
+// design drew Accept and Decline buttons that nothing could implement.
+//
+// Narrow on purpose: this appointment must be a referral, it must name this
+// doctor (not merely be at their hospital, which the check above already
+// allows), and it must still be awaiting a decision.
+const DOCTOR_REFERRAL_ACTIONS: Action['action'][] = ['approve', 'reject']
+
+function mayDecideReferral(
+  appt: { doctor_id: string | null; booking_mode?: string | null; approval_status?: string | null },
+  doctorId: string | null | undefined,
+): boolean {
+  return !!doctorId
+    && appt.doctor_id === doctorId
+    && appt.booking_mode === 'referral'
+    && appt.approval_status === 'pending_approval'
+}
 
 // PATCH /api/appointments/[id] -- Task 15, replacing admin-api.ts's
 // assignDoctorToAppointment/markNoShow/approveAppointment/rejectAppointment/
@@ -60,7 +90,7 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: appt, error: apptErr } = await db
     .from('appointments')
-    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date, appointment_date, start_time, slot_id')
+    .select('hospital_id, doctor_id, assigned_doctor_id, urgency, clinic_id, status, check_in_date, appointment_date, start_time, slot_id, booking_mode, approval_status')
     .eq('id', id)
     .single()
   if (apptErr || !appt) return Errors.notFound('Appointment')
@@ -82,7 +112,17 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
   if (caller.role === 'doctor') {
     const ownPatient = !!caller.doctorId && (caller.doctorId === appt.doctor_id || caller.doctorId === appt.assigned_doctor_id)
     if (!ownPatient) return Errors.forbidden('You can only act on your own patients')
-    if (!DOCTOR_ACTIONS.includes(body.action)) return Errors.forbidden('This action is for hospital staff')
+
+    const decidingOwnReferral =
+      DOCTOR_REFERRAL_ACTIONS.includes(body.action) && mayDecideReferral(appt as any, caller.doctorId)
+
+    if (!DOCTOR_ACTIONS.includes(body.action) && !decidingOwnReferral) {
+      return Errors.forbidden(
+        DOCTOR_REFERRAL_ACTIONS.includes(body.action)
+          ? 'Only the doctor a referral names can accept or decline it, and only while it is awaiting a decision'
+          : 'This action is for hospital staff',
+      )
+    }
   }
 
   switch (body.action) {
@@ -270,6 +310,40 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: true })
     }
 
+    // Sent out of the waiting room mid-visit -- laboratory, imaging, pharmacy.
+    // Recorded rather than inferred, so the front desk can see who is out and
+    // why, and so return_to_queue has something to pair with.
+    case 'leave_queue': {
+      if (caller.role === 'doctor' && caller.doctorId !== appt.doctor_id && caller.doctorId !== appt.assigned_doctor_id) {
+        return Errors.forbidden('You can only send your own patient for tests')
+      }
+      const { data: updated, error } = await db.from('appointments').update({
+        left_queue_at: new Date().toISOString(),
+        left_queue_reason: body.reason?.trim() || null,
+        updated_at: new Date().toISOString(),
+      } as never).eq('id', id).eq('status', 'checked_in').select('id')
+      if (error) return Errors.internal(error.message)
+      if (!updated?.length) {
+        return Errors.validation(`Only a checked-in patient can be sent out of the queue (this one is ${appt.status})`)
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    // Back from the lab. Re-stamps the FIFO ordering key so the patient is
+    // ordered by when they returned rather than by this morning's check-in --
+    // without which they are placed ahead of everyone who arrived while they
+    // were away, which is the most visible unfairness this queue can produce.
+    // The credit that softens the demotion lives in app_config
+    // (lab_return_credit_minutes), not here.
+    case 'return_to_queue': {
+      if (caller.role === 'doctor' && caller.doctorId !== appt.doctor_id && caller.doctorId !== appt.assigned_doctor_id) {
+        return Errors.forbidden('You can only return your own patient to the queue')
+      }
+      const { error } = await (db as any).rpc('return_to_queue', { p_appointment_id: id })
+      if (error) return Errors.validation(error.message)
+      return NextResponse.json({ success: true })
+    }
+
     case 'check_in': {
       const result = await checkInAppointment(db, id)
       if (!result.ok) return Errors.validation(result.error)
@@ -307,10 +381,22 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
-      // BH5: enforce state machine -- only 'checked_in' or 'confirmed' may start a consultation
-      const { data: updated, error } = await db.from('appointments').update({
+      // BH5: enforce state machine -- only 'checked_in' or 'confirmed' may start a consultation.
+      //
+      // Starting straight from 'confirmed' is allowed (a doctor seeing someone
+      // without a front-desk step), but it must still set check_in_date, because
+      // everything downstream keys on it: renumber_queue_after_change returns
+      // early when it is null, so the patient would get no queue position and
+      // appear in nobody's queue, and the nightly sweep's
+      // `COALESCE(check_in_date, ...) < today` would never reach the row to
+      // close it. That combination left one consult open for 58 days.
+      const update: Record<string, unknown> = {
         status: 'in_progress', consult_started_at: new Date().toISOString(),
-      }).eq('id', id).in('status', ['checked_in', 'confirmed']).select('id')
+      }
+      if (!appt.check_in_date) update.check_in_date = checkInDate
+
+      const { data: updated, error } = await db.from('appointments').update(update as never)
+        .eq('id', id).in('status', ['checked_in', 'confirmed']).select('id')
       if (error) return Errors.internal(error.message)
       if (!updated?.length) return Errors.validation(`Cannot start a consultation from status ${appt.status}`)
 
@@ -322,11 +408,17 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       // touch (another check-in, a completion elsewhere, etc.) while they're still at
       // position 2. Best-effort: never blocks the start_consultation response.
       if (doctorId) {
+        // Whoever is lowest in the queue among those still waiting -- not
+        // "position 2". Position 2 is only the next patient when the one just
+        // started was position 1, and `ring` deliberately lets a free doctor
+        // call someone in early; when that happened the heads-up went to the
+        // wrong person and the patient actually at the front got nothing.
         const { data: nextUp } = await db.from('appointments')
           .select('id')
           .eq('hospital_id', appt.hospital_id).eq('check_in_date', checkInDate)
-          .eq('status', 'checked_in').eq('queue_position', 2)
+          .eq('status', 'checked_in')
           .or(`doctor_id.eq.${doctorId},assigned_doctor_id.eq.${doctorId}`)
+          .order('queue_position', { ascending: true, nullsFirst: false })
           .limit(1).maybeSingle()
         if (nextUp) {
           const { data: claimed } = await db.from('appointments')
@@ -336,6 +428,10 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
             await notifyPatient(
               db, nextUp.id, 'queue_next_alert', "You're next!",
               'The doctor is now seeing the patient ahead of you — please be ready.',
+              // One of the two queue messages whose entire value is that it
+              // arrives: a patient who misses it wanders off and is marked a
+              // no-show for a slot they were present for.
+              { critical: true },
             )
           }
         }
@@ -378,6 +474,15 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
         .select('id')
       if (error) return Errors.internal(error.message)
       if (!updated?.length) return Errors.notFound('Appointment')
+
+      // consult_ended_at is stamped by the stamp_consult_end trigger
+      // (20261027000001) for every path, so a consult closed here still counts
+      // towards the wait estimate. The virtual session is this route's job.
+      if (['completed', 'cancelled', 'no_show'].includes(body.status)) {
+        await db.from('virtual_sessions')
+          .update({ status: 'ended', ended_at: new Date().toISOString() })
+          .eq('appointment_id', id).eq('status', 'active')
+      }
       return NextResponse.json({ success: true })
     }
 
@@ -423,9 +528,13 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
         if (doc) doctorLabel = [(doc as any).title, (doc as any).full_name].filter(Boolean).join(' ') || doctorLabel
       }
 
+      // Routed to the ringing channel, not the default one: this is a person
+      // being called in from a waiting room, and a silent notification there is
+      // a missed one. Same channel the virtual-consult call uses.
       await notifyPatient(
         db, id, 'queue_ring', `${doctorLabel} is ready for you`,
         'Please make your way to the consultation room now.',
+        { channelId: 'queue-calls', critical: true },
       )
       return NextResponse.json({ success: true })
     }

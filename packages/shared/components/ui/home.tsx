@@ -147,7 +147,7 @@ export function Pill({ label, value, icon, onPress, tone = 'neutral' }: {
 
 export function DateTile({ weekday, day, month }: { weekday: string; day: string; month: string }) {
   const { theme: t } = useTheme()
-  const c = heroTones(t.id === 'forest')
+  const c = heroTones(t.isDark)
   return (
     <View style={[hc.date, { backgroundColor: c.tileBg }]}>
       <Text style={[hc.dateWeekday, { color: c.tileSub }]}>{weekday}</Text>
@@ -163,7 +163,7 @@ export function DateTile({ weekday, day, month }: { weekday: string; day: string
  */
 export function CountTile({ value, label }: { value: number | string; label: string }) {
   const { theme: t } = useTheme()
-  const c = heroTones(t.id === 'forest')
+  const c = heroTones(t.isDark)
   return (
     <View style={[hc.date, { backgroundColor: c.tileBg, paddingVertical: 12 }]}>
       <Text style={[hc.countValue, { color: c.tileInk }]}>{value}</Text>
@@ -231,7 +231,7 @@ export function HeroCard({
   style?: StyleProp<ViewStyle>
 }) {
   const { theme: t } = useTheme()
-  const c = heroTones(t.id === 'forest')
+  const c = heroTones(t.isDark)
   const Wrapper: any = onPress ? TouchableOpacity : View
 
   return (
@@ -295,7 +295,7 @@ export function HeroBody({ title, subtitle, meta, leading }: {
   title: string; subtitle?: string | null; meta?: string | null; leading?: React.ReactNode
 }) {
   const { theme: t } = useTheme()
-  const c = heroTones(t.id === 'forest')
+  const c = heroTones(t.isDark)
   return (
     <View style={hc.body}>
       {leading}
@@ -397,7 +397,7 @@ export function RowCard({ leading, title, subtitle, action, onActionPress, onPre
           accessibilityRole="button" accessibilityLabel={`${action} ${title}`}
           style={[rc.action, { backgroundColor: t.accent }]}
         >
-          <Text style={[rc.actionText, { color: t.id === 'forest' ? '#081416' : '#FFFFFF' }]}>{action}</Text>
+          <Text style={[rc.actionText, { color: t.q.onPrimary }]}>{action}</Text>
         </TouchableOpacity>
       )}
     </Wrapper>

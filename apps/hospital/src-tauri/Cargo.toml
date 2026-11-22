@@ -1,0 +1,22 @@
+[package]
+name = "queue-hospital"
+version = "1.0.0"
+description = "Queue Hospital desktop"
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+# A release build of a webview shell is almost all dependency code, so the
+# default dev-profile settings would ship an installer several times larger
+# than it needs to be.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { View, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
+import { View } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
+import {
+  Screen, AppBar, Body, Card, Journey, Notice, SectionHead, DetailRow,
+  Btn, BottomBar, Mono,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: any }
 
@@ -13,7 +15,7 @@ export function ConfirmationScreen({ navigation, route }: Props) {
 
   const {
     hospital,
-    doctor,          // null for physical or virtual with no preference
+    doctor,          // null for physical, or virtual with no preference
     bookingRef,
     approvalStatus,  // 'auto_approved' | 'pending_approval'
     selectedDate,
@@ -23,21 +25,11 @@ export function ConfirmationScreen({ navigation, route }: Props) {
     directBooking,   // true for a direct-to-doctor booking (no hospital involved)
   } = route.params ?? {}
 
-  const isPending  = approvalStatus === 'pending_approval'
-  const isVirtual  = bookingType === 'virtual'
+  const isPending = approvalStatus === 'pending_approval'
+  const isVirtual = bookingType === 'virtual'
   const isHomeVisit = bookingType === 'home_visit'
   const doctorName = doctor?.full_name ?? doctor?.name ?? null
-  const reviewerLabel = directBooking ? 'the doctor' : 'the hospital'
-
-  const scale   = useRef(new Animated.Value(0.3)).current
-  const opacity = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scale,   { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }),
-      Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-    ]).start()
-  }, [])
+  const reviewer = directBooking ? 'the doctor' : 'the hospital'
 
   function goHome() {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Home' } }] })
@@ -46,197 +38,110 @@ export function ConfirmationScreen({ navigation, route }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Appointments' } }] })
   }
 
-  const accentColor = isPending ? t.statusBusy.text : t.accent
+  // The same rail the visit carries from here on. A booking awaiting review has
+  // not passed "Booked" yet -- showing it further along would promise a place
+  // in a queue nobody has agreed to give.
+  const steps = ['Booked', 'Paid', 'Checked in', 'In the queue', 'Called', 'Seen']
+
+  const next: string[] = directBooking
+    ? [
+        `${doctorName ?? 'The doctor'} reviews your request`,
+        'You get a notification once they confirm, or suggest another time',
+        isVirtual
+          ? 'The call link appears on the appointment when the time comes'
+          : 'They come to the address you gave, at the confirmed time',
+      ]
+    : isVirtual
+      ? isPending
+        ? ['The hospital reviews your request', 'You get a notification when it is approved', 'A doctor is confirmed for your session']
+        : [
+            doctorName ? `Your video visit with ${doctorName} is confirmed` : 'The hospital assigns a doctor for your session',
+            'Keep your phone on during your window — the doctor calls you',
+          ]
+      : [
+          `Arrive at ${hospital?.name ?? 'the hospital'}${startTime ? ` around ${String(startTime).slice(0, 5)}` : ''}`,
+          'Show your queue pass at the front desk to check in',
+          'Watch your number — we call you when it is your turn',
+        ]
 
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: t.splashBg }]}>
-      <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+    <Screen>
+      <AppBar title={isPending ? 'Request sent' : 'You are booked'} sub={bookingRef ?? undefined} />
 
-        {/* Animated icon */}
-        <Animated.View style={[st.checkWrap, { opacity, transform: [{ scale }] }]}>
-          <View style={[st.checkCircle, {
-            backgroundColor: isPending ? 'rgba(239,159,39,0.14)' : t.accentBgMid,
-            borderColor:     isPending ? 'rgba(239,159,39,0.35)' : t.accentBorder,
-          }]}>
-            <Ionicons name={isPending ? 'document-text-outline' : 'checkmark-circle'} size={38} color={accentColor} />
+      <Body>
+        <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 20, gap: 8 }}>
+          <View style={{
+            width: 64, height: 64, borderRadius: 32,
+            backgroundColor: isPending ? t.q.amberBg : t.q.greenBg,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons
+              name={isPending ? 'hourglass-outline' : 'checkmark'}
+              size={30}
+              color={isPending ? t.q.amber : t.q.green}
+            />
           </View>
-          <Text style={st.headline}>
-            {isPending ? 'Booking submitted!' : 'Booking confirmed!'}
+          <Text style={{ fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: t.q.ink, textAlign: 'center' }}>
+            {isPending ? 'Request sent' : 'You are booked'}
           </Text>
-          <Text style={st.sub}>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, textAlign: 'center' }}>
             {isPending
-              ? `${directBooking ? 'The doctor' : 'The hospital'} will review your request and notify you once approved.`
-              : 'We\'ll send you a reminder before your appointment.'}
+              ? `${reviewer.charAt(0).toUpperCase() + reviewer.slice(1)} will review your request and let you know.`
+              : [hospital?.name, doctorName, selectedDate].filter(Boolean).join(' · ')}
           </Text>
-        </Animated.View>
+        </View>
 
-        {/* Pending approval notice */}
+        {!isPending && <Journey steps={steps} activeIndex={0} />}
+
         {isPending && (
-          <Animated.View style={[st.pendingBanner, { opacity }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-              <Ionicons name="hourglass-outline" size={14} color={t.statusBusy.text} />
-              <Text style={[st.pendingTitle, { marginBottom: 0 }]}>
-                {directBooking ? "Awaiting the doctor's confirmation" : 'Awaiting hospital approval'}
-              </Text>
-            </View>
-            <Text style={st.pendingText}>
-              {directBooking
-                ? `Your payment will only be charged once ${reviewerLabel} approves your booking. If rejected, nothing is charged.`
-                : "Your payment will only be charged once the hospital approves your booking. If rejected, nothing is charged — you pay at the hospital only after the booking is approved."}
-            </Text>
-          </Animated.View>
+          <Notice tone="amber" icon="hourglass-outline">
+            Nothing is charged while this is under review. If {reviewer} declines, there is nothing to pay.
+          </Notice>
         )}
 
-        {/* Booking card */}
-        <Animated.View style={[st.card, { opacity }]}>
-          <View style={st.cardHeader}>
-            <View>
-              <Text style={st.cardHeaderLabel}>Booking ID</Text>
-              <Text style={[st.bookingId, { color: accentColor }]}>{bookingRef ?? '—'}</Text>
-            </View>
-            <View style={[st.statusPill, {
-              backgroundColor: isPending ? 'rgba(239,159,39,0.14)' : t.accentBgMid,
-              borderColor:     isPending ? 'rgba(239,159,39,0.35)' : t.accentBorder,
-            }]}>
-              <Text style={[st.statusText, { color: accentColor }]}>
-                {isPending ? 'Pending Review' : 'Confirmed'}
-              </Text>
-            </View>
-          </View>
+        <Card>
+          <DetailRow label="Reference" value={bookingRef ?? '—'} mono />
+          <DetailRow label="Type" value={isVirtual ? 'Video consultation' : isHomeVisit ? 'Home visit' : 'In person'} />
+          {!directBooking && <DetailRow label="Hospital" value={hospital?.name ?? '—'} />}
+          <DetailRow label="Doctor" value={doctorName ?? (isVirtual ? 'Hospital assigns' : 'Assigned on arrival')} />
+          <DetailRow label="Date" value={selectedDate ?? '—'} />
+          <DetailRow
+            label="Priority"
+            value={urgency ? urgency.charAt(0).toUpperCase() + urgency.slice(1) : 'Routine'}
+            last
+          />
+        </Card>
 
-          {[
-            {
-              icon: isVirtual ? 'videocam-outline' as const : isHomeVisit ? 'home-outline' as const : 'walk-outline' as const,
-              label: 'Visit type',
-              value: isVirtual ? 'Virtual consultation' : isHomeVisit ? 'Home visit' : 'Physical visit',
-            },
-            {
-              icon: 'person-outline' as const,
-              label: 'Doctor',
-              value: doctorName
-                ?? (isVirtual ? 'Hospital will assign' : 'Assigned when you arrive'),
-            },
-            ...(directBooking ? [] : [{
-              icon: 'business-outline' as const,
-              label: 'Hospital',
-              value: hospital?.name ?? '—',
-            }]),
-            {
-              icon: 'calendar-outline' as const,
-              label: 'Date',
-              value: selectedDate ?? '—',
-            },
-            {
-              icon: 'flash-outline' as const,
-              label: 'Urgency',
-              value: urgency
-                ? urgency.charAt(0).toUpperCase() + urgency.slice(1)
-                : 'Routine',
-            },
-          ].map(row => (
-            <View key={row.label} style={st.cardRow}>
-              <View style={st.cardRowLeft}>
-                <Ionicons name={row.icon} size={14} color="rgba(255,255,255,0.5)" />
-                <Text style={st.cardLabel}>{row.label}</Text>
-              </View>
-              <Text style={st.cardValue} numberOfLines={2}>{row.value}</Text>
+        <SectionHead title="What happens next" />
+        <Card pad>
+          {next.map((line, i) => (
+            <View key={line} style={{ flexDirection: 'row', gap: 12, paddingVertical: 7 }}>
+              <Mono size={13} weight="700" color={t.q.primary}>{i + 1}</Mono>
+              <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 19, color: t.q.ink70 }}>{line}</Text>
             </View>
           ))}
-        </Animated.View>
+        </Card>
 
-        {/* What happens next */}
-        <Animated.View style={[st.noteBox, { opacity }]}>
-          <Text style={st.noteTitle}>What happens next</Text>
-          {directBooking ? (
-            <Text style={st.noteText}>
-              1. {doctorName ?? 'The doctor'} reviews your request{'\n'}
-              2. You'll receive a notification once they confirm (or suggest another time){'\n'}
-              {isVirtual
-                ? "3. Check your Bookings tab for the meeting link when your appointment time approaches"
-                : "3. They'll arrive at the address you provided at the confirmed time"}
-            </Text>
-          ) : isVirtual ? (
-            isPending ? (
-              <Text style={st.noteText}>
-                1. Hospital reviews your booking request{'\n'}
-                2. You'll receive a notification when approved{'\n'}
-                3. A doctor will be confirmed for your virtual session{'\n'}
-                4. Check your Bookings tab for updates
-              </Text>
-            ) : (
-              <Text style={st.noteText}>
-                {doctorName
-                  ? `Your virtual appointment with ${doctorName} is confirmed.`
-                  : 'The hospital will assign a doctor for your virtual session.'}{'\n'}
-                Check your Bookings tab for the meeting link when your appointment time approaches.
-              </Text>
-            )
-          ) : (
-            <Text style={st.noteText}>
-              Present at the {hospital?.name ?? 'hospital'} reception on {selectedDate ?? 'the scheduled date'}.{'\n'}
-              The front desk will assign you an available doctor when you arrive.
-            </Text>
-          )}
-        </Animated.View>
-
-        {/* Actions */}
-        <Animated.View style={[st.actions, { opacity }]}>
-          {!!selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) && (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
+        {!!selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) && (
+          <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
+            <Btn
+              label="Add to Google Calendar" variant="secondary" small icon="calendar-outline"
               onPress={() => addToGoogleCalendar({
-                title: `${bookingType === 'virtual' ? 'Video visit' : 'Hospital visit'}${doctorName ? ` with ${doctorName}` : ''}`,
-                date: selectedDate, time: startTime ?? null,
-                location: bookingType === 'virtual' ? 'Queue app (video)' : hospital?.name,
+                title: `${isVirtual ? 'Video visit' : 'Hospital visit'}${doctorName ? ` with ${doctorName}` : ''}`,
+                date: selectedDate,
+                time: startTime ?? null,
+                location: isVirtual ? 'Queue app (video)' : hospital?.name,
                 details: `Booking ${bookingRef ?? ''} · Queue`,
               }).catch(() => {})}
-              style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)', flexDirection: 'row', gap: 8, justifyContent: 'center' }]}>
-              <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
-              <Text style={st.secondaryBtnText}>Add to Google Calendar</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={goBookings}
-            style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' }]}>
-            <Text style={st.secondaryBtnText}>View bookings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={goHome}
-            style={[st.primaryBtn, { backgroundColor: accentColor }]}>
-            <Text style={st.primaryBtnText}>Back to home</Text>
-          </TouchableOpacity>
-        </Animated.View>
+            />
+          </View>
+        )}
+      </Body>
 
-      </ScrollView>
-    </SafeAreaView>
+      <BottomBar>
+        <Btn label="Home" variant="secondary" onPress={goHome} />
+        <Btn grow label="View booking" onPress={goBookings} />
+      </BottomBar>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe:            { flex: 1 },
-  content:         { alignItems: 'center', padding: 28, paddingTop: 40 },
-  checkWrap:       { alignItems: 'center', marginBottom: 24 },
-  checkCircle:     { width: 88, height: 88, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, marginBottom: 18 },
-  checkIcon:       { fontSize: 38 },
-  headline:        { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.8, textAlign: 'center' },
-  sub:             { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 6, textAlign: 'center', lineHeight: 19 },
-  pendingBanner:   { width: '100%', backgroundColor: 'rgba(239,159,39,0.1)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(239,159,39,0.3)', marginBottom: 14 },
-  pendingTitle:    { fontSize: 13, fontWeight: '700', color: '#EF9F27', marginBottom: 5 },
-  pendingText:     { fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 },
-  card:            { width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 12 },
-  cardHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  cardHeaderLabel: { fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 3 },
-  bookingId:       { fontSize: 14, fontWeight: '800' },
-  statusPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  statusText:      { fontSize: 11, fontWeight: '700' },
-  cardRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', gap: 12 },
-  cardRowLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardRowIcon:     { fontSize: 14 },
-  cardLabel:       { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
-  cardValue:       { fontSize: 12, color: 'rgba(255,255,255,0.88)', fontWeight: '600', textAlign: 'right', flex: 1 },
-  noteBox:         { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 20 },
-  noteTitle:       { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.6)', marginBottom: 7 },
-  noteText:        { fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 19 },
-  actions:         { flexDirection: 'row', gap: 9, width: '100%' },
-  secondaryBtn:    { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
-  secondaryBtnText:{ fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
-  primaryBtn:      { flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' },
-  primaryBtnText:  { fontSize: 13, fontWeight: '700', color: '#fff' },
-})

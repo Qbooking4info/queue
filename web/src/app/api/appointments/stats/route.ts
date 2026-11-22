@@ -60,6 +60,41 @@ async function computeRevenue(
   return rows.reduce((sum, a) => sum + computeAppointmentFee(a, opdFee), 0)
 }
 
+/**
+ * Money that actually arrived, as opposed to `revenue` above, which is what
+ * the fee maths says the completed appointments in this range were worth.
+ *
+ * The two are different questions and a hospital needs both: the estimate is
+ * what was earned, this is what was collected. They diverge whenever a patient
+ * pays at the desk (nothing to record here), a payment fails, or a booking is
+ * refunded -- and a dashboard that shows only the estimate quietly reports
+ * income the hospital never received.
+ *
+ * Scoped by paid_at, not appointment_date: it is a cash figure, so it belongs
+ * to the day the money moved.
+ */
+async function computeCollected(
+  db: ReturnType<typeof createAdminClient>, hospitalId: string, from: string, to: string,
+): Promise<{ collected: number; refunded: number; payout: number; count: number }> {
+  const { data } = await (db as any)
+    .from('payments')
+    .select('amount, hospital_payout, status, refunded_at')
+    .eq('hospital_id', hospitalId)
+    .gte('paid_at', `${from}T00:00:00`)
+    .lte('paid_at', `${to}T23:59:59`)
+
+  const rows = (data ?? []) as { amount: number | null; hospital_payout: number | null; status: string; refunded_at: string | null }[]
+  let collected = 0, refunded = 0, payout = 0, count = 0
+  for (const r of rows) {
+    if (r.status !== 'success') continue
+    if (r.refunded_at) { refunded += Number(r.amount ?? 0); continue }
+    collected += Number(r.amount ?? 0)
+    payout += Number(r.hospital_payout ?? 0)
+    count += 1
+  }
+  return { collected, refunded, payout, count }
+}
+
 interface DoctorWaitConsultStats {
   doctorId: string
   doctorName: string
@@ -171,11 +206,16 @@ export async function GET(req: NextRequest) {
       computeRevenue(db, hospitalId, from, to, orFilter),
       computeWaitConsultStats(db, hospitalId, from, to, orFilter),
     ])
+    // Payments carry no clinic, so a clinic-scoped caller gets the hospital's
+    // collected figure or nothing. Nothing is the honest answer: attributing
+    // the whole hospital's takings to one clinic would be worse than silence.
+    const collected = null
     const total = totalRes.count ?? 0
     const completed = completedRes.count ?? 0
     const cancelled = cancelledRes.count ?? 0
     return NextResponse.json({
       total, completed, cancelled, pending: pendingRes.count ?? 0, revenue,
+      collected,
       avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
       doctorStats: waitConsult.doctorStats,
     })
@@ -193,11 +233,13 @@ export async function GET(req: NextRequest) {
     computeRevenue(db, hospitalId, from, to),
     computeWaitConsultStats(db, hospitalId, from, to),
   ])
+  const collected = await computeCollected(db, hospitalId, from, to)
   const total = totalRes.count ?? 0
   const completed = completedRes.count ?? 0
   const cancelled = cancelledRes.count ?? 0
   return NextResponse.json({
     total, completed, cancelled, pending: pendingRes.count ?? 0, revenue,
+    collected,
     avgWaitMinutes: waitConsult.avgWaitMinutes, avgConsultMinutes: waitConsult.avgConsultMinutes,
     doctorStats: waitConsult.doctorStats,
   })

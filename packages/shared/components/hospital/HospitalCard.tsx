@@ -1,10 +1,9 @@
-import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { View } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../contexts/ThemeContext'
 import { EntityAvatar } from '../ui/EntityAvatar'
-import { Stars } from '../ui/Stars'
-import { StatusBadge } from '../ui/StatusBadge'
+import { Row, Mono } from '../q'
 import type { BedSpaceStatus } from '../../lib/api'
 
 export interface DisplayHospital {
@@ -46,81 +45,48 @@ export interface DisplayHospital {
   bed_space_updated_at?:  string | null
 }
 
-interface Props { hospital: DisplayHospital; onPress: () => void }
+interface Props { hospital: DisplayHospital; onPress: () => void; distanceKm?: number | null }
 
-export function HospitalCard({ hospital: h, onPress }: Props) {
+/**
+ * One hospital, as a row inside a card -- the v4 handoff's find-care list.
+ *
+ * It was a free-standing bordered card with a rating, a wait figure, three
+ * service chips and two badges. The handoff puts hospitals in one card as
+ * hairline-separated rows carrying a name, a place-and-opening line, and the
+ * OPD fee, because that is what someone choosing a hospital compares. The
+ * dropped figures were not all real anyway: `wait` was the hardcoded string
+ * "~15 min" for every hospital in the list.
+ */
+export function HospitalCard({ hospital: h, onPress, distanceKm }: Props) {
   const { theme: t } = useTheme()
+  const where = [
+    h.city,
+    h.specialty,
+    h.is_24_hours ? 'open 24 hours' : null,
+    distanceKm != null ? (distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`) : null,
+  ].filter(Boolean).join(' · ')
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75}
-      style={[styles.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      <View style={styles.row}>
+    <Row
+      leading={
         <EntityAvatar
-          size={46}
+          size={40}
           kind="hospital"
           uri={h.logoUrl}
           label={h.name}
           hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }}
         />
-        <View style={styles.info}>
-          <View style={styles.topRow}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={[styles.name, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                {h.verified && <Ionicons name="checkmark-circle" size={13} color={t.accent} />}
-              </View>
-              <Text style={[styles.specialty, { color: t.textMuted }]}>{h.specialty}</Text>
-            </View>
-            <StatusBadge type={h.tagType} />
-          </View>
-          <View style={styles.metaRow}>
-            <Stars rating={h.rating} />
-            <Text style={[styles.meta, { color: t.textMuted }]}>({h.reviews})</Text>
-            <Text style={[styles.meta, { color: t.textMuted }]}>·</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <Ionicons name="time-outline" size={11} color={t.textSecondary} />
-              <Text style={[styles.meta, { color: t.textSecondary }]}>{h.wait}</Text>
-            </View>
-            <Text style={[styles.meta, { color: t.textMuted }]}>·</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <Ionicons name="location-outline" size={11} color={t.textSecondary} />
-              <Text style={[styles.meta, { color: t.textSecondary }]}>{h.distance}</Text>
-            </View>
-          </View>
-          <View style={styles.tags}>
-            {h.services.slice(0, 3).map(s => (
-              <View key={s} style={[styles.tag, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                <Text style={[styles.tagText, { color: t.textMuted }]}>{s}</Text>
-              </View>
-            ))}
-            {h.services.length > 3 && <Text style={[styles.tagText, { color: t.textMuted }]}>+{h.services.length - 3}</Text>}
-            {h.virtual && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <Ionicons name="videocam-outline" size={11} color={t.accent} />
-                <Text style={[styles.tagText, { color: t.accent, fontWeight: '600' }]}>Virtual</Text>
-              </View>
-            )}
-            {h.is_24_hours && (
-              <View style={[styles.tag, { backgroundColor: '#052e16', borderColor: '#16a34a' }]}>
-                <Text style={[styles.tagText, { color: '#4ade80', fontWeight: '700' }]}>24/7</Text>
-              </View>
-            )}
-          </View>
+      }
+      title={h.name}
+      sub={where || null}
+      right={
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          {h.opd_fee != null && <Mono size={13} weight="700">₦{Number(h.opd_fee).toLocaleString('en-NG')}</Mono>}
+          {h.virtual && <Ionicons name="videocam-outline" size={13} color={t.q.primary} />}
         </View>
-      </View>
-    </TouchableOpacity>
+      }
+      chevron
+      onPress={onPress}
+    />
   )
 }
-
-const styles = StyleSheet.create({
-  card:     { borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1 },
-  row:      { flexDirection: 'row', gap: 12 },
-  info:     { flex: 1, minWidth: 0 },
-  topRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
-  name:     { fontSize: 14, fontWeight: '700', letterSpacing: -0.3 },
-  specialty:{ fontSize: 11, marginTop: 1 },
-  metaRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
-  meta:     { fontSize: 11 },
-  tags:     { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  tag:      { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  tagText:  { fontSize: 10 },
-})

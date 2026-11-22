@@ -101,7 +101,14 @@ export async function pickAndUploadAmbulancePhoto(
 ): Promise<string | null> {
   const url = await pickAndUpload('ambulances', ambulanceId, 'vehicle', source, [16, 10])
   if (!url) return null
-  const { error } = await supabase.from('ambulances').update({ photo_url: url }).eq('id', ambulanceId)
+  // Through an RPC, not a table update: `ambulances` has RLS on and no policies,
+  // so a direct update matched zero rows and PostgREST reported that as success
+  // -- the picture uploaded, the screen said it had saved, and nothing was
+  // written. set_ambulance_photo also keeps status and is_active out of reach,
+  // which a table-level UPDATE policy would have opened up.
+  const { error } = await supabase.rpc('set_ambulance_photo', {
+    p_ambulance_id: ambulanceId, p_url: url,
+  })
   if (error) throw new Error(error.message)
   return url
 }

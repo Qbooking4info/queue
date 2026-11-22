@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react'
 import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { haptics } from '@queue/shared/lib/haptics'
 import {
@@ -23,19 +20,33 @@ import { fmt12 } from '@queue/shared/lib/format'
 import { payForAppointment } from '@queue/shared/lib/payments'
 import { getWallet, payWithWallet, naira } from '@queue/shared/lib/wallet'
 import { emergencyPremium, totalBookingFee, EMERGENCY_FEE_MULTIPLIER } from '@queue/shared/lib/fees'
-import { Header } from '@queue/shared/components/ui/v3'
-import { Avatar } from '@queue/shared/components/ui/Avatar'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Seg, Btn, BottomBar,
+  Notice, DetailRow, Field, SearchField, Empty, Mono, MONO,
+} from '@queue/shared/components/q'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
 import type { Clinic, BookingResult, DayHours, LinkedDependent } from '@queue/shared/lib/api'
 
 interface Props { navigation: any; route: any }
 
-// Step indices
-const STEP_TYPE     = 0
-const STEP_HOSPITAL = 1
-const STEP_DETAILS  = 2
-const STEP_SCHEDULE = 3
-const STEP_CONFIRM  = 4
+// Step indices.
+//
+// Three pages, down from five. The old flow opened on a full page holding one
+// binary choice (physical vs virtual) and then split "about your visit" from
+// "pick a time" across two more -- but the clinic you pick is what determines
+// which slots exist, so the patient was being walked forward and back across a
+// decision that is really one decision. Nothing was removed to get here: the
+// type choice became a toggle on the hospital page, and details and schedule
+// became two sections of one scrolling page.
+//
+// STEP_DETAILS and STEP_SCHEDULE are kept as names for those two sections so
+// the guards, effects and copy that distinguish them still read clearly; they
+// are deliberately the same page.
+const STEP_HOSPITAL = 0
+const STEP_VISIT    = 1
+const STEP_DETAILS  = STEP_VISIT
+const STEP_SCHEDULE = STEP_VISIT
+const STEP_CONFIRM  = 2
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -127,9 +138,9 @@ export function BookingFlowScreen({ navigation, route }: Props) {
   // load (see the hours-driven effect below), so the picker is never empty while loading.
   const [DATES, setDATES] = useState(() => getBookingDates(8))
 
-  const startStep = presetType && presetHospital ? STEP_DETAILS
-                  : presetType                   ? STEP_HOSPITAL
-                  : STEP_TYPE
+  // A hospital arriving from HospitalProfile skips straight to the visit page;
+  // a bare type preset just preselects the toggle.
+  const startStep = presetHospital ? STEP_VISIT : STEP_HOSPITAL
 
   // ── Core state ────────────────────────────────────────────────────────────
   const [step,        setStep]        = useState(startStep)
@@ -436,24 +447,38 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   function goBack() {
     if (step <= startStep) { navigation.goBack(); return }
-    const prev = step - 1
-    // skip hospital step on back if it was pre-set
-    if (prev === STEP_HOSPITAL && presetHospital) { setStep(STEP_TYPE); return }
-    setStep(prev)
+    setStep(step - 1)
   }
 
   function canAdvance() {
     if (step === STEP_HOSPITAL) return !!hospital
-    if (step === STEP_DETAILS) {
+    if (step === STEP_VISIT) {
+      // Details half.
       if (isEmergency && hospitalOpenNow === false) return false
       if (noEmergencyClinic) return false
       if (clinicRestrictionReason) return false
-      return reason.trim().length >= 3 && !(hospital?.clinic_model === 'multi' && !selectedClinic)
-    }
-    if (step === STEP_SCHEDULE) {
+      if (reason.trim().length < 3) return false
+      if (hospital?.clinic_model === 'multi' && !selectedClinic) return false
+      // Schedule half. Both must hold before the patient reaches payment --
+      // merging the pages must not merge away a requirement.
       return !!opdSlot && !dateFullMap[selectedDate]
     }
     return true
+  }
+
+  // With details and schedule on one page there are several reasons Continue
+  // can be disabled, and a button that is simply dead is the worst of them.
+  // Says the first thing still missing, in the order the page asks for it.
+  function blockingReason(): string | null {
+    if (step !== STEP_VISIT || canAdvance()) return null
+    if (isEmergency && hospitalOpenNow === false) return 'This hospital is closed right now — choose another for an emergency.'
+    if (noEmergencyClinic) return 'This hospital has no emergency department.'
+    if (clinicRestrictionReason) return clinicRestrictionReason.reason
+    if (reason.trim().length < 3) return 'Tell us the reason for your visit.'
+    if (hospital?.clinic_model === 'multi' && !selectedClinic) return 'Choose a clinic.'
+    if (dateFullMap[selectedDate]) return 'That date is fully booked — pick another day.'
+    if (!opdSlot) return 'Pick an arrival window.'
+    return null
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -619,822 +644,548 @@ export function BookingFlowScreen({ navigation, route }: Props) {
 
   // ── Progress bar ──────────────────────────────────────────────────────────
 
-  const PHASES = ['What', 'When', 'Pay & confirm'] as const
-  const phase = step <= STEP_DETAILS ? 0 : step === STEP_SCHEDULE ? 1 : 2
+  const PHASES = ['Hospital', 'Your visit', 'Pay & confirm'] as const
+  const phase = step
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  // The handoff's three steps. The names changed with the redesign ("Your
+  // visit / Doctor & time / Pay"); the step boundaries did not.
+  const PHASE_LABELS = ['Your visit', 'Doctor & time', 'Pay'] as const
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header onBack={goBack}
-        title={step === STEP_TYPE ? 'New appointment'
-          : step === STEP_HOSPITAL ? 'Choose a hospital'
-          : step === STEP_DETAILS ? (rescheduleCtx ? 'Reschedule visit' : 'About your visit')
-          : step === STEP_SCHEDULE ? (rescheduleCtx ? 'Pick a new time' : 'Pick a time')
-          : (rescheduleCtx ? 'Confirm new date' : 'Pay & confirm')}
-        right={<Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)' }}>{phase + 1} of 3</Text>}>
-        {/* v3.1: three phases -- What (type, hospital, details), When, Pay & confirm */}
-        <View style={{ flexDirection: 'row', gap: 6 }} accessibilityLabel={`Step ${phase + 1} of 3: ${PHASES[phase]}`}>
-          {PHASES.map((label, i) => (
-            <View key={label} style={{ flex: 1, gap: 4 }}>
-              <View style={{ height: 4, borderRadius: 99, backgroundColor: i <= phase ? '#FFFFFF' : 'rgba(255,255,255,0.3)' }} />
-              <Text style={{ fontSize: 11, color: i === phase ? '#FFFFFF' : '#CCFBF1', fontWeight: i === phase ? '700' : '400' }}>{label}</Text>
-            </View>
-          ))}
-        </View>
-      </Header>
-      <View style={[s.container, { paddingTop: 12 }]}>
+    <Screen>
+      <AppBar
+        title={rescheduleCtx ? 'Reschedule visit' : 'Book a visit'}
+        sub={`Step ${phase + 1} of 3`}
+        onBack={goBack}
+      />
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
+      {/* The step rail. Three equal segments: the bar no longer claims a third
+          of the way through while the patient is on page two of five. */}
+      <View
+        style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}
+        accessibilityLabel={`Step ${phase + 1} of 3: ${PHASE_LABELS[phase]}`}>
+        {PHASE_LABELS.map((label, i) => (
+          <View key={label} style={{ flex: 1, gap: 5 }}>
+            <View style={{ height: 3, borderRadius: 2, backgroundColor: i <= phase ? t.q.primary : t.q.line }} />
+            <Text style={{ fontSize: 11, fontWeight: i === phase ? '700' : '500', color: i === phase ? t.q.ink : t.q.ink60 }}>
+              {label}
+            </Text>
+          </View>
+        ))}
+      </View>
 
-          {/* ══ STEP 0 — Choose type ══════════════════════════════════ */}
-          {step === STEP_TYPE && (
-            <View style={s.stepWrap}>
-              <Text style={[s.stepHeading, { color: t.textPrimary }]}>
-                How would you like to see a doctor?
-              </Text>
-              <Text style={[s.stepSub, { color: t.textMuted }]}>
-                Choose your consultation type to get started.
-              </Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <Body keyboardShouldPersistTaps="handled">
 
-              {([
-                {
-                  type: 'physical' as const,
-                  icon: 'business-outline' as const,
-                  iconColor: t.accent,
-                  iconBg: t.accentBg,
-                  label: 'Physical Visit',
-                  desc:  'Visit the hospital in person. A doctor will be assigned when you arrive at the clinic.',
-                },
-                {
-                  type: 'virtual' as const,
-                  icon: 'videocam-outline' as const,
-                  iconColor: t.statusVirtual.text,
-                  iconBg: 'rgba(55,138,221,0.12)',
-                  label: 'Virtual Consultation',
-                  desc:  'Video or phone call with a doctor. You can choose a preferred doctor if available.',
-                },
-              ]).map(opt => (
-                <TouchableOpacity key={opt.type}
-                  onPress={() => { setBookingType(opt.type); setPreferredDoc(null); setStep(STEP_HOSPITAL) }}
-                  style={[s.typeCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                  <View style={[s.typeIcon, { backgroundColor: opt.iconBg }]}>
-                    <Ionicons name={opt.icon} size={26} color={opt.iconColor} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.typeLabel, { color: t.textPrimary }]}>{opt.label}</Text>
-                    <Text style={[s.typeSub,   { color: t.textMuted   }]}>{opt.desc}</Text>
-                  </View>
-                  <Text style={{ color: t.textMuted, fontSize: 20 }}>›</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* ══ STEP 1 — Choose hospital ══════════════════════════════ */}
+          {/* ══ STEP 1 — Choose a hospital ═══════════════════════════ */}
           {step === STEP_HOSPITAL && (
-            <View style={s.stepWrap}>
-              <Text style={[s.stepSub, { color: t.textMuted, marginBottom: 14 }]}>
-                {bookingType === 'virtual'
-                  ? 'Showing hospitals that offer virtual consultations'
-                  : 'All hospitals available for in-person visits'}
-              </Text>
+            <>
+              {/* Two options that change nothing else on screen, so they are a
+                  switch rather than a page of their own -- and the patient can
+                  change their mind without walking backwards. */}
+              <Seg<'physical' | 'virtual'>
+                value={bookingType}
+                onChange={v => { haptics.tap(); setBookingType(v); setPreferredDoc(null) }}
+                options={[{ key: 'physical', label: 'In person' }, { key: 'virtual', label: 'Video call' }]}
+              />
 
-              <View style={[s.searchRow, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-                <Ionicons name="search-outline" size={14} color={t.textMuted} />
-                <TextInput
-                  value={searchText} onChangeText={setSearchText}
-                  placeholder="Search hospitals…"
-                  placeholderTextColor={t.textMuted}
-                  style={[s.searchInput, { color: t.textPrimary }]}
-                />
-                {searchText.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchText('')} accessibilityLabel="Clear search" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={14} color={t.textMuted} />
-                  </TouchableOpacity>
-                )}
+              <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink60 }}>
+                  {bookingType === 'virtual'
+                    ? 'A doctor will call you. Pick the hospital you want to consult with.'
+                    : 'A doctor is assigned when you arrive. Pick a hospital to continue.'}
+                </Text>
               </View>
+
+              <SearchField value={searchText} onChangeText={setSearchText} placeholder="Search hospitals…" />
 
               {loadingHosp ? (
-                <ActivityIndicator color={t.accent} style={{ marginTop: 30 }} />
+                <ActivityIndicator color={t.q.primary} style={{ marginTop: 30 }} />
               ) : hospitalList.length === 0 ? (
-                <View style={[s.emptyBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                  <Ionicons name="business-outline" size={28} color={t.textMuted} style={{ marginBottom: 8, opacity: 0.4 }} />
-                  <Text style={[{ fontSize: 13, color: t.textMuted, textAlign: 'center' }]}>
-                    {bookingType === 'virtual'
-                      ? 'No hospitals with virtual consultations found.'
-                      : 'No hospitals found. Try a different search.'}
-                  </Text>
-                </View>
+                <Card>
+                  <Empty
+                    icon="business-outline"
+                    title={bookingType === 'virtual' ? 'No hospital here consults online yet' : 'No hospitals match that'}
+                    body={bookingType === 'virtual'
+                      ? 'Try an in-person visit, or find an independent doctor who consults online.'
+                      : 'Try a shorter search.'}
+                    action={bookingType === 'virtual' ? 'Find a doctor online' : undefined}
+                    onAction={() => navigation.navigate('DoctorSearch', { initialFilter: 'virtual' })}
+                  />
+                </Card>
               ) : (
-                hospitalList.map(h => (
-                  <TouchableOpacity key={h.id}
-                    onPress={() => {
-                      setHospital(h)
-                      setPreferredDoc(null)
-                      setSelectedClinic(null); setReferralNote('')
-                      setStep(STEP_DETAILS)
-                    }}
-                    style={[s.hospRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                    <EntityAvatar size={42} kind="hospital" uri={h.logoUrl} label={h.name}
-                      hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                        <Text style={[s.hospName, { color: t.textPrimary }]} numberOfLines={1}>{h.name}</Text>
-                        {h.verified && <Ionicons name="checkmark-circle" size={12} color={t.accent} />}
-                      </View>
-                      <Text style={[s.hospSpec, { color: t.textMuted }]} numberOfLines={1}>{h.specialty}</Text>
-                      <View style={{ flexDirection: 'row', gap: 5, marginTop: 3, flexWrap: 'wrap' }}>
-                        {h.virtual && (
-                          <View style={[s.miniTag, { backgroundColor: 'rgba(55,138,221,0.1)', borderColor: 'rgba(55,138,221,0.2)' }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="videocam-outline" size={9} color={t.statusVirtual.text} /><Text style={{ fontSize: 9, color: t.statusVirtual.text }}>Virtual</Text></View>
-                          </View>
-                        )}
-                        {h.approval_mode === 'manual' && (
-                          <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.2)' }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Ionicons name="clipboard-outline" size={9} color={t.statusBusy.text} /><Text style={{ fontSize: 9, color: t.statusBusy.text }}>Manual review</Text></View>
-                          </View>
-                        )}
-                        {h.opd_fee != null && h.opd_fee > 0 && bookingType === 'physical' && (
-                          <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                            <Text style={{ fontSize: 9, color: t.accent }}>₦{Number(h.opd_fee).toLocaleString()} OPD</Text>
-                          </View>
-                        )}
-                      </View>
+                <Card>
+                  {hospitalList.map((h, i) => (
+                    <View key={String(h.id)}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        leading={
+                          <EntityAvatar size={40} kind="hospital" uri={h.logoUrl} label={h.name}
+                            hospital={{ type: h.hospitalType, ownership: h.ownership, clinicModel: h.clinic_model }} />
+                        }
+                        title={h.name}
+                        sub={[h.specialty, h.approval_mode === 'manual' ? 'reviewed by hand' : null].filter(Boolean).join(' · ')}
+                        right={h.opd_fee != null && h.opd_fee > 0 && bookingType === 'physical'
+                          ? <Mono size={13} weight="700">₦{Number(h.opd_fee).toLocaleString('en-NG')}</Mono>
+                          : undefined}
+                        chevron
+                        onPress={() => {
+                          setHospital(h)
+                          setPreferredDoc(null)
+                          setSelectedClinic(null); setReferralNote('')
+                          setStep(STEP_VISIT)
+                        }}
+                      />
                     </View>
-                    <Text style={{ color: t.textMuted, fontSize: 20 }}>›</Text>
-                  </TouchableOpacity>
-                ))
+                  ))}
+                </Card>
               )}
-            </View>
+            </>
           )}
 
-          {/* ══ STEP 2 — Details (reason + urgency) ══════════════════ */}
-          {step === STEP_DETAILS && (
-            <View style={s.stepWrap}>
-              {/* Context chip */}
-              <View style={[s.contextChip, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                <Text style={{ fontSize: 16 }}>{bookingType === 'virtual' ? <Ionicons name="videocam-outline" size={16} color={t.textMuted} /> : <Ionicons name="walk-outline" size={16} color={t.accent} />}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.contextName, { color: t.textPrimary }]} numberOfLines={1}>
-                    {hospital?.name}
-                  </Text>
-                  <Text style={[{ fontSize: 11, color: t.textMuted }]}>
-                    {bookingType === 'virtual' ? 'Virtual consultation' : 'In-person visit'}
-                  </Text>
-                </View>
-                {!presetHospital && (
-                  <TouchableOpacity onPress={() => setStep(STEP_HOSPITAL)}>
-                    <Text style={{ fontSize: 11, color: t.accent }}>Change</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+          {/* ══ STEP 2 — Your visit, then when ══════════════════════ */}
+          {step === STEP_VISIT && (
+            <>
+              <Card>
+                <Row
+                  icon={bookingType === 'virtual' ? 'videocam-outline' : 'business-outline'}
+                  title={hospital?.name ?? '—'}
+                  sub={bookingType === 'virtual' ? 'Virtual consultation' : 'In-person visit'}
+                  right={!presetHospital
+                    ? <Btn label="Change" variant="ghost" small onPress={() => setStep(STEP_HOSPITAL)} />
+                    : undefined}
+                />
+              </Card>
 
-              {/* Who is this for -- linked (real-account) dependents only */}
               {linkedDependents.length > 0 && (
                 <>
-                  <Text style={[s.label, { color: t.textMuted }]}>Who is this for?</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                    <TouchableOpacity onPress={() => setBookingForDependentId(null)}
-                      style={[s.forBtnSmall, {
-                        borderColor:     !bookingForDependentId ? t.accent : t.cardBorder,
-                        backgroundColor: !bookingForDependentId ? t.accentBg : t.cardBg,
-                      }]}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: !bookingForDependentId ? t.accent : t.textMuted }}>Myself</Text>
-                    </TouchableOpacity>
-                    {linkedDependents.map(d => (
-                      <TouchableOpacity key={d.linkId} onPress={() => setBookingForDependentId(d.dependent.id)}
-                        style={[s.forBtnSmall, {
-                          borderColor:     bookingForDependentId === d.dependent.id ? t.accent : t.cardBorder,
-                          backgroundColor: bookingForDependentId === d.dependent.id ? t.accentBg : t.cardBg,
-                        }]}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: bookingForDependentId === d.dependent.id ? t.accent : t.textMuted }}>
-                          {d.dependent.full_name} ({d.relationship})
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <SectionHead title="Who is this for?" />
+                  <Card>
+                    <Row
+                      icon="person-outline"
+                      iconTone={!bookingForDependentId ? 'teal' : 'neutral'}
+                      tint={!bookingForDependentId}
+                      title={user?.full_name ?? 'Me'}
+                      sub={(user as any)?.patient_code ?? 'Your own account'}
+                      right={!bookingForDependentId ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                      onPress={() => setBookingForDependentId(null)}
+                    />
+                    {linkedDependents.map(d => {
+                      const on = bookingForDependentId === d.dependent.id
+                      return (
+                        <View key={d.linkId}>
+                          <Hair />
+                          <Row
+                            icon="person-outline"
+                            iconTone={on ? 'teal' : 'neutral'}
+                            tint={on}
+                            title={d.dependent.full_name}
+                            sub={`${d.relationship} · managed by you`}
+                            right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                            onPress={() => setBookingForDependentId(d.dependent.id)}
+                          />
+                        </View>
+                      )
+                    })}
+                  </Card>
                 </>
               )}
 
               {isManual && (
-                <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                  <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
-                    <Text style={{ fontWeight: '700' }}>Manual approval:</Text> This hospital reviews each booking. Please describe your symptoms clearly so they can assess your case.
-                  </Text>
-                </View>
+                <Notice tone="amber" icon="clipboard-outline">
+                  This hospital reviews each booking by hand. Describe your symptoms clearly so they can
+                  assess your case. Nothing is charged until they accept.
+                </Notice>
               )}
 
-              <Text style={[s.label, { color: t.textMuted }]}>{bookingType === 'virtual' ? 'Reason for consultation' : 'Reason for visit'} *</Text>
-              <TextInput
-                value={reason} onChangeText={setReason}
-                multiline numberOfLines={3}
-                placeholder="e.g. Persistent headache for 3 days, chest discomfort, follow-up after surgery…"
-                placeholderTextColor={t.textMuted}
-                style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-              />
-
-              <Text style={[s.label, { color: t.textMuted, marginTop: 16 }]}>How urgent is this?</Text>
-              <View style={{ gap: 8 }}>
-                {([
-                  ['routine',   'medical-outline',      'Routine',   'Regular check-up or follow-up'],
-                  ['emergency', 'warning-outline',       'Emergency', 'Severe symptoms requiring prompt care (2× fee)'],
-                ] as const).map(([id, icon, label, sub]) => {
-                  const active = urgency === id
-                  const danger = id === 'emergency'
-                  const activeColor = danger ? t.danger : t.accent
-                  const activeBg    = danger ? t.dangerSubtle : t.accentBg
-                  return (
-                    <TouchableOpacity key={id} onPress={() => setUrgency(id)}
-                      style={[s.urgRow, {
-                        borderColor:     active ? activeColor : t.cardBorder,
-                        backgroundColor: active ? activeBg    : t.cardBg,
-                      }]}>
-                      <Ionicons name={icon} size={20} color={active ? activeColor : t.textMuted} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.urgLabel, { color: active ? activeColor : t.textPrimary }]}>{label}</Text>
-                        <Text style={[s.urgSub,   { color: t.textMuted }]}>{sub}</Text>
-                      </View>
-                      <View style={[s.radio, {
-                        borderColor:     active ? activeColor : t.cardBorder,
-                        backgroundColor: active ? activeColor : 'transparent',
-                      }]}>
-                        {active && <Ionicons name="checkmark" size={10} color="#000" />}
-                      </View>
-                    </TouchableOpacity>
-                  )
-                })}
+              <SectionHead title={bookingType === 'virtual' ? 'Reason for consultation' : 'Reason for visit'} />
+              <View style={{ paddingHorizontal: 16 }}>
+                <Field
+                  label="What brings you in?"
+                  value={reason}
+                  onChangeText={setReason}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="e.g. Persistent headache for 3 days, chest discomfort, follow-up after surgery…"
+                  style={{ minHeight: 88, textAlignVertical: 'top' }}
+                />
               </View>
 
+              <SectionHead title="How urgent is this?" />
+              <Card>
+                {([
+                  ['routine', 'medical-outline', 'Routine', 'Regular check-up or follow-up'],
+                  ['emergency', 'warning-outline', 'Emergency', `Severe symptoms needing prompt care (${EMERGENCY_FEE_MULTIPLIER}× fee)`],
+                ] as const).map(([id, icon, label, sub], i) => {
+                  const on = urgency === id
+                  return (
+                    <View key={id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        icon={icon}
+                        iconTone={id === 'emergency' ? 'red' : on ? 'teal' : 'neutral'}
+                        tint={on}
+                        title={label}
+                        sub={sub}
+                        right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                        onPress={() => setUrgency(id)}
+                      />
+                    </View>
+                  )
+                })}
+              </Card>
+
               {isEmergency && (
-                <View style={[s.noticeBox, {
-                  marginTop: 12,
-                  backgroundColor: hospitalOpenNow === false ? t.dangerSubtle : t.dangerSubtle,
-                  borderColor: t.dangerStrong,
-                }]}>
-                  {hospitalOpenNow === false ? (
-                    <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                      <Text style={{ fontWeight: '800' }}>{hospital?.name} is closed right now.</Text> Emergency
-                      bookings can only be for today, so please go back and choose a hospital that's currently open.
-                    </Text>
-                  ) : (
-                    <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                      Emergency bookings are for <Text style={{ fontWeight: '800' }}>today only</Text> — you won't
-                      be able to pick a future date, and you'll be prioritized to the front of today's queue.
-                    </Text>
-                  )}
-                </View>
+                hospitalOpenNow === false ? (
+                  <Notice tone="red">
+                    {hospital?.name} is closed right now. An emergency booking can only be for today, so go
+                    back and choose a hospital that is open.
+                  </Notice>
+                ) : (
+                  <Notice tone="red">
+                    Emergency bookings are for today only — no future date — and you are placed at the front
+                    of today&apos;s queue.
+                  </Notice>
+                )
               )}
 
               {/* ── Clinic selector (multi-clinic hospitals) ────────── */}
               {hospital?.clinic_model === 'multi' && (
-                <View style={{ marginTop: 20 }}>
-                  <Text style={[s.label, { color: t.textMuted }]}>
-                    {isEmergency ? 'Emergency department' : 'Select a clinic *'}
-                  </Text>
+                <>
+                  <SectionHead title={isEmergency ? 'Emergency department' : 'Clinic'} />
 
                   {!isEmergency && (
-                    <View style={[s.noticeBox, { backgroundColor: 'rgba(15,118,110,0.08)', borderColor: 'rgba(15,118,110,0.25)', marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: '#0F766E', lineHeight: 18 }}>
-                        <Text style={{ fontWeight: '700' }}>Not sure where to go?</Text>{' Book OPD — our front desk will direct you to the right specialist.'}
-                      </Text>
-                    </View>
+                    <Notice tone="teal" icon="information-circle-outline">
+                      Not sure where to go? Book general outpatient — the front desk directs you to the
+                      right specialist.
+                    </Notice>
                   )}
 
                   {noEmergencyClinic && (
-                    <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginBottom: 12 }]}>
-                      <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                        <Text style={{ fontWeight: '800' }}>{hospital?.name} hasn't set up an Emergency Department.</Text> Please
-                        go back and choose a different hospital for an emergency booking.
-                      </Text>
-                    </View>
+                    <Notice tone="red">
+                      {hospital?.name} has not set up an emergency department. Go back and choose a
+                      different hospital for an emergency booking.
+                    </Notice>
                   )}
 
                   {loadingClinics ? (
-                    <ActivityIndicator color={t.accent} style={{ marginVertical: 12 }} />
+                    <ActivityIndicator color={t.q.primary} style={{ marginVertical: 12 }} />
                   ) : (
-                    visibleClinics.map(clinic => {
-                      const active = selectedClinic?.id === clinic.id
-                      return (
-                        <TouchableOpacity key={clinic.id}
-                          onPress={() => { setSelectedClinic(active ? null : clinic); setReferralNote('') }}
-                          style={[s.urgRow, {
-                            borderColor:     active ? t.accent : t.cardBorder,
-                            backgroundColor: active ? t.accentBg : t.cardBg,
-                            marginBottom: 8,
-                          }]}>
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
-                              <Text style={[s.urgLabel, { color: active ? t.accent : t.textPrimary }]}>{clinic.name}</Text>
-                              {isEmergency ? (
-                                <View style={[s.miniTag, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Ionicons name="alert-circle-outline" size={9} color={t.danger} /><Text style={{ fontSize: 9, fontWeight: '700', color: t.danger }}>Emergency</Text></View>
-                                </View>
-                              ) : clinic.is_opd ? (
-                                <View style={[s.miniTag, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: t.accent }}>Recommended</Text>
-                                </View>
-                              ) : (
-                                <View style={[s.miniTag, { backgroundColor: 'rgba(239,159,39,0.1)', borderColor: 'rgba(239,159,39,0.3)' }]}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: t.statusBusy.text }}>Needs referral</Text>
-                                </View>
-                              )}
-                            </View>
-                            {clinic.description && (
-                              <Text style={[s.urgSub, { color: t.textMuted, marginTop: 3 }]}>{clinic.description}</Text>
-                            )}
-                            {clinic.service_tags?.length > 0 && (
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
-                                {clinic.service_tags.slice(0, 4).map(tag => (
-                                  <View key={tag} style={[s.miniTag, {
-                                    backgroundColor: active ? t.accentBgMid : t.inputBg,
-                                    borderColor: active ? t.accentBorder : t.cardBorder,
-                                  }]}>
-                                    <Text style={{ fontSize: 9, color: active ? t.accent : t.textMuted }}>{tag}</Text>
-                                  </View>
-                                ))}
-                                {clinic.service_tags.length > 4 && (
-                                  <Text style={{ fontSize: 9, color: t.textMuted, alignSelf: 'center' }}>
-                                    +{clinic.service_tags.length - 4}
-                                  </Text>
-                                )}
-                              </View>
-                            )}
+                    <Card>
+                      {visibleClinics.map((clinic, i) => {
+                        const on = selectedClinic?.id === clinic.id
+                        return (
+                          <View key={clinic.id}>
+                            {i > 0 && <Hair />}
+                            <Row
+                              icon="medical-outline"
+                              iconTone={on ? 'teal' : 'neutral'}
+                              tint={on}
+                              title={clinic.name}
+                              sub={clinic.description ?? (clinic.service_tags?.length ? clinic.service_tags.slice(0, 4).join(' · ') : null)}
+                              pill={isEmergency ? 'Emergency' : clinic.is_opd ? 'No referral' : 'Needs referral'}
+                              pillTone={isEmergency ? 'red' : clinic.is_opd ? 'teal' : 'amber'}
+                              pillSolid={isEmergency}
+                              onPress={() => { setSelectedClinic(on ? null : clinic); setReferralNote('') }}
+                            />
                           </View>
-                          <View style={[s.radio, {
-                            borderColor:     active ? t.accent : t.cardBorder,
-                            backgroundColor: active ? t.accent : 'transparent',
-                          }]}>
-                            {active && <Ionicons name="checkmark" size={10} color="#000" />}
-                          </View>
-                        </TouchableOpacity>
-                      )
-                    })
+                        )
+                      })}
+                    </Card>
                   )}
 
                   {clinicRestrictionReason && (
-                    <View style={[s.noticeBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong, marginTop: 4 }]}>
-                      <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                        <Text style={{ fontWeight: '800' }}>Can't book this clinic.</Text> {clinicRestrictionReason.reason}
-                      </Text>
+                    <>
+                      <Notice tone="red">
+                        You cannot book this clinic. {clinicRestrictionReason.reason}
+                      </Notice>
                       {clinicRestrictionReason.needsProfile && (
-                        <TouchableOpacity onPress={() => { haptics.tap(); navigation.navigate('MedicalHistory') }} style={{ marginTop: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger, textDecorationLine: 'underline' }}>
-                            Complete your health profile →
-                          </Text>
-                        </TouchableOpacity>
+                        <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+                          <Btn label="Complete your health profile" variant="secondary" small
+                            onPress={() => { haptics.tap(); navigation.navigate('MedicalHistory') }} />
+                        </View>
                       )}
-                    </View>
+                    </>
                   )}
 
                   {selectedClinic && !selectedClinic.is_opd && !isEmergency && !clinicRestrictionReason && (
                     <>
-                      <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginTop: 4 }]}>
-                        <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
-                          <Text style={{ fontWeight: '700' }}>Specialist clinic</Text>{' — the hospital will review your booking. A referral note helps them approve faster.'}
-                        </Text>
+                      <Notice tone="amber">
+                        A specialist clinic is reviewed by the hospital. A referral note helps them approve faster.
+                      </Notice>
+                      <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+                        <Field
+                          label="Referral note (optional)"
+                          value={referralNote}
+                          onChangeText={setReferralNote}
+                          multiline
+                          numberOfLines={3}
+                          placeholder="e.g. Referred by Dr Okafor for chest pain."
+                          style={{ minHeight: 80, textAlignVertical: 'top' }}
+                        />
                       </View>
-                      <Text style={[s.label, { color: t.textMuted, marginTop: 10 }]}>Referral note (optional)</Text>
-                      <TextInput
-                        value={referralNote} onChangeText={setReferralNote}
-                        multiline numberOfLines={3}
-                        placeholder="e.g. Referred by Dr. Okafor for chest pain. Include referral letter details here."
-                        placeholderTextColor={t.textMuted}
-                        style={[s.textarea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                      />
                     </>
                   )}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* ══ STEP 3 — Schedule ════════════════════════════════════ */}
-          {step === STEP_SCHEDULE && (
-            <View style={s.stepWrap}>
-
-              {/* ── Physical ───────────────────────────────────────── */}
-              {bookingType === 'physical' && (
-                <>
-                  <Text style={[s.label, { color: t.textMuted }]}>Choose a date</Text>
-                  {checkingLim && (
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
-                  )}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
-                    {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
-                      const active = selectedDate === d.iso
-                      const full   = !!dateFullMap[d.iso]
-                      return (
-                        <TouchableOpacity key={d.iso} onPress={() => !full && setSelectedDate(d.iso)}
-                          disabled={full}
-                          style={[s.dateChip, {
-                            borderColor:     full ? t.cardBorder : active ? t.accent : t.cardBorder,
-                            backgroundColor: full ? t.inputBg   : active ? t.accentBg : t.cardBg,
-                            opacity: full ? 0.45 : 1,
-                          }]}>
-                          <Text style={[s.dateLabel, { color: full ? t.textMuted : active ? t.accent : t.textPrimary }]}>
-                            {d.label}
-                          </Text>
-                          {full && <Text style={{ fontSize: 9, color: t.textMuted }}>Full</Text>}
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </ScrollView>
-                  {isEmergency && (
-                    <Text style={{ fontSize: 11, color: t.danger, marginBottom: 8 }}>
-                      Emergency bookings are today only — no other dates available.
-                    </Text>
-                  )}
-                  {dateFullMap[selectedDate] && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
-                    </View>
-                  )}
-
-                  <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred arrival window</Text>
-                  {opdSlots.length === 0 && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available slots for today. Please choose another date.</Text></View>
-                    </View>
-                  )}
-                  <View style={s.slotGrid}>
-                    {opdSlots.map(sl => {
-                      const active = opdSlot?.id === sl.id
-                      return (
-                        <TouchableOpacity key={sl.id} onPress={() => setOpdSlot(active ? null : sl)}
-                          style={[s.slotBtn, {
-                            borderColor:     active ? t.accent : t.cardBorder,
-                            backgroundColor: active ? t.accentBg : t.cardBg,
-                          }]}>
-                          <Text style={[s.slotText, {
-                            color: active ? t.accent : t.textSecondary,
-                            fontWeight: active ? '700' : '400',
-                          }]}>{sl.label}</Text>
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-
-                  <View style={[s.infoBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                    <Text style={[s.infoText, { color: t.textMuted }]}>
-                      A doctor will be assigned by the front desk when you arrive. Your selected window is a preferred arrival time.
-                    </Text>
-                  </View>
                 </>
               )}
 
-              {/* ── Virtual ────────────────────────────────────────── */}
+              {/* ── When ───────────────────────────────────────────── */}
+              <SectionHead title={rescheduleCtx ? 'Pick a new time' : 'When would you like to come?'} />
+
               {bookingType === 'virtual' && (
-                <>
-                  {/* How it works banner */}
-                  <View style={[s.infoBox, { backgroundColor: 'rgba(55,138,221,0.08)', borderColor: 'rgba(55,138,221,0.22)', marginBottom: 18 }]}>
-                    <Text style={[s.infoText, { color: t.statusVirtual.text, lineHeight: 18 }]}>
-                      <Text style={{ fontWeight: '700' }}>Virtual queue — how it works:</Text>{'\n'}
-                      Join the queue for your chosen date and window. When it's your turn, the doctor will call you directly. You don't need to be at the hospital.
-                    </Text>
-                  </View>
-
-                  {/* Preferred doctor (optional) */}
-                  {virtualDoctors.length > 0 && (
-                    <>
-                      <Text style={[s.label, { color: t.textMuted }]}>Preferred doctor (optional)</Text>
-                      <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
-                        Pick a doctor you'd like to consult, or skip — the hospital will assign one.
-                      </Text>
-
-                      <TouchableOpacity
-                        onPress={() => setPreferredDoc(null)}
-                        style={[s.docRow, {
-                          borderColor:     !preferredDoc ? t.accent : t.cardBorder,
-                          backgroundColor: !preferredDoc ? t.accentBg : t.cardBg,
-                        }]}>
-                        <View style={[s.docAvatarBox, { backgroundColor: t.inputBg }]}>
-                          <Ionicons name="shuffle-outline" size={18} color={t.textMuted} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[s.docName, { color: !preferredDoc ? t.accent : t.textPrimary }]}>No preference</Text>
-                          <Text style={[s.docSpec, { color: t.textMuted }]}>Hospital assigns the next available doctor</Text>
-                        </View>
-                        <View style={[s.radio, {
-                          borderColor:     !preferredDoc ? t.accent : t.cardBorder,
-                          backgroundColor: !preferredDoc ? t.accent : 'transparent',
-                        }]}>
-                          {!preferredDoc && <Ionicons name="checkmark" size={10} color="#000" />}
-                        </View>
-                      </TouchableOpacity>
-
-                      {virtualDoctors.map((d: any) => {
-                        const active   = preferredDoc?.id === d.id
-                        const initials = (d.full_name ?? 'Dr')
-                          .split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-                        const fee = d.virtual_fee ?? d.consultation_fee ?? 0
-                        return (
-                          <TouchableOpacity key={d.id}
-                            onPress={() => setPreferredDoc(active ? null : d)}
-                            style={[s.docRow, {
-                              borderColor:     active ? t.accent : t.cardBorder,
-                              backgroundColor: active ? t.accentBg : t.cardBg,
-                            }]}>
-                            <EntityAvatar size={40} kind="doctor" />
-                            <View style={{ flex: 1 }}>
-                              <Text style={[s.docName, { color: active ? t.accent : t.textPrimary }]}>{d.full_name}</Text>
-                              <Text style={[s.docSpec, { color: t.textMuted }]}>
-                                {d.specialty?.name ?? 'Specialist'} · ₦{Number(fee).toLocaleString()}
-                              </Text>
-                            </View>
-                            <View style={[s.radio, {
-                              borderColor:     active ? t.accent : t.cardBorder,
-                              backgroundColor: active ? t.accent : 'transparent',
-                            }]}>
-                              {active && <Ionicons name="checkmark" size={10} color="#000" />}
-                            </View>
-                          </TouchableOpacity>
-                        )
-                      })}
-                    </>
-                  )}
-
-                  {/* Date */}
-                  <Text style={[s.label, { color: t.textMuted, marginTop: 16 }]}>Choose a date</Text>
-                  {checkingLim && (
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 6 }}>Checking availability…</Text>
-                  )}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 8 }}>
-                    {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
-                      const active = selectedDate === d.iso
-                      const full   = !!dateFullMap[d.iso]
-                      return (
-                        <TouchableOpacity key={d.iso} onPress={() => !full && setSelectedDate(d.iso)}
-                          disabled={full}
-                          style={[s.dateChip, {
-                            borderColor:     full ? t.cardBorder : active ? t.accent : t.cardBorder,
-                            backgroundColor: full ? t.inputBg   : active ? t.accentBg : t.cardBg,
-                            opacity: full ? 0.45 : 1,
-                          }]}>
-                          <Text style={[s.dateLabel, { color: full ? t.textMuted : active ? t.accent : t.textPrimary }]}>
-                            {d.label}
-                          </Text>
-                          {full && <Text style={{ fontSize: 9, color: t.textMuted }}>Full</Text>}
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </ScrollView>
-                  {isEmergency && (
-                    <Text style={{ fontSize: 11, color: t.danger, marginBottom: 8 }}>
-                      Emergency bookings are today only — no other dates available.
-                    </Text>
-                  )}
-                  {dateFullMap[selectedDate] && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>This date is fully booked. Please pick another day.</Text></View>
-                    </View>
-                  )}
-
-                  {/* Arrival window */}
-                  <Text style={[s.label, { color: t.textMuted, marginTop: 14 }]}>Preferred call window</Text>
-                  {opdSlots.length === 0 && (
-                    <View style={[s.warnBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)' }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}><Ionicons name="alert-circle-outline" size={13} color={t.statusBusy.text} style={{ marginTop: 1 }} /><Text style={{ fontSize: 12, color: t.statusBusy.text, flex: 1 }}>No available windows for today. Please choose another date.</Text></View>
-                    </View>
-                  )}
-                  <View style={s.slotGrid}>
-                    {opdSlots.map(sl => {
-                      const active = opdSlot?.id === sl.id
-                      return (
-                        <TouchableOpacity key={sl.id} onPress={() => setOpdSlot(active ? null : sl)}
-                          style={[s.slotBtn, {
-                            borderColor:     active ? t.accent : t.cardBorder,
-                            backgroundColor: active ? t.accentBg : t.cardBg,
-                          }]}>
-                          <Text style={[s.slotText, {
-                            color: active ? t.accent : t.textSecondary,
-                            fontWeight: active ? '700' : '400',
-                          }]}>{sl.label}</Text>
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-
-                  <View style={[s.infoBox, { backgroundColor: t.inputBg, borderColor: t.cardBorder, marginTop: 10 }]}>
-                    <Text style={[s.infoText, { color: t.textMuted }]}>
-                      The doctor will call you during your selected window when it's your turn. Make sure your phone is on.
-                    </Text>
-                  </View>
-                </>
+                <Notice tone="teal" icon="videocam-outline">
+                  Join the queue for your date and window. When it is your turn the doctor calls you
+                  directly — you do not need to be at the hospital.
+                </Notice>
               )}
-            </View>
-          )}
 
-          {/* ══ STEP 4 — Review & Confirm ════════════════════════════ */}
-          {step === STEP_CONFIRM && (
-            <View style={s.stepWrap}>
+              {bookingType === 'virtual' && virtualDoctors.length > 0 && (
+                <Card>
+                  <View style={{ padding: 14, paddingBottom: 6 }}>
+                    <CardLabel>Preferred doctor (optional)</CardLabel>
+                  </View>
+                  <Row
+                    icon="shuffle-outline"
+                    iconTone={!preferredDoc ? 'teal' : 'neutral'}
+                    tint={!preferredDoc}
+                    title="No preference"
+                    sub="The hospital assigns the next available doctor"
+                    right={!preferredDoc ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                    onPress={() => setPreferredDoc(null)}
+                  />
+                  {virtualDoctors.map((d: any) => {
+                    const on = preferredDoc?.id === d.id
+                    const fee = d.virtual_fee ?? d.consultation_fee ?? 0
+                    return (
+                      <View key={d.id}>
+                        <Hair />
+                        <Row
+                          leading={<EntityAvatar size={40} kind="doctor" uri={d.avatar_url} label={d.full_name} />}
+                          tint={on}
+                          title={d.full_name}
+                          sub={d.specialty?.name ?? 'Specialist'}
+                          right={<Mono size={13} weight="700">₦{Number(fee).toLocaleString('en-NG')}</Mono>}
+                          onPress={() => setPreferredDoc(on ? null : d)}
+                        />
+                      </View>
+                    )
+                  })}
+                </Card>
+              )}
 
-              {isManual && (
-                <View style={[s.noticeBox, { backgroundColor: 'rgba(239,159,39,0.08)', borderColor: 'rgba(239,159,39,0.25)', marginBottom: 14 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}><Ionicons name="time-outline" size={14} color={t.statusBusy.text} /><Text style={{ fontSize: 13, fontWeight: '700', color: t.statusBusy.text }}>Pending hospital review</Text></View>
-                  <Text style={{ fontSize: 12, color: t.statusBusy.text, lineHeight: 18 }}>
-                    Nothing is charged now — you pay at the hospital. If the hospital rejects the request, there is nothing to pay.
+              <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 }}>
+                <CardLabel>Choose a date</CardLabel>
+                {checkingLim && (
+                  <Text style={{ fontSize: 11, color: t.q.ink60, marginTop: 4 }}>Checking availability…</Text>
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }} style={{ flexGrow: 0 }}>
+                {(isEmergency ? DATES.slice(0, 1) : DATES).map(d => {
+                  const on = selectedDate === d.iso
+                  const full = !!dateFullMap[d.iso]
+                  return (
+                    <Pressable
+                      key={d.iso}
+                      disabled={full}
+                      onPress={() => setSelectedDate(d.iso)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on, disabled: full }}
+                      accessibilityLabel={full ? `${d.label}, fully booked` : d.label}
+                      style={{
+                        minWidth: 84, minHeight: 56, paddingHorizontal: 12,
+                        alignItems: 'center', justifyContent: 'center', borderRadius: 14,
+                        backgroundColor: on ? t.q.sel : t.q.surface,
+                        borderWidth: 1, borderColor: on ? t.q.primary : t.q.line,
+                        opacity: full ? 0.45 : 1,
+                      }}>
+                      <Text style={{ fontSize: 13, fontWeight: on ? '700' : '600', color: on ? t.q.primary : t.q.ink }}>
+                        {d.label}
+                      </Text>
+                      {full && <Text style={{ fontSize: 10, color: t.q.ink60, marginTop: 2 }}>Full</Text>}
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+
+              {isEmergency && (
+                <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                  <Text style={{ fontSize: 11.5, color: t.q.red }}>
+                    Emergency bookings are today only — no other date is offered.
                   </Text>
                 </View>
               )}
+              {dateFullMap[selectedDate] && (
+                <Notice tone="amber">That date is fully booked. Please pick another day.</Notice>
+              )}
 
-              {/* Summary */}
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.cardTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Booking summary</Text>
-                {[
-                  { label: 'Hospital', value: hospital?.name ?? '—' },
-                  ...(selectedClinic ? [{ label: 'Clinic', value: selectedClinic.name + (!selectedClinic.is_opd ? ' (pending review)' : '') }] : []),
-                  { label: 'Type',     value: bookingType === 'virtual' ? 'Virtual consultation' : 'Physical visit' },
-                  { label: 'Doctor',   value: bookingType === 'virtual'
-                      ? (preferredDoc?.full_name ?? 'No preference — hospital assigns')
-                      : 'Assigned on arrival at clinic' },
-                  { label: 'Date',     value: DATES.find(d => d.iso === selectedDate)?.label ?? selectedDate },
-                  { label: 'Time',     value: opdSlot?.label ?? '—' },
-                  { label: 'Reason',   value: reason },
-                  { label: 'Priority', value: urgency.charAt(0).toUpperCase() + urgency.slice(1) },
-                ].map(row => (
-                  <View key={row.label} style={[s.cardRow, { borderBottomColor: t.cardBorder }]}>
-                    <Text style={[s.cardLabel, { color: t.textMuted }]}>{row.label}</Text>
-                    <Text style={[s.cardValue, { color: t.textPrimary }]} numberOfLines={2}>{row.value}</Text>
-                  </View>
-                ))}
+              <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+                <CardLabel>{bookingType === 'virtual' ? 'Preferred call window' : 'Preferred arrival window'}</CardLabel>
               </View>
-
-              {/* Fee */}
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.cardTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Order summary</Text>
-                {[
-                  { label: bookingType === 'virtual' ? 'Consultation fee' : 'OPD fee', value: `₦${baseFee.toLocaleString()}` },
-                  { label: 'Platform fee', value: '₦500' },
-                  ...(emergencyExtra > 0 ? [{ label: `Emergency premium (${EMERGENCY_FEE_MULTIPLIER}×)`, value: `₦${emergencyExtra.toLocaleString()}` }] : []),
-                ].map(item => (
-                  <View key={item.label} style={[s.cardRow, { borderBottomColor: t.cardBorder }]}>
-                    <Text style={[s.cardLabel, { color: t.textMuted }]}>{item.label}</Text>
-                    <Text style={[s.cardValue, { color: t.textPrimary }]}>{item.value}</Text>
-                  </View>
-                ))}
-                <View style={[s.cardRow, { borderBottomColor: 'transparent' }]}>
-                  <Text style={[s.cardLabel, { color: t.textPrimary, fontWeight: '700', fontSize: 14 }]}>Total</Text>
-                  <Text style={[s.cardValue, { color: t.accent, fontWeight: '800', fontSize: 15 }]}>₦{totalFee.toLocaleString()}</Text>
+              {opdSlots.length === 0 ? (
+                <Notice tone="amber">
+                  {bookingType === 'virtual'
+                    ? 'No call windows left for that date. Please choose another day.'
+                    : 'No arrival windows left for that date. Please choose another day.'}
+                </Notice>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+                  {opdSlots.map(sl => {
+                    const on = opdSlot?.id === sl.id
+                    return (
+                      <Pressable
+                        key={sl.id}
+                        onPress={() => setOpdSlot(on ? null : (sl as any))}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={{
+                          flexGrow: 1, flexBasis: '30%', minHeight: 46,
+                          alignItems: 'center', justifyContent: 'center', borderRadius: 14,
+                          backgroundColor: on ? t.q.sel : t.q.surface,
+                          borderWidth: 1, borderColor: on ? t.q.primary : t.q.line,
+                        }}>
+                        <Text style={{ fontFamily: MONO, fontSize: 13, fontWeight: on ? '700' : '400', color: on ? t.q.primary : t.q.ink70 }}>
+                          {sl.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
                 </View>
-              </View>
+              )}
 
-              {/* Cancellation policy */}
-              <View style={[s.policyCard, { backgroundColor: t.inputBg, borderColor: t.cardBorder }]}>
-                <Text style={[s.policyTitle, { color: t.textPrimary }]}>Cancellation Policy</Text>
-                {[
-                  { icon: 'checkmark-circle-outline' as const, text: 'Cancel any time before your appointment – no charge' },
-                  { icon: 'warning-outline'           as const, text: 'Repeated late cancellations may affect future bookings' },
-                  { icon: 'repeat-outline'            as const, text: 'No-show – 48-hour window to reschedule free' },
-                  { icon: 'close-circle-outline'      as const, text: 'Booking rejected by hospital – no charge' },
-                ].map((p, i) => (
-                  <View key={i} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 7 }}>
-                    <Ionicons name={p.icon} size={13} color={t.textSecondary} />
-                    <Text style={{ fontSize: 12, flex: 1, lineHeight: 17, color: t.textSecondary }}>{p.text}</Text>
-                  </View>
-                ))}
+              <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
+                <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                  {bookingType === 'virtual'
+                    ? 'The doctor calls you during your window when it is your turn. Keep your phone on.'
+                    : 'A doctor is assigned by the front desk when you arrive. Your window is a preferred arrival time.'}
+                </Text>
               </View>
-
-              {/* Payment */}
-              <Text style={[s.label, { color: t.textMuted }]}>Payment method</Text>
-              {PAYMENT_OPTIONS.map(p => {
-                const active = payMethod === p.id
-                return (
-                  <TouchableOpacity key={p.id} onPress={() => setPayMethod(p.id)}
-                    style={[s.payRow, {
-                      backgroundColor: active ? t.accentBg : t.cardBg,
-                      borderColor:     active ? t.accentBorder : t.cardBorder,
-                    }]}>
-                    <Ionicons name={p.icon} size={20} color={active ? t.accent : t.textSecondary} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.payLabel, { color: active ? t.accent : t.textPrimary }]}>{p.label}</Text>
-                      <Text style={[s.paySub,   { color: t.textMuted }]}>{p.id === 'wallet' && walletKobo != null ? `Balance ${naira(walletKobo)}` : p.sub}</Text>
-                    </View>
-                    <View style={[s.radio, {
-                      borderColor:     active ? t.accent : t.cardBorder,
-                      backgroundColor: active ? t.accent : 'transparent',
-                    }]}>
-                      {active && <Ionicons name="checkmark" size={10} color="#000" />}
-                    </View>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
+            </>
           )}
 
-          <View style={{ height: 24 }} />
-        </ScrollView>
+          {/* ══ STEP 3 — Review and pay ═════════════════════════════ */}
+          {step === STEP_CONFIRM && (
+            <>
+              {isManual && (
+                <Notice tone="amber" icon="time-outline">
+                  Pending hospital review. Nothing is charged now — you pay at the hospital, and if the
+                  request is rejected there is nothing to pay.
+                </Notice>
+              )}
 
-        {/* Error */}
-        {submitError.length > 0 && (
-          <Text style={{ color: '#F87171', fontSize: 12, textAlign: 'center', paddingBottom: 6, paddingHorizontal: 20 }}>
-            {submitError}
-          </Text>
+              <SectionHead title="Booking summary" />
+              <Card>
+                <DetailRow label="Patient" value={bookingForDependentId
+                  ? (linkedDependents.find(d => d.dependent.id === bookingForDependentId)?.dependent.full_name ?? 'Dependent')
+                  : (user?.full_name ?? 'Me')} />
+                <DetailRow label="Hospital" value={hospital?.name ?? '—'} />
+                {selectedClinic && (
+                  <DetailRow label="Clinic" value={selectedClinic.name + (!selectedClinic.is_opd ? ' (pending review)' : '')} />
+                )}
+                <DetailRow label="Type" value={bookingType === 'virtual' ? 'Video consultation' : 'In person'} />
+                <DetailRow label="Doctor" value={bookingType === 'virtual'
+                  ? (preferredDoc?.full_name ?? 'No preference — hospital assigns')
+                  : 'Assigned on arrival'} />
+                <DetailRow label="Arrive" value={`${DATES.find(d => d.iso === selectedDate)?.label ?? selectedDate}${opdSlot ? ', ' + opdSlot.label : ''}`} />
+                <DetailRow label="Reason" value={reason || '—'} />
+                <DetailRow label="Priority" value={urgency === 'emergency' ? 'Emergency' : 'Routine'} last />
+              </Card>
+
+              <SectionHead title="Order summary" />
+              <Card>
+                <DetailRow
+                  label={bookingType === 'virtual' ? 'Consultation' : 'OPD fee'}
+                  value={`₦${baseFee.toLocaleString('en-NG')}`} mono />
+                <DetailRow label="Platform fee" value="₦500" mono />
+                {emergencyExtra > 0 && (
+                  <DetailRow label={`Emergency (${EMERGENCY_FEE_MULTIPLIER}×)`} value={`₦${emergencyExtra.toLocaleString('en-NG')}`} mono />
+                )}
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, minHeight: 48 }}>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: t.q.ink }}>Total</Text>
+                  <Mono size={17} weight="700" color={t.q.primary}>₦{totalFee.toLocaleString('en-NG')}</Mono>
+                </View>
+              </Card>
+
+              <SectionHead title="Payment method" />
+              <Card>
+                {PAYMENT_OPTIONS.map((pm, i) => {
+                  const on = payMethod === pm.id
+                  return (
+                    <View key={pm.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        icon={pm.icon}
+                        iconTone={on ? 'teal' : 'neutral'}
+                        tint={on}
+                        title={pm.label}
+                        sub={pm.id === 'wallet' && walletKobo != null ? `Balance ${naira(walletKobo)}` : pm.sub}
+                        right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                        onPress={() => setPayMethod(pm.id)}
+                      />
+                    </View>
+                  )
+                })}
+              </Card>
+
+              <SectionHead title="If you cannot come" />
+              <Card pad>
+                {[
+                  'Cancel any time before your appointment — no charge.',
+                  'No-show: you have 48 hours to reschedule free.',
+                  'Rejected by the hospital: nothing is charged.',
+                  'Repeated late cancellations may affect future bookings.',
+                ].map(line => (
+                  <View key={line} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+                    <Text style={{ color: t.q.ink60 }}>·</Text>
+                    <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, color: t.q.ink70 }}>{line}</Text>
+                  </View>
+                ))}
+              </Card>
+            </>
+          )}
+        </Body>
+
+        {!!submitError && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: t.q.red, textAlign: 'center' }}>{submitError}</Text>
+          </View>
         )}
 
-        {/* CTA row */}
-        <View style={[s.ctaWrap, { borderTopColor: t.cardBorder, backgroundColor: t.canvasBg }]}>
-          {step >= STEP_DETAILS && step < STEP_CONFIRM && totalFee > 0 && (
-            <View style={{ justifyContent: 'center', paddingRight: 4 }} accessibilityLabel={`Total ${totalFee} naira`}>
-              <Text style={{ fontSize: 11, color: t.textMuted }}>Total</Text>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>₦{totalFee.toLocaleString()}</Text>
-            </View>
-          )}
+        {/* Why Continue is disabled, so the page never reads as a dead end. */}
+        {!!blockingReason() && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: t.q.ink60, textAlign: 'center' }}>{blockingReason()}</Text>
+          </View>
+        )}
 
-          {/* Type step: no CTA — tapping a card advances */}
-          {step !== STEP_TYPE && step < STEP_CONFIRM && (
-            <TouchableOpacity onPress={() => { haptics.tap(); setStep(s => s + 1) }} disabled={!canAdvance()}
-              style={[s.ctaBtn, { backgroundColor: canAdvance() ? t.accent : t.inputBg, flex: 1 }]}>
-              <Text style={[s.ctaBtnText, { color: canAdvance() ? '#fff' : t.textMuted }]}>
-                Continue
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {step === STEP_CONFIRM && (
-            <Button
-              label={isManual ? 'Submit for Review' : 'Confirm booking'}
-              onPress={() => { haptics.success(); handleConfirm() }} loading={submitting} style={{ flex: 1 }}
+        <BottomBar meta={
+          step >= STEP_DETAILS && totalFee > 0 ? (
+            <>
+              <Mono size={12} color={t.q.ink60}>Total</Mono>
+              <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+              <Mono size={12} weight="700">₦{totalFee.toLocaleString('en-NG')}</Mono>
+            </>
+          ) : undefined
+        }>
+          {step < STEP_CONFIRM ? (
+            <Btn
+              grow
+              label={step === STEP_HOSPITAL ? 'Continue · your visit' : 'Continue to payment'}
+              disabled={!canAdvance()}
+              onPress={() => { haptics.tap(); setStep(n => n + 1) }}
+            />
+          ) : (
+            <Btn
+              grow
+              label={isManual ? 'Submit for review' : `Pay ₦${totalFee.toLocaleString('en-NG')}`}
+              loading={submitting}
+              onPress={() => { haptics.success(); handleConfirm() }}
             />
           )}
-        </View>
-        </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
+        </BottomBar>
+      </KeyboardAvoidingView>
+    </Screen>
   )
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  safe:         { flex: 1 },
-  container:    { flex: 1, paddingHorizontal: 20 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, marginBottom: 12 },
-  backBtn:      { width: 32, height: 32, justifyContent: 'center' },
-  backArrow:    { fontSize: 22 },
-  title:        { fontSize: 15, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center', flex: 1 },
-  progress:     { flexDirection: 'row', gap: 5, marginBottom: 16 },
-  progressBar:  { height: 3, borderRadius: 99, marginBottom: 3 },
-  progressLabel:{ fontSize: 10 },
-  stepWrap:     { paddingTop: 4, paddingBottom: 8 },
-  stepHeading:  { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
-  stepSub:      { fontSize: 13, lineHeight: 19 },
-  // Type
-  typeCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1.5 },
-  typeIcon:     { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:    { fontSize: 15, fontWeight: '700', marginBottom: 3 },
-  typeSub:      { fontSize: 12, lineHeight: 17 },
-  // Hospital
-  searchRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 14, borderWidth: 1 },
-  searchInput:  { flex: 1, fontSize: 13 },
-  hospRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 13, marginBottom: 8, borderWidth: 1 },
-  hospName:     { fontSize: 13, fontWeight: '700' },
-  hospSpec:     { fontSize: 11, marginTop: 1 },
-  miniTag:      { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  emptyBox:     { borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center', marginTop: 10 },
-  // Details
-  contextChip:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 11, marginBottom: 14, borderWidth: 1 },
-  contextName:  { fontSize: 13, fontWeight: '700' },
-  forBtnSmall:  { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, borderWidth: 1 },
-  noticeBox:    { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  label:        { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
-  textarea:     { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top', marginBottom: 4 },
-  urgRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 13, borderWidth: 1.5 },
-  urgLabel:     { fontSize: 13, fontWeight: '700' },
-  urgSub:       { fontSize: 11, marginTop: 1 },
-  radio:        { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  // Schedule
-  dateChip:     { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5, minWidth: 80, alignItems: 'center' },
-  dateLabel:    { fontSize: 12, fontWeight: '600' },
-  warnBox:      { borderRadius: 10, borderWidth: 1, padding: 11, marginBottom: 10 },
-  slotGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
-  slotBtn:      { width: '30%', paddingVertical: 11, borderRadius: 11, borderWidth: 1.5, alignItems: 'center' },
-  slotText:     { fontSize: 12 },
-  infoBox:      { borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8 },
-  infoText:     { fontSize: 12, lineHeight: 18 },
-  docRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1.5 },
-  docAvatarBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  docName:      { fontSize: 13, fontWeight: '700' },
-  docSpec:      { fontSize: 11, marginTop: 1 },
-  // Confirm
-  card:         { borderRadius: 14, overflow: 'hidden', marginBottom: 12, borderWidth: 1 },
-  cardTitle:    { padding: 10, paddingHorizontal: 14, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, borderBottomWidth: 1 },
-  cardRow:      { flexDirection: 'row', justifyContent: 'space-between', padding: 9, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  cardLabel:    { fontSize: 12 },
-  cardValue:    { fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' },
-  policyCard:   { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
-  policyTitle:  { fontSize: 12, fontWeight: '700', marginBottom: 10 },
-  payRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 13, marginBottom: 8, borderWidth: 1.5 },
-  payLabel:     { fontSize: 13, fontWeight: '600' },
-  paySub:       { fontSize: 11, marginTop: 1 },
-  // CTA
-  ctaWrap:      { flexDirection: 'row', gap: 8, paddingVertical: 12, borderTopWidth: 1 },
-  backStepBtn:  { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  backStepText: { fontSize: 13, fontWeight: '600' },
-  ctaBtn:       { borderRadius: 14, padding: 15, alignItems: 'center' },
-  ctaBtnText:   { fontSize: 15, fontWeight: '700' },
-})

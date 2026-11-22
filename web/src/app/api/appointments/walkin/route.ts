@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/supabase/auth-server'
 import { Errors } from '@/lib/api-error'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { fmtLocalDate } from '@/lib/dashboard-utils'
+import { checkInAppointment } from '@/lib/appointment-checkin'
 import { randomBytes } from 'crypto'
 
 // Only auto-links (or surfaces via lookup) a patient who has an existing
@@ -83,10 +84,27 @@ export async function POST(req: NextRequest) {
     const {
       hospitalId, patientName, patientPhone, patientNumber,
       doctorId, clinicId, date, startTime, reason, staffId,
+      // Urgency and type used to be dropped on the floor here and hardcoded
+      // below, so a front desk marking someone an emergency was told it
+      // worked and it never reached the row -- the patient then sat in the
+      // ordinary queue. Both are read and validated now.
+      urgency, type,
+      // A walk-in is someone standing at the desk, so they are checked in by
+      // default (which is what issues their queue number). Explicit false is
+      // for registering someone who is expected later today.
+      checkIn,
     } = body
 
     if (!hospitalId || !patientName || !date || !startTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const URGENCIES = ['routine', 'urgent', 'emergency']
+    if (urgency != null && !URGENCIES.includes(urgency)) {
+      return Errors.validation(`urgency must be one of ${URGENCIES.join(', ')}`)
+    }
+    if (type != null && type !== 'in-person' && type !== 'virtual') {
+      return Errors.validation("type must be 'in-person' or 'virtual'")
     }
 
     if (caller.role !== 'super_admin' && caller.hospitalId !== hospitalId) {
@@ -194,12 +212,12 @@ export async function POST(req: NextRequest) {
         clinic_id:            clinicId   ?? null,
         appointment_date:     date,
         start_time:           startTime,
-        type:                 'in-person',
+        type:                 type === 'virtual' ? 'virtual' : 'in-person',
         reason:               reason     ?? null,
         status:               'confirmed',
         booking_mode:         'walkin',
         approval_status:      'auto_approved',
-        urgency:              'routine',
+        urgency:              urgency ?? 'routine',
         booking_ref:          bookingRef,
         booked_by_staff_id:   staffId    ?? null,
         walkin_patient_name:  patientName,
@@ -210,10 +228,42 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // Check them in unless the desk said otherwise. This is what actually
+    // issues the queue number: renumber_queue_after_change assigns
+    // queue_position off checked_in_at the moment status flips to
+    // 'checked_in'. Filing a walk-in as 'confirmed' and stopping there left a
+    // patient who was physically present with no number and no place in the
+    // queue, which the desk had no way to tell from a booking for later.
+    //
+    // Routed through checkInAppointment rather than a second update here, so
+    // walk-ins pass the same approval guards as every other check-in.
+    let checkedIn = false
+    let checkInError: string | null = null
+    if (checkIn !== false) {
+      const result = await checkInAppointment(db, data.id)
+      checkedIn = result.ok
+      if (!result.ok) checkInError = result.error
+    }
+
+    // The number the desk reads out, once the trigger has assigned it.
+    let queuePosition: number | null = null
+    if (checkedIn) {
+      const { data: row } = await db
+        .from('appointments')
+        .select('queue_position')
+        .eq('id', data.id)
+        .single()
+      queuePosition = (row as { queue_position: number | null } | null)?.queue_position ?? null
+    }
+
     return NextResponse.json({
       id:         data.id,
       bookingRef: data.booking_ref,
       linked:     !!patientUserId,
+      checkedIn,
+      checkInError,
+      queuePosition,
     })
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })

@@ -88,6 +88,9 @@ export interface FleetRequestRow {
   patient: { full_name: string } | { full_name: string }[] | null
   dependent: { full_name: string } | { full_name: string }[] | null
   unit: { id: string; plate_number: string; call_sign: string | null; vehicle_tier: string } | { id: string; plate_number: string; call_sign: string | null; vehicle_tier: string }[] | null
+  /** Where the crew is taking them. Set on the ambulance, read here so the
+   *  operator's call list can say "Ikoyi -> LUTH" rather than only the pickup. */
+  destination: { id: string; name: string } | { id: string; name: string }[] | null
 }
 
 export async function getFleet(): Promise<{ provider: FleetProvider | null; ambulances: FleetUnit[]; locationTtlSeconds: number }> {

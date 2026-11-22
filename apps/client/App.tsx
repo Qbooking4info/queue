@@ -18,12 +18,13 @@ import { View, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { setStatusBarStyle } from 'expo-status-bar'
 
-import { ThemeProvider, useTheme }     from '@queue/shared/contexts/ThemeContext'
+import { ThemeProvider, useTheme, V4_PALETTES } from '@queue/shared/contexts/ThemeContext'
 import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AppLockGate } from '@queue/shared/components/AppLock'
 import { AlertProvider }               from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth }       from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }            from '@queue/shared/contexts/LocationContext'
+import { useDeviceRegistration }   from '@queue/shared/hooks/useDeviceRegistration'
 import { usePushNotifications }        from '@queue/shared/hooks/usePushNotifications'
 import { useRingAlert, RingOverlay }   from '@queue/shared/components/RingOverlay'
 
@@ -55,6 +56,8 @@ import { PrivacySecurityScreen }       from './screens/PrivacySecurityScreen'
 import { InsuranceScreen }             from './screens/InsuranceScreen'
 import { SupportScreen }               from './screens/SupportScreen'
 import { QueuePassScreen }             from './screens/QueuePassScreen'
+import { LiveQueueScreen }             from './screens/LiveQueueScreen'
+import { FollowUpScreen }              from './screens/FollowUpScreen'
 import { SosScreen }                   from './screens/SosScreen'
 import { SosTriageScreen }             from './screens/SosTriageScreen'
 import { AmbulanceHomeScreen }         from './screens/AmbulanceHomeScreen'
@@ -104,6 +107,7 @@ function VideoCallScreen(props: any) {
 // cold-started process, otherwise on-duty crews silently stop reporting.
 import '@queue/shared/lib/location-task'
 import { useUnreadMessages } from '@queue/shared/hooks/useUnreadMessages'
+import { QTabBar } from '@queue/shared/components/q'
 
 const Tab        = createBottomTabNavigator()
 const Stack      = createNativeStackNavigator()
@@ -124,19 +128,19 @@ function TabIcon({ name, focused, color }: { name: React.ComponentProps<typeof I
 
 function MainTabs() {
   const unread = useUnreadMessages('patient')
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <Tab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-    }}>
-      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'home' : 'home-outline'} {...p} />,             tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,     tabBarLabel: 'Appointments' }} />
-      <Tab.Screen name="Messages"     component={MessagesScreen}     options={{ tabBarBadge: unread > 0 ? '' : undefined, tabBarBadgeStyle: { backgroundColor: '#EF4444', minWidth: 9, maxHeight: 9, borderRadius: 5, top: 2 }, tabBarIcon: p => <TabIcon name={p.focused ? 'chatbubble' : 'chatbubble-outline'} {...p} />, tabBarLabel: 'Messages' }} />
-      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'person' : 'person-outline'} {...p} />,         tabBarLabel: 'Profile' }} />
+    <Tab.Navigator
+      // The v4 handoff marks the selected tab with a rule on its own top edge,
+      // which the default tab bar cannot draw -- hence a custom one.
+      tabBar={props => <QTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Appointments' }} />
+      {/* My Records is a tab in v4, and Profile moves to the avatar in Home's
+          header -- a patient opens their records far more often than their
+          account settings. */}
+      <Tab.Screen name="MyRecords"    component={MyCareScreen}       options={{ tabBarLabel: 'My Records' }} />
+      <Tab.Screen name="Messages"     component={MessagesScreen}     options={{ tabBarLabel: 'Messages', tabBarBadge: unread > 0 ? '' : undefined }} />
     </Tab.Navigator>
   )
 }
@@ -148,7 +152,7 @@ const THEMED_STATUS_ROUTES = new Set(['Sos', 'Confirmation', 'EmergencyConfirmat
 
 function AppStack() {
   const { theme: t } = useTheme()
-  const themeStyle = t.id === 'forest' ? 'light' : 'dark'
+  const themeStyle = t.isDark ? 'light' : 'dark'
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
       screenListeners={({ route }) => ({
@@ -157,11 +161,20 @@ function AppStack() {
       <Stack.Screen name="MainTabs"             component={MainTabs} />
       <Stack.Screen name="Search"               component={SearchScreen} />
       <Stack.Screen name="QueuePass"            component={QueuePassScreen as any} />
+      <Stack.Screen name="LiveQueue"            component={LiveQueueScreen as any} />
+      {/* "LabHub" in the handoff. The lab half has no data model yet, so the
+          screen is the follow-up booking half; the route name stays so the
+          handoff's navigation map still resolves. */}
+      <Stack.Screen name="LabHub"               component={FollowUpScreen as any} />
       <Stack.Screen name="Sos"                  component={SosScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="SosTriage"            component={SosTriageScreen as any} options={{ gestureEnabled: false }} />
       <Stack.Screen name="AmbulanceHome"        component={AmbulanceHomeScreen} />
       <Stack.Screen name="VirtualCare"          component={VirtualCareScreen} />
       <Stack.Screen name="MyCare"               component={MyCareScreen} />
+      {/* Profile left the tab bar when My Records took the fourth slot (v4
+          handoff); it is reached from the avatar in Home's header, so it has
+          to exist as a pushed screen or that avatar leads nowhere. */}
+      <Stack.Screen name="Profile"              component={ProfileScreen} />
       <Stack.Screen name="CarePlans"            component={CarePlansScreen} />
       <Stack.Screen name="HospitalProfile"      component={HospitalProfileScreen} />
       <Stack.Screen name="BookingFlow"          component={BookingFlowScreen} />
@@ -206,7 +219,7 @@ function PatientAuthStack() {
   const { theme: t } = useTheme()
   return (
     <PatientNav.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <PatientNav.Screen name="Login"    component={LoginScreen} />
       <PatientNav.Screen name="Register" component={RegisterScreen} />
     </PatientNav.Navigator>
@@ -232,6 +245,7 @@ function AppNavigator() {
   // push token would silently overwrite the dependent's own push_token every time a
   // caretaker switches in, breaking notification delivery to the dependent's own phone.
   usePushNotifications(switchedInto ? undefined : user?.id)
+  useDeviceRegistration(user?.id, 'patient')
 
   // "Doctor calls a patient in" overlay. Every signed-in user of this app is a
   // patient now, so the old isPlainPatient guard (which existed to stop a doctor
@@ -299,7 +313,7 @@ function App() {
   const fontsReady = useQueueFonts()
   if (!fontsReady) return null
   return (
-    <ThemeProvider>
+    <ThemeProvider palettes={V4_PALETTES} defaultMode="light">
       <AlertProvider>
         <AuthProvider>
           <LocationProvider>

@@ -2,14 +2,14 @@
 // caller may message. Picking one opens (or reuses) the thread via
 // start_conversation, which re-checks the relationship server-side.
 import { useMemo, useState } from 'react'
-import { View, Modal, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native'
+import { View, Modal, FlatList, ActivityIndicator, Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { Text, TextInput } from './ui/Typography'
-import { EmptyState } from './ui/v3'
+import { Text } from './ui/Typography'
 import { useTheme } from '../contexts/ThemeContext'
 import { Alert } from '../contexts/AlertContext'
 import { haptics } from '../lib/haptics'
 import { startConversation, type ChatTarget } from '../lib/chat'
+import { Card, Hair, Row, SearchField, IconBtn, Empty } from './q'
 
 export interface ChatOption { id: string; target: ChatTarget; title: string; subtitle?: string; avatarUrl?: string | null; icon?: React.ComponentProps<typeof Ionicons>['name'] }
 
@@ -40,37 +40,43 @@ export function NewMessageSheet({ visible, onClose, options, loading, navigation
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: t.canvasBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%', minHeight: '55%', paddingBottom: 24 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 }}>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.textPrimary }} accessibilityRole="header">{title}</Text>
-            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close"
-              style={{ width: 44, height: 44, borderRadius: 99, alignItems: 'center', justifyContent: 'center', backgroundColor: t.cardBg }}>
-              <Ionicons name="close" size={20} color={t.textPrimary} />
-            </TouchableOpacity>
+        <View style={{
+          backgroundColor: t.q.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          maxHeight: '85%', minHeight: '55%', paddingBottom: 24,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+            <Text accessibilityRole="header" style={{ flex: 1, fontSize: 17, fontWeight: '700', letterSpacing: -0.2, color: t.q.ink }}>
+              {title}
+            </Text>
+            <IconBtn name="close" label="Close" onPress={onClose} />
           </View>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-            <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={t.textMuted} accessibilityLabel="Search"
-              style={{ minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, paddingHorizontal: 14, color: t.textPrimary, fontSize: 15 }} />
-          </View>
-          {loading ? <ActivityIndicator color={t.accent} style={{ marginTop: 30 }} /> : (
-            <FlatList data={list} keyExtractor={o => o.target + o.id} keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-              ListEmptyComponent={<EmptyState icon="people-outline" title="No one to message yet" body="People you have a visit, link or job with show up here." />}
-              renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => pick(item)} disabled={!!busyId} accessibilityRole="button" accessibilityLabel={`Message ${item.title}`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg }}>
-                  {item.avatarUrl ? <Image source={{ uri: item.avatarUrl }} style={{ width: 42, height: 42, borderRadius: 99 }} /> : (
-                    <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={item.icon ?? 'person-outline'} size={20} color={t.accent} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }} numberOfLines={1}>{item.title}</Text>
-                    {!!item.subtitle && <Text style={{ fontSize: 12, color: t.textMuted }} numberOfLines={1}>{item.subtitle}</Text>}
-                  </View>
-                  {busyId === item.id ? <ActivityIndicator color={t.accent} /> : <Ionicons name="chatbubble-ellipses-outline" size={18} color={t.accent} />}
-                </TouchableOpacity>
-              )} />
+          <SearchField value={q} onChangeText={setQ} placeholder="Search" />
+          {loading ? <ActivityIndicator color={t.q.primary} style={{ marginTop: 30 }} /> : (
+            <Card style={{ flexShrink: 1 }}>
+              <FlatList
+                data={list}
+                keyExtractor={o => o.target + o.id}
+                keyboardShouldPersistTaps="handled"
+                ItemSeparatorComponent={() => <Hair />}
+                ListEmptyComponent={
+                  <Empty icon="people-outline" title="No one to message yet"
+                    body="People you have a visit, link or job with show up here." />
+                }
+                renderItem={({ item }) => (
+                  <Row
+                    leading={item.avatarUrl
+                      ? <Image source={{ uri: item.avatarUrl }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                      : undefined}
+                    icon={item.avatarUrl ? undefined : (item.icon ?? 'person-outline')}
+                    iconTone="teal"
+                    title={item.title}
+                    sub={item.subtitle ?? null}
+                    right={busyId === item.id
+                      ? <ActivityIndicator color={t.q.primary} />
+                      : <Ionicons name="chatbubble-outline" size={18} color={t.q.primary} />}
+                    onPress={busyId ? undefined : () => pick(item)} />
+                )} />
+            </Card>
           )}
         </View>
       </View>

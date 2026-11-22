@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, Btn, BottomBar, Empty, IconBtn,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
@@ -104,80 +105,75 @@ export function HospitalClinicsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Clinics" subtitle="Departments and their admins" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TouchableOpacity onPress={() => setShowCreate(true)} style={[s.addBtn, { backgroundColor: '#FFFFFF' }]}>
-          <Ionicons name="add" size={16} color="#0F766E" />
-          <Text style={[s.addBtnText, { color: '#0F766E' }]}>New Clinic</Text>
-        </TouchableOpacity>
-      
-        </View>} />
+    <Screen>
+      <AppBar
+        title="Clinics"
+        sub="Departments and their admins"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={<IconBtn name="add" label="New clinic" onPress={() => setShowCreate(true)} />}
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
           {clinics.length === 0 ? (
-            <View style={s.empty}>
-              <Ionicons name="business-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No clinics set up yet</Text>
-              <TouchableOpacity onPress={() => setShowCreate(true)} style={[s.emptyBtn, { borderColor: t.accent }]}>
-                <Text style={[s.emptyBtnText, { color: t.accent }]}>+ Create First Clinic</Text>
-              </TouchableOpacity>
-            </View>
-          ) : clinics.map(clinic => (
-            <View key={clinic.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('HospitalClinicDetail', { clinicId: clinic.id })}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                <View style={[s.avatar, { backgroundColor: `${t.accent}20`, borderColor: `${t.accent}40` }]}>
-                  <Text style={[s.avatarText, { color: t.accent }]}>{initials(clinic.name)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.clinicName, { color: t.textPrimary }]}>{clinic.name}</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                    <View style={[s.badge, { backgroundColor: clinic.is_active ? 'rgba(0,194,101,0.14)' : 'rgba(122,144,137,0.14)' }]}>
-                      <Text style={[s.badgeText, { color: clinic.is_active ? t.statusSuccess.text : t.textMuted }]}>{clinic.is_active ? 'Active' : 'Inactive'}</Text>
-                    </View>
-                    {clinic.is_emergency && (
-                      <View style={[s.badge, { backgroundColor: t.dangerBg }]}>
-                        <Text style={[s.badgeText, { color: t.danger }]}>Emergency Dept</Text>
-                      </View>
-                    )}
-                    <View style={[s.badge, { backgroundColor: `${t.accent}14` }]}>
-                      <Text style={[s.badgeText, { color: t.accent }]}>{clinic.doctorCount} doctor{clinic.doctorCount === 1 ? '' : 's'}</Text>
-                    </View>
+            <Card style={{ marginTop: 12 }}>
+              <Empty
+                icon="business-outline"
+                title="No clinics yet"
+                body="A clinic is a department patients can book into — general outpatient, paediatrics, the emergency department."
+                action="Create the first one"
+                onAction={() => setShowCreate(true)}
+              />
+            </Card>
+          ) : (
+            <Card>
+              {clinics.map((clinic, i) => (
+                <View key={clinic.id}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    icon={clinic.is_emergency ? 'alert-circle-outline' : 'medical-outline'}
+                    iconTone={clinic.is_emergency ? 'red' : clinic.is_active ? 'teal' : 'neutral'}
+                    dim={!clinic.is_active}
+                    title={clinic.name}
+                    sub={[
+                      clinic.subAdmin ? `Sub-admin: ${clinic.subAdmin.full_name}` : 'Sub-admin: none',
+                      `${clinic.doctorCount} doctor${clinic.doctorCount === 1 ? '' : 's'}`,
+                    ].join(' · ')}
+                    pill={clinic.is_emergency ? 'Emergency' : clinic.is_active ? undefined : 'Inactive'}
+                    pillTone={clinic.is_emergency ? 'red' : 'neutral'}
+                    chevron
+                    onPress={() => navigation.navigate('HospitalClinicDetail', { clinicId: clinic.id })}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
+                    <Btn
+                      label={clinic.is_active ? 'Deactivate' : 'Reactivate'}
+                      variant="secondary" small
+                      loading={busyId === clinic.id}
+                      onPress={() => toggleActive(clinic)}
+                    />
+                    <Btn
+                      label="Delete" variant="ghost" small
+                      disabled={busyId === clinic.id}
+                      onPress={() => setConfirmDeleteId(clinic.id)}
+                    />
                   </View>
-                  {clinic.subAdmin && (
-                    <Text style={[s.subAdminText, { color: t.textMuted }]}>Admin: {clinic.subAdmin.full_name}</Text>
-                  )}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-              </TouchableOpacity>
-
-              <View style={{ flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: t.cardBorder, paddingTop: 10 }}>
-                <TouchableOpacity onPress={() => toggleActive(clinic)} disabled={busyId === clinic.id}
-                  style={[s.smallBtn, { borderColor: t.cardBorder, flex: 1 }]}>
-                  {busyId === clinic.id ? <ActivityIndicator size="small" color={t.textMuted} /> : (
-                    <Text style={[s.smallBtnText, { color: t.textPrimary }]}>{clinic.is_active ? 'Deactivate' : 'Reactivate'}</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setConfirmDeleteId(clinic.id)} disabled={busyId === clinic.id}
-                  style={[s.smallBtn, { borderColor: 'rgba(239,68,68,0.3)', flex: 1 }]}>
-                  <Text style={[s.smallBtnText, { color: t.danger }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
+              ))}
+            </Card>
+          )}
+        </Body>
       )}
+
+      <BottomBar>
+        <Btn grow label="New clinic" icon="add" onPress={() => setShowCreate(true)} />
+      </BottomBar>
 
       {showCreate && (
         <CreateClinicModal
@@ -188,25 +184,24 @@ export function HospitalClinicsScreen({ navigation }: Props) {
       )}
 
       {confirmDeleteId && (
-        <View style={s.overlay}>
-          <View style={[s.confirmCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Ionicons name="warning-outline" size={32} color={t.danger} style={{ marginBottom: 10 }} />
-            <Text style={[s.modalTitle, { color: t.textPrimary }]}>Delete this clinic?</Text>
-            <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 6, marginBottom: 18, lineHeight: 19 }}>
-              Doctors assigned to this clinic will remain in the hospital pool — this only removes the clinic itself.
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <Card pad style={{ marginHorizontal: 0, alignSelf: 'stretch', gap: 12 }}>
+            <CardLabel>Delete this clinic?</CardLabel>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70 }}>
+              Doctors assigned to it stay in the hospital pool — this removes the clinic itself.
+              Bookings already made into it are not deleted.
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={() => setConfirmDeleteId(null)} style={[s.smallBtn, { flex: 1, borderColor: t.cardBorder }]}>
-                <Text style={[s.smallBtnText, { color: t.textPrimary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(confirmDeleteId)} style={[s.smallBtn, { flex: 1, backgroundColor: t.danger }]}>
-                <Text style={[s.smallBtnText, { color: '#fff' }]}>Yes, Delete</Text>
-              </TouchableOpacity>
+              <Btn grow label="Keep it" variant="secondary" onPress={() => setConfirmDeleteId(null)} />
+              <Btn grow label="Delete" variant="danger" onPress={() => handleDelete(confirmDeleteId)} />
             </View>
-          </View>
+          </Card>
         </View>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 

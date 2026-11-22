@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { View, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Switch, TextInput } from 'react-native'
+import { View, ScrollView, Pressable, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Switch, TextInput } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { Text } from '@queue/shared/components/ui/Typography'
@@ -14,7 +13,10 @@ import {
   type ReminderSlot, type CarePlanPeriod,
 } from '@queue/shared/lib/carePlanReminders'
 import { haptics } from '@queue/shared/lib/haptics'
-import { Header, HeaderTail, Card, SectionTitle, EmptyState, PrimaryButton } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Stat, Btn, BottomBar,
+  Empty, IconBtn,
+} from '@queue/shared/components/q'
 import { SchedulePicker, durationLabel, type Schedule } from '@queue/shared/components/ui/SchedulePicker'
 
 interface Props { navigation: any }
@@ -192,122 +194,156 @@ export function CarePlansScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title="Care plans" onBack={() => navigation.goBack()}>
-        <Text style={{ color: '#CCFBF1', fontSize: 14 }}>Tick off today’s tasks. Your hospital sees your progress.</Text>
-      </Header>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}>
-        <HeaderTail />
+    <Screen>
+      <AppBar title="Care plans" onBack={() => navigation.goBack()} />
+
+      <Body refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+          tintColor={t.q.primary} colors={[t.q.primary]} />
+      }>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60 }}>
+            Tick off today&apos;s tasks. Your hospital sees your progress.
+          </Text>
+        </View>
+
         {plans == null ? (
-          <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
         ) : plans.length === 0 ? (
-          <View style={{ padding: 20, gap: 14 }}>
-            <EmptyState icon="checkbox-outline" title="Nothing here yet"
-              body="Your hospital or doctor can set a plan after a visit — for blood pressure, diabetes or recovery. You can also set your own goals right now." />
-            <PrimaryButton label="Set your own goal" icon="add" onPress={() => setAdding(true)} />
-          </View>
+          <Card>
+            <Empty
+              icon="checkbox-outline"
+              title="No plan yet"
+              body="Your hospital or doctor can set one after a visit — for blood pressure, diabetes or recovery. You can also set a goal of your own right now."
+              action="Set your own goal"
+              onAction={() => setAdding(true)}
+            />
+          </Card>
         ) : plans.map(p => {
           const pct = planProgress(p)
           const due = todaysTasks(p)
+          const doneToday = due.reduce((n, task) => n + Array.from({ length: slotsOf(task) })
+            .filter((_, slot) => !!doneLog(task, slot)).length, 0)
+          const dueToday = due.reduce((n, task) => n + slotsOf(task), 0)
+
           return (
-            <View key={p.id} style={{ paddingHorizontal: 20, paddingTop: 16, gap: 10 }}>
-              <Card style={{ gap: 10 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>{p.title}</Text>
-                    <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
-                      {[p.condition, p.doctor?.full_name, p.hospital?.name].filter(Boolean).join(' · ')}
-                    </Text>
-                  </View>
+            <View key={p.id}>
+              <SectionHead title={p.source === 'self' ? 'Your own goals' : 'From your hospital'} />
+              <Card>
+                <View style={{ padding: 14, gap: 6 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '800', letterSpacing: -0.3, color: t.q.ink }}>
+                    {p.title}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60 }}>
+                    {[p.condition, p.doctor?.full_name, p.hospital?.name].filter(Boolean).join(' · ')
+                      || 'A goal you set yourself'}
+                  </Text>
                   {pct != null && (
-                    <View accessibilityLabel={`${pct} percent of this plan done so far`} style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 22, fontWeight: '800', color: t.accent }}>{pct}%</Text>
-                      <Text style={{ fontSize: 11, color: t.textMuted }}>so far</Text>
+                    <View
+                      accessibilityLabel={`${pct} percent of this plan done so far`}
+                      style={{ height: 6, borderRadius: 3, backgroundColor: t.q.muted, overflow: 'hidden', marginTop: 6 }}>
+                      <View style={{ width: `${pct}%`, height: '100%', backgroundColor: t.q.primary }} />
                     </View>
                   )}
+                  {!!p.notes && (
+                    <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70, marginTop: 4 }}>{p.notes}</Text>
+                  )}
                 </View>
-                {pct != null && (
-                  <View style={{ height: 6, borderRadius: 99, backgroundColor: t.accentBg, overflow: 'hidden' }}>
-                    <View style={{ width: `${pct}%`, height: '100%', backgroundColor: t.accent }} />
-                  </View>
-                )}
-                {p.next_check_in && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="calendar-outline" size={14} color={t.textMuted} />
-                    <Text style={{ fontSize: 13, color: t.textSecondary }}>Next check-in · {fmt(p.next_check_in)}</Text>
-                  </View>
-                )}
-                {!!p.notes && <Text style={{ fontSize: 13, color: t.textSecondary, lineHeight: 19 }}>{p.notes}</Text>}
+
+                <Hair inset={0} />
+                <View style={{ flexDirection: 'row' }}>
+                  <Stat label="Today" value={`${doneToday} of ${dueToday}`} note="done" />
+                  <Stat label="Plan so far" value={pct != null ? `${pct}%` : '—'} note="of every task" />
+                  <Stat
+                    label="Next check-in"
+                    value={p.next_check_in ? fmt(p.next_check_in).replace(/,/g, '') : '—'}
+                    note={p.next_check_in ? 'with your doctor' : 'none set'}
+                    last
+                  />
+                </View>
               </Card>
 
-              <SectionTitle title="Today" />
-              <Card style={{ paddingVertical: 4 }}>
+              <SectionHead title="Today" />
+              <Card>
                 {due.length === 0 ? (
-                  <Text style={{ padding: 12, fontSize: 13, color: t.textMuted }}>Nothing due today.</Text>
+                  <Row icon="checkmark-done-outline" iconTone="green" title="Nothing due today"
+                    sub="Come back tomorrow" />
                 ) : due.map((task, i) => {
                   const per = slotsOf(task)
                   const mine = times.filter(x => x.task_id === task.id)
-                  const last = i === due.length - 1
+                  const remindersOn = mine.some(x => x.enabled)
                   return (
-                    <View key={task.id} style={{ borderBottomWidth: last ? 0 : 1, borderBottomColor: t.cardBorder, paddingVertical: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 15, fontWeight: '600', color: t.textPrimary }}>{task.title}</Text>
-                          <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                            {freqLabel(task)}{task.ends_on ? ` · until ${fmt(task.ends_on)}` : ''}
-                          </Text>
-                        </View>
-                        {p.source === 'self' && (
-                          <TouchableOpacity
-                            onPress={() => Alert.alert('Remove goal?', task.title, [
-                              { text: 'Keep', style: 'cancel' },
-                              { text: 'Remove', style: 'destructive', onPress: async () => {
-                                const err = await removeOwnGoal(task.id)
-                                if (err) Alert.alert('Could not remove', err); else { haptics.success(); await load() }
-                              } },
-                            ])}
-                            accessibilityRole="button" accessibilityLabel={`Remove ${task.title}`} hitSlop={8}
-                            style={{ padding: 4 }}>
-                            <Ionicons name="trash-outline" size={16} color={t.textMuted} />
-                          </TouchableOpacity>
-                        )}
-                        {task.cadence !== 'once' && (
-                          <TouchableOpacity onPress={() => setEditing(task)} accessibilityRole="button"
-                            accessibilityLabel={`Set reminder times for ${task.title}`} hitSlop={8}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                            <Ionicons name={mine.some(x => x.enabled) ? 'alarm' : 'alarm-outline'} size={16}
-                              color={mine.some(x => x.enabled) ? t.accent : t.textMuted} />
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: mine.some(x => x.enabled) ? t.accent : t.textMuted }}>
-                              {mine.some(x => x.enabled) ? 'Reminders on' : 'Remind me'}
+                    <View key={task.id}>
+                      {i > 0 && <Hair />}
+                      <View style={{ paddingHorizontal: 14, paddingVertical: 12, gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '600', color: t.q.ink }}>{task.title}</Text>
+                            <Text style={{ fontSize: 12, color: t.q.ink60, marginTop: 2 }}>
+                              {freqLabel(task)}{task.ends_on ? ` · until ${fmt(task.ends_on)}` : ''}
                             </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                          </View>
 
-                      {/* One box per occurrence, each ticked on its own, with the
-                          time beneath it when the patient has set one. */}
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-                        {Array.from({ length: per }).map((_, slot) => {
-                          const done = !!doneLog(task, slot)
-                          const key = `${task.id}:${slot}`
-                          const at = mine.find(x => x.slot === slot)
-                          return (
-                            <TouchableOpacity key={slot} onPress={() => toggle(p, task, slot)} disabled={busy === key}
-                              accessibilityRole="checkbox" accessibilityState={{ checked: done, busy: busy === key }}
-                              accessibilityLabel={`${task.title}${per > 1 ? `, ${slot + 1} of ${per}` : ''}${slotWhen(task, at) ? ` — ${slotWhen(task, at)}` : ''}`}
-                              style={{ alignItems: 'center', gap: 4, minWidth: 54 }}>
-                              <View style={{ width: 36, height: 36, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center',
-                                borderColor: done ? t.accent : t.cardBorder, backgroundColor: done ? t.accent : 'transparent' }}>
-                                {busy === key ? <ActivityIndicator size="small" color={done ? '#FFFFFF' : t.accent} />
-                                  : done ? <Ionicons name="checkmark" size={20} color="#FFFFFF" /> : null}
-                              </View>
-                              <Text numberOfLines={1} style={{ fontSize: 11, color: done ? t.accent : t.textMuted, fontWeight: done ? '700' : '400' }}>
-                                {slotWhen(task, at) || (per > 1 ? `#${slot + 1}` : 'Done')}
-                              </Text>
-                            </TouchableOpacity>
-                          )
-                        })}
+                          {p.source === 'self' && (
+                            <IconBtn
+                              name="trash-outline" label={`Remove ${task.title}`} size={17} color={t.q.ink60}
+                              onPress={() => Alert.alert('Remove goal?', task.title, [
+                                { text: 'Keep', style: 'cancel' },
+                                {
+                                  text: 'Remove', style: 'destructive', onPress: async () => {
+                                    const err = await removeOwnGoal(task.id)
+                                    if (err) Alert.alert('Could not remove', err)
+                                    else { haptics.success(); await load() }
+                                  },
+                                },
+                              ])}
+                            />
+                          )}
+
+                          {task.cadence !== 'once' && (
+                            <Btn
+                              label={remindersOn ? 'Reminders on' : 'Remind me'}
+                              variant={remindersOn ? 'ghost' : 'secondary'}
+                              small
+                              icon={remindersOn ? 'alarm' : 'alarm-outline'}
+                              onPress={() => setEditing(task)}
+                            />
+                          )}
+                        </View>
+
+                        {/* One box per occurrence, each ticked on its own, with
+                            the time under it when the patient has set one. */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                          {Array.from({ length: per }).map((_, slot) => {
+                            const done = !!doneLog(task, slot)
+                            const key = `${task.id}:${slot}`
+                            const at = mine.find(x => x.slot === slot)
+                            return (
+                              <Pressable
+                                key={slot}
+                                onPress={() => toggle(p, task, slot)}
+                                disabled={busy === key}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: done, busy: busy === key }}
+                                accessibilityLabel={`${task.title}${per > 1 ? `, ${slot + 1} of ${per}` : ''}${slotWhen(task, at) ? ` — ${slotWhen(task, at)}` : ''}`}
+                                style={{ alignItems: 'center', gap: 4, minWidth: 56 }}>
+                                <View style={{
+                                  width: 40, height: 40, borderRadius: 12, borderWidth: 2,
+                                  alignItems: 'center', justifyContent: 'center',
+                                  borderColor: done ? t.q.primary : t.q.line,
+                                  backgroundColor: done ? t.q.primary : 'transparent',
+                                }}>
+                                  {busy === key
+                                    ? <ActivityIndicator size="small" color={done ? '#FFFFFF' : t.q.primary} />
+                                    : done ? <Ionicons name="checkmark" size={22} color={t.q.onPrimary} /> : null}
+                                </View>
+                                <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: done ? '700' : '400', color: done ? t.q.primary : t.q.ink60 }}>
+                                  {slotWhen(task, at) || (per > 1 ? `#${slot + 1}` : 'Done')}
+                                </Text>
+                              </Pressable>
+                            )
+                          })}
+                        </View>
                       </View>
                     </View>
                   )
@@ -316,14 +352,13 @@ export function CarePlansScreen({ navigation }: Props) {
             </View>
           )
         })}
+      </Body>
 
-        {!!plans?.length && (
-          <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
-            <PrimaryButton label="Add a goal of your own" variant="ghost" icon="add"
-              onPress={() => setAdding(true)} />
-          </View>
-        )}
-      </ScrollView>
+      {!!plans?.length && (
+        <BottomBar>
+          <Btn grow label="Add a goal of your own" icon="add" onPress={() => setAdding(true)} />
+        </BottomBar>
+      )}
 
       {adding && (
         <AddGoalSheet
@@ -340,7 +375,7 @@ export function CarePlansScreen({ navigation }: Props) {
           onSaved={async () => { setEditing(null); await load() }}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
@@ -493,8 +528,8 @@ function TimesSheet({ task, current, onClose, onSaved }: {
           </Text>
 
           <View style={{ gap: 9 }}>
-            <PrimaryButton label={saving ? 'Saving…' : 'Save reminders'} onPress={save} loading={saving} />
-            <PrimaryButton label="Cancel" variant="ghost" onPress={onClose} disabled={saving} />
+            <Btn label={saving ? 'Saving…' : 'Save reminders'} onPress={save} loading={saving} />
+            <Btn label="Cancel" variant="secondary" onPress={onClose} disabled={saving} />
           </View>
         </View>
       </View>
@@ -584,8 +619,8 @@ function AddGoalSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           </ScrollView>
 
           <View style={{ gap: 9 }}>
-            <PrimaryButton label={saving ? 'Adding…' : 'Add goal'} onPress={save} loading={saving} disabled={saving || !title.trim()} />
-            <PrimaryButton label="Cancel" variant="ghost" onPress={onClose} disabled={saving} />
+            <Btn label={saving ? 'Adding…' : 'Add goal'} onPress={save} loading={saving} disabled={saving || !title.trim()} />
+            <Btn label="Cancel" variant="secondary" onPress={onClose} disabled={saving} />
           </View>
         </View>
       </View>

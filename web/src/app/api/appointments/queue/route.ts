@@ -8,7 +8,7 @@ const QUEUE_SELECT = `
   id, booking_ref, appointment_date, start_time, status, type, reason,
   booking_mode, approval_status, urgency, symptom_description, approval_note,
   assigned_doctor_id, clinic_id, refund_pct, walkin_patient_name, walkin_patient_phone,
-  queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date,
+  queue_position, estimated_wait, consult_started_at, consult_ended_at, consult_duration_secs, check_in_date, checked_in_at,
   referral_reason,
   patient:users!appointments_patient_id_fkey(id, full_name, date_of_birth, gender),
   doctor:doctors!appointments_doctor_id_fkey(id, full_name, specialty:specialties!doctors_specialty_id_fkey(name)),
@@ -44,6 +44,7 @@ function mapQueueRow(a: any) {
     consult_ended_at: a.consult_ended_at ?? null,
     consult_duration_secs: a.consult_duration_secs ?? null,
     check_in_date: a.check_in_date ?? null,
+    checked_in_at: a.checked_in_at ?? null,
     patient_id: isWalkin ? null : (a.patient?.id ?? null),
     patient_name: isWalkin ? (a.walkin_patient_name ?? 'Walk-in') : safePatientName(a.patient?.full_name, 'Unknown'),
     patient_age: isWalkin ? null : calcAge(a.patient?.date_of_birth ?? null),
@@ -100,14 +101,27 @@ export async function GET() {
   const appointments = Array.from(byId.values())
     .map(mapQueueRow)
     .sort((a, b) => {
-      // Emergency appointments always sort first; within a tier, whoever has an actual
-      // queue position (checked in) sorts by it, then everyone else falls back to start time.
+      // Emergency first, then three bands.
+      //
+      // The middle band is the one that matters: an OPD patient checks in with
+      // no doctor assigned (that is the model -- a doctor is assigned on
+      // arrival), so renumber_doctor_queue never runs for them and
+      // queue_position stays null. Sorting null as Infinity put the patient who
+      // physically arrived FIRST at the very bottom of the front desk's list,
+      // below people who have not turned up yet. They now sit between the
+      // numbered patients and the not-yet-arrived, ordered by when they walked
+      // in, which is the order the front desk should assign doctors in.
       const aEmergency = a.urgency === 'emergency' ? 0 : 1
       const bEmergency = b.urgency === 'emergency' ? 0 : 1
       if (aEmergency !== bEmergency) return aEmergency - bEmergency
-      const aPos = a.queue_position ?? Infinity
-      const bPos = b.queue_position ?? Infinity
-      if (aPos !== bPos) return aPos - bPos
+
+      const band = (r: { queue_position: number | null; checked_in_at: string | null }) =>
+        r.queue_position != null ? 0 : r.checked_in_at ? 1 : 2
+      const aBand = band(a), bBand = band(b)
+      if (aBand !== bBand) return aBand - bBand
+
+      if (aBand === 0) return (a.queue_position as number) - (b.queue_position as number)
+      if (aBand === 1) return (a.checked_in_at as string).localeCompare(b.checked_in_at as string)
       return a.start_time.localeCompare(b.start_time)
     })
 

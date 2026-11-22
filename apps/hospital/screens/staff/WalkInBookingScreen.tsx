@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Field, Notice, Btn,
+  BottomBar, Initials, Mono, Chip, BigFigure,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -31,8 +32,6 @@ export function WalkInBookingScreen({ navigation }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false)
 
   const [reason,    setReason]    = useState('')
-  const [urgency,   setUrgency]   = useState<'routine' | 'urgent' | 'emergency'>('routine')
-  const [apptType,  setApptType]  = useState<'in-person' | 'virtual'>('in-person')
   const [doctors,   setDoctors]   = useState<Doctor[]>([])
   const [clinics,   setClinics]   = useState<Clinic[]>([])
   const [doctorId,  setDoctorId]  = useState<string | null>(null)
@@ -40,6 +39,12 @@ export function WalkInBookingScreen({ navigation }: Props) {
   const [loading,   setLoading]   = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [bookingRef, setBookingRef] = useState('')
+  const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'emergency'>('routine')
+  const [visitType, setVisitType] = useState<'in-person' | 'virtual'>('in-person')
+  // What the desk reads out. Comes back from the walk-in route, which checks
+  // the patient in and lets the renumber trigger assign the number.
+  const [queueNumber, setQueueNumber] = useState<number | null>(null)
+  const [checkInError, setCheckInError] = useState<string | null>(null)
 
   const hospitalId = staffProfile?.hospitalId
 
@@ -90,9 +95,17 @@ export function WalkInBookingScreen({ navigation }: Props) {
     }
   }
 
+  function resetForm() {
+    setUrgency('routine'); setVisitType('in-person')
+    setQueueNumber(null); setCheckInError(null)
+    setSubmitted(false)
+    setPatientName(''); setPatientPhone(''); setPatientNumber('')
+    setFoundPatient(null); setReason(''); setDoctorId(null); setClinicId(null)
+  }
+
   async function handleSubmit() {
     if (!patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return }
-    if (!reason.trim()) { Alert.alert('Required', `Please enter the ${apptType === 'virtual' ? 'consultation' : 'visit'} reason.`); return }
+    if (!reason.trim()) { Alert.alert('Required', 'Please enter the reason for the visit.'); return }
     if (!hospitalId) return
 
     setLoading(true)
@@ -119,9 +132,9 @@ export function WalkInBookingScreen({ navigation }: Props) {
           date: today,
           startTime,
           reason: reason.trim(),
-          urgency,
-          type: apptType,
           staffId: user?.id || null,
+          urgency,
+          type: visitType,
         }),
       })
 
@@ -130,6 +143,8 @@ export function WalkInBookingScreen({ navigation }: Props) {
 
       haptics.success()
       setBookingRef(body.bookingRef ?? body.booking_ref ?? '')
+      setQueueNumber(typeof body.queuePosition === 'number' ? body.queuePosition : null)
+      setCheckInError(body.checkedIn === false ? (body.checkInError ?? 'They were registered but not checked in.') : null)
       setSubmitted(true)
     } catch (e) {
       haptics.error()
@@ -139,193 +154,262 @@ export function WalkInBookingScreen({ navigation }: Props) {
     }
   }
 
+  // ── Registered ────────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-        <Header title="Walk-in" subtitle="Patient added to the queue" />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View style={[s.successIcon, { backgroundColor: 'rgba(0,194,101,0.12)', borderColor: 'rgba(0,194,101,0.3)' }]}>
-            <Ionicons name="checkmark-circle" size={56} color={t.accentDark} />
+      <Screen>
+        <AppBar title="Walk-in registered" sub={bookingRef || undefined} />
+        <Body>
+          <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 18, gap: 8 }}>
+            <View style={{
+              width: 64, height: 64, borderRadius: 32, backgroundColor: t.q.greenBg,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Ionicons name="checkmark" size={30} color={t.q.green} />
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5, color: t.q.ink, textAlign: 'center' }}>
+              {patientName} is registered
+            </Text>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, textAlign: 'center' }}>
+              {[clinics.find(c => c.id === clinicId)?.name ?? 'General outpatient',
+                doctors.find(d => d.id === doctorId)?.full_name ?? 'next available doctor'].join(' · ')}
+            </Text>
           </View>
-          <Text style={[s.successTitle, { color: t.textPrimary }]}>Walk-in Registered</Text>
-          <Text style={[s.successRef, { color: t.accent }]}>{bookingRef}</Text>
-          <Text style={[s.successSub, { color: t.textMuted }]}>
-            {patientName} has been added to the queue.
-          </Text>
-          <TouchableOpacity style={[s.doneBtn, { backgroundColor: t.accent }]} onPress={() => {
-            setSubmitted(false); setPatientName(''); setPatientPhone(''); setPatientNumber('')
-            setFoundPatient(null); setReason(''); setDoctorId(null); setClinicId(null)
-          }}>
-            <Text style={s.doneBtnText}>Register Another</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+
+          {/* The number the board will actually call. The walk-in route checks
+              the patient in, and the renumber trigger assigns it. */}
+          {queueNumber != null ? (
+            <Card>
+              <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                <BigFigure label="Queue number" value={queueNumber} color={t.q.primary} />
+              </View>
+            </Card>
+          ) : checkInError ? (
+            <Notice tone="amber" icon="information-circle-outline">
+              {checkInError} Check them in from the queue to give them a number.
+            </Notice>
+          ) : (
+            <Notice tone="neutral" icon="information-circle-outline">
+              They are checked in. Their number appears on the queue screen.
+            </Notice>
+          )}
+
+          <SectionHead title="Tell the patient" />
+          <Card pad>
+            {[
+              `Their booking reference is ${bookingRef || 'on the way'}`,
+              patientPhone.trim()
+                ? `They get updates on ${patientPhone.trim()}`
+                : 'Add their phone number next time so they get updates',
+              queueNumber != null
+                ? `They are number ${queueNumber} in today's queue`
+                : 'They will be given a queue number at check-in',
+            ].map((line, i) => (
+              <View key={line} style={{ flexDirection: 'row', gap: 12, paddingVertical: 7 }}>
+                <Mono size={13} weight="700" color={t.q.primary}>{i + 1}</Mono>
+                <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 19, color: t.q.ink70 }}>{line}</Text>
+              </View>
+            ))}
+          </Card>
+        </Body>
+
+        <BottomBar meta={<>
+          <Mono size={12} color={t.q.ink60}>{bookingRef}</Mono>
+          {queueNumber != null && (
+            <>
+              <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+              <Mono size={12} weight="700" color={t.q.primary}>number {queueNumber}</Mono>
+            </>
+          )}
+        </>}>
+          <Btn label="Register another" variant="secondary" onPress={resetForm} />
+          <Btn grow label="Go to the queue" icon="list-outline"
+            onPress={() => { resetForm(); navigation.navigate('FrontDeskQueue') }} />
+        </BottomBar>
+      </Screen>
     )
   }
 
+  // ── Intake ────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Walk-in intake" subtitle="Register a walk-in patient to the queue" />
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <Screen>
+      <AppBar large title="Walk-in" />
 
-          {/* Patient lookup */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Patient lookup (optional)</Text>
-          <View style={[s.lookupRow]}>
-            <View style={[s.input, { flex: 1, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-              <TextInput value={patientNumber} onChangeText={setPatientNumber}
-                placeholder="Patient ID (QH-...)" placeholderTextColor={t.textMuted}
-                style={[s.inputText, { color: t.textPrimary }]} autoCapitalize="characters" />
-            </View>
-            <TouchableOpacity onPress={handleLookup} disabled={lookupLoading || (!patientNumber.trim() && !patientPhone.trim())}
-              accessibilityLabel="Look up patient"
-              style={[s.lookupBtn, { backgroundColor: t.accent }]}>
-              {lookupLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={18} color="#fff" />}
-            </TouchableOpacity>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60 }}>
+              Register someone who has walked in, then check them in to give them a number.
+            </Text>
           </View>
-          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, marginTop: 8 }]}>
-            <TextInput value={patientPhone} onChangeText={setPatientPhone}
-              placeholder="Or search by phone number" placeholderTextColor={t.textMuted}
-              keyboardType="phone-pad" style={[s.inputText, { color: t.textPrimary }]} />
+
+          <SectionHead title="Already a patient?" />
+          <View style={{ paddingHorizontal: 16, gap: 10 }}>
+            <Field
+              label="Phone number or Patient ID"
+              value={patientNumber}
+              onChangeText={setPatientNumber}
+              placeholder="K7M3QX, or their phone number"
+              autoCapitalize="characters"
+            />
+            <Btn
+              label={lookupLoading ? 'Looking…' : 'Find patient'}
+              variant="secondary"
+              icon="search"
+              loading={lookupLoading}
+              disabled={!patientNumber.trim() && !patientPhone.trim()}
+              onPress={handleLookup}
+            />
           </View>
+
           {foundPatient && (
-            <View style={[s.foundBanner, { backgroundColor: t.statusSuccess.bg, borderColor: t.statusSuccess.border }]}>
-              <Ionicons name="person-circle-outline" size={18} color={t.accentDark} />
-              <Text style={[s.foundText, { color: t.accentDark }]}>Found: {foundPatient.full_name} · {foundPatient.patient_number}</Text>
-            </View>
+            <Card style={{ marginTop: 12 }}>
+              <Row
+                icon="person-circle-outline" iconTone="green"
+                tint
+                title={foundPatient.full_name}
+                sub={[foundPatient.phone, foundPatient.patient_number].filter(Boolean).join(' · ')}
+                pill="Linked" pillTone="green"
+              />
+            </Card>
           )}
 
-          {/* Patient info */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Patient info</Text>
-          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-            <TextInput value={patientName} onChangeText={setPatientName}
-              placeholder="Full name *" placeholderTextColor={t.textMuted}
-              style={[s.inputText, { color: t.textPrimary }]} />
-          </View>
-          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, marginTop: 8 }]}>
-            <TextInput value={patientPhone} onChangeText={setPatientPhone}
-              placeholder="Phone number" placeholderTextColor={t.textMuted}
-              keyboardType="phone-pad" style={[s.inputText, { color: t.textPrimary }]} />
-          </View>
-
-          {/* Visit reason */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>{apptType === 'virtual' ? 'Consultation reason *' : 'Visit reason *'}</Text>
-          <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder, height: 80, alignItems: 'flex-start', paddingTop: 12 }]}>
-            <TextInput value={reason} onChangeText={setReason}
-              placeholder={apptType === 'virtual' ? 'Reason for consultation…' : 'Reason for visit…'} placeholderTextColor={t.textMuted} multiline
-              style={[s.inputText, { color: t.textPrimary }]} />
-          </View>
-
-          {/* Urgency */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Urgency</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['routine', 'urgent', 'emergency'] as const).map(u => {
-              const colors = { routine: t.accent, urgent: t.statusBusy.text, emergency: t.danger }
-              const color = colors[u]
-              const active = urgency === u
-              return (
-                <TouchableOpacity key={u} onPress={() => setUrgency(u)}
-                  style={[s.urgencyBtn, { borderColor: active ? color : t.cardBorder, backgroundColor: active ? `${color}18` : t.cardBg }]}>
-                  <Text style={[s.urgencyText, { color: active ? color : t.textMuted }]}>{u.charAt(0).toUpperCase() + u.slice(1)}</Text>
-                </TouchableOpacity>
-              )
-            })}
+          <SectionHead title={foundPatient ? 'Check these are right' : 'Or a new patient'} />
+          <View style={{ paddingHorizontal: 16, gap: 14 }}>
+            <Field
+              label="Full name"
+              value={patientName}
+              onChangeText={setPatientName}
+              placeholder="Patient full name"
+              autoCapitalize="words"
+            />
+            <Field
+              label="Phone number"
+              hint="So they get queue updates by SMS"
+              value={patientPhone}
+              onChangeText={setPatientPhone}
+              placeholder="+234 …"
+              keyboardType="phone-pad"
+            />
+            <Field
+              label="Reason for visit"
+              value={reason}
+              onChangeText={setReason}
+              multiline
+              numberOfLines={3}
+              placeholder="What has brought them in?"
+              style={{ minHeight: 80, textAlignVertical: 'top' }}
+            />
           </View>
 
-          {/* Visit type */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Visit type</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {(['in-person', 'virtual'] as const).map(tp => {
-              const active = apptType === tp
-              return (
-                <TouchableOpacity key={tp} onPress={() => setApptType(tp)}
-                  style={[s.urgencyBtn, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? `${t.accent}18` : t.cardBg }]}>
-                  <Text style={[s.urgencyText, { color: active ? t.accent : t.textMuted }]}>{tp === 'in-person' ? 'In-person' : 'Virtual'}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-
-          {/* Assign doctor (optional) */}
-          {doctors.length > 0 && (
-            <>
-              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Assign doctor (optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => setDoctorId(null)}
-                    style={[s.docChip, { borderColor: !doctorId ? t.accent : t.cardBorder, backgroundColor: !doctorId ? `${t.accent}18` : t.cardBg }]}>
-                    <Text style={[s.docChipText, { color: !doctorId ? t.accent : t.textMuted }]}>Any</Text>
-                  </TouchableOpacity>
-                  {doctors.map(d => {
-                    const active = doctorId === d.id
-                    return (
-                      <TouchableOpacity key={d.id} onPress={() => setDoctorId(d.id)}
-                        style={[s.docChip, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? `${t.accent}18` : t.cardBg }]}>
-                        <Text style={[s.docChipText, { color: active ? t.accent : t.textPrimary }]}>{[d.title, d.full_name].filter(Boolean).join(' ')}</Text>
-                        {d.specialty_name && <Text style={[s.docSpec, { color: t.textMuted }]}>{d.specialty_name}</Text>}
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </ScrollView>
-            </>
-          )}
-
-          {/* Assign clinic (optional) */}
           {clinics.length > 0 && (
             <>
-              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 16 }]}>Assign clinic (optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => setClinicId(null)}
-                    style={[s.docChip, { borderColor: !clinicId ? t.accent : t.cardBorder, backgroundColor: !clinicId ? `${t.accent}18` : t.cardBg }]}>
-                    <Text style={[s.docChipText, { color: !clinicId ? t.accent : t.textMuted }]}>Any</Text>
-                  </TouchableOpacity>
-                  {clinics.map(c => {
-                    const active = clinicId === c.id
-                    return (
-                      <TouchableOpacity key={c.id} onPress={() => setClinicId(c.id)}
-                        style={[s.docChip, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? `${t.accent}18` : t.cardBg }]}>
-                        <Text style={[s.docChipText, { color: active ? t.accent : t.textPrimary }]}>{c.name}</Text>
-                        {c.is_opd && <Text style={[s.docSpec, { color: t.textMuted }]}>OPD</Text>}
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </ScrollView>
+              <SectionHead title="Clinic" />
+              <Card>
+                <Row
+                  icon="shuffle-outline"
+                  iconTone={!clinicId ? 'teal' : 'neutral'}
+                  tint={!clinicId}
+                  title="Any clinic"
+                  sub="The front desk decides on arrival"
+                  right={!clinicId ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                  onPress={() => setClinicId(null)}
+                />
+                {clinics.map(c => {
+                  const on = clinicId === c.id
+                  return (
+                    <View key={c.id}>
+                      <Hair />
+                      <Row
+                        icon="medical-outline"
+                        iconTone={on ? 'teal' : 'neutral'}
+                        tint={on}
+                        title={c.name}
+                        sub={c.is_opd ? 'General outpatient · no referral needed' : null}
+                        right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                        onPress={() => setClinicId(c.id)}
+                      />
+                    </View>
+                  )
+                })}
+              </Card>
             </>
           )}
 
-          <Button
-            label="Add to Queue" onPress={handleSubmit} loading={loading}
-            icon="person-add-outline" size="lg" style={{ marginTop: 28 }}
+          {doctors.length > 0 && (
+            <>
+              <SectionHead title="Doctor" />
+              <Card>
+                <Row
+                  icon="shuffle-outline"
+                  iconTone={!doctorId ? 'teal' : 'neutral'}
+                  tint={!doctorId}
+                  title="Next available"
+                  sub="Assigned when they are called"
+                  right={!doctorId ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                  onPress={() => setDoctorId(null)}
+                />
+                {doctors.map(d => {
+                  const on = doctorId === d.id
+                  return (
+                    <View key={d.id}>
+                      <Hair />
+                      <Row
+                        leading={<Initials name={d.full_name} size={40} tint="#7C2D12" />}
+                        tint={on}
+                        title={[d.title, d.full_name].filter(Boolean).join(' ')}
+                        sub={d.specialty_name}
+                        right={on ? <Mono size={11} color={t.q.primary}>SELECTED</Mono> : undefined}
+                        onPress={() => setDoctorId(on ? null : d.id)}
+                      />
+                    </View>
+                  )
+                })}
+              </Card>
+            </>
+          )}
+
+          <SectionHead title="How urgent" />
+          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
+            {(['routine', 'urgent', 'emergency'] as const).map(u => (
+              <Chip key={u} label={u === 'emergency' ? 'Emergency' : u === 'urgent' ? 'Urgent' : 'Routine'}
+                on={urgency === u} onPress={() => { haptics.tap(); setUrgency(u) }} />
+            ))}
+          </View>
+          {urgency === 'emergency' && (
+            <Notice tone="red" icon="alert-circle">
+              An emergency is placed above the numbered queue, ahead of everyone already waiting.
+            </Notice>
+          )}
+
+          <SectionHead title="Kind of visit" />
+          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
+            {([['in-person', 'In person'], ['virtual', 'Video']] as const).map(([v, label]) => (
+              <Chip key={v} label={label} on={visitType === v}
+                onPress={() => { haptics.tap(); setVisitType(v) }} />
+            ))}
+          </View>
+
+          <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+            <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+              Registering a walk-in checks them in straight away, which is what gives them their queue
+              number.
+            </Text>
+          </View>
+        </Body>
+
+        <BottomBar>
+          <Btn
+            grow
+            label="Add to queue"
+            icon="person-add-outline"
+            loading={loading}
+            disabled={!patientName.trim() || !reason.trim()}
+            onPress={handleSubmit}
           />
-        </ScrollView>
+        </BottomBar>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  title:       { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginBottom: 4 },
-  sub:         { fontSize: 13, marginBottom: 20 },
-  sectionLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  lookupRow:   { flexDirection: 'row', gap: 8 },
-  lookupBtn:   { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  input:       { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' },
-  inputText:   { fontSize: 14 },
-  foundBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
-  foundText:   { fontSize: 12, fontWeight: '600' },
-  urgencyBtn:  { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
-  urgencyText: { fontSize: 12, fontWeight: '700' },
-  docChip:     { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, minWidth: 100 },
-  docChipText: { fontSize: 12, fontWeight: '700' },
-  docSpec:     { fontSize: 10, marginTop: 2 },
-  successIcon: { width: 96, height: 96, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 20 },
-  successTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center' },
-  successRef:  { fontSize: 20, fontWeight: '800', marginTop: 6, marginBottom: 8 },
-  successSub:  { fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-  doneBtn:     { borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14 },
-  doneBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
-})

@@ -329,6 +329,52 @@ retroactively manufacture — or erase — a month of adherence the hospital is 
 
 ---
 
+## `hospital_beds` *(`20261121000004`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| Hospital staff manage own beds | ALL | active, non-`ambulance_crew` `hospital_admins` **or** `clinic_admins` of the row's hospital |
+
+No patient or crew policy, deliberately. What those two need is the single
+derived word on `hospitals.bed_space_status`, which they already read — not a
+list of which bed is free in which ward.
+
+---
+
+## `prescriptions`, `test_orders` *(`20261121000005`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| Patients read own … | SELECT | `patient_id IN (SELECT current_patient_ids())` |
+| Doctors manage … on own appointments | ALL | `doctor_id IN (SELECT current_doctor_ids())` |
+| Hospital staff manage own … | ALL | active, non-crew `hospital_admins` or `clinic_admins` of the row's hospital |
+
+The same three audiences the appointment itself has, written the same way, so
+there is one pattern to understand rather than three.
+
+---
+
+## `lab_results` *(`20261121000006`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| Patients read own results | SELECT | `patient_id IN (SELECT current_patient_ids())` |
+| Ordering doctor reads results | SELECT | the row's `test_order_id` belongs to an order whose `doctor_id IN (SELECT current_doctor_ids())` |
+| Hospital staff manage own results | ALL | hospital staff as above; the `WITH CHECK` is evaluated against the **order's** hospital, not the submitted `hospital_id`, which a trigger overwrites anyway |
+
+The ordering doctor is read-only on purpose: a clinician does not amend a
+laboratory's result from a consultation screen.
+
+---
+
+## `user_devices` *(`20261121000007`)*
+| Policy | Operation | Rule |
+|---|---|---|
+| Users manage own devices | ALL | `user_id` = the caller |
+
+Strictly own-rows. No staff or support read path — this is a privacy feature,
+and a support console that can see where a patient has been signed in is the
+opposite of one.
+
+---
+
 ## Performance Indexes (added alongside RLS)
 
 | Index | Table | Columns | Purpose |

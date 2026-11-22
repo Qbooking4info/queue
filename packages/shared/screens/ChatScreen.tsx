@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, FlatList, TouchableOpacity, KeyboardAvoidingView, ActivityIndicator } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Text, TextInput } from '../components/ui/Typography'
-import { Header, EmptyState } from '../components/ui/v3'
+import { Screen, AppBar, Card, Empty, Notice } from '../components/q'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { haptics } from '../lib/haptics'
@@ -65,41 +64,50 @@ export function ChatScreen({ navigation, route }: Props) {
   const iAmPatient = conv?.me?.role === 'patient'
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title={other?.display_name ?? 'Conversation'} subtitle={other ? ROLE_LABEL[other.role] : undefined} onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar
+        title={other?.display_name ?? 'Conversation'}
+        sub={other ? ROLE_LABEL[other.role] : undefined}
+        onBack={() => navigation.goBack()}
+      />
+      {/* A message is not an emergency channel, and nobody watching a thread
+          for a reply should have to work that out for themselves. */}
       {iAmPatient && (
         <TouchableOpacity onPress={() => navigation.navigate('Sos')} accessibilityRole="button"
-          style={{ backgroundColor: t.dangerSubtle, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Ionicons name="warning-outline" size={16} color={t.danger} />
-          <Text style={{ flex: 1, fontSize: 12, color: t.textPrimary, lineHeight: 17 }}>
-            Chest pain, fainting or trouble breathing? Don't wait for a reply — <Text style={{ fontWeight: '800', color: t.danger }}>tap for SOS</Text>
+          accessibilityLabel="Emergency SOS"
+          style={{ backgroundColor: t.q.redBg, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="warning-outline" size={16} color={t.q.red} />
+          <Text style={{ flex: 1, fontSize: 12, lineHeight: 17, color: t.q.ink }}>
+            Chest pain, fainting or trouble breathing? Don&apos;t wait for a reply — <Text style={{ fontWeight: '800', color: t.q.red }}>tap for SOS</Text>
           </Text>
         </TouchableOpacity>
       )}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {loading ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={t.accent} /></View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={t.q.primary} /></View>
         ) : error && !conv ? (
-          <EmptyState icon="chatbubble-ellipses-outline" title="Chat unavailable" body={error} />
+          <Card style={{ marginTop: 16 }}>
+            <Empty icon="chatbubble-ellipses-outline" title="Chat unavailable" body={error} />
+          </Card>
         ) : (
           <FlatList ref={list} data={msgs} keyExtractor={m => m.id}
             contentContainerStyle={{ padding: 16, gap: 8, flexGrow: 1 }}
             keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
-            ListEmptyComponent={<Text style={{ textAlign: 'center', color: t.textMuted, fontSize: 13, marginTop: 24 }}>
+            ListEmptyComponent={<Text style={{ textAlign: 'center', color: t.q.ink60, fontSize: 13, marginTop: 24 }}>
               {iAmPatient ? 'Say hello and describe how you feel. Replies show up here.' : 'No messages yet. Say hello.'}</Text>}
             renderItem={({ item }) => {
               const mine = item.sender_member_id === myId
               return (
                 <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                   {!mine && other?.role === 'hospital' && !!item.sender_name && (
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginBottom: 2 }}>{item.sender_name}</Text>
+                    <Text style={{ fontSize: 11, color: t.q.ink60, marginBottom: 2 }}>{item.sender_name}</Text>
                   )}
-                  <View style={{ backgroundColor: mine ? t.accent : t.cardBg, borderWidth: mine ? 0 : 1, borderColor: t.cardBorder,
+                  <View style={{ backgroundColor: mine ? t.q.primary : t.q.surface, borderWidth: mine ? 0 : 1, borderColor: t.q.line,
                     borderRadius: 16, borderBottomRightRadius: mine ? 4 : 16, borderBottomLeftRadius: mine ? 16 : 4, paddingHorizontal: 12, paddingVertical: 9 }}>
-                    <Text style={{ fontSize: 15, lineHeight: 21, color: mine ? (t.id === 'forest' ? '#081416' : '#FFFFFF') : t.textPrimary }}>{item.body}</Text>
+                    <Text style={{ fontSize: 15, lineHeight: 21, color: mine ? t.q.onPrimary : t.q.ink }}>{item.body}</Text>
                   </View>
-                  <Text style={{ fontSize: 10, color: t.textMuted, marginTop: 2, alignSelf: mine ? 'flex-end' : 'flex-start' }}>
+                  <Text style={{ fontSize: 10, color: t.q.ink60, marginTop: 2, alignSelf: mine ? 'flex-end' : 'flex-start' }}>
                     {new Date(item.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}
                     {mine && other?.last_read_at && new Date(other.last_read_at) >= new Date(item.created_at) ? ' · Read' : ''}
                   </Text>
@@ -108,23 +116,23 @@ export function ChatScreen({ navigation, route }: Props) {
             }} />
         )}
 
-        {!!error && !!conv && <Text accessibilityRole="alert" style={{ color: t.danger, fontSize: 12, paddingHorizontal: 16, paddingBottom: 4 }}>{error}</Text>}
+        {!!error && !!conv && <Notice tone="red">{error}</Notice>}
 
         {conv && (closed ? (
-          <Text style={{ textAlign: 'center', color: t.textMuted, padding: 16, fontSize: 13 }}>This conversation is closed.</Text>
+          <Text style={{ textAlign: 'center', color: t.q.ink60, padding: 16, fontSize: 13 }}>This conversation is closed.</Text>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: t.cardBorder, backgroundColor: t.cardBg }}>
-            <TextInput value={draft} onChangeText={setDraft} placeholder="Write a message" placeholderTextColor={t.textMuted} multiline
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: t.q.line, backgroundColor: t.q.surface }}>
+            <TextInput value={draft} onChangeText={setDraft} placeholder="Write a message" placeholderTextColor={t.q.ink60} multiline
               accessibilityLabel="Message" maxLength={4000}
-              style={{ flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 24, borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg,
-                paddingHorizontal: 16, paddingTop: 13, paddingBottom: 13, fontSize: 15, color: t.textPrimary }} />
+              style={{ flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 24, borderWidth: 1, borderColor: t.q.line, backgroundColor: t.q.field,
+                paddingHorizontal: 16, paddingTop: 13, paddingBottom: 13, fontSize: 15, color: t.q.ink }} />
             <TouchableOpacity onPress={send} disabled={!draft.trim() || sending} accessibilityRole="button" accessibilityLabel="Send"
-              style={{ width: 48, height: 48, borderRadius: 99, backgroundColor: draft.trim() ? t.accent : t.cardBorder, alignItems: 'center', justifyContent: 'center' }}>
-              {sending ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="send" size={18} color={t.id === 'forest' ? '#081416' : '#FFFFFF'} />}
+              style={{ width: 48, height: 48, borderRadius: 99, backgroundColor: draft.trim() ? t.q.primary : t.q.muted, alignItems: 'center', justifyContent: 'center' }}>
+              {sending ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="send" size={18} color={t.q.onPrimary} />}
             </TouchableOpacity>
           </View>
         ))}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }

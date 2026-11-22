@@ -37,10 +37,10 @@ export function Button({
 
   // forest's accent (#0F766E) is bright enough that white text on it reads worse than
   // near-black -- six screens had already independently discovered this and hand-wrote
-  // the same `t.id === 'forest' ? '#061208' : '#fff'` check. Centralizing it here so
+  // the same `t.q.onPrimary` check. Centralizing it here so
   // every future primary button gets it for free instead of rediscovering it a seventh
   // time.
-  const onPrimary = t.id === 'forest' ? '#081416' : '#FFFFFF'
+  const onPrimary = t.q.onPrimary
 
   // v3.1 sizing, shared with PrimaryButton: 48 px touch target (52 for lg), 13 px radius.
   const containerStyles: ViewStyle = {

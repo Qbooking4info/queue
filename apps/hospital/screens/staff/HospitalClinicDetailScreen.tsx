@@ -1,10 +1,13 @@
 import { useState, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, KeyboardAvoidingView } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, Chip, Notice, Btn,
+  BottomBar, Stat, StatStrip, Empty, IconBtn, Initials, Mono, MONO,
+  Field as KField,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert }    from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
@@ -47,7 +50,10 @@ function rangeBounds(key: RangeKey): { from: string; to: string } {
 
 interface Props { navigation: any; route: { params: { clinicId: string } } }
 
+type DetailTab = 'details' | 'people' | 'hours' | 'stats'
+
 export function HospitalClinicDetailScreen({ navigation, route }: Props) {
+  const [detailTab, setDetailTab] = useState<DetailTab>('details')
   const { theme: t } = useTheme()
   const { clinicId } = route.params
 
@@ -297,291 +303,430 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
+  // The handoff splits this into four tabs. It was one scroll holding a form,
+  // a rota, two staff lists, an appointment list and three charts -- long
+  // enough that the save button for the details form sat a screen and a half
+  // above the analytics nobody scrolled to.
+  const subAdmin = staff.find(m => m.role === 'clinic_admin')
+  const deskOfficers = staff.filter(m => m.role === 'front_desk' || m.role === 'desk_officer')
+  const pendingCount = appts.filter(a => a.approval_status === 'pending_approval').length
+
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title={`${clinic?.name ?? 'Clinic'}`} onBack={() => navigation.goBack()} right={saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : undefined} />
+    <Screen>
+      <AppBar
+        title={clinic?.name ?? 'Clinic'}
+        sub={clinic?.is_emergency ? 'Emergency department' : clinic?.is_active ? 'Active' : 'Inactive'}
+        onBack={() => navigation.goBack()}
+        right={saving ? (
+          <View style={{ width: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="small" color={t.q.primary} />
+          </View>
+        ) : undefined}
+      />
+
+      <Seg<DetailTab>
+        value={detailTab} onChange={setDetailTab}
+        options={[
+          { key: 'details', label: 'Details' },
+          { key: 'people', label: 'People' },
+          { key: 'hours', label: 'Hours' },
+          { key: 'stats', label: 'Stats' },
+        ]}
+      />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        <Section theme={t} title="Details">
-          <Field theme={t} label="Name" value={name} onChange={setName} />
-          <Field theme={t} label="Description" value={description} onChange={setDescription} multiline />
-          <Field theme={t} label="Daily booking limit" value={dailyLimit} onChange={setDailyLimit} keyboardType="number-pad" placeholder="Unlimited" />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Field theme={t} label="Min age" value={minAge} onChange={setMinAge} keyboardType="number-pad" placeholder="None" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Field theme={t} label="Max age" value={maxAge} onChange={setMaxAge} keyboardType="number-pad" placeholder="None" />
-            </View>
-          </View>
-          <Text style={[s.label, { color: t.textMuted }]}>GENDER RESTRICTION</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-            {([null, 'male', 'female'] as const).map(g => (
-              <TouchableOpacity key={g ?? 'none'} onPress={() => setGenderRestriction(g)}
-                style={[s.chip, { borderColor: genderRestriction === g ? t.accent : t.cardBorder, backgroundColor: genderRestriction === g ? `${t.accent}18` : 'transparent' }]}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: genderRestriction === g ? t.accent : t.textMuted }}>{g ? (g === 'male' ? 'Male only' : 'Female only') : 'None'}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity onPress={handleSaveDetails} disabled={saving}
-            style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent }]}>
-            <Text style={s.saveBtnText}>Save Details</Text>
-          </TouchableOpacity>
-        </Section>
+        <Body keyboardShouldPersistTaps="handled">
 
-        <Section theme={t} title="Status">
-          <ToggleRow theme={t} label="Active" sub="Inactive clinics don't accept new bookings" value={!!clinic?.is_active} onToggle={toggleActive} />
-          <ToggleRow theme={t} label="Emergency Department" sub="Only one clinic per hospital can hold this" value={!!clinic?.is_emergency} onToggle={toggleEmergency} last />
-        </Section>
-
-        <Section theme={t} title="Operating Hours">
-          {hours.map(h => (
-            <View key={h.day} style={s.hourRow}>
-              <Text style={[s.dayLabel, { color: t.textPrimary }]}>{DAY_NAMES[h.day]}</Text>
-              {h.closed ? (
-                <Text style={{ flex: 1, fontSize: 12, color: t.textMuted, textAlign: 'center' }}>Closed</Text>
-              ) : (
-                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                  <TextInput value={h.open} onChangeText={v => updateHourField(h.day, 'open', v)}
-                    style={[s.timeInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                    placeholder="08:00" placeholderTextColor={t.textMuted} maxLength={5} />
-                  <Text style={{ color: t.textMuted, fontSize: 12 }}>–</Text>
-                  <TextInput value={h.close} onChangeText={v => updateHourField(h.day, 'close', v)}
-                    style={[s.timeInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]}
-                    placeholder="18:00" placeholderTextColor={t.textMuted} maxLength={5} />
-                </View>
-              )}
-              <Switch value={!h.closed} onValueChange={() => toggleClosed(h.day)} trackColor={{ true: t.accent }} />
-            </View>
-          ))}
-          <TouchableOpacity onPress={saveHours} disabled={saving}
-            style={[s.saveBtn, { backgroundColor: saving ? `${t.accent}88` : t.accent, marginTop: 12 }]}>
-            <Text style={s.saveBtnText}>Save Hours</Text>
-          </TouchableOpacity>
-        </Section>
-
-        <Section theme={t} title={`Doctors in this clinic (${doctors.length})`}>
-          {doctors.length === 0 ? (
-            <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No doctors assigned yet.</Text>
-          ) : doctors.map(doc => (
-            <View key={doc.id} style={s.doctorRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{doc.full_name}</Text>
-                {doc.specialty_name && <Text style={{ fontSize: 11, color: t.textMuted }}>{doc.specialty_name}</Text>}
-                {doc.is_active_here && (
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.accent, marginTop: 2 }}>Active here</Text>
-                )}
-              </View>
-              {!doc.is_active_here && (
-                <TouchableOpacity onPress={() => setDoctorActive(doc.id)} disabled={saving} style={{ marginRight: 14 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Set Active</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => unassignDoctor(doc.id)} disabled={saving}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: t.danger }}>Unassign</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TouchableOpacity
-            onPress={() => { setAssignTab('assign'); setShowAssign(true); loadUnassigned() }}
-            style={[s.smallOutlineBtn, { borderColor: t.accent, marginTop: 10 }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add Doctor</Text>
-          </TouchableOpacity>
-        </Section>
-
-        <Section theme={t} title={`Staff (${staff.length})`}>
-          <Text style={[s.label, { color: t.textMuted, marginBottom: 8 }]}>SUB-ADMIN · CLINIC MANAGEMENT ACCESS</Text>
-          {(() => {
-            const subAdmin = staff.find(m => m.role === 'clinic_admin')
-            return subAdmin ? (
-              <StaffRow theme={t} member={subAdmin} roleLabel="Sub-Admin" onManage={() => setManagingStaff(subAdmin)} />
-            ) : (
-              <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No sub-admin assigned to this clinic yet.</Text>
-            )
-          })()}
-
-          <Text style={[s.label, { color: t.textMuted, marginTop: 16, marginBottom: 8 }]}>FRONT DESK OFFICERS · QUEUE & CHECK-IN</Text>
-          {(() => {
-            const deskOfficers = staff.filter(m => m.role === 'front_desk' || m.role === 'desk_officer')
-            return deskOfficers.length === 0 ? (
-              <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No front desk officers yet.</Text>
-            ) : deskOfficers.map(m => (
-              <StaffRow key={m.id} theme={t} member={m} roleLabel="Desk" onManage={() => setManagingStaff(m)} />
-            ))
-          })()}
-
-          <TouchableOpacity onPress={() => setShowAddStaff(true)} style={[s.smallOutlineBtn, { borderColor: t.accent, marginTop: 10 }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>+ Add Staff Member</Text>
-          </TouchableOpacity>
-        </Section>
-
-        <Section theme={t} title="Appointments">
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-            {(['today', 'week', 'month'] as const).map(k => (
-              <TouchableOpacity key={k} onPress={() => setRangeKey(k)}
-                style={[s.chip, { borderColor: rangeKey === k ? t.accent : t.cardBorder, backgroundColor: rangeKey === k ? `${t.accent}18` : 'transparent' }]}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: rangeKey === k ? t.accent : t.textMuted }}>
-                  {k === 'today' ? 'Today' : k === 'week' ? 'This week' : 'This month'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {(() => {
-            const pending = appts.filter(a => a.approval_status === 'pending_approval')
-            return pending.length > 0 ? (
-              <View style={[s.pendingBanner, { backgroundColor: t.statusBusy.bg, borderColor: t.statusBusy.border }]}>
-                <Ionicons name="hourglass-outline" size={14} color={t.statusBusy.text} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: t.statusBusy.text, flex: 1 }}>
-                  {pending.length} booking{pending.length !== 1 ? 's' : ''} awaiting review
-                </Text>
-              </View>
-            ) : null
-          })()}
-
-          {appts.length === 0 ? (
-            <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8 }}>No appointments for this period.</Text>
-          ) : (
-            appts.map(a => {
-              const sc = statusBadgeColors(t)[a.status as keyof ReturnType<typeof statusBadgeColors>] ?? t.statusNeutral
-              return (
-                <View key={a.id} style={s.apptRow}>
+          {/* ── Details ──────────────────────────────────────────── */}
+          {detailTab === 'details' && (
+            <>
+              <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: 6 }}>
+                <KField label="Name" value={name} onChangeText={setName} placeholder="Clinic name" />
+                <KField label="Description" value={description} onChangeText={setDescription}
+                  multiline numberOfLines={3} placeholder="What this clinic treats"
+                  style={{ minHeight: 76, textAlignVertical: 'top' }} />
+                <KField label="Daily booking limit" hint="Leave blank for no limit"
+                  value={dailyLimit} onChangeText={setDailyLimit}
+                  keyboardType="number-pad" placeholder="Unlimited" />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{a.patient_name}</Text>
-                    <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-                      {a.appointment_date} · {a.start_time} · Dr. {a.doctor_name}
-                    </Text>
+                    <KField label="Min age" value={minAge} onChangeText={setMinAge}
+                      keyboardType="number-pad" placeholder="None" />
                   </View>
-                  <View style={[s.statusBadge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: sc.text }}>{a.status.replace(/_/g, ' ')}</Text>
+                  <View style={{ flex: 1 }}>
+                    <KField label="Max age" value={maxAge} onChangeText={setMaxAge}
+                      keyboardType="number-pad" placeholder="None" />
                   </View>
                 </View>
-              )
-            })
-          )}
-        </Section>
+              </View>
 
-        <Section theme={t} title="Analytics">
-          <View style={s.statGrid}>
-            <StatTile theme={t} label="Total" value={String(stats.total)} />
-            <StatTile theme={t} label="Completed" value={String(stats.completed)} />
-            <StatTile theme={t} label="Cancelled" value={String(stats.cancelled)} />
-            <StatTile theme={t} label="Pending" value={String(stats.pending)} />
-          </View>
-          {(stats.avgWaitMinutes != null || stats.avgConsultMinutes != null) && (
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 4 }}>
-              {stats.avgWaitMinutes != null && (
-                <Text style={{ fontSize: 11, color: t.textMuted, flex: 1 }}>Avg wait: <Text style={{ fontWeight: '700', color: t.textPrimary }}>{stats.avgWaitMinutes}m</Text></Text>
-              )}
-              {stats.avgConsultMinutes != null && (
-                <Text style={{ fontSize: 11, color: t.textMuted, flex: 1 }}>Avg consult: <Text style={{ fontWeight: '700', color: t.textPrimary }}>{stats.avgConsultMinutes}m</Text></Text>
-              )}
-            </View>
+              <SectionHead title="Who it is for" />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+                {([null, 'male', 'female'] as const).map(g => (
+                  <Chip
+                    key={g ?? 'none'}
+                    label={g ? (g === 'male' ? 'Men only' : 'Women only') : 'Anyone'}
+                    on={genderRestriction === g}
+                    onPress={() => setGenderRestriction(g)}
+                  />
+                ))}
+              </View>
+
+              <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+                <Btn label="Save details" loading={saving} onPress={handleSaveDetails} />
+              </View>
+
+              <SectionHead title="Status" />
+              <Card>
+                <KToggleRow
+                  label="Active"
+                  sub="An inactive clinic takes no new bookings"
+                  value={!!clinic?.is_active}
+                  onToggle={toggleActive}
+                  theme={t}
+                />
+                <KToggleRow
+                  label="Emergency department"
+                  sub="Only one clinic per hospital can hold this"
+                  value={!!clinic?.is_emergency}
+                  onToggle={toggleEmergency}
+                  theme={t}
+                  last
+                />
+              </Card>
+            </>
           )}
 
-          {(() => {
-            const specCounts: Record<string, number> = {}
-            appts.forEach(a => { const n = a.specialty_name ?? 'General'; specCounts[n] = (specCounts[n] ?? 0) + 1 })
-            const specBreakdown = Object.entries(specCounts).sort((x, y) => y[1] - x[1]).slice(0, 5)
-              .map(([name, count]) => ({ name, count, pct: appts.length > 0 ? Math.round(count / appts.length * 100) : 0 }))
-            return specBreakdown.length > 0 ? (
-              <View style={{ marginTop: 16 }}>
-                <Text style={[s.label, { color: t.textMuted, marginBottom: 10 }]}>TOP SPECIALTIES</Text>
-                {specBreakdown.map((sp, i) => (
-                  <View key={sp.name} style={{ marginBottom: i < specBreakdown.length - 1 ? 12 : 0 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: t.textPrimary }}>{sp.name}</Text>
-                      <Text style={{ fontSize: 11, color: t.textMuted }}>{sp.count} · {sp.pct}%</Text>
+          {/* ── People ───────────────────────────────────────────── */}
+          {detailTab === 'people' && (
+            <>
+              <SectionHead title={`Doctors · ${doctors.length}`} />
+              {doctors.length === 0 ? (
+                <Card>
+                  <Empty
+                    icon="medical-outline"
+                    title="No doctors here yet"
+                    body="Assign a doctor already at this hospital, or link a new one by their doctor ID."
+                    action="Add a doctor"
+                    onAction={() => { setAssignTab('assign'); setShowAssign(true); loadUnassigned() }}
+                  />
+                </Card>
+              ) : (
+                <Card>
+                  {doctors.map((doc, i) => (
+                    <View key={doc.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        leading={<Initials name={doc.full_name} size={40} tint="#7C2D12" />}
+                        title={doc.full_name}
+                        sub={doc.specialty_name}
+                        pill={doc.is_active_here ? 'Active here' : undefined}
+                        pillTone="green"
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
+                        {!doc.is_active_here && (
+                          <Btn label="Set active" variant="secondary" small disabled={saving}
+                            onPress={() => setDoctorActive(doc.id)} />
+                        )}
+                        <Btn label="Unassign" variant="ghost" small disabled={saving}
+                          onPress={() => unassignDoctor(doc.id)} />
+                      </View>
                     </View>
-                    <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden' }}>
-                      <View style={{ height: '100%', width: `${sp.pct}%`, backgroundColor: t.accent, borderRadius: 99 }} />
+                  ))}
+                </Card>
+              )}
+
+              <SectionHead title="Sub-admin · clinic management" />
+              <Card>
+                {subAdmin ? (
+                  <Row
+                    leading={<Initials name={subAdmin.full_name} size={40} />}
+                    title={subAdmin.full_name}
+                    sub={subAdmin.email}
+                    right={<Btn label="Manage" variant="secondary" small onPress={() => setManagingStaff(subAdmin)} />}
+                  />
+                ) : (
+                  <Row
+                    icon="person-add-outline" iconTone="neutral"
+                    title="No sub-admin yet"
+                    sub="A sub-admin manages this clinic's doctors, staff and hours"
+                    right={<Btn label="Add" variant="secondary" small onPress={() => setShowAddStaff(true)} />}
+                  />
+                )}
+              </Card>
+
+              <SectionHead title="Front desk · queue & check-in" />
+              <Card>
+                {deskOfficers.length === 0 ? (
+                  <Row
+                    icon="person-add-outline" iconTone="neutral"
+                    title="No front desk officers yet"
+                    sub="They check patients in and run the queue"
+                    right={<Btn label="Add" variant="secondary" small onPress={() => setShowAddStaff(true)} />}
+                  />
+                ) : deskOfficers.map((m, i) => (
+                  <View key={m.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      leading={<Initials name={m.full_name} size={40} />}
+                      title={m.full_name}
+                      sub={m.email}
+                      right={<Btn label="Manage" variant="secondary" small onPress={() => setManagingStaff(m)} />}
+                    />
+                  </View>
+                ))}
+              </Card>
+            </>
+          )}
+
+          {/* ── Hours ────────────────────────────────────────────── */}
+          {detailTab === 'hours' && (
+            <>
+              <SectionHead title="When this clinic is open" />
+              <Card>
+                {hours.map((h, i) => (
+                  <View key={h.day}>
+                    {i > 0 && <Hair />}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 56, paddingVertical: 8 }}>
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: t.q.ink }}>
+                        {DAY_NAMES[h.day]}
+                      </Text>
+                      {h.closed ? (
+                        <Text style={{ fontSize: 13, color: t.q.ink60 }}>Closed</Text>
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TextInput
+                            value={h.open}
+                            onChangeText={v => updateHourField(h.day, 'open', v)}
+                            placeholder="08:00" placeholderTextColor={t.q.ink60} maxLength={5}
+                            accessibilityLabel={`${DAY_NAMES[h.day]} opens`}
+                            style={{
+                              width: 64, minHeight: 40, borderRadius: 10, borderWidth: 1,
+                              borderColor: t.q.line, backgroundColor: t.q.field, paddingHorizontal: 8,
+                              textAlign: 'center', fontFamily: MONO, fontSize: 13, color: t.q.ink,
+                            }}
+                          />
+                          <Text style={{ color: t.q.ink60 }}>–</Text>
+                          <TextInput
+                            value={h.close}
+                            onChangeText={v => updateHourField(h.day, 'close', v)}
+                            placeholder="18:00" placeholderTextColor={t.q.ink60} maxLength={5}
+                            accessibilityLabel={`${DAY_NAMES[h.day]} closes`}
+                            style={{
+                              width: 64, minHeight: 40, borderRadius: 10, borderWidth: 1,
+                              borderColor: t.q.line, backgroundColor: t.q.field, paddingHorizontal: 8,
+                              textAlign: 'center', fontFamily: MONO, fontSize: 13, color: t.q.ink,
+                            }}
+                          />
+                        </View>
+                      )}
+                      <Switch
+                        value={!h.closed}
+                        onValueChange={() => toggleClosed(h.day)}
+                        accessibilityLabel={`${DAY_NAMES[h.day]} open`}
+                        trackColor={{ true: t.q.primary, false: t.q.line }}
+                        thumbColor="#FFFFFF"
+                      />
                     </View>
                   </View>
                 ))}
+              </Card>
+              <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
+                <Btn label="Save hours" loading={saving} onPress={saveHours} />
               </View>
-            ) : null
-          })()}
+            </>
+          )}
 
-          {(() => {
-            const virtual = appts.filter(a => a.type === 'virtual').length
-            const inPerson = appts.length - virtual
-            if (appts.length === 0) return null
-            const virtPct = Math.round(virtual / appts.length * 100)
-            return (
-              <View style={{ marginTop: 16 }}>
-                <Text style={[s.label, { color: t.textMuted, marginBottom: 10 }]}>VISIT TYPE</Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12, color: t.textPrimary }}>In-person</Text>
-                  <Text style={{ fontSize: 11, color: t.textMuted }}>{inPerson} · {100 - virtPct}%</Text>
-                </View>
-                <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-                  <View style={{ height: '100%', width: `${100 - virtPct}%`, backgroundColor: t.accent, borderRadius: 99 }} />
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12, color: t.textPrimary }}>Virtual</Text>
-                  <Text style={{ fontSize: 11, color: t.textMuted }}>{virtual} · {virtPct}%</Text>
-                </View>
-                <View style={{ height: 6, backgroundColor: t.inputBg, borderRadius: 99, overflow: 'hidden' }}>
-                  <View style={{ height: '100%', width: `${virtPct}%`, backgroundColor: t.statusVirtual.text, borderRadius: 99 }} />
-                </View>
+          {/* ── Stats ────────────────────────────────────────────── */}
+          {detailTab === 'stats' && (
+            <>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10 }}>
+                {(['today', 'week', 'month'] as const).map(k => (
+                  <Chip
+                    key={k}
+                    label={k === 'today' ? 'Today' : k === 'week' ? 'This week' : 'This month'}
+                    on={rangeKey === k}
+                    onPress={() => setRangeKey(k)}
+                  />
+                ))}
               </View>
-            )
-          })()}
-        </Section>
-      </ScrollView>
+
+              <StatStrip>
+                <Stat label="Booked" value={stats.total} note={`${stats.completed} seen`} />
+                <Stat label="Cancelled" value={stats.cancelled}
+                  tone={stats.cancelled > 0 ? 'amber' : undefined} note="in this period" />
+                <Stat label="Avg wait" value={stats.avgWaitMinutes ?? '—'}
+                  unit={stats.avgWaitMinutes != null ? 'min' : undefined}
+                  note={stats.avgConsultMinutes != null ? `${stats.avgConsultMinutes} min consult` : 'not timed'}
+                  last />
+              </StatStrip>
+
+              {pendingCount > 0 && (
+                <Notice tone="amber" icon="hourglass-outline">
+                  {pendingCount} booking{pendingCount === 1 ? '' : 's'} awaiting review in this clinic.
+                </Notice>
+              )}
+
+              {appts.length > 0 && (() => {
+                const virtual = appts.filter(a => a.type === 'virtual').length
+                const inPerson = appts.length - virtual
+                const virtPct = Math.round((virtual / appts.length) * 100)
+                return (
+                  <>
+                    <SectionHead title="Visit type" />
+                    <Card pad style={{ gap: 12 }}>
+                      <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                        <View style={{ width: `${100 - virtPct}%`, backgroundColor: t.q.primary }} />
+                        <View style={{ flex: 1, backgroundColor: t.q.amberFill }} />
+                      </View>
+                      {[
+                        { label: 'In person', count: inPerson, pct: 100 - virtPct, color: t.q.primary },
+                        { label: 'Video', count: virtual, pct: virtPct, color: t.q.amberFill },
+                      ].map(r => (
+                        <View key={r.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: r.color }} />
+                          <Text style={{ flex: 1, fontSize: 13, color: t.q.ink }}>{r.label}</Text>
+                          <Mono size={13} weight="700">{r.count}</Mono>
+                          <Mono size={12} color={t.q.ink60}>{r.pct}%</Mono>
+                        </View>
+                      ))}
+                    </Card>
+                  </>
+                )
+              })()}
+
+              {(() => {
+                const specCounts: Record<string, number> = {}
+                appts.forEach(a => { const n = a.specialty_name ?? 'General'; specCounts[n] = (specCounts[n] ?? 0) + 1 })
+                const rows = Object.entries(specCounts).sort((x, y) => y[1] - x[1]).slice(0, 5)
+                  .map(([nm, count]) => ({ name: nm, count, pct: appts.length > 0 ? Math.round((count / appts.length) * 100) : 0 }))
+                return rows.length > 0 ? (
+                  <>
+                    <SectionHead title="Top specialties" />
+                    <Card pad style={{ gap: 10 }}>
+                      {rows.map(sp => (
+                        <View key={sp.name} style={{ gap: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, color: t.q.ink }}>{sp.name}</Text>
+                            <Mono size={13} weight="700">{sp.count}</Mono>
+                            <Mono size={12} color={t.q.ink60}>{sp.pct}%</Mono>
+                          </View>
+                          <View style={{ height: 6, borderRadius: 3, backgroundColor: t.q.muted, overflow: 'hidden' }}>
+                            <View style={{ width: `${sp.pct}%`, height: '100%', backgroundColor: t.q.primary }} />
+                          </View>
+                        </View>
+                      ))}
+                    </Card>
+                  </>
+                ) : null
+              })()}
+
+              <SectionHead title="Appointments" />
+              {appts.length === 0 ? (
+                <Card>
+                  <Empty icon="calendar-outline" title="Nothing in this period"
+                    body="Bookings into this clinic show up here." />
+                </Card>
+              ) : (
+                <Card>
+                  {appts.map((a, i) => (
+                    <View key={a.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        title={a.patient_name}
+                        sub={`${a.appointment_date} · ${a.start_time} · ${a.doctor_name}`}
+                        pill={a.status.replace(/_/g, ' ')}
+                        pillTone={
+                          a.status === 'completed' ? 'green'
+                          : a.status === 'checked_in' || a.status === 'in_progress' ? 'teal'
+                          : a.status === 'cancelled' || a.status === 'no_show' ? 'neutral'
+                          : 'amber'
+                        }
+                      />
+                    </View>
+                  ))}
+                </Card>
+              )}
+            </>
+          )}
+        </Body>
       </KeyboardAvoidingView>
 
-      {showAssign && (
-        <View style={s.overlay}>
-          <View style={[s.modal, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={[s.sectionTitle, { color: t.textPrimary, marginBottom: 0 }]}>Add Doctor</Text>
-              <TouchableOpacity onPress={() => setShowAssign(false)} accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={22} color={t.textMuted} /></TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 12, color: t.textMuted, marginBottom: 14 }}>
-              Assign a doctor already at this hospital, or link a new one by their Doctor ID.
-            </Text>
+      {detailTab === 'people' && (
+        <BottomBar>
+          <Btn label="Add staff" variant="secondary" icon="person-add-outline"
+            onPress={() => setShowAddStaff(true)} />
+          <Btn grow label="Add doctor" icon="medical-outline"
+            onPress={() => { setAssignTab('assign'); setShowAssign(true); loadUnassigned() }} />
+        </BottomBar>
+      )}
 
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-              {(['assign', 'new'] as const).map(tb => (
-                <TouchableOpacity key={tb} onPress={() => setAssignTab(tb)}
-                  style={[s.tab, { borderColor: assignTab === tb ? t.accent : t.cardBorder, backgroundColor: assignTab === tb ? `${t.accent}18` : 'transparent' }]}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: assignTab === tb ? t.accent : t.textMuted }}>
-                    {tb === 'assign' ? 'Assign Existing' : 'Link by ID'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+      {showAssign && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+        }}>
+          <View style={{
+            backgroundColor: t.q.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            paddingTop: 16, paddingBottom: 28, maxHeight: '85%',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }}>
+              <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.q.ink }}>Add a doctor</Text>
+              <IconBtn name="close" label="Close" onPress={() => setShowAssign(false)} />
             </View>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
+              <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink60 }}>
+                Assign a doctor already at this hospital, or link a new one by their doctor ID.
+              </Text>
+            </View>
+
+            <Seg<'assign' | 'new'>
+              value={assignTab} onChange={setAssignTab}
+              options={[{ key: 'assign', label: 'Already here' }, { key: 'new', label: 'Link by ID' }]}
+            />
 
             {assignTab === 'assign' ? (
-              <ScrollView style={{ maxHeight: 320 }}>
+              <ScrollView style={{ maxHeight: 360 }}>
                 {unassignedDoctors.length === 0 ? (
-                  <Text style={{ fontSize: 12, color: t.textMuted, paddingVertical: 8, lineHeight: 18 }}>
-                    No unassigned doctors at this hospital.{'\n'}Use "Link by ID" to add one who isn't linked yet.
-                  </Text>
-                ) : unassignedDoctors.map(d => (
-                  <TouchableOpacity key={d.id} onPress={() => assignDoctor(d.id)} disabled={saving}
-                    style={[s.doctorRow, { borderColor: t.cardBorder, borderWidth: 1, borderRadius: 10, marginBottom: 6, paddingHorizontal: 10 }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>{[d.title, d.full_name].filter(Boolean).join(' ')}</Text>
-                      {d.specialty_name && <Text style={{ fontSize: 11, color: t.textMuted }}>{d.specialty_name}</Text>}
-                    </View>
-                    <Ionicons name="add-circle-outline" size={20} color={t.accent} />
-                  </TouchableOpacity>
-                ))}
+                  <Card>
+                    <Empty
+                      icon="medical-outline"
+                      title="No unassigned doctors"
+                      body="Every doctor at this hospital is already in a clinic. Use Link by ID to add one who is not linked yet."
+                    />
+                  </Card>
+                ) : (
+                  <Card>
+                    {unassignedDoctors.map((d, i) => (
+                      <View key={d.id}>
+                        {i > 0 && <Hair />}
+                        <Row
+                          leading={<Initials name={d.full_name} size={40} tint="#7C2D12" />}
+                          title={[d.title, d.full_name].filter(Boolean).join(' ')}
+                          sub={d.specialty_name}
+                          right={<Ionicons name="add-circle-outline" size={20} color={t.q.primary} />}
+                          onPress={saving ? undefined : () => assignDoctor(d.id)}
+                        />
+                      </View>
+                    ))}
+                  </Card>
+                )}
               </ScrollView>
             ) : (
-              <LinkDoctorByIdForm
-                theme={t} clinicId={clinicId}
-                onLinked={() => { setShowAssign(false); load() }}
-              />
+              <ScrollView style={{ maxHeight: 360 }}>
+                <LinkDoctorByIdForm
+                  theme={t} clinicId={clinicId}
+                  onLinked={() => { setShowAssign(false); load() }}
+                />
+              </ScrollView>
             )}
           </View>
         </View>
@@ -601,11 +746,11 @@ export function HospitalClinicDetailScreen({ navigation, route }: Props) {
           theme={t} member={managingStaff}
           onClose={() => setManagingStaff(null)}
           onRemove={() => removeStaff(managingStaff)}
-          onSaveProfile={(name, email) => updateStaffProfile(managingStaff.id, name, email)}
+          onSaveProfile={(nm, em) => updateStaffProfile(managingStaff.id, nm, em)}
           onResetPassword={pw => resetStaffPassword(managingStaff.id, pw)}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
@@ -750,7 +895,7 @@ function Field({ theme: t, label, value, onChange, multiline, keyboardType, plac
   )
 }
 
-function ToggleRow({ theme: t, label, sub, value, onToggle, last }: {
+function KToggleRow({ theme: t, label, sub, value, onToggle, last }: {
   theme: any; label: string; sub: string; value: boolean; onToggle: () => void; last?: boolean
 }) {
   return (

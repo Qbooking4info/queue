@@ -52,13 +52,19 @@ export interface AdminAppointmentRow {
   queue_position: number | null
   patient_name: string
   doctor_name: string
+  /** When they physically arrived. The front desk's "longest wait" is measured
+   *  from this, not from the appointment time -- a patient who came early has
+   *  been waiting since they came. */
+  checked_in_at: string | null
+  /** Who they are waiting for, so a per-doctor count needs no extra query. */
+  doctor_id: string | null
 }
 
 export async function getTodayAppointments(hospitalId: string, clinicId?: string | null): Promise<AdminAppointmentRow[]> {
   const today = fmtLocalDate(new Date())
   let query = supabase
     .from('appointments')
-    .select('id, booking_ref, appointment_date, start_time, status, type, queue_position, booking_mode, walkin_patient_name, patient:users!appointments_patient_id_fkey(full_name), doctor:doctors!appointments_doctor_id_fkey(full_name), assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name)')
+    .select('id, booking_ref, appointment_date, start_time, status, type, queue_position, booking_mode, walkin_patient_name, checked_in_at, doctor_id, assigned_doctor_id, patient:users!appointments_patient_id_fkey(full_name), doctor:doctors!appointments_doctor_id_fkey(full_name), assigned_doctor:doctors!appointments_assigned_doctor_id_fkey(full_name)')
     .eq('hospital_id', hospitalId)
     .eq('appointment_date', today)
     .order('queue_position', { ascending: true, nullsFirst: false })
@@ -82,6 +88,8 @@ export async function getTodayAppointments(hospitalId: string, clinicId?: string
         ? (a.walkin_patient_name ?? 'Walk-in Patient')
         : safePatientName(a.patient?.full_name, 'Unknown'),
       doctor_name: a.doctor?.full_name ?? a.assigned_doctor?.full_name ?? 'Unassigned',
+      checked_in_at: a.checked_in_at ?? null,
+      doctor_id: a.doctor_id ?? a.assigned_doctor_id ?? null,
     }
   })
 }

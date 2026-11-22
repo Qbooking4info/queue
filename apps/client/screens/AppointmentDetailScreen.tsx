@@ -1,47 +1,28 @@
 import { useState, useEffect } from 'react'
 import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
-import { View, ScrollView, TouchableOpacity, StyleSheet, Clipboard } from 'react-native'
+import { View } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, DetailRow,
+  Journey, Notice, Pill, Btn, BottomBar, Mono, NUMS, type PillTone,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getOrCreateConversation, startConversation } from '@queue/shared/lib/chat'
 import { haptics } from '@queue/shared/lib/haptics'
-import { Avatar } from '@queue/shared/components/ui/Avatar'
-import { Stars } from '@queue/shared/components/ui/Stars'
-import { Button } from '@queue/shared/components/ui/Button'
 import { QueuePositionPicker } from '@queue/shared/components/QueuePositionPicker'
-import { cancelAppointment, getHospitalById } from '@queue/shared/lib/api'
+import { cancelAppointment, getHospitalById, selfCheckIn } from '@queue/shared/lib/api'
+import * as ExpoLocation from 'expo-location'
+import { payForAppointment } from '@queue/shared/lib/payments'
 import { getPaymentForAppointment, shareReceipt, type ReceiptPayment } from '@queue/shared/lib/receipt'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { supabase } from '@queue/shared/lib/supabase'
-import { fmtDate, fmt12 } from '@queue/shared/lib/format'
+import { fmtDate, fmt12, arrivalWindow, todayLocalDate } from '@queue/shared/lib/format'
 import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
 
 interface Props { navigation: any; route: any }
-
-function InfoRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  const { theme: t } = useTheme()
-  return (
-    <View style={[st.infoRow, { borderBottomColor: t.cardBorder }]}>
-      <Text style={[st.infoLabel, { color: t.textMuted }]}>{label}</Text>
-      <Text style={[st.infoValue, { color: accent ? t.accent : t.textPrimary }]}>{value}</Text>
-    </View>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { theme: t } = useTheme()
-  return (
-    <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-      <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>{title}</Text>
-      {children}
-    </View>
-  )
-}
 
 export function AppointmentDetailScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
@@ -55,7 +36,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
   const raw = rawParam
   const [cancelled,          setCancelled]          = useState(false)
   const [cancelling,         setCancelling]         = useState(false)
-  const [copied,             setCopied]             = useState(false)
+  const [checkingIn,         setCheckingIn]         = useState(false)
+  const [checkedIn,          setCheckedIn]          = useState(false)
   const [refundPct,          setRefundPct]          = useState(100)
   const [payment,            setPayment]            = useState<ReceiptPayment | null>(null)
   const [savingReceipt,      setSavingReceipt]      = useState(false)
@@ -139,6 +121,8 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     clinic:         clinicName,
     date:           raw.appointment_date ?? raw.date,
     time:           raw.start_time ?? raw.time,
+    // The close of the arrival window, where the booked slot had one.
+    endTime:        (raw as any).end_time ?? null,
     status:         raw.status,
     type:           raw.type,
     payment:        (() => {
@@ -212,16 +196,88 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     : isMissed ? 'Missed'
     : appt.status.charAt(0).toUpperCase() + appt.status.slice(1)
 
+  // The pill's tone in the handoff's vocabulary. The old screen carried a
+  // hand-mixed colour per status; these are the same five tones every other
+  // screen uses, so one status cannot read two ways in two places.
+  const statusTone: PillTone = isPendingReview ? 'amber'
+    : isRejected ? 'red'
+    : cancelled || appt.status === 'cancelled' ? 'neutral'
+    : isMissed ? 'red'
+    : appt.status === 'completed' ? 'neutral'
+    : appt.status === 'checked_in' || appt.status === 'in_progress' ? 'teal'
+    : 'green'
+
   const displayStatusColor = isPendingReview
     ? { bg: 'rgba(239,159,39,0.12)', text: t.statusBusy.text, border: 'rgba(239,159,39,0.3)' }
     : isRejected
     ? { bg: '#FCEBEB', text: '#791F1F', border: 'rgba(163,45,45,0.3)' }
     : statusColor
 
-  function copyRef() {
-    Clipboard.setString(appt.id)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  // Paid-ness lives in its own table, so an appointment row cannot answer it.
+  // undefined means "not known yet" and must never render as unpaid.
+  const [isPaid, setIsPaid] = useState<boolean | undefined>(undefined)
+  const [paying, setPaying] = useState(false)
+
+  useEffect(() => {
+    let cancelledQuery = false
+    supabase.from('payments').select('id').eq('appointment_id', raw.id).eq('status', 'success')
+      .limit(1).maybeSingle()
+      .then(({ data }) => { if (!cancelledQuery) setIsPaid(!!data) })
+    return () => { cancelledQuery = true }
+  }, [raw.id])
+
+  async function payNow() {
+    setPaying(true)
+    const outcome = await payForAppointment(raw.id)
+    setPaying(false)
+    if (outcome.status === 'success') {
+      setIsPaid(true)
+      Alert.alert('Paid', 'Your booking is paid and your arrival window is held.')
+    } else if (outcome.status === 'disabled') {
+      Alert.alert('Pay at the desk', outcome.reason ?? 'Online payment is not available for this booking.')
+    } else if (outcome.status === 'error') {
+      Alert.alert('Payment failed', outcome.message ?? 'Please try again in a moment.')
+    }
+  }
+
+
+  /**
+   * "I have arrived." Only offered where the hospital has turned self
+   * check-in on; the server re-checks that, that this is today's booking, and
+   * that the phone is actually at the hospital before issuing a number.
+   */
+  const handleSelfCheckIn = async () => {
+    setCheckingIn(true)
+    try {
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        haptics.error()
+        Alert.alert('Location needed',
+          'We check you are at the hospital before giving you a number. Allow location, or check in at the front desk.')
+        return
+      }
+      const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced })
+      const res = await selfCheckIn(raw.id, { lat: pos.coords.latitude, lng: pos.coords.longitude })
+      if (!res.ok) {
+        haptics.error()
+        Alert.alert('Not checked in', res.error)
+        return
+      }
+      haptics.success()
+      setCheckedIn(true)
+      if (res.queuePosition != null) setQueuePosition(res.queuePosition)
+      Alert.alert(
+        res.queuePosition != null ? `You are number ${res.queuePosition}` : 'You are checked in',
+        res.estimatedWait != null
+          ? `About ${res.estimatedWait} minutes. Your number is on this screen.`
+          : 'Your number will appear here in a moment.',
+      )
+    } catch {
+      haptics.error()
+      Alert.alert('Not checked in', 'We could not get your location. Please check in at the front desk.')
+    } finally {
+      setCheckingIn(false)
+    }
   }
 
   const handleCancel = async () => {
@@ -282,534 +338,453 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
     })
   }
 
+  // Where this visit stands on the rail every screen shares. A rejected or
+  // cancelled booking has no place on it -- those get their own treatment
+  // below rather than a dot that pretends the journey continues.
+  const journeyIndex =
+    appt.status === 'completed' ? 5
+    : appt.status === 'in_progress' ? 4
+    : appt.status === 'checked_in' ? (queuePosition != null ? 3 : 2)
+    : isPaid === false ? 1
+    : isPaid === true ? 2
+    : 1
+  const journeyBlock = isPaid === false ? 1 : undefined
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Appointment" onBack={() => navigation.goBack()}
-        right={<View style={[st.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }]}>
-          <Text style={[st.statusText, { color: displayStatusColor.text }]}>{displayStatus}</Text>
-        </View>} />
+    <Screen>
+      <AppBar
+        title="Appointment"
+        sub={appt.id}
+        onBack={() => navigation.goBack()}
+        right={<View style={{ paddingRight: 10, justifyContent: 'center' }}>
+          <Pill label={displayStatus} tone={statusTone} />
+        </View>}
+      />
 
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-
-        {/* ─── Hospital Check-in Pass ─── */}
-        {showPass && (
-          <View style={[st.passCard, {
-            backgroundColor: t.bannerBg,
-            borderColor: isVirtual ? t.infoBorder : t.accentBorder,
-          }]}>
-            <View style={[st.passHeader, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Ionicons name={isVirtual ? 'videocam-outline' : 'business-outline'} size={13} color={isVirtual ? t.statusVirtual.text : t.accent} />
-              <Text style={[st.passTitle, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>
-                {isVirtual ? 'VIRTUAL CONSULTATION PASS' : 'HOSPITAL CHECK-IN PASS'}
-              </Text>
-            </View>
-
-            {/* Big booking ref */}
-            <TouchableOpacity onPress={copyRef} style={st.passRefWrap} activeOpacity={0.7}>
-              <Text style={[st.passRef, { color: isVirtual ? t.statusVirtual.text : t.accent }]}>{appt.id}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                {copied && <Ionicons name="checkmark" size={10} color={t.accent} />}
-                <Text style={[st.passCopy, { color: copied ? t.accent : 'rgba(255,255,255,0.35)' }]}>
-                  {copied ? 'Copied' : 'Tap to copy'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
-
-            {/* Pass info */}
-            {[
-              { label: 'Patient',  value: appt.patientName ?? 'You' },
-              { label: 'Hospital', value: appt.hospital },
-              { label: 'Date',     value: `${fmtDate(appt.date)}  ·  ${fmt12(appt.time)}` },
-              appt.doctor ? { label: 'Doctor', value: appt.doctor } : null,
-            ].filter(Boolean).map(row => row && (
-              <View key={row.label} style={st.passRow}>
-                <Text style={st.passRowLabel}>{row.label}</Text>
-                <Text style={st.passRowValue} numberOfLines={1}>{row.value}</Text>
-              </View>
-            ))}
-
-            <View style={[st.passDivider, { backgroundColor: 'rgba(255,255,255,0.08)', marginTop: 10 }]} />
-
-            <View style={st.passFooter}>
-              <Ionicons name={isVirtual ? 'videocam-outline' : 'location-outline'} size={14} color="rgba(255,255,255,0.55)" />
-              <Text style={[st.passFooterText, { color: 'rgba(255,255,255,0.55)' }]}>
-                {isVirtual
-                  ? 'Share this ID if asked by your doctor during the session'
-                  : 'Show this ID at the hospital reception desk for check-in'}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Pending review notice */}
-        {isPendingReview && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(239,159,39,0.3)', backgroundColor: 'rgba(239,159,39,0.07)' }]}>
-            <Ionicons name="hourglass-outline" size={18} color={t.statusBusy.text} />
-            <View style={{ flex: 1 }}>
-              <Text style={[st.pendingTitle, { color: t.statusBusy.text }]}>Awaiting hospital approval</Text>
-              {appt.clinic && !isOpdClinic && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 11, color: t.statusBusy.text, fontWeight: '700' }}>Clinic:</Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)' }}>{appt.clinic}</Text>
-                </View>
-              )}
-              <Text style={[st.pendingSub, { color: 'rgba(239,159,39,0.65)' }]}>
-                {isOpdClinic
-                  ? 'The hospital is reviewing your booking. Your check-in pass will appear here once approved.'
-                  : 'A desk officer will verify your referral or reason and approve or decline your specialist booking. You\'ll be notified of the outcome.'}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Rejection card */}
-        {isRejected && (
-          <View style={[st.pendingCard, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.06)' }]}>
-            <Ionicons name="close-circle" size={20} color="#DC2626" />
-            <View style={{ flex: 1 }}>
-              <Text style={[st.pendingTitle, { color: '#DC2626', marginBottom: 6 }]}>Booking Rejected</Text>
-              {(raw as any).approval_note ? (
-                <View style={{ marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 3 }}>
-                    Hospital's note:
+      <Body>
+        {/* ── Rejected ───────────────────────────────────────────────
+            The handoff gives this its own screen. It is the same visit, so it
+            stays here -- but it replaces the rail rather than sitting under
+            it, because there is no journey left to show. */}
+        {isRejected ? (
+          <>
+            <Card pad style={{ backgroundColor: t.q.redBg, borderColor: 'transparent' }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                <Ionicons name="close-circle" size={20} color={t.q.red} style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.q.red }}>Booking rejected</Text>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70 }}>
+                    Nothing was charged for this booking.
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#DC2626', lineHeight: 18 }}>
+                </View>
+              </View>
+            </Card>
+
+            {!!(raw as any).approval_note && (
+              <>
+                <SectionHead title="The hospital's note" />
+                <Card pad>
+                  <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink }}>
                     {(raw as any).approval_note}
                   </Text>
-                </View>
-              ) : null}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(220,38,38,0.6)', marginBottom: 6 }}>
-                What you can do:
-              </Text>
-              {[
-                { icon: 'business-outline' as const,      text: 'Book OPD — the desk officer will refer you to the right specialist' },
-                { icon: 'document-text-outline' as const, text: 'Resubmit with a referral letter or additional medical details' },
-                { icon: 'call-outline' as const,          text: 'Contact the hospital directly for more information' },
-              ].map(tip => (
-                <View key={tip.text} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
-                  <Ionicons name={tip.icon} size={12} color="#DC2626" style={{ marginTop: 3 }} />
-                  <Text style={{ fontSize: 11, color: '#DC2626', lineHeight: 18, flex: 1 }}>{tip.text}</Text>
-                </View>
-              ))}
+                </Card>
+              </>
+            )}
+
+            <SectionHead title="What you can do" />
+            <Card>
               {raw.hospital && (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('BookingFlow', {
-                    hospital:    toDisplayHospital(raw.hospital),
-                    bookingType: 'physical',
-                  })}
-                  style={[st.opdBtn, { borderColor: 'rgba(163,45,45,0.4)', backgroundColor: 'rgba(239,68,68,0.1)', marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Book OPD Appointment</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#DC2626" />
-                </TouchableOpacity>
+                <>
+                  <Row
+                    icon="business-outline"
+                    title="Book a general outpatient visit"
+                    sub="No referral needed — the doctor refers you on if you need a specialist"
+                    chevron
+                    onPress={() => navigation.navigate('BookingFlow', {
+                      hospital: toDisplayHospital(raw.hospital),
+                      bookingType: 'physical',
+                    })}
+                  />
+                  <Hair />
+                </>
               )}
-            </View>
-          </View>
+              {chatHospitalId && (
+                <>
+                  <Row
+                    icon="chatbubble-outline"
+                    title="Message the hospital"
+                    sub="Front desk: directions, payments, paperwork"
+                    chevron
+                    onPress={messageHospital}
+                  />
+                  <Hair />
+                </>
+              )}
+              <Row
+                icon="document-text-outline"
+                title="Try again with a referral letter"
+                sub="A specialist clinic usually needs one"
+                chevron
+                onPress={() => raw.hospital && navigation.navigate('BookingFlow', {
+                  hospital: toDisplayHospital(raw.hospital),
+                  bookingType: 'physical',
+                })}
+              />
+            </Card>
+          </>
+        ) : cancelled || appt.status === 'cancelled' ? (
+          <Notice tone="neutral" icon="close-circle-outline">
+            This appointment was cancelled. Nothing was charged for it, so there is nothing to refund.
+          </Notice>
+        ) : (
+          <Journey
+            steps={['Booked', 'Paid', 'Checked in', 'In the queue', 'Called', 'Seen']}
+            activeIndex={journeyIndex}
+            blockingIndex={journeyBlock}
+          />
         )}
 
-        {/* Hero card */}
-        <View style={[st.heroCard, { backgroundColor: t.bannerBg, borderColor: t.bannerBorder }]}>
-          {/* Booking ID */}
-          <View style={st.bookingIdRow}>
-            <Text style={[st.bookingIdLabel, { color: t.accent }]}>BOOKING ID</Text>
-            <Text style={[st.bookingId, { color: t.accent }]}>{appt.id}</Text>
-          </View>
+        {isPendingReview && !isRejected && (
+          <Notice tone="amber" icon="hourglass-outline">
+            {isOpdClinic
+              ? 'The hospital is reviewing this booking. Your queue pass appears here once it is approved.'
+              : 'A desk officer is checking your referral or reason for this specialist clinic. You will be told either way.'}
+          </Notice>
+        )}
 
-          {/* Doctor / placeholder */}
-          <View style={st.doctorRow}>
-            {appt.doctor ? (
-              <EntityAvatar size={52} kind="doctor" label={appt.doctor ?? undefined} />
-            ) : (
-              <View style={[st.doctorAvatarPlaceholder, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
-                <Ionicons name={isVirtual ? 'videocam-outline' : 'walk-outline'} size={22} color="rgba(255,255,255,0.5)" />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={st.doctorName}>
-                {appt.doctor ?? (isVirtual ? 'Doctor to be assigned' : 'Assigned at clinic')}
-              </Text>
-              <Text style={[st.doctorSpec, { color: 'rgba(255,255,255,0.55)' }]}>
-                {appt.spec ?? (isVirtual ? 'Virtual consultation' : 'In-person visit')}
-              </Text>
-              {appt.doctor && appt.rating > 0 && <Stars rating={appt.rating} />}
-            </View>
-            {isVirtual ? (
-              <View style={[st.typePill, { backgroundColor: 'rgba(91,158,255,0.15)', borderColor: t.infoBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="videocam-outline" size={11} color={t.statusVirtual.text} />
-                  <Text style={[st.typePillText, { color: t.statusVirtual.text }]}>Virtual</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={[st.typePill, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="walk-outline" size={11} color={t.accent} />
-                  <Text style={[st.typePillText, { color: t.accent }]}>In-person</Text>
-                </View>
-              </View>
-            )}
-          </View>
+        {isPaid === false && !isPendingReview && !isRejected && isUpcoming && (
+          <Notice tone="red" icon="alert-circle-outline">
+            Not paid yet. Unpaid bookings are released, so pay to keep your arrival window.
+          </Notice>
+        )}
 
-          {/* Date / time chips */}
-          <View style={st.chipsRow}>
-            {([
-              { icon: 'calendar-outline' as const, val: fmtDate(appt.date) },
-              { icon: 'time-outline' as const,     val: fmt12(appt.time) },
-              { icon: 'location-outline' as const, val: appt.hospital },
-            ] as const).map(c => (
-              <View key={c.val} style={[st.chip, { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.12)' }]}>
-                <Ionicons name={c.icon} size={12} color="rgba(255,255,255,0.5)" style={{ marginRight: 3 }} />
-                <Text style={st.chipText} numberOfLines={1}>{c.val}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Emergency banner */}
         {isEmergency && !cancelled && (
-          <View style={[st.joinBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
-            <Ionicons name="alert-circle-outline" size={22} color={t.danger} />
-            <View style={{ flex: 1 }}>
-              <Text style={[st.joinTitle, { color: t.danger }]}>Emergency booking</Text>
-              <Text style={[st.joinSub, { color: 'rgba(239,68,68,0.7)' }]}>
-                {appt.status === 'checked_in' || appt.status === 'in_progress'
-                  ? "You've been placed at the front of today's queue."
-                  : 'You will be prioritized to the front of the queue once checked in.'}
-              </Text>
-            </View>
-          </View>
+          <Notice tone="red">
+            Emergency booking. {appt.status === 'checked_in' || appt.status === 'in_progress'
+              ? 'You are at the front of today’s queue.'
+              : 'You go to the front of the queue once you are checked in.'}
+          </Notice>
         )}
 
-        {/* Virtual join banner */}
         {canJoinVirtual && !cancelled && (
-          <TouchableOpacity
-            style={[st.joinBanner, { backgroundColor: '#0D2240', borderColor: t.infoBorder }]}
-            onPress={() => navigation.navigate('VideoCall', {
-              appointmentId: raw.id,
-              doctorName:    appt.doctor ?? 'your doctor',
-            })}
-          >
-            <Ionicons name="videocam-outline" size={22} color={t.statusVirtual.text} />
-            <View style={{ flex: 1 }}>
-              <Text style={[st.joinTitle, { color: t.statusVirtual.text }]}>Virtual consultation</Text>
-              <Text style={[st.joinSub, { color: 'rgba(133,183,235,0.6)' }]}>Tap to join your video room</Text>
-            </View>
-            <View style={[st.joinBtn, { backgroundColor: '#0F766E' }]}>
-              <Text style={st.joinBtnText}>Join</Text>
-            </View>
-          </TouchableOpacity>
+          <Card style={{ marginTop: 8 }}>
+            <Row
+              icon="videocam-outline"
+              tint
+              title="Your video room is ready"
+              sub="Tap to join the consultation"
+              right={<Btn label="Join" small onPress={() => navigation.navigate('VideoCall', {
+                appointmentId: raw.id,
+                doctorName: appt.doctor ?? 'your doctor',
+              })} />}
+            />
+          </Card>
         )}
 
-        {/* Queue position (in-person upcoming, confirmed) -- tappable to voluntarily
-            move later once actually checked in (not just confirmed/waiting to arrive) */}
+        {/* "I have arrived." Shown only where the hospital has opted into self
+            check-in, on the day, and before they are in the queue -- so the
+            button is never offered when the server would refuse it. */}
+        {isInPerson && isConfirmed && !cancelled && !checkedIn
+          && raw.status !== 'checked_in' && raw.status !== 'in_progress'
+          && raw.appointment_date === todayLocalDate()
+          && (raw.hospital as { allow_self_check_in?: boolean | null } | null)?.allow_self_check_in && (
+          <>
+            <SectionHead title="At the hospital?" />
+            <Card>
+              <View style={{ padding: 14, gap: 10 }}>
+                <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink70 }}>
+                  Check in from here once you have arrived and we will give you your number. We confirm
+                  you are at {appt.hospital} first.
+                </Text>
+                <Btn label="I have arrived" icon="hand-left-outline"
+                  loading={checkingIn} onPress={handleSelfCheckIn} />
+              </View>
+            </Card>
+          </>
+        )}
+
+        {/* Live queue figures, once there are any. Tapping opens the full
+            live-queue screen rather than burying the queue inside this one. */}
         {isInPerson && isConfirmed && !cancelled && (
-          <TouchableOpacity
-            activeOpacity={raw.status === 'checked_in' ? 0.7 : 1}
-            onPress={() => { if (raw.status === 'checked_in') setShowQueuePicker(true) }}
-            style={[st.queueCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={st.queueLeft}>
-              <Text style={[st.queueNum, { color: t.accent }]}>{queuePosition ?? '—'}</Text>
-              <Text style={[st.queueLabel, { color: t.textMuted }]}>Queue position</Text>
-            </View>
-            <View style={[st.queueDivider, { backgroundColor: t.cardBorder }]} />
-            <View style={st.queueRight}>
-              <Text style={[st.queueNum, { color: t.textPrimary }]}>
-                {appt.estimated_wait ? `~${appt.estimated_wait} min` : '—'}
-              </Text>
-              <Text style={[st.queueLabel, { color: t.textMuted }]}>Est. wait after check-in</Text>
-            </View>
-            {raw.status === 'checked_in' && (
-              <Ionicons name="swap-vertical-outline" size={16} color={t.textMuted} style={{ position: 'absolute', top: 10, right: 10 }} />
-            )}
-          </TouchableOpacity>
+          <>
+            <SectionHead title="In the queue" />
+            <Card>
+              <Row
+                leading={
+                  <View style={{ flexDirection: 'row', gap: 18 }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: t.q.ink60 }}>Your number</Text>
+                      <Text style={[{ fontSize: 26, fontWeight: '800', color: t.q.ink }, NUMS]}>
+                        {queuePosition ?? '—'}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11, color: t.q.ink60 }}>Est. wait</Text>
+                      <Text style={[{ fontSize: 26, fontWeight: '800', color: t.q.primary }, NUMS]}>
+                        {appt.estimated_wait ? `${appt.estimated_wait}m` : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                }
+                title=""
+                tint
+                chevron
+                onPress={() => navigation.navigate('LiveQueue', { appointmentId: raw.id })}
+              />
+              {raw.status === 'checked_in' && (
+                <>
+                  <Hair />
+                  <Row
+                    icon="swap-vertical-outline"
+                    title="Running late?"
+                    sub="Move yourself further down today’s queue"
+                    chevron
+                    onPress={() => setShowQueuePicker(true)}
+                  />
+                </>
+              )}
+            </Card>
+          </>
         )}
 
-        <View style={st.pad}>
-          {/* Appointment details */}
-          <Section title="Appointment details">
-            <InfoRow label="Date"      value={fmtDate(appt.date)} />
-            <InfoRow label="Time"      value={fmt12(appt.time)} />
-            <InfoRow label="Type"      value={isVirtual ? 'Virtual consultation' : 'In-person visit'} />
-            {appt.spec && <InfoRow label="Specialty" value={appt.spec} />}
-            <InfoRow label="Hospital"  value={appt.hospital} />
-            {appt.clinic && <InfoRow label="Clinic" value={appt.clinic + (isOpdClinic ? ' (General)' : '')} />}
-            <InfoRow label="Fee"       value={appt.payment} accent />
-          </Section>
+        <SectionHead title="Visit" />
+        <Card>
+          <DetailRow label="Hospital" value={appt.hospital} />
+          {!!appt.clinic && <DetailRow label="Clinic" value={appt.clinic + (isOpdClinic ? ' (general)' : '')} />}
+          {/* A window where the slot gave one ("09:00 - 09:30"), a single time
+              where it did not. Arriving at the top of a half-hour window is
+              what spreads a waiting room out. */}
+          <DetailRow
+            label="Arrive"
+            value={(appt as any).endTime
+              ? `${fmtDate(appt.date)} · ${arrivalWindow({ start_time: appt.time, end_time: (appt as any).endTime })}`
+              : `${fmtDate(appt.date)} · ${fmt12(appt.time)}`} />
+          <DetailRow label="Type" value={isVirtual ? 'Video consultation' : 'In person'} />
+          {!!appt.spec && <DetailRow label="Specialty" value={appt.spec} />}
+          <DetailRow label="Reference" value={appt.id} mono last />
+        </Card>
 
-          {/* Vitals — recorded by hospital staff during this visit */}
-          {hasVitals && liveVitals && (
-            <Section title="Vitals recorded during visit">
-              {liveVitals.weight_kg != null && <InfoRow label="Weight" value={`${liveVitals.weight_kg} kg`} />}
-              {liveVitals.height_cm != null && <InfoRow label="Height" value={`${liveVitals.height_cm} cm`} />}
-              {liveVitals.bmi != null && <InfoRow label="BMI" value={String(liveVitals.bmi)} accent />}
+        {appt.doctor ? (
+          <>
+            <SectionHead title="Your doctor" />
+            <Card>
+              <Row
+                leading={<EntityAvatar size={44} kind="doctor" label={appt.doctor ?? undefined} />}
+                title={appt.doctor}
+                sub={[appt.spec, doctorObj?.years_experience ? `${doctorObj.years_experience} years` : null]
+                  .filter(Boolean).join(' · ') || 'Your doctor'}
+                right={chatDoctorId && !cancelled && raw.status !== 'cancelled'
+                  ? <Btn label={openingChat ? 'Opening…' : 'Message'} variant="secondary" small onPress={messageDoctor} />
+                  : undefined}
+              />
+            </Card>
+          </>
+        ) : isInPerson ? (
+          <>
+            <SectionHead title="Your doctor" />
+            <Card>
+              <Row
+                icon="business-outline"
+                iconTone="neutral"
+                title="Assigned when you arrive"
+                sub="The front desk allocates you to an available doctor"
+              />
+            </Card>
+          </>
+        ) : null}
+
+        {hasVitals && liveVitals && (
+          <>
+            <SectionHead title="Vitals from this visit" />
+            <Card>
+              {liveVitals.weight_kg != null && <DetailRow label="Weight" value={`${liveVitals.weight_kg} kg`} mono />}
+              {liveVitals.height_cm != null && <DetailRow label="Height" value={`${liveVitals.height_cm} cm`} mono />}
+              {liveVitals.bmi != null && <DetailRow label="BMI" value={String(liveVitals.bmi)} mono />}
               {liveVitals.bp_systolic != null && liveVitals.bp_diastolic != null && (
-                <InfoRow label="Blood Pressure" value={`${liveVitals.bp_systolic}/${liveVitals.bp_diastolic}`} />
+                <DetailRow label="Blood pressure" value={`${liveVitals.bp_systolic}/${liveVitals.bp_diastolic}`} mono />
               )}
-              {liveVitals.blood_sugar != null && <InfoRow label="Blood Sugar" value={`${liveVitals.blood_sugar} mg/dL`} />}
-            </Section>
-          )}
+              {liveVitals.blood_sugar != null && <DetailRow label="Blood sugar" value={`${liveVitals.blood_sugar} mg/dL`} mono last />}
+            </Card>
+          </>
+        )}
 
-          {/* What the doctor recorded for this visit -- the patient-facing half of
-              the doctor app's Consultation summary screen. Completed visits only:
-              a plan on a visit still in progress is not final yet. Multi-line
-              blocks, not InfoRow, because these are paragraphs rather than values. */}
-          {appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).prescription || (raw as any).treatment_plan) && (
-            <Section title="Consultation Plan">
-              {(raw as any).diagnosis && (
-                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
-                  <Text style={[st.planLabel, { color: t.textMuted }]}>Diagnosis</Text>
-                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).diagnosis}</Text>
-                </View>
-              )}
-              {(raw as any).investigations && (
-                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
-                  <Text style={[st.planLabel, { color: t.textMuted }]}>Investigations</Text>
-                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).investigations}</Text>
-                </View>
-              )}
-              {(raw as any).prescription && (
-                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
-                  <Text style={[st.planLabel, { color: t.textMuted }]}>Prescription</Text>
-                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).prescription}</Text>
-                </View>
-              )}
-              {(raw as any).treatment_plan && (
-                <View style={[st.planBlock, { borderTopColor: t.cardBorder }]}>
-                  <Text style={[st.planLabel, { color: t.textMuted }]}>Plan</Text>
-                  <Text style={[st.planValue, { color: t.textPrimary }]}>{(raw as any).treatment_plan}</Text>
-                </View>
-              )}
-            </Section>
-          )}
-
-          {/* Doctor info — only show if a doctor was assigned */}
-          {appt.doctor ? (
-            <Section title="Your doctor">
-              <View style={[st.doctorCard, { borderBottomColor: t.cardBorder }]}>
-                <EntityAvatar size={44} kind="doctor" label={appt.doctor ?? undefined} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[st.dcName, { color: t.textPrimary }]}>{appt.doctor}</Text>
-                  <Text style={[st.dcSpec, { color: t.textMuted }]}>{appt.spec} · {appt.hospital}</Text>
-                  {appt.rating > 0 && <Stars rating={appt.rating} />}
-                </View>
-              </View>
-              <InfoRow label="Experience"    value={doctorObj?.years_experience ? `${doctorObj.years_experience} years` : '—'} />
-              <InfoRow label="Consultations" value={doctorObj?.review_count ? `${doctorObj.review_count}+ consultations` : '—'} />
-            </Section>
-          ) : isInPerson ? (
-            <View style={[st.section, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <Text style={[st.sectionTitle, { color: t.textMuted, borderBottomColor: t.cardBorder }]}>Your doctor</Text>
-              <View style={st.noDoctorRow}>
-                <Ionicons name="business-outline" size={28} color={t.textMuted} style={{ opacity: 0.5 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[st.noDoctorTitle, { color: t.textPrimary }]}>Doctor assigned at check-in</Text>
-                  <Text style={[st.noDoctorSub, { color: t.textMuted }]}>
-                    When you arrive, the front desk will allocate you to an available doctor.
-                    Present your check-in pass ID above.
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          {/* How to prepare */}
-          {isUpcoming && !cancelled && (
-            <Section title="How to prepare">
-              {(isVirtual ? [
-                'Ensure stable internet connection before your session',
-                'Use headphones for clearer audio',
-                'Have your previous test results ready to share',
-                'Find a quiet, well-lit space for the call',
-              ] : [
-                'Arrive 10 minutes before your appointment time',
-                'Bring a valid ID and your HMO card if applicable',
-                'Bring any previous test results or referral letters',
-                'Bring a list of medications you currently take',
-              ]).map(tip => (
-                <View key={tip} style={[st.tipRow, { borderBottomColor: t.cardBorder, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
-                  <Ionicons name="checkmark-circle-outline" size={14} color={t.accent} style={{ marginTop: 2 }} />
-                  <Text style={[st.tipText, { color: t.textSecondary, flex: 1 }]}>{tip}</Text>
+        {appt.status === 'completed' && ((raw as any).diagnosis || (raw as any).investigations || (raw as any).prescription || (raw as any).treatment_plan) && (
+          <>
+            <SectionHead title="What the doctor recorded" />
+            <Card pad>
+              {([
+                ['Diagnosis', (raw as any).diagnosis],
+                ['Investigations', (raw as any).investigations],
+                ['Prescription', (raw as any).prescription],
+                ['Plan', (raw as any).treatment_plan],
+              ] as const).filter(([, v]) => !!v).map(([label, value]) => (
+                <View key={label} style={{ paddingVertical: 8 }}>
+                  <CardLabel>{label}</CardLabel>
+                  <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink, marginTop: 4 }}>{value}</Text>
                 </View>
               ))}
-            </Section>
-          )}
+            </Card>
+          </>
+        )}
 
-          {/* Payment */}
-          <Section title="Payment">
-            <InfoRow label="Consultation fee" value={appt.payment} accent />
-            {appt.paymentMethod && <InfoRow label="Payment method" value={appt.paymentMethod} />}
-          </Section>
+        {isUpcoming && !cancelled && (
+          <>
+            <SectionHead title="How to prepare" />
+            <Card pad>
+              <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink70 }}>
+                {isVirtual
+                  ? 'Find a quiet, well-lit place with a steady connection. Headphones help. Have your recent results to hand.'
+                  : 'Arrive ten minutes early with a valid ID, your HMO card if you have one, any recent results or referral letter, and a list of the medicines you take now.'}
+              </Text>
+            </Card>
+          </>
+        )}
 
-          {/* Actions */}
-          {isUpcoming && !cancelled && !isPendingReview && !isRejected && (
-            <View style={st.actions}>
-              {canReschedule && (
-                <Button
-                  label="Reschedule" onPress={() => { haptics.tap(); handleReschedule() }}
-                  loading={rescheduleLoading} variant="outline" icon="calendar-outline" style={{ flex: 1 }}
-                />
-              )}
-              <Button
-                label="Cancel" onPress={() => { haptics.tap(); handleCancel() }}
-                loading={cancelling} variant="danger" icon="close" style={{ flex: 1 }}
+        <SectionHead title="Payment" />
+        <Card>
+          <DetailRow label="Fee" value={appt.payment} mono />
+          {!!appt.paymentMethod && <DetailRow label="Method" value={appt.paymentMethod} />}
+          <DetailRow label="Status" value={isPaid === true ? 'Paid' : isPaid === false ? 'Not paid yet' : 'Checking…'} last />
+        </Card>
+
+        <View style={{ height: 12 }} />
+
+        <Card>
+          {chatHospitalId && !cancelled && (
+            <>
+              <Row
+                icon="business-outline"
+                title={openingChat ? 'Opening chat…' : 'Message the hospital'}
+                sub="Front desk: directions, payments, paperwork"
+                chevron
+                onPress={messageHospital}
               />
-            </View>
+              <Hair />
+            </>
           )}
-
-          {/* Missed appointment (no_show) — reschedule once for free, or book fresh if already used */}
-          {isMissed && (
-            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(239,68,68,0.2)', marginBottom: 12 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: canReschedule || raw.hospital ? 10 : 0 }}>
-                <Ionicons name="alert-circle-outline" size={14} color={t.danger} style={{ marginTop: 1 }} />
-                <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
-                  {canReschedule
-                    ? 'This appointment was marked as missed. You can reschedule it once for free.'
-                    : "This appointment was marked as missed and you've already used your free reschedule. Book a new appointment to continue."}
-                </Text>
-              </View>
-              {canReschedule ? (
-                <Button
-                  label="Reschedule" onPress={() => { haptics.tap(); handleReschedule() }}
-                  loading={rescheduleLoading} variant="outline" icon="calendar-outline"
-                />
-              ) : raw.hospital ? (
-                <Button
-                  label="Book a New Appointment"
-                  onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {
-                    hospital:    toDisplayHospital(raw.hospital),
-                    bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
-                  }) }}
-                  variant="outline" icon="add-circle-outline"
-                />
-              ) : null}
-            </View>
+          {!cancelled && !['cancelled', 'completed', 'no_show'].includes(raw.status) && !!raw.appointment_date && (
+            <>
+              <Row
+                icon="calendar-outline"
+                title="Add to Google Calendar"
+                sub="Get a reminder on your phone"
+                chevron
+                onPress={() => { haptics.tap(); addToGoogleCalendar({
+                  title: `${raw.type === 'virtual' ? 'Video visit' : 'Hospital visit'}${raw.doctor?.full_name ? ` with ${raw.doctor.full_name}` : ''}`,
+                  date: raw.appointment_date,
+                  time: raw.start_time,
+                  location: raw.type === 'virtual' ? 'Queue app (video)' : (raw.hospital?.name ?? undefined),
+                  details: `Booking ${(raw as any).booking_ref ?? ''} · Queue`,
+                }).catch(() => {}) }}
+              />
+              <Hair />
+            </>
           )}
-
-          {isPendingReview && !cancelled && !isRejected && (
-            <Button
-              label="Withdraw booking request" onPress={() => { haptics.tap(); handleCancel() }}
-              loading={cancelling} variant="danger" icon="close" style={{ marginBottom: 12 }}
+          {payment && (
+            <>
+              <Row
+                icon="receipt-outline"
+                title={savingReceipt ? 'Preparing receipt…' : 'Download receipt'}
+                sub={`PDF · ₦${Number(payment.amount).toLocaleString('en-NG')} paid`}
+                chevron
+                onPress={downloadReceipt}
+              />
+              <Hair />
+            </>
+          )}
+          {appt.status === 'completed' && appt.doctor && (
+            <Row
+              icon="star-outline"
+              title={`Rate ${appt.doctor}`}
+              sub="Help other patients choose"
+              chevron
+              onPress={() => {
+                Alert.alert(
+                  `Rate ${appt.doctor}`,
+                  'How would you rate this consultation?',
+                  [1, 2, 3, 4, 5].map(stars => ({
+                    text: `${stars} star${stars === 1 ? '' : 's'}`,
+                    onPress: async () => {
+                      if (!user || !doctorObj?.id) return
+                      const { error } = await supabase.from('reviews').insert({
+                        appointment_id: raw.id,
+                        patient_id: user.id,
+                        doctor_id: doctorObj.id,
+                        rating: stars,
+                        body: '',
+                      })
+                      if (error) {
+                        Alert.alert('Could not submit rating',
+                          error.code === '23505' ? 'You have already rated this consultation.' : 'Please try again in a moment.')
+                        return
+                      }
+                      Alert.alert('Thank you', 'Your rating has been submitted.')
+                    },
+                  })),
+                )
+              }}
             />
           )}
+        </Card>
 
-          {/* Completed — rate & rebook */}
-          {appt.status === 'completed' && appt.doctor && (
-            <View style={st.actions}>
-              <TouchableOpacity
-                onPress={() => {
-                  // MM10: Rate Doctor flow
-                  Alert.alert(
-                    `Rate Dr. ${appt.doctor!.split(' ').pop()}`,
-                    'How would you rate this consultation?',
-                    [1, 2, 3, 4, 5].map(stars => ({
-                      text: `${stars} Star${stars === 1 ? '' : 's'}`,
-                      onPress: async () => {
-                        if (!user || !doctorObj?.id) return
-                        const { error } = await supabase.from('reviews').insert({
-                          appointment_id: raw.id,
-                          patient_id:     user.id,
-                          doctor_id:      doctorObj.id,
-                          rating:         stars,
-                          body:           '',
-                        })
-                        if (error) {
-                          Alert.alert('Could not submit rating',
-                            error.code === '23505' ? 'You have already rated this consultation.' : 'Please try again in a moment.')
-                          return
-                        }
-                        Alert.alert('Thank you!', 'Your rating has been submitted.')
-                      },
-                    }))
-                  )
-                }}
-                style={[st.rescheduleBtn, { borderColor: t.accentBorder, backgroundColor: t.accentBg, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
-                <Ionicons name="star" size={14} color={t.accent} />
-                <Text style={[st.rescheduleTxt, { color: t.accent }]}>
-                  Rate Dr. {appt.doctor.split(' ').pop()}
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {isMissed && (
+          <Notice tone="red">
+            {canReschedule
+              ? 'This appointment was marked as missed. You can reschedule it once, free.'
+              : 'This appointment was marked as missed, and the free reschedule is used. Book a new appointment to continue.'}
+          </Notice>
+        )}
+      </Body>
+
+      {/* ── The bar. One primary action, chosen by what the visit needs
+          next: pay it, reschedule it, or nothing at all. ───────────── */}
+      {isRejected ? (
+        raw.hospital ? (
+          <BottomBar>
+            <Btn grow label="Book OPD appointment" onPress={() => navigation.navigate('BookingFlow', {
+              hospital: toDisplayHospital(raw.hospital),
+              bookingType: 'physical',
+            })} />
+          </BottomBar>
+        ) : null
+      ) : isPendingReview && !cancelled ? (
+        <BottomBar>
+          <Btn grow variant="danger" label="Withdraw request" loading={cancelling}
+            onPress={() => { haptics.tap(); handleCancel() }} />
+        </BottomBar>
+      ) : isMissed ? (
+        <BottomBar>
+          {canReschedule ? (
+            <Btn grow label="Reschedule" icon="calendar-outline" loading={rescheduleLoading}
+              onPress={() => { haptics.tap(); handleReschedule() }} />
+          ) : raw.hospital ? (
+            <Btn grow label="Book a new appointment" onPress={() => { haptics.tap(); navigation.navigate('BookingFlow', {
+              hospital: toDisplayHospital(raw.hospital),
+              bookingType: raw.type === 'virtual' ? 'virtual' : 'physical',
+            }) }} />
+          ) : null}
+        </BottomBar>
+      ) : isUpcoming && !cancelled ? (
+        <BottomBar meta={
+          <>
+            <Mono size={12} color={t.q.ink60}>{appt.payment}</Mono>
+            <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+            <Mono size={12}>{isPaid === true ? 'paid' : isPaid === false ? 'due' : 'checking'}</Mono>
+          </>
+        }>
+          <Btn label="Cancel" variant="secondary" loading={cancelling}
+            onPress={() => { haptics.tap(); handleCancel() }} />
+          {isPaid === false ? (
+            <Btn grow label="Pay now" loading={paying} onPress={payNow} />
+          ) : canReschedule ? (
+            <Btn grow label="Reschedule" icon="calendar-outline" loading={rescheduleLoading}
+              onPress={() => { haptics.tap(); handleReschedule() }} />
+          ) : (
+            <Btn grow label="Queue pass" icon="qr-code-outline"
+              onPress={() => navigation.navigate('QueuePass', { appointmentId: raw.id })} />
           )}
-
-          {chatDoctorId && !cancelled && raw.status !== 'cancelled' && (
-            <TouchableOpacity onPress={messageDoctor} disabled={openingChat} accessibilityRole="button"
-              accessibilityLabel="Message your doctor"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{openingChat ? 'Opening chat…' : 'Message doctor'}</Text>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>Ask about results, medicines or follow-up</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </TouchableOpacity>
-          )}
-
-          {chatHospitalId && !cancelled && (
-            <TouchableOpacity onPress={messageHospital} disabled={openingChat} accessibilityRole="button"
-              accessibilityLabel="Message the hospital"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="business-outline" size={20} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Message hospital</Text>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>Front desk: directions, payments, paperwork</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </TouchableOpacity>
-          )}
-
-          {!cancelled && !['cancelled', 'completed', 'no_show'].includes(raw.status) && !!raw.appointment_date && (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
-              onPress={() => { haptics.tap(); addToGoogleCalendar({
-                title: `${raw.type === 'virtual' ? 'Video visit' : 'Hospital visit'}${raw.doctor?.full_name ? ` with ${raw.doctor.full_name}` : ''}`,
-                date: raw.appointment_date, time: raw.start_time,
-                location: raw.type === 'virtual' ? 'Queue app (video)' : (raw.hospital?.name ?? undefined),
-                details: `Booking ${(raw as any).booking_ref ?? ''} · Queue`,
-              }).catch(() => {}) }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={20} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>Add to Google Calendar</Text>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>Get a reminder on your phone</Text>
-              </View>
-              <Ionicons name="open-outline" size={18} color={t.textMuted} />
-            </TouchableOpacity>
-          )}
-
-          {payment && (
-            <TouchableOpacity onPress={downloadReceipt} disabled={savingReceipt} accessibilityRole="button"
-              accessibilityLabel="Download payment receipt"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: t.cardBorder, backgroundColor: t.cardBg, marginBottom: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="receipt-outline" size={20} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: t.textPrimary }}>{savingReceipt ? 'Preparing receipt…' : 'Download receipt'}</Text>
-                <Text style={{ fontSize: 12, color: t.textMuted }}>PDF · ₦{Number(payment.amount).toLocaleString()} paid</Text>
-              </View>
-              <Ionicons name="download-outline" size={20} color={t.accent} />
-            </TouchableOpacity>
-          )}
-
-          {/* Cancelled refund note */}
-          {cancelled && (
-            <View style={[st.refundNote, { backgroundColor: t.dangerSubtle, borderColor: 'rgba(239,68,68,0.2)', flexDirection: 'row', alignItems: 'flex-start', gap: 6 }]}>
-              <Ionicons name="checkmark-circle" size={14} color={t.danger} style={{ marginTop: 1 }} />
-              <Text style={[st.refundText, { color: t.danger, flex: 1 }]}>
-                Appointment cancelled. Nothing was charged for this booking, so there is nothing to refund.
-              </Text>
-            </View>
-          )}
-
-          <View style={{ height: 32 }} />
-        </View>
-      </ScrollView>
+        </BottomBar>
+      ) : null}
 
       {showQueuePicker && (
         <QueuePositionPicker
@@ -818,107 +793,6 @@ export function AppointmentDetailScreen({ navigation, route }: Props) {
           onMoved={(newPosition) => { setQueuePosition(newPosition); setShowQueuePicker(false) }}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const DEFAULT_APPT = {
-  id: 'QUE-00421',
-  hospital: 'Lagos Island General',
-  doctor: null,
-  spec: 'Cardiology',
-  date: 'Thu, 29 May',
-  time: '9:00 AM',
-  status: 'confirmed',
-  type: 'in-person',
-  payment: '₦15,500',
-  rating: 0,
-}
-
-const st = StyleSheet.create({
-  planBlock: { paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, gap: 4 },
-  planLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
-  planValue: { fontSize: 15, lineHeight: 21 },
-  safe:               { flex: 1 },
-  header:             { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  backBtn:            { padding: 4 },
-  backArrow:          { fontSize: 22 },
-  headerTitle:        { flex: 1, fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
-  statusBadge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  statusText:         { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  // Check-in pass
-  passCard:           { marginHorizontal: 20, borderRadius: 20, borderWidth: 1.5, marginBottom: 12, overflow: 'hidden' },
-  passHeader:         { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  passTitle:          { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
-  passRefWrap:        { alignItems: 'center', paddingVertical: 18 },
-  passRef:            { fontSize: 32, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  passCopy:           { fontSize: 10, marginTop: 5, fontWeight: '600' },
-  passDivider:        { height: 1, marginHorizontal: 16 },
-  passRow:            { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6, gap: 12 },
-  passRowLabel:       { fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 },
-  passRowValue:       { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textAlign: 'right', flex: 1 },
-  passFooter:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, paddingTop: 10 },
-  passFooterText:     { fontSize: 11, flex: 1, lineHeight: 16 },
-  // Pending notice
-  pendingCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  pendingIcon:        { fontSize: 20 },
-  pendingTitle:       { fontSize: 13, fontWeight: '700', marginBottom: 3 },
-  pendingSub:         { fontSize: 11, lineHeight: 16 },
-  // Hero
-  heroCard:           { marginHorizontal: 20, borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 12 },
-  bookingIdRow:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  bookingIdLabel:     { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
-  bookingId:          { fontSize: 11, fontWeight: '700' },
-  doctorRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  doctorAvatarPlaceholder: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  doctorName:         { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  doctorSpec:         { fontSize: 12, marginTop: 1, marginBottom: 4 },
-  typePill:           { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, borderWidth: 1 },
-  typePillText:       { fontSize: 10, fontWeight: '700' },
-  chipsRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip:               { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1, maxWidth: '100%' },
-  chipIcon:           { fontSize: 12 },
-  chipText:           { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '500', flexShrink: 1 },
-  // Virtual join
-  joinBanner:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 12 },
-  joinTitle:          { fontSize: 13, fontWeight: '700' },
-  joinSub:            { fontSize: 11, marginTop: 2 },
-  joinBtn:            { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  joinBtnText:        { fontSize: 12, fontWeight: '700', color: '#fff' },
-  // Queue
-  queueCard:          { flexDirection: 'row', marginHorizontal: 20, borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
-  queueLeft:          { flex: 1, alignItems: 'center', padding: 14 },
-  queueRight:         { flex: 1, alignItems: 'center', padding: 14 },
-  queueDivider:       { width: 1 },
-  queueNum:           { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  queueLabel:         { fontSize: 10, marginTop: 2, textAlign: 'center' },
-  // Pad
-  pad:                { paddingHorizontal: 20 },
-  // Section
-  section:            { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  sectionTitle:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, padding: 12, paddingHorizontal: 14, borderBottomWidth: 1 },
-  // Rows
-  infoRow:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 11, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  infoLabel:          { fontSize: 12, flexShrink: 0 },
-  infoValue:          { fontSize: 12, fontWeight: '600', textAlign: 'right', flex: 1 },
-  // No-doctor placeholder
-  noDoctorRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  noDoctorTitle:      { fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  noDoctorSub:        { fontSize: 11, lineHeight: 17 },
-  // Doctor card
-  doctorCard:         { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1 },
-  dcName:             { fontSize: 14, fontWeight: '700' },
-  dcSpec:             { fontSize: 11, marginTop: 1, marginBottom: 4 },
-  // Tips
-  tipRow:             { padding: 11, paddingHorizontal: 14, borderBottomWidth: 1 },
-  tipText:            { fontSize: 12, lineHeight: 18 },
-  // Actions
-  actions:            { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  rescheduleBtn:      { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
-  rescheduleTxt:      { fontSize: 13, fontWeight: '600' },
-  // Refund
-  refundNote:         { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 12 },
-  refundText:         { fontSize: 12, lineHeight: 18 },
-  // Rejection
-  opdBtn:             { borderRadius: 10, borderWidth: 1, padding: 11, alignItems: 'center' },
-})

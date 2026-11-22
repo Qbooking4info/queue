@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
+import { View, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { haptics } from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
-import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
 import {
   getHospitals, getHospitalById, getClinicsForHospital, createReferral,
   getHospitalHours, getClinicHours, isOpenNow, findEmergencyClinic,
   type HospitalWithDoctors, type Clinic, type DayHours,
 } from '@queue/shared/lib/api'
 import type { Doctor } from '@queue/shared/types/database'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, Hair, SectionHead, Seg, Chip,
+  Btn, BottomBar, Notice, SearchField, Mono, Empty,
+} from '@queue/shared/components/q'
 
 interface Props {
   navigation: any
@@ -65,12 +65,6 @@ function hourlySlotsForDate(hours: DayHours[], iso: string): string[] {
   const out: string[] = []
   for (let hour = oh; hour < ch; hour++) out.push(`${String(hour).padStart(2, '0')}:00`)
   return out
-}
-
-function fmt12(time: string): string {
-  const [hStr, mStr] = time.split(':')
-  const h = parseInt(hStr)
-  return `${h % 12 || 12}:${mStr} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
 function todayIso(): string {
@@ -248,250 +242,224 @@ export function ReferPatientScreen({ navigation, route }: Props) {
       'Referral sent',
       result.originalCompleted
         ? `${base} This consultation has been marked complete.`
-        : `${base} This consultation is still open -- refer another patient or end it from the Queue when you're done.`,
+        : `${base} This consultation is still open — refer another patient or end it from the Queue when you're done.`,
       [{ text: 'Done', onPress: () => navigation.goBack() }],
     )
   }
 
-  return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <SafeAreaView edges={['left','right','bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-        <Header title={`Refer ${patientName}`} subtitle="Same hospital or another hospital" onBack={() => navigation.goBack()}>
-          <SegmentedControl<'same' | 'other'> onDark value={mode} onChange={switchMode}
-            options={[{ value: 'same', label: 'Same hospital' }, { value: 'other', label: 'Other hospital' }]} />
-        </Header>
+  const whenLabel = isEmergency
+    ? 'Now'
+    : `${openDates.find(d => d.iso === date)?.label ?? date} · ${startTime}`
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          {mode === 'other' && (
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Refer patient" sub={patientName} onBack={() => navigation.goBack()} />
+
+        <Seg<'same' | 'other'>
+          value={mode} onChange={switchMode}
+          options={[{ key: 'same', label: 'Same hospital' }, { key: 'other', label: 'Other hospital' }]} />
+
+        <Body keyboardShouldPersistTaps="handled">
+          {mode === 'other' && !selectedHospital && (
             <>
-              <Text style={[st.label, { color: t.textMuted }]}>Receiving hospital</Text>
-              {!selectedHospital && (
-                <TextInput
-                  value={search} onChangeText={setSearch}
-                  placeholder="Search hospitals…"
-                  placeholderTextColor={t.textMuted}
-                  style={[st.input, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder, marginBottom: 8 }]}
-                />
+              <SearchField value={search} onChangeText={setSearch} placeholder="Search hospitals" />
+              {loadingHospitals ? (
+                <ActivityIndicator color={t.q.primary} style={{ marginVertical: 20 }} />
+              ) : hospitals.length === 0 ? (
+                <Card>
+                  <Empty icon="business-outline" title="No hospitals found"
+                    body="Try a different name, or refer within your own hospital." />
+                </Card>
+              ) : (
+                <Card>
+                  {hospitals.map((h, i) => (
+                    <View key={h.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        icon="business-outline"
+                        title={h.name}
+                        sub={[h.city, h.state].filter(Boolean).join(', ') || null}
+                        chevron
+                        onPress={() => pickOtherHospital(h)} />
+                    </View>
+                  ))}
+                </Card>
               )}
             </>
           )}
 
-          {mode === 'other' && !selectedHospital && (
-            loadingHospitals ? (
-              <ActivityIndicator color={t.accent} style={{ marginVertical: 16 }} />
-            ) : (
-              <>
-                {hospitals.map(h => (
-                  <TouchableOpacity key={h.id}
-                    onPress={() => pickOtherHospital(h)}
-                    style={[st.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                    <Text style={[st.cardTitle, { color: t.textPrimary }]}>{h.name}</Text>
-                    <Text style={[st.cardSub, { color: t.textMuted }]}>{[h.city, h.state].filter(Boolean).join(', ') || '—'}</Text>
-                  </TouchableOpacity>
-                ))}
-                {hospitals.length === 0 && (
-                  <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 8 }}>No hospitals found.</Text>
-                )}
-              </>
-            )
+          {!!selectedHospital && (
+            <Card style={{ marginTop: 12 }}>
+              <Row
+                icon="business-outline" iconTone="teal" tint
+                title={selectedHospital.name}
+                sub={mode === 'other'
+                  ? ([selectedHospital.city, selectedHospital.state].filter(Boolean).join(', ') || null)
+                  : 'Your own hospital'}
+                right={mode === 'other'
+                  ? <Btn label="Change" variant="secondary" small
+                      onPress={() => { setSelectedHospital(null); setSelectedDoctor(null); setClinics([]); setSelectedClinicId('') }} />
+                  : undefined} />
+            </Card>
           )}
 
-          {selectedHospital && (
-            <View style={[st.card, { backgroundColor: t.accentBg, borderColor: t.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-              <View>
-                <Text style={[st.cardTitle, { color: t.textPrimary }]}>{selectedHospital.name}</Text>
-                {mode === 'other' && (
-                  <Text style={[st.cardSub, { color: t.textMuted }]}>{[selectedHospital.city, selectedHospital.state].filter(Boolean).join(', ') || '—'}</Text>
-                )}
-              </View>
-              {mode === 'other' && (
-                <TouchableOpacity onPress={() => { setSelectedHospital(null); setSelectedDoctor(null); setClinics([]); setSelectedClinicId('') }}>
-                  <Text style={{ color: t.accent, fontSize: 12, fontWeight: '700' }}>Change</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Urgency</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SectionHead title="Urgency" />
+          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
             {(['routine', 'urgent', 'emergency'] as const).map(u => (
-              <TouchableOpacity key={u} onPress={() => setUrgency(u)}
-                style={[st.chip, { flex: 1, alignItems: 'center', borderColor: urgency === u ? t.accent : t.cardBorder, backgroundColor: urgency === u ? t.accentBg : t.cardBg }]}>
-                <Text style={{ color: urgency === u ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>{u}</Text>
-              </TouchableOpacity>
+              <Chip key={u} label={u === 'emergency' ? 'Emergency' : u === 'urgent' ? 'Urgent' : 'Routine'}
+                on={urgency === u} onPress={() => { haptics.tap(); setUrgency(u) }} />
             ))}
           </View>
 
           {isEmergency && (
-            <View style={[st.noticeBox, {
-              marginTop: 12,
-              backgroundColor: emergencyMaybeClosed ? t.dangerBg : t.dangerSubtle,
-              borderColor: t.dangerStrong,
-            }]}>
-              {emergencyMaybeClosed ? (
-                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                  <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} may be closed right now.</Text> Emergency
-                  referrals are still sent immediately — confirm they can receive the patient before sending.
-                </Text>
-              ) : (
-                <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                  Emergency referrals are sent for <Text style={{ fontWeight: '800' }}>right now</Text> — no date or
-                  time to pick, and this patient will be prioritized at the receiving side.
-                </Text>
-              )}
-            </View>
+            <Notice tone="red" icon="alert-circle">
+              {emergencyMaybeClosed
+                ? `${selectedHospital?.name} may be closed right now. Emergency referrals are still sent immediately — confirm they can receive the patient before sending.`
+                : 'Emergency referrals are sent for right now — no date or time to pick, and the patient is prioritised at the receiving side.'}
+            </Notice>
           )}
 
-          {selectedHospital && visibleClinics.length > 0 && (
+          {noEmergencyClinic && (
+            <Notice tone="red" icon="alert-circle">
+              {selectedHospital?.name} has not set up an Emergency Department. Choose a different hospital for an
+              emergency referral.
+            </Notice>
+          )}
+
+          {!!selectedHospital && visibleClinics.length > 0 && (
             <>
-              <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>
-                {isEmergency ? 'Emergency department' : 'Clinic / Department (optional)'}
-              </Text>
+              <SectionHead title={isEmergency ? 'Emergency department' : 'Clinic or department'} />
               {isEmergency ? (
-                <View style={[st.docRow, { borderColor: t.dangerStrong, backgroundColor: t.dangerSubtle }]}>
-                  <Text style={{ color: t.danger, fontSize: 13, fontWeight: '700' }}>{emergencyClinic?.name}</Text>
-                </View>
+                <Card>
+                  <Row icon="medical" iconTone="red" tint title={emergencyClinic?.name ?? 'Emergency'}
+                    sub="Emergency referrals always go here" />
+                </Card>
               ) : (
-                <>
-                  <TouchableOpacity
-                    onPress={() => { setSelectedClinicId(''); setSelectedDoctor(null) }}
-                    style={[st.docRow, { borderColor: !selectedClinicId ? t.accent : t.cardBorder, backgroundColor: !selectedClinicId ? t.accentBg : t.cardBg }]}>
-                    <Text style={{ color: !selectedClinicId ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>Any clinic</Text>
-                  </TouchableOpacity>
-                  {clinics.map(c => {
-                    const active = selectedClinicId === c.id
-                    return (
-                      <TouchableOpacity key={c.id} onPress={() => { setSelectedClinicId(active ? '' : c.id); setSelectedDoctor(null) }}
-                        style={[st.docRow, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? t.accentBg : t.cardBg }]}>
-                        <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>{c.name}</Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+                  <Chip label="Any clinic" on={!selectedClinicId}
+                    onPress={() => { haptics.tap(); setSelectedClinicId(''); setSelectedDoctor(null) }} />
+                  {clinics.map(c => (
+                    <Chip key={c.id} label={c.name} on={selectedClinicId === c.id}
+                      onPress={() => { haptics.tap(); setSelectedClinicId(selectedClinicId === c.id ? '' : c.id); setSelectedDoctor(null) }} />
+                  ))}
+                </ScrollView>
               )}
             </>
           )}
 
-          {loadingClinics && <ActivityIndicator color={t.accent} style={{ marginVertical: 8 }} />}
+          {loadingClinics && <ActivityIndicator color={t.q.primary} style={{ marginVertical: 10 }} />}
 
-          {noEmergencyClinic && (
-            <View style={[st.noticeBox, { marginTop: 8, backgroundColor: t.dangerSubtle, borderColor: t.dangerStrong }]}>
-              <Text style={{ fontSize: 12, color: t.danger, lineHeight: 18 }}>
-                <Text style={{ fontWeight: '800' }}>{selectedHospital?.name} hasn't set up an Emergency Department.</Text> Choose
-                a different hospital for an emergency referral.
-              </Text>
-            </View>
-          )}
-
-          {selectedHospital && filteredDoctors.length > 0 && (
+          {!!selectedHospital && filteredDoctors.length > 0 && (
             <>
-              <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Receiving doctor (optional)</Text>
-              <TouchableOpacity
-                onPress={() => setSelectedDoctor(null)}
-                style={[st.docRow, { borderColor: !selectedDoctor ? t.accent : t.cardBorder, backgroundColor: !selectedDoctor ? t.accentBg : t.cardBg }]}>
-                <Text style={{ color: !selectedDoctor ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>No preference</Text>
-                <Text style={{ color: t.textMuted, fontSize: 11, marginTop: 1 }}>Hospital assigns a doctor</Text>
-              </TouchableOpacity>
-              {filteredDoctors.map(d => {
-                const active = selectedDoctor?.id === d.id
-                return (
-                  <TouchableOpacity key={d.id} onPress={() => setSelectedDoctor(active ? null : d)}
-                    style={[st.docRow, { borderColor: active ? t.accent : t.cardBorder, backgroundColor: active ? t.accentBg : t.cardBg }]}>
-                    <Text style={{ color: active ? t.accent : t.textPrimary, fontSize: 13, fontWeight: '700' }}>
-                      {[d.title, d.full_name].filter(Boolean).join(' ')}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
+              <SectionHead title="Receiving doctor" />
+              <Card>
+                <Row title="No preference" sub="The hospital assigns a doctor"
+                  tint={!selectedDoctor}
+                  onPress={() => { haptics.tap(); setSelectedDoctor(null) }} />
+                {filteredDoctors.map(d => (
+                  <View key={d.id}>
+                    <Hair />
+                    <Row
+                      title={[d.title, d.full_name].filter(Boolean).join(' ')}
+                      sub={(d as any).specialty_name ?? null}
+                      tint={selectedDoctor?.id === d.id}
+                      onPress={() => { haptics.tap(); setSelectedDoctor(selectedDoctor?.id === d.id ? null : d) }} />
+                  </View>
+                ))}
+              </Card>
             </>
           )}
 
           {!isEmergency && (
             <>
-              <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Date</Text>
+              <SectionHead title="Date" />
               {openDates.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
                   {openDates.map(d => (
-                    <TouchableOpacity key={d.iso} onPress={() => setDate(d.iso)}
-                      style={[st.chip, { borderColor: date === d.iso ? t.accent : t.cardBorder, backgroundColor: date === d.iso ? t.accentBg : t.cardBg }]}>
-                      <Text style={{ color: date === d.iso ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>{d.label}</Text>
-                    </TouchableOpacity>
+                    <Chip key={d.iso} label={d.label} on={date === d.iso}
+                      onPress={() => { haptics.tap(); setDate(d.iso) }} />
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ color: t.textMuted, fontSize: 12 }}>No upcoming open day found.</Text>
+                <Notice tone="amber">No upcoming open day found for this hospital.</Notice>
               )}
 
-              <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Preferred time</Text>
+              <SectionHead title="Preferred time" />
               {timeOptions.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
                   {timeOptions.map(time => (
-                    <TouchableOpacity key={time} onPress={() => setStartTime(time)}
-                      style={[st.chip, { borderColor: startTime === time ? t.accent : t.cardBorder, backgroundColor: startTime === time ? t.accentBg : t.cardBg }]}>
-                      <Text style={{ color: startTime === time ? t.accent : t.textPrimary, fontSize: 12, fontWeight: '700' }}>{fmt12(time)}</Text>
-                    </TouchableOpacity>
+                    <Chip key={time} label={time} on={startTime === time}
+                      onPress={() => { haptics.tap(); setStartTime(time) }} />
                   ))}
                 </ScrollView>
               ) : (
-                <Text style={{ color: t.textMuted, fontSize: 12 }}>Closed this day.</Text>
+                <Notice tone="amber">Closed on this day.</Notice>
               )}
             </>
           )}
 
-          <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Reason for visit (optional)</Text>
-          <TextInput
-            value={reason} onChangeText={setReason}
-            placeholder="e.g. Follow-up cardiology consult"
-            placeholderTextColor={t.textMuted}
-            style={[st.input, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-          />
-
-          <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>Reason for referral *</Text>
-          <TextInput
-            value={referralReason} onChangeText={setReferralReason}
-            placeholder="Why is this patient being referred? Visible to the receiving hospital."
-            placeholderTextColor={t.textMuted}
-            multiline numberOfLines={4}
-            style={[st.textarea, { color: t.textPrimary, backgroundColor: t.inputBg, borderColor: t.inputBorder }]}
-          />
+          <SectionHead title="Why are you referring?" />
+          <Card>
+            <View style={{ padding: 14, gap: 14 }}>
+              <View style={{ gap: 6 }}>
+                <CardLabel>Reason for referral</CardLabel>
+                <TextInput
+                  value={referralReason} onChangeText={setReferralReason}
+                  placeholder="What the receiving doctor needs to know"
+                  placeholderTextColor={t.q.ink60}
+                  accessibilityLabel="Reason for referral"
+                  multiline textAlignVertical="top"
+                  style={{
+                    minHeight: 110, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                    backgroundColor: t.q.field, padding: 12, fontSize: 14, lineHeight: 20, color: t.q.ink,
+                  }} />
+                <Text style={{ fontSize: 12, color: t.q.ink60 }}>Visible to the receiving hospital.</Text>
+              </View>
+              <View style={{ gap: 6 }}>
+                <CardLabel>Reason for visit (optional)</CardLabel>
+                <TextInput
+                  value={reason} onChangeText={setReason}
+                  placeholder="e.g. Follow-up cardiology consult"
+                  placeholderTextColor={t.q.ink60}
+                  accessibilityLabel="Reason for visit"
+                  style={{
+                    minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: t.q.line,
+                    backgroundColor: t.q.field, paddingHorizontal: 14, fontSize: 15, color: t.q.ink,
+                  }} />
+              </View>
+            </View>
+          </Card>
 
           {isInProgress && (
-            <View style={[st.completeRow, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textPrimary }}>Also complete this consultation</Text>
-                <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-                  Leave off to send more referrals from this same visit -- end it yourself from the Queue when you're done.
-                </Text>
+            <Card>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 56 }}>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.q.ink }}>Also complete this consultation</Text>
+                  <Text style={{ fontSize: 12.5, lineHeight: 17, color: t.q.ink60 }}>
+                    Leave it off to send more referrals from this same visit — end it yourself from the queue when
+                    you are done.
+                  </Text>
+                </View>
+                <Switch value={completeConsult} onValueChange={v => { haptics.tap(); setCompleteConsult(v) }}
+                  accessibilityLabel="Also complete this consultation"
+                  trackColor={{ false: t.q.line, true: t.q.primary }} thumbColor="#FFFFFF" />
               </View>
-              <Switch value={completeConsult} onValueChange={setCompleteConsult}
-                trackColor={{ false: t.cardBorder, true: t.accent }} thumbColor="#fff" />
-            </View>
+            </Card>
           )}
+        </Body>
 
-          <Button
-            label={isInProgress && completeConsult ? 'Refer & Complete' : 'Send Referral'}
-            onPress={submit} loading={submitting} size="lg" style={{ marginTop: t.spacing.xl }}
-          />
-        </ScrollView>
-      </SafeAreaView>
+        <BottomBar meta={<Mono size={12} weight="600" color={isEmergency ? t.q.red : t.q.ink70}>{whenLabel}</Mono>}>
+          <Btn grow
+            label={isInProgress && completeConsult ? 'Refer & end consultation' : 'Send referral'}
+            loading={submitting}
+            disabled={!selectedHospital || !referralReason.trim()}
+            onPress={submit} />
+        </BottomBar>
+      </Screen>
     </KeyboardAvoidingView>
   )
 }
-
-const st = StyleSheet.create({
-  safe:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  backBtn:     { padding: 4 },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  modeBtn:     { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingVertical: 10 },
-  label:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  input:       { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
-  textarea:    { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, minHeight: 90, textAlignVertical: 'top' },
-  card:        { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 8 },
-  cardTitle:   { fontSize: 14, fontWeight: '800' },
-  cardSub:     { fontSize: 11, marginTop: 2 },
-  docRow:      { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
-  chip:        { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  noticeBox:   { borderWidth: 1, borderRadius: 12, padding: 12 },
-  completeRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 20 },
-})

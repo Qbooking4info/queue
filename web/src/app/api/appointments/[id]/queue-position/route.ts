@@ -104,12 +104,41 @@ async function handleGET(req: NextRequest, { params }: { params: Promise<{ id: s
     ? inThisQueue().eq('urgency', 'emergency')
     : inThisQueue().neq('urgency', 'emergency')
 
-  // Run in parallel: every checked-in patient polls this route every 15s, so three
-  // sequential round-trips here were three times the latency for no reason.
-  const [{ count: emergencyCount }, { count: tierSize }, { count: queueTotal }] = await Promise.all([
+  // How many people are genuinely in front of this patient, and how many of
+  // those are emergencies. A bare rank is what makes a legitimate queue change
+  // read as a purchased jump -- the patient watches 4 become 5 and has no way
+  // to learn that an ambulance arrived. Counting the emergencies separately
+  // lets the app say so. Both are counted over the whole queue (not the
+  // caller's own urgency tier) because "ahead of me" means ahead of me.
+  const pos = appt.queue_position
+  const ahead = () => inThisQueue().lt('queue_position', pos as number)
+
+  // Run in parallel: every checked-in patient polls this route every 15s, so
+  // sequential round-trips here were multiplied latency for no reason.
+  // Who the doctor is with right now. Every waiting room in the country has a
+  // board showing this, and without it a patient holding number 7 has no way
+  // to tell a queue that is moving from one that has stopped -- their own
+  // number is identical in both cases.
+  const nowServing = () => db.from('appointments')
+    .select('queue_position')
+    .eq('hospital_id', hospitalId).eq('check_in_date', checkInDate)
+    .eq('status', 'in_progress')
+    .or(doctorFilter)
+    .not('queue_position', 'is', null)
+    .order('queue_position', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const [
+    { count: emergencyCount }, { count: tierSize }, { count: queueTotal },
+    aheadRes, emgAheadRes, servingRes,
+  ] = await Promise.all([
     inThisQueue().eq('urgency', 'emergency'),
     tierSizeQuery,
     inThisQueue(),
+    pos == null ? Promise.resolve({ count: null }) : ahead(),
+    pos == null ? Promise.resolve({ count: null }) : ahead().eq('urgency', 'emergency'),
+    nowServing(),
   ])
 
   const tierOffset = isEmergency ? 0 : (emergencyCount ?? 0)
@@ -123,7 +152,17 @@ async function handleGET(req: NextRequest, { params }: { params: Promise<{ id: s
     // caller's own tier, which for an emergency patient counts only the emergency tier
     // and would under-report the queue as a total.
     queueTotal: queueTotal ?? null,
+    aheadOfYou: aheadRes.count ?? null,
+    emergenciesAhead: emgAheadRes.count ?? null,
+    // Null when the doctor is between patients, which the screen says as
+    // "between patients" rather than leaving the last number up and implying
+    // someone is still in the room.
+    nowServing: (servingRes.data as { queue_position: number | null } | null)?.queue_position ?? null,
     estimatedWait: appt.estimated_wait, status: appt.status,
+    // When these figures were true. The card polls every 15s and a phone that
+    // has lost its connection shows the last good answer indefinitely, which is
+    // indistinguishable from a live one unless we stamp it.
+    asOf: new Date().toISOString(),
   })
 }
 

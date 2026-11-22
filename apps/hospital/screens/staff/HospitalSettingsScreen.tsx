@@ -2,15 +2,15 @@ import { useState, useCallback, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, RefreshControl, KeyboardAvoidingView } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Field, Btn, Mono, MONO,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
-import { Button } from '@queue/shared/components/ui/Button'
 import { getMyHospital } from '@queue/shared/lib/admin-api'
 import { Image } from 'react-native'
 import { pickAndUploadHospitalLogo } from '@queue/shared/lib/avatar'
@@ -209,190 +209,233 @@ export function HospitalSettingsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Settings" subtitle={hospitalName ?? undefined} onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {saving && <ActivityIndicator color="#FFFFFF" size="small" />}
-      
-        </View>} />
+    <Screen>
+      <AppBar
+        title="Hospital settings"
+        sub={hospitalName ?? undefined}
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={saving ? <View style={{ width: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color={t.q.primary} />
+        </View> : undefined}
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <ScrollView keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
-          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Logo</Text>
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 }]}>
-            <TouchableOpacity onPress={askLogo} disabled={logoBusy} accessibilityRole="button"
-              accessibilityLabel="Change hospital logo"
-              style={{ width: 64, height: 64, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: t.accentBg, borderWidth: 1.5, borderColor: t.accentBorder }}>
-              {logoUrl ? (
-                <Image source={{ uri: logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
-              ) : (
-                <Text style={{ fontSize: 19, fontWeight: '800', color: t.accent }}>
-                  {(hospitalName || '?').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()}
-                </Text>
-              )}
-              {logoBusy && (
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                </View>
-              )}
-            </TouchableOpacity>
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>Hospital logo</Text>
-              <Text style={{ fontSize: 12, color: t.textMuted, lineHeight: 17 }}>
-                Patients see this wherever your hospital appears. Without one they see
-                your initials instead.
-              </Text>
-              <TouchableOpacity onPress={askLogo} disabled={logoBusy} accessibilityRole="button">
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent, marginTop: 2 }}>
-                  {logoUrl ? 'Change logo' : 'Upload a logo'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Booking & approval */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary }]}>Booking</Text>
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <ToggleRow label="Auto-approve bookings" sub="Instantly confirm bookings without review"
-              value={settings?.approval_mode === 'auto'} disabled={saving}
-              onToggle={() => save({ approval_mode: settings?.approval_mode === 'auto' ? 'manual' : 'auto' })} theme={t} />
-            <ToggleRow label="Requires referral" sub="Patients must provide a referral note"
-              value={settings?.requires_referral ?? false} disabled={saving}
-              onToggle={() => toggle('requires_referral')} theme={t} />
-            <ToggleRow label="Virtual consultations" sub="Allow video call appointments"
-              value={settings?.accepts_virtual ?? false} disabled={saving}
-              onToggle={() => toggle('accepts_virtual')} theme={t} last />
-          </View>
-
-          {/* Booking limits */}
-          {isAdmin && (
-            <>
-              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Booking limits</Text>
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 14 }]}>
-                <FieldRow label="Daily booking limit" sub="Leave blank for no limit" theme={t}>
-                  <TextInput value={dailyLimit} onChangeText={setDailyLimit} placeholder="No limit" placeholderTextColor={t.textMuted}
-                    keyboardType="number-pad" style={[s.smallInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-                </FieldRow>
-                <FieldRow label="OPD consultation fee (₦)" theme={t}>
-                  <TextInput value={opdFee} onChangeText={setOpdFee} placeholder="0" placeholderTextColor={t.textMuted}
-                    keyboardType="number-pad" style={[s.smallInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-                </FieldRow>
-                <Button label="Save" onPress={saveBookingLimits} loading={savingBooking} size="sm" style={{ marginTop: 10 }} />
-              </View>
-            </>
-          )}
-
-          {/* Hours */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Operations</Text>
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <ToggleRow label="24-hour service" sub="Hospital operates around the clock"
-              value={settings?.is_24_hours ?? false} disabled={saving}
-              onToggle={() => toggle('is_24_hours')} theme={t} />
-            <ToggleRow label="Emergency hours" sub="Accept emergency walk-ins at any hour"
-              value={settings?.emergency_hours ?? false} disabled={saving}
-              onToggle={() => toggle('emergency_hours')} theme={t} last />
-          </View>
-
-          {/* Reminders */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Reminders</Text>
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <ToggleRow label="SMS reminders" sub="Send SMS reminders to patients"
-              value={settings?.sms_reminders ?? false} disabled={saving}
-              onToggle={() => toggle('sms_reminders')} theme={t} />
-            <ToggleRow label="Email reminders" sub="Send email reminders to patients"
-              value={settings?.email_reminders ?? false} disabled={saving}
-              onToggle={() => toggle('email_reminders')} theme={t} last />
-          </View>
-
-          {/* Ambulance service */}
-          {isAdmin && (
-            <>
-              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Ambulance service</Text>
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <ToggleRow label="Private fleet only" sub="Only your own ambulances serve this hospital, not the shared network"
-                  value={settings?.ambulance_private_fleet ?? true} disabled={saving}
-                  onToggle={() => toggle('ambulance_private_fleet')} theme={t} />
-                <ToggleRow label="24/7 ambulance service" sub="Accept transport requests at any hour"
-                  value={settings?.ambulance_service_hours_247 ?? true} disabled={saving}
-                  onToggle={() => toggle('ambulance_service_hours_247')} theme={t} last />
-                <View style={{ padding: 14, paddingTop: 4 }}>
-                  <FieldRow label="Service radius (meters)" sub="Leave blank for no limit" theme={t}>
-                    <TextInput value={ambRadius} onChangeText={setAmbRadius} placeholder="No limit" placeholderTextColor={t.textMuted}
-                      keyboardType="number-pad" style={[s.smallInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-                  </FieldRow>
-                  <Button label="Save" onPress={saveBookingLimits} loading={savingBooking} size="sm" style={{ marginTop: 10 }} />
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Location */}
-          {isAdmin && (
-            <>
-              <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Location</Text>
-              <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 14 }]}>
-                {settings?.latitude != null && settings?.longitude != null && (
-                  <Text style={[s.hintText, { color: t.textMuted, textAlign: 'left', marginBottom: 10 }]}>
-                    Current: {settings.latitude.toFixed(4)}, {settings.longitude.toFixed(4)}
-                  </Text>
-                )}
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TextInput value={address} onChangeText={setAddress} placeholder="Search for your hospital's address" placeholderTextColor={t.textMuted}
-                    style={[s.smallInput, { flex: 1, backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-                  <TouchableOpacity onPress={geocodeAddress} disabled={geocoding} style={[s.findBtn, { borderColor: t.cardBorder, backgroundColor: t.inputBg }]}>
-                    {geocoding ? <ActivityIndicator size="small" color={t.textSecondary} /> : <Text style={{ fontSize: 13, color: t.textSecondary, fontWeight: '600' }}>Find</Text>}
+          <Body keyboardShouldPersistTaps="handled" refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+              tintColor={t.q.primary} colors={[t.q.primary]} />
+          }>
+            <SectionHead title="Logo" />
+            <Card>
+              <Row
+                leading={
+                  <TouchableOpacity
+                    onPress={askLogo} disabled={logoBusy}
+                    accessibilityRole="button" accessibilityLabel="Change hospital logo"
+                    style={{
+                      width: 48, height: 48, borderRadius: 14, overflow: 'hidden',
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: t.q.sel, borderWidth: 1, borderColor: t.q.line,
+                    }}>
+                    {logoUrl ? (
+                      <Image source={{ uri: logoUrl }} style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover" accessibilityIgnoresInvertColors />
+                    ) : (
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: t.q.primary }}>
+                        {(hospitalName || '?').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()}
+                      </Text>
+                    )}
+                    {logoBusy && (
+                      <View style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      </View>
+                    )}
                   </TouchableOpacity>
+                }
+                title="Hospital logo"
+                sub="Patients see this wherever your hospital appears. Without one they see your initials."
+                right={<Btn label={logoUrl ? 'Change' : 'Upload'} variant="secondary" small
+                  disabled={logoBusy} onPress={askLogo} />}
+              />
+            </Card>
+
+            <SectionHead title="Booking" />
+            <Card>
+              <ToggleRow label="Auto-approve bookings" sub="Confirm instantly, with no staff review"
+                value={settings?.approval_mode === 'auto'} disabled={saving}
+                onToggle={() => save({ approval_mode: settings?.approval_mode === 'auto' ? 'manual' : 'auto' })} theme={t} />
+              <ToggleRow label="Requires referral" sub="For specialist clinics"
+                value={settings?.requires_referral ?? false} disabled={saving}
+                onToggle={() => toggle('requires_referral')} theme={t} />
+              <ToggleRow label="Virtual consultations" sub="Allow video appointments"
+                value={settings?.accepts_virtual ?? false} disabled={saving}
+                onToggle={() => toggle('accepts_virtual')} theme={t} last />
+            </Card>
+
+            {isAdmin && (
+              <>
+                <SectionHead title="Limits and fees" />
+                <Card pad style={{ gap: 14 }}>
+                  <Field
+                    label="Daily booking limit"
+                    hint="Leave blank for no limit"
+                    value={dailyLimit}
+                    onChangeText={setDailyLimit}
+                    placeholder="No limit"
+                    keyboardType="number-pad"
+                  />
+                  <Field
+                    label="OPD consultation fee (₦)"
+                    value={opdFee}
+                    onChangeText={setOpdFee}
+                    placeholder="0"
+                    keyboardType="number-pad"
+                  />
+                  <Btn label="Save" small loading={savingBooking} onPress={saveBookingLimits} />
+                </Card>
+              </>
+            )}
+
+            <SectionHead title="Operations" />
+            <Card>
+              <ToggleRow label="24-hour service" sub="Open around the clock"
+                value={settings?.is_24_hours ?? false} disabled={saving}
+                onToggle={() => toggle('is_24_hours')} theme={t} />
+              <ToggleRow label="Emergency hours" sub="Accept emergency walk-ins at any hour"
+                value={settings?.emergency_hours ?? false} disabled={saving}
+                onToggle={() => toggle('emergency_hours')} theme={t} last />
+            </Card>
+
+            <SectionHead title="Reminders" />
+            <Card>
+              <ToggleRow label="SMS reminders" sub="Text patients before their visit"
+                value={settings?.sms_reminders ?? false} disabled={saving}
+                onToggle={() => toggle('sms_reminders')} theme={t} />
+              <ToggleRow label="Email reminders" sub="Email patients before their visit"
+                value={settings?.email_reminders ?? false} disabled={saving}
+                onToggle={() => toggle('email_reminders')} theme={t} last />
+            </Card>
+
+            {isAdmin && (
+              <>
+                <SectionHead title="Ambulance service" />
+                <Card>
+                  <ToggleRow label="Private fleet only"
+                    sub="Only your own ambulances serve this hospital, not the shared network"
+                    value={settings?.ambulance_private_fleet ?? true} disabled={saving}
+                    onToggle={() => toggle('ambulance_private_fleet')} theme={t} />
+                  <ToggleRow label="24/7 ambulance service" sub="Accept transport requests at any hour"
+                    value={settings?.ambulance_service_hours_247 ?? true} disabled={saving}
+                    onToggle={() => toggle('ambulance_service_hours_247')} theme={t} last />
+                </Card>
+                <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 14 }}>
+                  <Field
+                    label="Service radius (metres)"
+                    hint="Leave blank for no limit"
+                    value={ambRadius}
+                    onChangeText={setAmbRadius}
+                    placeholder="No limit"
+                    keyboardType="number-pad"
+                  />
+                  <Btn label="Save" small loading={savingBooking} onPress={saveBookingLimits} />
                 </View>
-                {foundLat != null && foundLng != null && (
-                  <Text style={[s.hintText, { color: t.textMuted, textAlign: 'left', marginTop: 8 }]}>Found: {foundLat.toFixed(4)}, {foundLng.toFixed(4)}</Text>
-                )}
-                <Button label="Save location" onPress={saveLocation} loading={savingLocation} size="sm" style={{ marginTop: 10 }} />
-              </View>
-            </>
-          )}
+              </>
+            )}
 
-          {/* Operating hours */}
-          <Text style={[s.sectionLabel, { color: t.textPrimary, marginTop: 20 }]}>Operating hours</Text>
-          <View style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            {editHours.map((h, i) => (
-              <View key={h.day} style={[s.hoursEditRow, { borderTopColor: t.cardBorder, borderTopWidth: i === 0 ? 0 : 1 }]}>
-                <Text style={[s.dayName, { color: t.textPrimary, flex: 1 }]}>{DAYS[h.day]}</Text>
-                {h.closed ? (
-                  <Text style={[s.closedText, { color: t.textMuted, marginRight: 10 }]}>Closed</Text>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 10 }}>
-                    <TextInput value={h.open} onChangeText={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, open: v } : x))}
-                      placeholder="08:00" placeholderTextColor={t.textMuted} maxLength={5}
-                      style={[s.timeInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-                    <Text style={{ color: t.textMuted, fontSize: 12 }}>–</Text>
-                    <TextInput value={h.close} onChangeText={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, close: v } : x))}
-                      placeholder="18:00" placeholderTextColor={t.textMuted} maxLength={5}
-                      style={[s.timeInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
+            {isAdmin && (
+              <>
+                <SectionHead title="Location" />
+                <Card pad style={{ gap: 14 }}>
+                  {settings?.latitude != null && settings?.longitude != null && (
+                    <Mono size={12} color={t.q.ink60}>
+                      Current: {settings.latitude.toFixed(4)}, {settings.longitude.toFixed(4)}
+                    </Mono>
+                  )}
+                  <Field
+                    label="Address"
+                    hint="Patients get directions to this point"
+                    value={address}
+                    onChangeText={setAddress}
+                    placeholder="Search for your hospital's address"
+                  />
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Btn label={geocoding ? 'Finding…' : 'Find on the map'} variant="secondary" small
+                      loading={geocoding} onPress={geocodeAddress} />
+                    <Btn label="Save location" small loading={savingLocation} onPress={saveLocation} />
                   </View>
-                )}
-                <Switch value={!h.closed} onValueChange={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, closed: !v } : x))}
-                  trackColor={{ true: t.accentDark, false: t.cardBorder }} />
-              </View>
-            ))}
-            <View style={{ padding: 14, paddingTop: 10 }}>
-              <Button label="Save hours" onPress={saveHours} loading={savingHours} size="sm" />
-            </View>
-          </View>
+                  {foundLat != null && foundLng != null && (
+                    <Mono size={12} color={t.q.green}>Found: {foundLat.toFixed(4)}, {foundLng.toFixed(4)}</Mono>
+                  )}
+                </Card>
+              </>
+            )}
 
-          {isAdmin && <PayoutAccountCard theme={t} />}
-        </ScrollView>
+            <SectionHead title="Operating hours" />
+            <Card>
+              {editHours.map((h, i) => (
+                <View key={h.day}>
+                  {i > 0 && <Hair />}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 56, paddingVertical: 8 }}>
+                    <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: t.q.ink }}>{DAYS[h.day]}</Text>
+                    {h.closed ? (
+                      <Text style={{ fontSize: 13, color: t.q.ink60 }}>Closed</Text>
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TextInput
+                          value={h.open}
+                          onChangeText={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, open: v } : x))}
+                          placeholder="08:00" placeholderTextColor={t.q.ink60} maxLength={5}
+                          accessibilityLabel={`${DAYS[h.day]} opens`}
+                          style={{
+                            width: 64, minHeight: 40, borderRadius: 10, borderWidth: 1,
+                            borderColor: t.q.line, backgroundColor: t.q.field,
+                            paddingHorizontal: 8, textAlign: 'center',
+                            fontFamily: MONO, fontSize: 13, color: t.q.ink,
+                          }}
+                        />
+                        <Text style={{ color: t.q.ink60 }}>–</Text>
+                        <TextInput
+                          value={h.close}
+                          onChangeText={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, close: v } : x))}
+                          placeholder="18:00" placeholderTextColor={t.q.ink60} maxLength={5}
+                          accessibilityLabel={`${DAYS[h.day]} closes`}
+                          style={{
+                            width: 64, minHeight: 40, borderRadius: 10, borderWidth: 1,
+                            borderColor: t.q.line, backgroundColor: t.q.field,
+                            paddingHorizontal: 8, textAlign: 'center',
+                            fontFamily: MONO, fontSize: 13, color: t.q.ink,
+                          }}
+                        />
+                      </View>
+                    )}
+                    <Switch
+                      value={!h.closed}
+                      onValueChange={v => setEditHours(hs => hs.map(x => x.day === h.day ? { ...x, closed: !v } : x))}
+                      accessibilityLabel={`${DAYS[h.day]} open`}
+                      trackColor={{ true: t.q.primary, false: t.q.line }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+              ))}
+              <Hair />
+              <View style={{ padding: 14 }}>
+                <Btn label="Save hours" small loading={savingHours} onPress={saveHours} />
+              </View>
+            </Card>
+
+            {isAdmin && <PayoutAccountCard theme={t} />}
+          </Body>
         </KeyboardAvoidingView>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
@@ -401,14 +444,21 @@ function ToggleRow({ label, sub, value, disabled, onToggle, theme: t, last }: {
   onToggle: () => void; theme: any; last?: boolean
 }) {
   return (
-    <View style={[s.toggleRow, { borderBottomColor: t.cardBorder, borderBottomWidth: last ? 0 : 1 }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={[s.toggleLabel, { color: t.textPrimary }]}>{label}</Text>
-        <Text style={[s.toggleSub, { color: t.textMuted }]}>{sub}</Text>
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 56 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', letterSpacing: -0.14, color: t.q.ink }}>{label}</Text>
+          <Text style={{ fontSize: 12.5, lineHeight: 16, color: t.q.ink60 }}>{sub}</Text>
+        </View>
+        <Switch
+          value={value} onValueChange={onToggle} disabled={disabled}
+          accessibilityLabel={label}
+          trackColor={{ true: t.q.primary, false: t.q.line }}
+          thumbColor="#FFFFFF"
+        />
       </View>
-      <Switch value={value} onValueChange={onToggle} disabled={disabled}
-        trackColor={{ true: t.accentDark, false: t.cardBorder }} />
-    </View>
+      {!last && <Hair />}
+    </>
   )
 }
 
@@ -535,7 +585,7 @@ function PayoutAccountCard({ theme: t }: { theme: any }) {
                 <Text style={{ color: t.statusOpen.text, fontSize: 12, fontWeight: '600' }}>{resolvedName}</Text>
               </View>
             )}
-            <Button label="Save payout account" onPress={save} loading={saving} disabled={!resolvedName} size="sm" style={{ marginTop: 10 }} />
+            <Btn label="Save payout account" small loading={saving} disabled={!resolvedName} onPress={save} style={{ marginTop: 10 }} />
           </>
         )}
       </View>

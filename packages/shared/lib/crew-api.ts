@@ -127,6 +127,39 @@ export interface CrewStats {
   member_since: string | null
 }
 
+export interface CrewRun {
+  request_id: string
+  booking_ref: string
+  status: TransportStatus
+  triage_level: number | null
+  symptom_description: string | null
+  pickup_address: string | null
+  destination_name: string | null
+  disposition: string | null
+  cancellation_reason: string | null
+  created_at: string
+  matched_at: string | null
+  ended_at: string | null
+}
+
+/**
+ * Runs this crew member personally worked that have since ended.
+ *
+ * RLS on transport_requests only ever shows a crew their *active* job, so a
+ * finished or cancelled run becomes unreadable the moment it ends -- which is
+ * why this goes through get_my_crew_runs (20261121000002) rather than a table
+ * read. Returns [] rather than throwing if that migration has not been applied
+ * yet, so the screen shows no history instead of an error.
+ */
+export async function getMyCrewRuns(limit = 20): Promise<CrewRun[]> {
+  const { data, error } = await supabase.rpc('get_my_crew_runs', { p_limit: limit })
+  if (error) {
+    if (error.code === 'PGRST202' || /does not exist/i.test(error.message)) return []
+    throw error
+  }
+  return (data ?? []) as CrewRun[]
+}
+
 /** Lifetime stats for the crew profile. Attributed per person via
  *  transport_events.actor_id, not per unit -- several crew share one rig. */
 export async function getMyCrewStats(): Promise<CrewStats | null> {

@@ -1,33 +1,57 @@
-import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native'
+import { useState, useCallback, useEffect } from 'react'
+import { View, Pressable, RefreshControl } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { useLocation, distanceKm } from '@queue/shared/contexts/LocationContext'
-import { getHospitals, getNextAppointment, getActiveQueueAppointment } from '@queue/shared/lib/api'
+import {
+  getHospitals, getNextAppointment, getActiveQueueAppointment,
+  getQueuePositionBounds, getCompletedAppointments,
+} from '@queue/shared/lib/api'
 import { supabase } from '@queue/shared/lib/supabase'
 import { toDisplayHospital } from '@queue/shared/lib/adapters'
 import { haptics } from '@queue/shared/lib/haptics'
 import { readCache, writeCache } from '@queue/shared/lib/cache'
-import { useEffect } from 'react'
+import { formatWait } from '@queue/shared/lib/waitTime'
+import { todayLocalDate } from '@queue/shared/lib/format'
 import { SkeletonCard } from '@queue/shared/components/ui/Skeleton'
-import { StatusBadge } from '@queue/shared/components/ui/StatusBadge'
-import { Card } from '@queue/shared/components/ui/v3'
 import {
-  TopBar, TopBarButton, Pill, HeroCard, HeroBody, DateTile,
-  QuickRow, QuickTile, SectionHead, RowCard,
-} from '@queue/shared/components/ui/home'
+  Screen, AppBar, Body, Card, CardLabel, CardActions, CardAction, SectionHead,
+  Row, Hair, Pill, Mono, Btn, SearchField, IconBtn, Initials, Empty, NUMS,
+  type PillTone,
+} from '@queue/shared/components/q'
 import type { AppointmentWithRelations } from '@queue/shared/lib/api'
 import type { DisplayHospital } from '@queue/shared/components/hospital/HospitalCard'
-import { ProfileAvatar } from '@queue/shared/components/ui/ProfileAvatar'
-import { todayLocalDate } from '@queue/shared/lib/format'
-import { HomeCarousel, type Slide } from '../components/HomeCarousel'
 
-function greeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Good morning' : h < 16 ? 'Good afternoon' : 'Good evening'
+/**
+ * Status pill wording and tone, matching the handoff's Appointments screen.
+ *
+ * `paid` is passed in rather than read off the appointment: payment lives in
+ * its own table, so an appointment row alone cannot tell paid from unpaid.
+ * Undefined means "not known yet", which must not render as "Pay to hold" --
+ * telling a patient who has paid that they have not is the worse error.
+ */
+function statusPill(a: AppointmentWithRelations, paid?: boolean): { label: string; tone: PillTone; solid?: boolean } {
+  if (a.status === 'checked_in') return { label: 'Checked in', tone: 'teal' }
+  if (a.status === 'in_progress') return { label: 'With the doctor', tone: 'teal', solid: true }
+  if (a.status === 'pending' || a.approval_status === 'pending') return { label: 'Awaiting approval', tone: 'amber', solid: true }
+  if (paid === false) return { label: 'Pay to hold', tone: 'amber', solid: true }
+  if (a.status === 'confirmed') return { label: 'Confirmed', tone: 'green' }
+  if (a.status === 'completed') return { label: 'Seen', tone: 'neutral' }
+  return { label: a.status.replace(/_/g, ' '), tone: 'neutral' }
+}
+
+function dayLabel(iso: string) {
+  if (iso === todayLocalDate()) return 'Today'
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+// The handoff prints an arrival WINDOW ("12:00-14:00"). Appointments carry a
+// single start_time and no end, so this prints the one time we actually have
+// rather than inventing a window the front desk would not honour.
+function startTime(a: AppointmentWithRelations) {
+  return a.start_time ? a.start_time.slice(0, 5) : null
 }
 
 function formatDistance(km?: number, city?: string | null) {
@@ -35,43 +59,21 @@ function formatDistance(km?: number, city?: string | null) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`
 }
 
-function visitWhen(a: AppointmentWithRelations) {
-  const today = todayLocalDate()  // local calendar date; the UTC slice is yesterday from 00:00-01:00 WAT
-  const day = a.appointment_date === today ? 'Today'
-    : new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })
-  return `${day}${a.start_time ? ' · ' + a.start_time.slice(0, 5) : ''}`
-}
-
-function longDate(d = new Date()) {
-  return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })
-}
-
-/** The three stacked parts of the hero's date tile. */
-function datePieces(iso: string) {
-  const d = new Date(iso + 'T00:00:00')
-  return {
-    weekday: d.toLocaleDateString('en-NG', { weekday: 'short' }).toUpperCase(),
-    day:     String(d.getDate()),
-    month:   d.toLocaleDateString('en-NG', { month: 'short' }),
-  }
-}
-
-function initials(name?: string | null) {
-  return (name ?? '?').replace(/^Dr\.?\s*/i, '').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
-}
-
 interface Props { navigation: any }
 
 export function HomeScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user, switchedInto } = useAuth() as any
+  const { user } = useAuth() as any
   const { coords } = useLocation()
   const [hospitals, setHospitals] = useState<(DisplayHospital & { distanceKm?: number })[]>([])
   const [nextAppt, setNextAppt] = useState<AppointmentWithRelations | null>(null)
   const [activeAppt, setActiveAppt] = useState<AppointmentWithRelations | null>(null)
   const [virtualDoctors, setVirtualDoctors] = useState<number | null>(null)
+  const [results, setResults] = useState<any[]>([])
   const [unread, setUnread] = useState(0)
-  const [lastDoctor, setLastDoctor] = useState<{ userId: string; name: string; specialty?: string } | null>(null)
+  const [ahead, setAhead] = useState<number | null>(null)
+  const [wait, setWait] = useState<number | null>(null)
+  const [paid, setPaid] = useState<boolean | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -97,17 +99,36 @@ export function HomeScreen({ navigation }: Props) {
       setActiveAppt(active)
       setVirtualDoctors(docs.count ?? null)
       writeCache(user?.id, 'home', { hospitals: mapped, nextAppt: appt, activeAppt: active, virtualDoctors: docs.count ?? null })
+
       if (user) {
-        // "Book again" shortcut: the doctor from the most recent completed visit.
-        const { data: last } = await supabase.from('appointments')
-          .select('doctor:doctors!appointments_doctor_id_fkey(user_id, full_name, specialty:specialties!doctors_specialty_id_fkey(name))')
-          .eq('patient_id', user.id).eq('status', 'completed')
-          .order('appointment_date', { ascending: false }).limit(1).maybeSingle()
-        const d = (last as any)?.doctor
-        setLastDoctor(d?.user_id ? { userId: d.user_id, name: d.full_name, specialty: d.specialty?.name } : null)
         const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true })
           .eq('user_id', user.id).eq('is_read', false)
         setUnread(count ?? 0)
+        // The handoff's second card is "Lab results available". There is no
+        // lab-results table yet (see docs/repair/ISSUES.md), so this card shows
+        // what the record actually holds -- the diagnosis and notes a doctor
+        // wrote at a completed visit -- and says so in its own label. Nothing
+        // here invents a result the patient could act on.
+        const done = await getCompletedAppointments(user.id)
+        setResults((done ?? []).filter((a: any) => a.diagnosis || a.doctor_notes).slice(0, 2))
+      }
+
+      // Paid-ness of the visit on the card. One row, one query.
+      const forPill = active ?? appt
+      if (forPill) {
+        const { data: pay } = await supabase.from('payments')
+          .select('id').eq('appointment_id', forPill.id).limit(1).maybeSingle()
+        setPaid(!!pay)
+      } else {
+        setPaid(undefined)
+      }
+
+      // Live queue figures for the card. Only meaningful once checked in.
+      if (active) {
+        const b = await getQueuePositionBounds(active.id)
+        if (b.ok) { setAhead(b.aheadOfYou); setWait(b.estimatedWait) }
+      } else {
+        setAhead(null); setWait(null)
       }
     } catch {
       setFailed(true)
@@ -132,191 +153,227 @@ export function HomeScreen({ navigation }: Props) {
 
   async function onRefresh() { setRefreshing(true); await load(); setRefreshing(false) }
 
-  const firstName = user?.full_name?.split(' ')[0] ?? 'there'
   const visit = activeAppt ?? nextAppt
   const inQueue = !!activeAppt
-
-  // Shown in place of the old one-line "No upcoming visits" row. Every slide is
-  // built from data this screen already has, and only appears when it has
-  // something true to say -- an empty hero is worse than a short carousel.
-  const heroSlides: Slide[] = [
-    {
-      key: 'book',
-      title: 'Book your doctor appointment',
-      body: 'Find the right doctor, at the right time, for a healthier tomorrow.',
-      icon: 'medkit',
-      onPress: () => navigation.navigate('Search'),
-      search: { placeholder: 'Search for doctor, specialty, or clinic…' },
-    },
-    ...(virtualDoctors
-      ? [{
-          key: 'virtual',
-          title: 'See a doctor without leaving home',
-          body: `${virtualDoctors} ${virtualDoctors === 1 ? 'doctor is' : 'doctors are'} available for video, audio or chat right now.`,
-          icon: 'videocam' as const,
-          cta: 'Start a virtual visit',
-          onPress: () => navigation.navigate('VirtualCare'),
-        } satisfies Slide]
-      : []),
-    ...(lastDoctor
-      ? [{
-          key: 'again',
-          title: `Book again with ${lastDoctor.name}`,
-          body: lastDoctor.specialty ? `Your last visit was ${lastDoctor.specialty}.` : 'Pick up where you left off.',
-          icon: 'person' as const,
-          cta: 'See availability',
-          onPress: () => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId }),
-        } satisfies Slide]
-      : []),
-    {
-      key: 'sos',
-      title: 'Need help now?',
-      body: 'Request an ambulance, or call the emergency lines without leaving the app.',
-      icon: 'alert-circle',
-      cta: 'Emergency',
-      tone: 'alert',
-      onPress: () => { haptics.heavy(); navigation.navigate('Sos') },
-    },
-  ]
+  const pill = visit ? statusPill(visit, paid) : null
+  const waitText = formatWait(wait)
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <TopBar
-        avatar={<ProfileAvatar size={40} onPress={() => navigation.navigate('Profile')} />}
-        eyebrow={longDate()}
-        title={`${greeting()}, ${firstName}`}
-        onAvatarPress={() => navigation.navigate('Profile')}
-        right={
-          <TopBarButton
-            icon="notifications-outline"
-            label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-            dot={unread > 0}
-            onPress={() => navigation.navigate('Notifications')}
-          />
-        }
-      />
-
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} colors={[t.accent]} />}>
-        <View style={{ paddingHorizontal: 20, gap: 16 }}>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Pill
-              label="Booking for:"
-              value={switchedInto ? firstName : 'Me'}
-              onPress={() => navigation.navigate('Dependents')}
-            />
-            <View style={{ flex: 1 }} />
-            <Pill
-              tone="danger"
-              icon="alert-circle"
-              value="Emergency SOS"
-              onPress={() => { haptics.heavy(); navigation.navigate('Sos') }}
-            />
+    <Screen>
+      <AppBar>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 10, paddingVertical: 12 }}>
+          {/* The avatar is the ONLY route to Profile now that the fourth tab is
+              My Records -- and from Profile to the wallet, dependents, insurance
+              and sign-out. It is a 44px target and says where it goes. */}
+          <Pressable
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button" accessibilityLabel="Your profile and account settings"
+            style={({ pressed }) => pressed ? { transform: [{ scale: 0.97 }] } : null}>
+            <Initials name={user?.full_name} size={44} />
+          </Pressable>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.27, color: t.q.ink }}>
+              {user?.full_name ?? 'Your account'}
+            </Text>
+            <Text style={{ fontSize: 13, color: t.q.ink60 }}>
+              Your health hub{user?.patient_code ? ` · ${user.patient_code}` : ''}
+            </Text>
           </View>
-
-          {loading ? (
-            <SkeletonCard />
-          ) : visit ? (
-            <HeroCard
-              eyebrow={inQueue ? 'IN THE QUEUE' : 'UPCOMING VISIT'}
-              status={{
-                label: inQueue && visit.queue_position != null
-                  ? `#${visit.queue_position} in line`
-                  : visit.status === 'confirmed' ? 'Confirmed' : 'Pending',
-                icon: inQueue ? 'people' : visit.status === 'confirmed' ? 'checkmark-circle' : 'time',
-              }}
-              onPress={() => navigation.navigate(
-                inQueue ? 'QueuePass' : 'AppointmentDetail',
-                inQueue ? { appointmentId: visit.id } : { appointment: visit },
-              )}
-              footer={[
-                { label: inQueue ? 'Queue Pass' : 'Reschedule', icon: inQueue ? 'qr-code-outline' : 'calendar-outline',
-                  onPress: () => navigation.navigate(
-                    inQueue ? 'QueuePass' : 'AppointmentDetail',
-                    inQueue ? { appointmentId: visit.id } : { appointment: visit }) },
-                { label: visit.type === 'virtual' ? 'Join visit' : 'Get directions',
-                  icon: visit.type === 'virtual' ? 'videocam-outline' : 'navigate-outline',
-                  onPress: () => navigation.navigate('AppointmentDetail', { appointment: visit }) },
-              ]}
-            >
-              <HeroBody
-                leading={<DateTile {...datePieces(visit.appointment_date)} />}
-                title={visit.doctor?.full_name ?? 'Doctor to be assigned'}
-                subtitle={[visit.doctor?.specialty?.name, visit.hospital?.name].filter(Boolean).join(' · ') || null}
-                meta={visitWhen(visit)}
-              />
-            </HeroCard>
-          ) : (
-            <HomeCarousel slides={heroSlides} />
-          )}
-
-          {failed && (
-            <Card style={{ backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="cloud-offline-outline" size={20} color={t.danger} />
-              <Text style={{ flex: 1, fontSize: 13, color: t.textPrimary }}>Couldn&apos;t load everything.</Text>
-              <TouchableOpacity onPress={load} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
-                <Text style={{ color: t.accent, fontWeight: '700' }}>Try again</Text>
-              </TouchableOpacity>
-            </Card>
-          )}
-
-          <View style={{ gap: 12 }}>
-            <SectionHead title="Services" />
-            <QuickRow>
-              {/* Saturated pastels rather than full-strength brand colours: four
-                  solid blocks of primary at this size fight each other and the
-                  hero card above them. */}
-              <QuickTile icon="calendar" label="Book visit" color="#4FD1B0"
-                onPress={() => navigation.navigate('Search')} />
-              <QuickTile icon="videocam" label="Virtual care" color="#7C9BF2"
-                badge={virtualDoctors ? String(virtualDoctors) : null}
-                onPress={() => navigation.navigate('VirtualCare')} />
-              <QuickTile icon="medkit" label="Ambulance" color="#F28B82"
-                onPress={() => navigation.navigate('AmbulanceHome')} />
-              <QuickTile icon="heart" label="My care" color="#6EE7C0"
-                onPress={() => navigation.navigate('MyCare')} />
-            </QuickRow>
-          </View>
-
-          {lastDoctor && (
-            <View style={{ gap: 10 }}>
-              <SectionHead title="Your care team" />
-              <RowCard
-                leading={
-                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontWeight: '800', color: t.accent, fontSize: 13 }}>{initials(lastDoctor.name)}</Text>
-                  </View>
-                }
-                title={lastDoctor.name}
-                subtitle={lastDoctor.specialty ?? null}
-                action="Rebook"
-                onActionPress={() => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId })}
-                onPress={() => navigation.navigate('DoctorProfile', { userId: lastDoctor.userId })}
-              />
-            </View>
-          )}
-
-          <View style={{ gap: 10 }}>
-            <SectionHead title="Near you" action="See all" onAction={() => navigation.navigate('Search')} />
-            {loading ? <SkeletonCard /> : hospitals.length === 0 ? (
-              <Text style={{ fontSize: 14, color: t.textMuted }}>No hospitals to show yet.</Text>
-            ) : hospitals.slice(0, 3).map(h => (
-              <RowCard
-                key={String(h.id)}
-                leading={
-                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="business" size={20} color={t.accent} />
-                  </View>
-                }
-                title={h.name}
-                subtitle={`${h.rating ? `★ ${h.rating.toFixed(1)} · ` : ''}${formatDistance(h.distanceKm, h.city)}`}
-                onPress={() => navigation.navigate('HospitalProfile', { hospital: h })}
-              />
-            ))}
-          </View>
+          <IconBtn name="notifications-outline" label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+            badge={unread > 0} onPress={() => navigation.navigate('Notifications')} />
         </View>
-      </ScrollView>
-    </View>
+      </AppBar>
+
+      <Body refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.q.primary} colors={[t.q.primary]} />
+      }>
+        <SearchField placeholder="Search doctor, specialty or clinic…" onPress={() => navigation.navigate('Search')} />
+
+        <View style={{ height: 6 }} />
+
+        {loading && !visit ? (
+          <View style={{ marginHorizontal: 16 }}><SkeletonCard /></View>
+        ) : visit ? (
+          <Card>
+            <View style={{ padding: 14, gap: 6 }}>
+              <CardLabel>{inQueue ? 'In the queue' : 'Upcoming appointment'}</CardLabel>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                <Initials name={visit.doctor?.full_name ?? 'Queue'} size={44} tint="#7C2D12" />
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '700', letterSpacing: -0.24, color: t.q.ink }}>
+                    {visit.doctor?.full_name ?? 'Doctor assigned on arrival'}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 17, color: t.q.ink60 }}>
+                    {[visit.doctor?.specialty?.name, visit.hospital?.name].filter(Boolean).join(' · ') || 'Your visit'}
+                  </Text>
+                </View>
+                {!!pill && <Pill label={pill.label} tone={pill.tone} solid={pill.solid} />}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+                <Mono size={13}>{dayLabel(visit.appointment_date)}</Mono>
+                {!!startTime(visit) && <Mono size={13}>{startTime(visit)}</Mono>}
+                {!!visit.booking_ref && <Mono size={13} color={t.q.ink60}>{visit.booking_ref}</Mono>}
+              </View>
+            </View>
+
+            {/* The live strip. "Now serving" is deliberately absent: the API
+                reports how many people are ahead of this patient, not which
+                number is currently with the doctor, and a number captioned
+                "now serving" that is really "someone's position" would be a
+                lie the patient can check against the waiting room. */}
+            {inQueue && (
+              <Row
+                tint
+                onPress={() => navigation.navigate('LiveQueue', { appointmentId: visit.id })}
+                leading={
+                  <View style={{ flexDirection: 'row', gap: 18 }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: t.q.ink60 }}>You</Text>
+                      <Text style={[{ fontSize: 26, fontWeight: '800', color: t.q.ink }, NUMS]}>
+                        {visit.queue_position ?? '—'}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11, color: t.q.ink60 }}>Ahead of you</Text>
+                      <Text style={[{ fontSize: 26, fontWeight: '800', color: t.q.primary }, NUMS]}>
+                        {ahead ?? '—'}
+                      </Text>
+                    </View>
+                  </View>
+                }
+                title=""
+                right={
+                  <Text style={{ flex: 1, fontSize: 13, color: t.q.ink70, textAlign: 'right' }}>
+                    {waitText ? `about ${waitText}` : 'Waiting time updating'}
+                  </Text>
+                }
+                chevron
+              />
+            )}
+
+            <CardActions>
+              <CardAction first label="Book new" onPress={() => navigation.navigate('Search')} />
+              <CardAction
+                label={inQueue ? 'Live queue' : 'View booking'}
+                onPress={() => navigation.navigate(
+                  inQueue ? 'LiveQueue' : 'AppointmentDetail',
+                  inQueue ? { appointmentId: visit.id } : { appointment: visit },
+                )}
+              />
+            </CardActions>
+          </Card>
+        ) : (
+          <Card>
+            <Empty
+              icon="calendar-outline"
+              title="No upcoming visit"
+              body="Book a hospital visit, see a doctor online, or browse by specialty."
+            />
+            <CardActions>
+              <CardAction first label="Book a visit" onPress={() => navigation.navigate('Search')} />
+              <CardAction label="See a doctor online" onPress={() => navigation.navigate('VirtualCare')} />
+            </CardActions>
+          </Card>
+        )}
+
+        {failed && (
+          <View style={{ marginTop: 12 }}>
+            <Card pad style={{ backgroundColor: t.q.redBg, borderColor: 'transparent' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ flex: 1, fontSize: 13, color: t.q.ink }}>Couldn&apos;t load everything.</Text>
+                <Btn label="Try again" variant="secondary" small onPress={load} />
+              </View>
+            </Card>
+          </View>
+        )}
+
+        {results.length > 0 && (
+          <>
+            <View style={{ height: 12 }} />
+            <Card>
+              <View style={{ paddingTop: 14, paddingHorizontal: 16, paddingBottom: 4 }}>
+                <CardLabel>From your last visits</CardLabel>
+              </View>
+              {results.map((a, i) => (
+                <View key={a.id}>
+                  {i > 0 && <Hair />}
+                  <Row
+                    icon="flask-outline"
+                    title={a.diagnosis ?? 'Consultation notes'}
+                    sub={[a.doctor?.full_name, new Date(a.appointment_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')}
+                    pill="Reviewed" pillTone="green"
+                    chevron
+                    onPress={() => navigation.navigate('Prescriptions')}
+                  />
+                </View>
+              ))}
+              <CardActions>
+                <CardAction first label="All records" onPress={() => navigation.navigate('MyRecords')} />
+                <CardAction label="Prescriptions" onPress={() => navigation.navigate('Prescriptions')} />
+              </CardActions>
+            </Card>
+          </>
+        )}
+
+        <View style={{ height: 12 }} />
+
+        {/* Virtual care and the ambulance lost their tiles when the quick-tile
+            grid went; without these two rows Home has no route to either. */}
+        <Card>
+          <Row
+            icon="videocam-outline"
+            title="See a doctor from home"
+            sub={virtualDoctors ? `${virtualDoctors} ${virtualDoctors === 1 ? 'doctor' : 'doctors'} available for video, audio or chat` : 'Video, audio or chat consultations'}
+            chevron
+            onPress={() => navigation.navigate('VirtualCare')}
+          />
+          <Hair />
+          <Row
+            icon="car-outline"
+            title="Ambulance"
+            sub="Request a crew, or book an emergency slot"
+            chevron
+            onPress={() => navigation.navigate('AmbulanceHome')}
+          />
+        </Card>
+
+        <View style={{ height: 12 }} />
+
+        <Card style={{ backgroundColor: t.q.redBg, borderColor: 'transparent' }}>
+          <Row
+            icon="warning-outline" iconTone="red"
+            title="Need help now?"
+            sub="Emergency SOS or an emergency slot"
+            titleColor={t.q.red}
+            subColor={t.q.ink70}
+            chevron
+            onPress={() => { haptics.heavy(); navigation.navigate('Sos') }}
+          />
+        </Card>
+
+        <SectionHead title="Near you" action="See all" onAction={() => navigation.navigate('Search')} />
+        {loading && hospitals.length === 0 ? (
+          <View style={{ marginHorizontal: 16 }}><SkeletonCard /></View>
+        ) : hospitals.length === 0 ? (
+          <Card><Empty icon="business-outline" title="No hospitals to show yet"
+            body="We could not reach the hospital list. Pull down to try again." /></Card>
+        ) : (
+          <Card>
+            {hospitals.slice(0, 3).map((h, i) => (
+              <View key={String(h.id)}>
+                {i > 0 && <Hair />}
+                <Row
+                  icon="business-outline"
+                  title={h.name}
+                  sub={`${h.rating ? `★ ${h.rating.toFixed(1)} · ` : ''}${formatDistance(h.distanceKm, h.city)}`}
+                  chevron
+                  onPress={() => navigation.navigate('HospitalProfile', { hospital: h })}
+                />
+              </View>
+            ))}
+          </Card>
+        )}
+      </Body>
+    </Screen>
   )
 }

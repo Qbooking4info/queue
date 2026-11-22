@@ -215,6 +215,130 @@ Emergency requests have no `destination_hospital_id` until a crew sets one, but 
 
 ---
 
+## Appointment flow review (2026-10-27)
+
+Full trace of booking -> check-in -> queue -> doctor calling the patient. Every finding was
+confirmed against production data before being written; every fix is verified below.
+
+### REP-100 · P1 · No capacity check at all: two patients can book one doctor at one time
+- **Where:** `reserve_appointment_slot` enforces `time_slots.max_capacity`, but only for a row with a `slot_id`.
+- **Evidence:** `time_slots`, `availability_templates`, `slot_overrides` all have **0 rows** against 33 doctors; **no appointment has ever set `slot_id`**. `BookingFlowScreen.tsx:285` therefore always falls back to a hardcoded 08:00-17:00 grid and sends `slotId: null`. **4 slots in prod hold two live appointments each.**
+- **Fix:** `20261027000001` adds `enforce_single_live_booking_per_slot` — one live appointment per (doctor, date, start_time) when no real slot is set. Exempts emergencies and staff-booked walk-ins; the slot-capacity trigger still governs rows that do carry a `slot_id`.
+- **Not addressed (product decision):** whether hospitals should configure real availability, which would make the existing slot machinery live and the offered hours true. Raised with the user; this fix removes the harm without pre-empting that call.
+- **Verification:** rolled-back prod tests — duplicate refused, emergency admitted, staff walk-in admitted, cancelled time reusable. **Status:** `verified_fixed`
+
+### REP-101 · P2 · Check-in ignores `approval_status`
+- `checkInAppointment` filtered on `status` only; the DB guard makes just `rejected` final. A booking awaiting manual hospital approval could be checked in and join the queue.
+- **Fix:** refuses `pending_approval` / `pending_review` / `rejected`; rows with no approval_status still check in (they predate the column). **Verification:** `web/src/lib/appointment-checkin.test.ts` (7); fails on the old code. **Status:** `verified_fixed`
+
+### REP-102 · P1 · Starting a consult from `confirmed` left the patient outside the queue
+- `start_consultation` accepts `confirmed`, but never set `check_in_date`. `renumber_queue_after_change` returns early when it is null, so no `queue_position` was assigned and the row appeared in no queue.
+- **Evidence:** 1 live row in prod with both null.
+- **Fix:** sets `check_in_date` when starting from `confirmed`, never overwriting an existing one. **Verification:** `route.flow.test.ts` (2). **Status:** `verified_fixed`
+
+### REP-103 · P1 · The nightly sweep could not close the rows REP-102 created
+- `process_missed_appointments` used `check_in_date < current_date`; `null < date` is null, so exactly the orphaned rows were unreachable. Same hole in the `stuck_checkin` branch.
+- **Evidence:** a virtual consult **in progress for 1,385 hours (58 days)** since 2026-08-31.
+- **Fix:** `COALESCE(check_in_date, appointment_date, consult_started_at::date, created_at::date)`. The stuck consult was closed by the same migration (scoped to consults older than 7 days). **Verification:** rolled-back prod test — a null-`check_in_date` consult is now swept. **Status:** `verified_fixed`
+
+### REP-104 · P2 · The doctor saw a different queue order from everyone else
+- `SpecialistQueueScreen` sorted emergency-first over `get_doctor_queue`'s `ORDER BY start_time`, while rendering `#{queue_position}` — so it showed #3 above #1. Front desk and the web queue API both sort by `queue_position`.
+- **Fix:** same ordering as the other two — emergency, then queue position, then start time. **Status:** `fixed_pending_verification` (no automated test; mobile screen)
+
+### REP-105 · P2 · Completing outside `end_consultation` lost the consult duration
+- `set_status` wrote the status with no `consult_ended_at`, so `consult_duration_secs` stayed null and the consult left the median that drives every wait estimate. **14 of 60** completed appointments; only **37 rows** fed the median.
+- **Fix:** `stamp_consult_end` trigger stamps the end on any terminal transition, covering every path including ones added later; `set_status` also ends an active virtual session. Existing unstamped rows are deliberately NOT backfilled — their real end time is unknown and inventing one would corrupt the median this protects.
+- **Verification:** rolled-back prod test (end stamped, 720s computed) + `route.flow.test.ts`. **Status:** `verified_fixed`
+
+### REP-106 · P2 · "The doctor is ready for you" did not ring
+- The `ring` action called `notifyPatient` with no `channelId`, so it landed on the default Android channel. Only virtual consults used the `queue-calls` ringing channel. In a waiting room a silent notification is a missed one.
+- **Fix:** `notifyPatient` takes an optional channel; `ring` passes `queue-calls`. **Verification:** `route.flow.test.ts`. **Status:** `verified_fixed`
+
+### REP-107 · P3 · The "You're next" pre-alert could target the wrong patient
+- It fired for `queue_position = 2`, assuming the patient just started was position 1 — but `ring` deliberately lets a free doctor call someone in early. When that happened the heads-up went to the wrong person and the patient actually at the front got nothing.
+- **Fix:** targets the lowest `queue_position` still `checked_in`. **Verification:** `route.flow.test.ts`. **Status:** `verified_fixed`
+
+### REP-038 — appears already fixed
+`get_doctor_queue` in production matches `(a.doctor_id = p_doctor_id OR a.assigned_doctor_id = p_doctor_id)`. Recommend closing.
+
+### Verified healthy during this review
+No duplicate queue positions in prod; the advisory-lock renumbering is correct and live; median wait estimates with the 4-hour outlier filter are deployed; all 24 appointment guard triggers enabled.
+
+---
+
+## Cross-app process review (2026-10-28)
+
+Ambulance, hospital and doctor flows traced the same way the appointment flow was. All four
+confirmed against production before fixing; all four verified after.
+
+### REP-110 · P1 · The ambulance vehicle photo never saved, and reported success
+- `ambulances` has RLS enabled and **zero policies**, so `avatar.ts`'s `.from('ambulances').update({ photo_url })` matched 0 rows — which PostgREST reports as success, not an error. **0 of 25 units had a photo**; the hospital logo path, which has an UPDATE policy, saved 5 of 5.
+- **Fix:** `set_ambulance_photo()` RPC (`20261028000001`), authorised exactly like `can_manage_ambulance_media` gates the storage upload — provider owner/admin, or owner/admin of the hospital running the fleet. A table-level UPDATE policy was rejected as the fix because it would also open `status`, `is_active` and `vehicle_tier`, which dispatch depends on.
+- **Verification:** rolled-back prod — unauthorised caller refused, non-http url refused, granted to `authenticated` only, column writable. **Status:** `verified_fixed`
+- **Introduced by** the vehicle-photo feature added 2026-10-25; never worked.
+
+### REP-019 (was open) · P2 · A crew whose shift ended mid-job was locked out of it
+- `my_crew_unit_for_request` required `now() between s.starts_at and s.ends_at`, so when the shift clock ran out — or an admin deleted the shift — the crew could no longer resolve the request they were physically in the middle of, and could not mark arrival or completion.
+- **Fix:** the shift window still governs starting work; a second branch lets crew of the assigned unit's provider close out a transport already in flight, bounded to the active statuses.
+- **Verification:** rolled-back prod. **Status:** `verified_fixed`
+
+### REP-111 · P2 · A unit that never reported a position raised no stale-tracking alarm
+- `flag_stale_tracking` inner-joined `ambulance_current_location`, so a unit with no row produced none — the worst case, a transport whose unit has never reported at all, was the one case dispatchers were never told about. **3 of 25 units have no location row.**
+- **Fix:** LEFT JOIN, with its own message naming the difference. **Verification:** rolled-back prod — alarm raised and correctly worded. **Status:** `verified_fixed`
+
+### REP-112 · P1 · Abandoned checkouts sat `pending` for ever
+- 5 pending payments, oldest **7 weeks**, and **3 belonged to appointments since COMPLETED** — the patient was seen while the books said payment was in flight. No reconciliation existed anywhere.
+- **Not fixed with a timer.** An abandoned checkout and a successful one whose webhook was dropped are indistinguishable inside the database; ageing rows out to `failed` would write off real money silently. Only Paystack knows which, so the fix follows the transport-sweep pattern: `reconcile-payments` pg_cron → `invoke_payment_reconcile()` → `POST /api/payments/reconcile`, which verifies each stale reference and records the answer.
+- **Consequence handled:** the webhook and verify routes guarded their success write on `status='pending'`, so a payment the cron wrote off could never be settled by a late genuine webhook. Both now accept `pending` **or** `failed`; the amount re-check still gates it, and `refunded` is excluded. Without this the fix would itself have lost money.
+- **Verification:** `web/src/app/api/payments/reconcile/route.test.ts` (7) + rolled-back prod (cron scheduled, url configured, invoker not client-callable). **Status:** `verified_fixed`
+
+## 2026-10-31 — product research findings (reports/Telehealth app features for Queue.md)
+
+Tier 0 of the research report. These are defects in what exists, not missing features; several
+are visible to a patient as unfairness or as a broken promise.
+
+### REP-120 · P1 · The two unmissable queue notifications were push-only
+- "You're next" and "the doctor is ready for you" went out over Expo push and nothing else. A token goes stale on reinstall or OS eviction and the send fails silently; **over a third of Nigerian mobile subscribers were still on 2G as of May 2026**, where a data push may never arrive at all. A missed "doctor is ready" is a no-show for a patient who was sitting in the waiting room.
+- `notifyPatient`/`notifyIncomingCall` now take `critical: true` and fall back to SMS **only when the push did not land**, so the ordinary case costs nothing. The gateway (`lib/patient-sms.ts`) already existed for the emergency-transport fallback; this reuses it rather than adding a provider.
+- `notifications.sent_via` is now written back with the channels that actually worked, instead of the optimistic `['in_app']` the insert carries. Nothing claims a channel it did not use.
+- **Verification:** `web/src/lib/notify-patient.test.ts` (9) + `route.flow.test.ts` ring assertion. **Status:** `verified_fixed` (code) — **SMS is inert until `PATIENT_SMS_URL` is configured**, which is a user decision, not a code one.
+
+### REP-121 · P1 · A bare queue position makes every legitimate change look purchased
+- The patient card showed one global integer and `~127m`. Emergency insertion and front-desk override both move that number with no explanation, and in this market the default assumption about an unexplained jump is that someone paid. Satisfaction falls when patients can *perceive* FIFO violations.
+- `GET /api/appointments/[id]/queue-position` now also returns `aheadOfYou`, `emergenciesAhead` and `asOf`. The card leads with "3 people ahead of you, including an emergency case" and keeps the rank as secondary detail, so the movement is explained rather than suspicious.
+- **Status:** `verified_fixed` (code) — the *monotonic position guarantee* (never show a worse position without an explanation) is **not** done; it needs stored state.
+
+### REP-122 · P1 · The wait estimate was quoted to the minute and excluded its own tail
+- `~127m` invites the patient to time us and catch us wrong, at a scale (ABUTH Zaria mean 97.2 min; 2–3 hours under manual systems) where we have no minute-level accuracy to offer. `formatWait()` now renders "About 2 to 2½ hours", banded upward from the estimate so we never promise sooner than we expect — being seen early is a pleasant surprise, being seen late is a broken promise.
+- A frozen screen was indistinguishable from a live one; the card now stamps "as of 11:42" and says so when the poll has stopped.
+- **Verification:** `packages/shared/lib/__tests__/waitTime.test.ts` (10). **Status:** `verified_fixed` (presentation).
+- The *arithmetic* half is in migration `20261031000001` and **not applied**: consult median over finished consults only (instead of everything under four hours, which discarded every genuinely long consultation and biased the estimate optimistic on the worst days), and the clinic wait median conditioned on weekday × hour.
+
+### REP-123 · P1 · A patient back from the lab is ranked ahead of everyone who arrived meanwhile
+- `renumber_doctor_queue()` orders by `checked_in_at`, so a patient who checked in at 08:00 and returns from haematology at 14:10 is placed at the front. The naive alternative — re-check-in — punishes the patient for the laboratory's slowness.
+- Migration `20261031000001` adds `requeued_at` (and `left_queue_at`/`left_queue_reason`/`requeue_count`), a `return_to_queue()` SECURITY DEFINER RPC revoked from every client role, and makes the ordering key `COALESCE(requeued_at, checked_in_at)`. `PATCH /api/appointments/[id]` gains `leave_queue` and `return_to_queue`, both doctor-ownership checked.
+- **The credit is a product decision, not a finding.** `app_config.lab_return_credit_minutes` defaults to 30; no published source describes how any system orders returning patients, so this is a starting position a hospital can change without a deploy.
+- **Verification:** 4 tests in `route.flow.test.ts`; SQL parsed with libpg_query. **Status:** `fix_written` — migration **not applied to production**, so the ordering defect is still live.
+
+### Still open from the report's Tier 0
+- Minutes-scale abandonment (call → timeout → park → one recall → no-show). The nightly sweep is the wrong timescale for a minute-scale queue event; needs a `rang_at` stamp and a park state.
+- Override audit: a front-desk move needs a reason code, an audit row, a rate cap, and a rule that it may never move a patient past someone whose pass is live.
+- Dispatch: offer expiry cannot distinguish "crew declined" from "crew offline", so calls are silently reassigned away from crews whose connectivity dropped; and shift-driven auto-availability can take a unit offline mid-transport.
+- Compliance (not code): NDPC registration, named DPO, 31 March annual return, 72-hour breach runbook, published refund/cancellation policy, and counsel on the Electronic Pharmacy Regulations 2026.
+
+### Investigated and ruled out
+- **86% of transport requests `no_unit_available`, 24 of 25 units offline** — correct behaviour. `offline_units_without_shift` is self-healing and dispatch rightly refuses a unit whose GPS is stale; it is a test environment with no crew app running.
+- **Front-desk manual reorder vs renumbering** — the live `renumber_doctor_queue` does honour `queue_rank_override`.
+- **`expire_locum_jobs`' unreferenced CTE** — data-modifying CTEs always execute.
+
+### Systematic scans
+- App writes to tables RLS silently refuses, across all four apps + `packages/shared`: **1 hit** (REP-110).
+- App reads of tables with no SELECT policy: **0**.
+- Fire-and-forget async in API routes (the REP-018 class): **0**.
+- Writes with the result discarded: **3**, all on `notifications` (which has policies) — idempotent, not defects.
+
+---
+
 ## Platform / hygiene
 
 ### REP-090 · P3 · `web` eslint baseline: 329 errors, 22 warnings (mostly `react-hooks/set-state-in-effect`, `no-explicit-any`). Not touched — not hiding, not a functional defect. `deferred_with_reason`

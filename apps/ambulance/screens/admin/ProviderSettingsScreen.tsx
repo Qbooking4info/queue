@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, TextInput, ActivityIndicator } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Switch, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import { haptics } from '@queue/shared/lib/haptics'
 import { getProviderSettings, updateProviderSettings } from '@queue/shared/lib/ambulance-admin-api'
+import {
+  Screen, AppBar, Body, Card, Hair, SectionHead, Field, Btn, BottomBar, Notice,
+} from '@queue/shared/components/q'
 
 /**
  * private_fleet / service_radius_m / service_hours_247 -- columns on
@@ -51,8 +53,11 @@ export function ProviderSettingsScreen({ navigation }: { navigation?: any }) {
         serviceHours247: hours247,
         serviceRadiusM: radiusM,
       })
+      haptics.success()
       setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
     } catch (err) {
+      haptics.error()
       setError(err instanceof Error ? err.message : 'Could not save settings')
     } finally {
       setSaving(false)
@@ -61,92 +66,77 @@ export function ProviderSettingsScreen({ navigation }: { navigation?: any }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.accent} />
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Service settings"
+          onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.primary} />
+        </View>
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        {/* Pushed from the operator's profile, so it needs its own way back. */}
-        {navigation?.canGoBack?.() && (
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button" accessibilityLabel="Back"
-            hitSlop={8}
-            style={{
-              width: 38, height: 38, borderRadius: 13, marginBottom: 12,
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: t.cardBg, borderWidth: 1, borderColor: t.cardBorder,
-            }}
-          >
-            <Ionicons name="chevron-back" size={20} color={t.textPrimary} />
-          </TouchableOpacity>
-        )}
-        <Text style={[s.title, { color: t.textPrimary }]}>Service Settings</Text>
-        <Text style={[s.subtitle, { color: t.textMuted }]}>How far and when your fleet is dispatched.</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar title="Service settings" sub="How far and when your fleet is dispatched"
+          onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined} />
 
-        {error ? (
-          <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={{ color: t.danger, fontSize: 14 }}>{error}</Text>
-          </View>
-        ) : null}
+        <Body>
+          {!!error && <Notice tone="red" icon="alert-circle">{error}</Notice>}
 
-        {providerType === 'hospital_fleet' && (
-          <View style={[s.row, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.rowLabel, { color: t.textPrimary }]}>Private fleet</Text>
-              <Text style={[s.rowSub, { color: t.textMuted }]}>Only transport patients to your own hospital</Text>
+          <SectionHead title="Dispatch" />
+          <Card>
+            {providerType === 'hospital_fleet' && (
+              <ToggleRow
+                label="Private fleet"
+                sub="Only transport patients to your own hospital"
+                value={privateFleet} onToggle={setPrivateFleet} theme={t} />
+            )}
+            <ToggleRow
+              label="Available 24/7"
+              sub={providerType === 'hospital_fleet'
+                ? "Off restricts dispatch to your hospital's operating hours"
+                : 'Off means you never receive requests'}
+              value={hours247} onToggle={setHours247} theme={t} last />
+          </Card>
+
+          <SectionHead title="Coverage" />
+          <Card>
+            <View style={{ padding: 14, gap: 6 }}>
+              <Field label="Coverage radius (km)" value={radiusKm} onChangeText={setRadiusKm}
+                keyboardType="number-pad" placeholder="No cap"
+                hint="Offers outside this radius never reach your crews. Leave it blank for no cap." />
             </View>
-            <Switch value={privateFleet} onValueChange={setPrivateFleet} trackColor={{ true: t.accent, false: t.cardBorder }} />
-          </View>
-        )}
+          </Card>
+        </Body>
 
-        <View style={[s.row, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>Available 24/7</Text>
-            <Text style={[s.rowSub, { color: t.textMuted }]}>
-              {providerType === 'hospital_fleet' ? "Off restricts dispatch to your hospital's operating hours" : 'Off means you never receive requests'}
-            </Text>
-          </View>
-          <Switch value={hours247} onValueChange={setHours247} trackColor={{ true: t.accent, false: t.cardBorder }} />
-        </View>
-
-        <View style={[s.row, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.rowLabel, { color: t.textPrimary }]}>Service radius (km)</Text>
-            <Text style={[s.rowSub, { color: t.textMuted }]}>Leave blank for no cap</Text>
-          </View>
-          <TextInput
-            value={radiusKm} onChangeText={setRadiusKm} keyboardType="number-pad" placeholder="—"
-            placeholderTextColor={t.textMuted}
-            style={[s.radiusInput, { color: t.textPrimary, borderColor: t.inputBorder, backgroundColor: t.inputBg }]}
-          />
-        </View>
-
-        {saved && (
-          <View style={[s.savedBanner, { backgroundColor: t.accentBgMid, borderColor: t.accentBorder }]}>
-            <Ionicons name="checkmark-circle" size={14} color={t.accent} />
-            <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>Saved</Text>
-          </View>
-        )}
-
-        <Button label="Save changes" onPress={handleSave} loading={saving} style={{ marginTop: 8 }} />
-      </ScrollView>
-    </SafeAreaView>
+        <BottomBar>
+          <Btn grow label={saved ? 'Saved' : 'Save changes'} icon={saved ? 'checkmark' : undefined}
+            loading={saving} onPress={handleSave} />
+        </BottomBar>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1 },
-  title: { fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
-  subtitle: { fontSize: 15, marginTop: 2, marginBottom: 18 },
-  errorBanner: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 14 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
-  rowLabel: { fontSize: 16, fontWeight: '700' },
-  rowSub: { fontSize: 13, marginTop: 2 },
-  radiusInput: { width: 64, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, textAlign: 'center', fontSize: 16 },
-  savedBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 6 },
-})
+function ToggleRow({ label, sub, value, onToggle, theme: t, last }: {
+  label: string; sub: string; value: boolean; onToggle: (v: boolean) => void; theme: any; last?: boolean
+}) {
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 56 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', letterSpacing: -0.14, color: t.q.ink }}>{label}</Text>
+          <Text style={{ fontSize: 12.5, lineHeight: 16, color: t.q.ink60 }}>{sub}</Text>
+        </View>
+        <Switch
+          value={value} onValueChange={v => { haptics.tap(); onToggle(v) }}
+          accessibilityLabel={label}
+          trackColor={{ true: t.q.primary, false: t.q.line }}
+          thumbColor="#FFFFFF" />
+      </View>
+      {!last && <Hair />}
+    </>
+  )
+}

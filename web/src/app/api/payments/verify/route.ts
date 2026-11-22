@@ -85,7 +85,14 @@ export async function POST(req: NextRequest) {
       webhook_event: 'verify.manual',
     } as never)
     .eq('id', payment.id)
-    .eq('status', 'pending')
+  // 'failed' is accepted as well as 'pending': the reconcile cron records
+  // Paystack's "abandoned" verdict as failed so the row stops sitting in limbo,
+  // but an abandoned checkout can still be completed from the same link
+  // afterwards. A genuine success must always win over an earlier write-off, or
+  // the money is lost silently. The amount is re-checked above, so a row failed
+  // for a mismatch can only come back if the amount is now right. 'refunded' is
+  // deliberately not in the list.
+    .in('status', ['pending', 'failed'])
     .select('id')
 
   // Lost the race with the webhook — which is a success, not an error.

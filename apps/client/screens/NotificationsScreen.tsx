@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
+import { View, RefreshControl } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Empty, IconBtn, Mono,
+  type PillTone,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { getNotifications, markNotificationRead, markAllNotificationsRead, getAppointmentById } from '@queue/shared/lib/api'
 import { SkeletonRow } from '@queue/shared/components/ui/Skeleton'
@@ -13,25 +15,26 @@ import { haptics } from '@queue/shared/lib/haptics'
 
 type NotifType = 'reminder' | 'confirmed' | 'cancelled' | 'virtual' | 'prescription' | 'lab' | 'payment' | 'waitlist' | 'review' | 'system' | 'no_show' | 'reschedule_prompt'
 
-const ACCENT: Record<string, string> = {
-  reminder:    '#EF9F27',
-  confirmed:   '#0F766E',
-  cancelled:   '#EF4444',
-  virtual:     '#5B9EFF',
-  prescription:'#A78BFA',
-  lab:         '#38BDF8',
-  payment:     '#0F766E',
-  waitlist:    '#EF9F27',
-  review:      '#FBBF24',
-  system:      '#94A3B8',
-  no_show:     '#EF4444',
-  reschedule_prompt: '#EF9F27',
+// Every notification type, mapped onto the kit's five tones rather than a
+// colour of its own. Twelve bespoke accents was twelve chances for two screens
+// to disagree about what "payment" looks like.
+const TONE: Record<string, PillTone> = {
+  reminder: 'amber',
+  confirmed: 'green',
+  cancelled: 'red',
+  virtual: 'teal',
+  prescription: 'teal',
+  lab: 'teal',
+  payment: 'green',
+  waitlist: 'amber',
+  review: 'amber',
+  system: 'neutral',
+  no_show: 'red',
+  reschedule_prompt: 'amber',
+  transport: 'red',
+  dispatch_offer: 'red',
 }
-const ICON_BG: Record<string, string> = {
-  reminder:'#1A3A28', confirmed:'#0D2A1F', cancelled:'#2A0D0D', virtual:'#0D1A3A',
-  prescription:'#1E1040', lab:'#101A3A', payment:'#0D280D', waitlist:'#2A2010',
-  review:'#2A1A00', system:'#1A1A1A', no_show:'#2A0D0D', reschedule_prompt:'#2A2010',
-}
+
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   reminder:'alarm-outline', confirmed:'checkmark-circle-outline', cancelled:'close-circle-outline', virtual:'videocam-outline',
   prescription:'medkit-outline', lab:'flask-outline', payment:'card-outline', waitlist:'hourglass-outline',
@@ -70,7 +73,9 @@ export function NotificationsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async (silent = false) => {
-    if (!user) return
+    // No signed-in user means there is nothing to load and never will be;
+    // returning without clearing `loading` leaves a spinner for ever.
+    if (!user) { setLoading(false); return }
     if (!silent) setLoading(true)
     const data = await getNotifications(user.id)
     setItems(data)
@@ -130,122 +135,59 @@ export function NotificationsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Notifications" subtitle={unreadCount > 0 ? `${unreadCount} unread` : undefined} onBack={() => navigation.goBack()}
-        right={unreadCount > 0 ? (
-          <TouchableOpacity onPress={handleMarkAll} accessibilityRole="button"
-            style={{ minHeight: 40, paddingHorizontal: 12, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center' }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>Mark all read</Text>
-          </TouchableOpacity>
-        ) : undefined} />
+    <Screen>
+      <AppBar
+        title="Notifications"
+        sub={unreadCount > 0 ? `${unreadCount} unread` : undefined}
+        onBack={() => navigation.goBack()}
+        right={unreadCount > 0
+          ? <IconBtn name="checkmark-done-outline" label="Mark all read" onPress={handleMarkAll} />
+          : undefined}
+      />
 
-      {loading ? (
-        <View style={{ paddingTop: 8 }}>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true) }} tintColor={t.accent} />
-          }>
-          {groups.map(group => {
-            const groupItems = items.filter(n => groupLabel(n.created_at) === group)
-            if (!groupItems.length) return null
+      <Body refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true) }}
+          tintColor={t.q.primary} colors={[t.q.primary]} />
+      }>
+        {loading ? (
+          <Card><SkeletonRow /><SkeletonRow /><SkeletonRow /></Card>
+        ) : items.length === 0 ? (
+          <Card style={{ marginTop: 16 }}>
+            <Empty icon="notifications-outline" title="Nothing yet"
+              body="Queue tells you here when your number moves, a booking is approved, or a payment goes through." />
+          </Card>
+        ) : (
+          groups.map(g => {
+            const inGroup = items.filter(n => groupLabel(n.created_at) === g)
+            if (inGroup.length === 0) return null
             return (
-              <View key={group}>
-                <View style={[st.groupRow, { borderBottomColor: t.cardBorder }]}>
-                  <Text style={[st.groupLabel, { color: t.textMuted }]}>{group}</Text>
-                  {group === 'Today' && unreadCount > 0 && (
-                    <View style={[st.unreadBadge, { backgroundColor: t.accent }]}>
-                      <Text style={st.unreadBadgeText}>
-                        {items.filter(n => !n.is_read && groupLabel(n.created_at) === 'Today').length}
-                      </Text>
+              <View key={g}>
+                <SectionHead title={g} />
+                <Card>
+                  {inGroup.map((n, i) => (
+                    <View key={n.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        icon={ICONS[n.type] ?? 'notifications-outline'}
+                        iconTone={TONE[n.type] ?? 'neutral'}
+                        // An unread notification is tinted rather than badged:
+                        // the row already carries a status pill's worth of
+                        // meaning in its own type, and two markers on one row
+                        // is the pattern this system does not use.
+                        tint={!n.is_read}
+                        title={n.title ?? 'Update'}
+                        sub={n.body ?? null}
+                        right={<Mono size={11} color={t.q.ink60}>{relativeTime(n.created_at)}</Mono>}
+                        onPress={() => { haptics.tap(); handleTap(n) }}
+                      />
                     </View>
-                  )}
-                </View>
-
-                {groupItems.map(n => {
-                  const accent = ACCENT[n.type] ?? '#94A3B8'
-                  // A light tint of the type colour; the old ICON_BG table was dark-theme only.
-                  const iconBg = `${accent}1F`
-                  const icon   = ICONS[n.type]   ?? 'notifications-outline'
-                  return (
-                    <TouchableOpacity key={n.id} onPress={() => { haptics.tap(); handleTap(n) }} activeOpacity={0.7}
-                      style={[st.row, {
-                        backgroundColor: n.is_read ? t.canvasBg : t.cardBg,
-                        borderBottomColor: t.cardBorder,
-                      }]}>
-                      {!n.is_read && <View style={[st.unreadDot, { backgroundColor: t.accent }]} />}
-                      <View style={[st.iconWrap, { backgroundColor: iconBg, borderColor: `${accent}30` }]}>
-                        <Ionicons name={icon} size={20} color={accent} />
-                      </View>
-                      <View style={st.content}>
-                        <View style={st.contentTop}>
-                          <Text style={[st.notifTitle, { color: t.textPrimary, fontWeight: n.is_read ? '500' : '700' }]}
-                            numberOfLines={1}>{n.title}</Text>
-                          <Text style={[st.time, { color: t.textMuted }]}>{relativeTime(n.created_at)}</Text>
-                        </View>
-                        <Text style={[st.body, { color: t.textSecondary }]} numberOfLines={2}>{n.body}</Text>
-                      </View>
-                      {/* Keep in step with handleTap — a chevron on a row that
-                          does nothing is worse than no chevron. */}
-                      {(APPT_TYPES.has(n.type) && n.data?.appointment_id)
-                        || n.type === 'prescription' || n.type === 'lab'
-                        || ((n.type === 'transport' || n.type === 'dispatch_offer') && n.data?.request_id)
-                        ? <Text style={[st.chevron, { color: t.textMuted }]}>›</Text>
-                        : null
-                      }
-                    </TouchableOpacity>
-                  )
-                })}
+                  ))}
+                </Card>
               </View>
             )
-          })}
-
-          {items.length === 0 && (
-            <View style={st.empty}>
-              <Ionicons name="notifications-outline" size={44} color={t.textMuted} style={{ marginBottom: 12, opacity: 0.4 }} />
-              <Text style={[st.emptyTitle, { color: t.textPrimary }]}>All caught up</Text>
-              <Text style={[st.emptySub, { color: t.textMuted }]}>No notifications yet. We'll let you know when something needs your attention.</Text>
-            </View>
-          )}
-
-          <View style={{ height: 32 }} />
-        </ScrollView>
-      )}
-    </SafeAreaView>
+          })
+        )}
+      </Body>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe:            { flex: 1 },
-  header:          { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
-  backBtn:         { padding: 4 },
-  backArrow:       { fontSize: 22 },
-  title:           { fontSize: 20, fontWeight: '800', letterSpacing: -0.6 },
-  unreadCount:     { fontSize: 12, marginTop: 1 },
-  markAllBtn:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, borderWidth: 1 },
-  markAllText:     { fontSize: 11, fontWeight: '700' },
-  groupRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 1 },
-  groupLabel:      { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7 },
-  unreadBadge:     { width: 18, height: 18, borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
-  unreadBadgeText: { fontSize: 10, fontWeight: '800', color: '#000' },
-  row:             { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, gap: 12, position: 'relative' },
-  unreadDot:       { position: 'absolute', left: 8, top: 20, width: 6, height: 6, borderRadius: 3 },
-  iconWrap:        { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderWidth: 1 },
-  iconEmoji:       { fontSize: 20 },
-  content:         { flex: 1, minWidth: 0 },
-  contentTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 3 },
-  notifTitle:      { fontSize: 13, flex: 1 },
-  time:            { fontSize: 10, flexShrink: 0, marginTop: 1 },
-  body:            { fontSize: 12, lineHeight: 17 },
-  empty:           { alignItems: 'center', padding: 48 },
-  emptyTitle:      { fontSize: 17, fontWeight: '700', marginBottom: 8 },
-  emptySub:        { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  chevron:         { fontSize: 20, fontWeight: '300', alignSelf: 'center', marginLeft: 4 },
-})

@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import * as ExpoLocation from 'expo-location'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native'
+import { View, ActivityIndicator, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, DetailRow, Journey,
+  Notice, Btn, BottomBar, IconBtn, Mono,
+} from '@queue/shared/components/q'
 import { HospitalsMap } from '@queue/shared/components/map/HospitalsMap'
 import { FallbackPanel } from '@queue/shared/components/emergency/FallbackPanel'
 import {
@@ -232,73 +234,105 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
 
   if (!request && loading) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={t.danger} />
-      </SafeAreaView>
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={t.q.red} />
+        </View>
+      </Screen>
     )
   }
 
   if (!request) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-          <Text accessibilityRole="alert" style={[s.statusText, { color: t.textPrimary }]}>We couldn't load your ambulance request</Text>
-          <Text style={{ color: t.textMuted, fontSize: 14, lineHeight: 20 }}>
-            Your request may still be active. Check your connection and try again — and if this is life-threatening, call an emergency number now.
-          </Text>
-          <Button label="Try again" onPress={() => { setLoading(true); setSyncKey(k => k + 1) }} />
-          <FallbackPanel variant="urgent" />
-          <Button label="Back to home" variant="outline" onPress={backToHome} />
-        </ScrollView>
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Ambulance request" />
+        <Body>
+          <Notice tone="red" icon="alert-circle-outline">
+            We could not load your ambulance request. It may still be active. Check your connection and
+            try again — and if this is life-threatening, call an emergency number now.
+          </Notice>
+          <View style={{ paddingHorizontal: 16, gap: 10 }}>
+            <Btn label="Try again" onPress={() => { setLoading(true); setSyncKey(k => k + 1) }} />
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <FallbackPanel variant="urgent" />
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <Btn label="Back to home" variant="secondary" onPress={backToHome} />
+          </View>
+        </Body>
+      </Screen>
     )
   }
 
-  const status      = request.status
-  const isTerminal   = TERMINAL.includes(status)
-  const canCancel    = CANCELLABLE.includes(status)
-  const statusColor  = status === 'completed' ? t.accentDark : status.startsWith('cancelled') || status === 'no_unit_available' ? '#8A8A8A' : t.danger
+  const status = request.status
+  const isTerminal = TERMINAL.includes(status)
+  const canCancel = CANCELLABLE.includes(status)
 
   const markers = [
-    ...(pickup  ? [{ id: 'pickup', latitude: pickup.lat,  longitude: pickup.lng,  title: 'Pickup location' }] : []),
-    ...(unitPos ? [{ id: 'unit',   latitude: unitPos.lat, longitude: unitPos.lng, title: 'Ambulance' }]       : []),
+    ...(pickup ? [{ id: 'pickup', latitude: pickup.lat, longitude: pickup.lng, title: 'Pickup location' }] : []),
+    ...(unitPos ? [{ id: 'unit', latitude: unitPos.lat, longitude: unitPos.lng, title: 'Ambulance' }] : []),
   ]
 
-  return (
-    <SafeAreaView style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={backToHome} accessibilityLabel="Close" hitSlop={8} style={s.backBtn}>
-          <Ionicons name="close" size={22} color={t.textMuted} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.headerTitle, { color: t.textPrimary }]}>Ambulance request</Text>
-          <Text style={[s.headerSub, { color: t.textMuted }]}>{request.booking_ref}</Text>
-        </View>
-      </View>
+  // The ambulance journey, in the same rail language the hospital visit uses.
+  // Terminal states are deliberately NOT placed on it: a cancelled job did not
+  // reach "arrived", and a rail that shows it there would be a lie told at the
+  // worst possible moment.
+  const STOPS = ['Accepted', 'On the way', 'Arrived', 'To hospital', 'At hospital']
+  const stopIndex =
+    status === 'matched' ? 0
+    : status === 'en_route_to_patient' ? 1
+    : status === 'on_scene' ? 2
+    : status === 'transporting' ? 3
+    : status === 'arrived_at_destination' || status === 'completed' ? 4
+    : -1
 
-      <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
-        <View style={[s.statusCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          <Ionicons name={STATUS_ICON[status] ?? 'help-circle-outline'} size={32} color={statusColor} />
-          <Text style={[s.statusText, { color: t.textPrimary }]}>{TRANSPORT_STATUS_LABEL[status]}</Text>
-          {!isTerminal && !searching && (
-            <Text style={[s.etaText, { color: t.textMuted }]}>ETA: {formatEta(request.eta_seconds)}</Text>
+  const etaText = searching
+    ? (deadlinePassed ? 'Still searching' : `Finding a crew · ${secondsLeft}s`)
+    : formatEta(request.eta_seconds)
+
+  return (
+    <Screen>
+      <AppBar
+        title="Ambulance request"
+        sub={request.booking_ref ?? undefined}
+        right={<IconBtn name="close" label="Close" onPress={backToHome} />}
+      />
+
+      <Body>
+        {stopIndex >= 0 && !isTerminal && (
+          <Journey steps={STOPS} activeIndex={stopIndex} />
+        )}
+
+        <Card>
+          <Row
+            icon={STATUS_ICON[status] ?? 'help-circle-outline'}
+            iconTone={isTerminal ? 'neutral' : 'red'}
+            title={TRANSPORT_STATUS_LABEL[status]}
+            sub={isTerminal ? null : etaText}
+            right={!isTerminal && !searching && request.eta_seconds != null
+              ? <Mono size={15} weight="700" color={t.q.red}>{formatEta(request.eta_seconds)}</Mono>
+              : undefined}
+          />
+          {!!unitPos && (
+            <>
+              <Hair />
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                <Mono size={11} color={t.q.ink60}>
+                  Unit last seen {Math.max(0, Math.round((Date.now() - Date.parse(unitPos.recordedAt)) / 1000))}s ago
+                </Mono>
+              </View>
+            </>
           )}
-          {searching && !deadlinePassed && (
-            <Text style={[s.etaText, { color: t.textMuted }]}>
-              Finding you an ambulance · {secondsLeft}s
-            </Text>
-          )}
-        </View>
+        </Card>
 
         {(status === 'no_unit_available' || deadlinePassed) && (
-          <View style={[s.noteBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-            <Text style={[s.noteText, { color: t.danger }]}>
-              {status === 'no_unit_available'
-                ? 'No ambulance could be reached.'
-                : "We haven't been able to reach an ambulance yet."}
-              {' '}Don't keep waiting on this request — call one of the numbers below now.
-            </Text>
-          </View>
+          <Notice tone="red" icon="alert-circle-outline">
+            {status === 'no_unit_available'
+              ? 'No ambulance could be reached.'
+              : 'We have not been able to reach an ambulance yet.'}
+            {' '}Do not keep waiting on this request — call one of the numbers below now.
+          </Notice>
         )}
 
         {/* Always mounted while the outcome is still open, not gated behind
@@ -306,96 +340,91 @@ export function AmbulanceTrackingScreen({ navigation, route }: Props) {
             both paths can run at once. It only changes tone at the deadline.
             The number list is device-cached, so it renders with no network. */}
         {(searching || status === 'no_unit_available') && (
-          <FallbackPanel variant={deadlinePassed || status === 'no_unit_available' ? 'urgent' : 'calm'} />
+          <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+            <FallbackPanel variant={deadlinePassed || status === 'no_unit_available' ? 'urgent' : 'calm'} />
+          </View>
         )}
 
         {markers.length > 0 && (
-          <HospitalsMap
-            style={s.map}
-            markers={markers}
-            initialRegion={{
-              latitude: markers[0].latitude,
-              longitude: markers[0].longitude,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            interactive
-          />
+          <Card>
+            <HospitalsMap
+              style={{ height: 220 }}
+              markers={markers}
+              initialRegion={{
+                latitude: markers[0].latitude,
+                longitude: markers[0].longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+              }}
+              interactive
+            />
+          </Card>
         )}
 
         {status === 'completed' && (
-          <View style={[s.noteBox, { backgroundColor: t.accentBg, borderColor: t.accentBorder }]}>
-            <Text style={[s.noteText, { color: t.accent }]}>
-              {details?.disposition ? DISPOSITION_LABEL[details.disposition] ?? 'Trip completed' : 'Trip completed'}
-              {details?.disposition === 'transported' && details.destination_name ? ` — ${details.destination_name}` : ''}.
-              {' '}Thank you for using Queue. Take care.
-            </Text>
-          </View>
+          <Notice tone="green" icon="checkmark-circle-outline">
+            {details?.disposition ? DISPOSITION_LABEL[details.disposition] ?? 'Trip completed' : 'Trip completed'}
+            {details?.disposition === 'transported' && details.destination_name ? ` — ${details.destination_name}` : ''}.
+            {' '}Thank you for using Queue. Take care.
+          </Notice>
         )}
 
-        {/* Who is coming. Shown from the moment a crew accepts, so the patient can
-            recognise the vehicle and reach the operator without searching for a number. */}
+        {/* Who is coming. Shown from the moment a crew accepts, so the patient
+            can recognise the vehicle and reach the operator without hunting
+            for a number. */}
         {details?.plate_number && !isTerminal && (
-          <View style={[s.detailCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder, padding: 16, gap: 12 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: t.dangerSubtle, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="medkit" size={22} color={t.danger} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: t.textPrimary }}>{details.call_sign ?? details.plate_number}</Text>
-                <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
-                  {[details.plate_number !== details.call_sign ? details.plate_number : null, details.vehicle_tier, details.provider_name].filter(Boolean).join(' · ')}
-                </Text>
-              </View>
-            </View>
-            {!!details.provider_phone && (
-              <Button label="Call ambulance" variant="outline"
-                onPress={() => Linking.openURL(`tel:${details.provider_phone}`).catch(() => Alert.alert('Error', 'Could not start a call.'))} />
-            )}
-          </View>
+          <>
+            <SectionHead title="Your ambulance" />
+            <Card>
+              <Row
+                icon="medkit" iconTone="red"
+                title={details.call_sign ?? details.plate_number}
+                sub={[
+                  details.plate_number !== details.call_sign ? details.plate_number : null,
+                  details.vehicle_tier,
+                  details.provider_name,
+                ].filter(Boolean).join(' · ')}
+                right={details.provider_phone
+                  ? <Btn label="Call" variant="secondary" small icon="call-outline"
+                      onPress={() => Linking.openURL(`tel:${details.provider_phone}`)
+                        .catch(() => Alert.alert('Error', 'Could not start a call.'))} />
+                  : undefined}
+              />
+            </Card>
+          </>
         )}
 
-        <View style={[s.detailCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-          {[
-            { label: 'Condition', value: request.symptom_description ?? '—' },
-            { label: 'Pickup',    value: request.pickup_address ?? 'Current location' },
-            ...(details?.destination_name ? [{ label: 'Hospital', value: details.destination_name }] : []),
-          ].map(row => (
-            <View key={row.label} style={[s.detailRow, { borderBottomColor: t.cardBorder }]}>
-              <Text style={[s.detailLabel, { color: t.textMuted }]}>{row.label}</Text>
-              <Text style={[s.detailValue, { color: t.textPrimary }]} numberOfLines={2}>{row.value}</Text>
-            </View>
-          ))}
-        </View>
+        <SectionHead title="The request" />
+        <Card>
+          <DetailRow label="Condition" value={request.symptom_description ?? '—'} />
+          <DetailRow label="Pickup" value={request.pickup_address ?? 'Current location'} />
+          {!!details?.destination_name && <DetailRow label="Taking you to" value={details.destination_name} />}
+          <DetailRow label="Reference" value={request.booking_ref ?? '—'} mono last />
+        </Card>
+      </Body>
 
-        {canCancel && (
-          <Button label="Cancel request" onPress={handleCancel} loading={cancelling} variant="danger" />
-        )}
-
-        {isTerminal && (
-          <Button label="Back to home" onPress={backToHome} variant="outline" />
-        )}
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </SafeAreaView>
+      {(canCancel || isTerminal) && (
+        <BottomBar meta={
+          !isTerminal ? (
+            <>
+              <Mono size={12} color={t.q.red} weight="700">{TRANSPORT_STATUS_LABEL[status]}</Mono>
+              {!!details?.call_sign && (
+                <>
+                  <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+                  <Mono size={12}>{details.call_sign}</Mono>
+                </>
+              )}
+            </>
+          ) : undefined
+        }>
+          {canCancel && (
+            <Btn grow label="Cancel request" variant="danger" loading={cancelling} onPress={handleCancel} />
+          )}
+          {isTerminal && (
+            <Btn grow label="Back to home" onPress={backToHome} />
+          )}
+        </BottomBar>
+      )}
+    </Screen>
   )
 }
-
-const s = StyleSheet.create({
-  safe:         { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
-  backBtn:      { padding: 4, marginTop: 2 },
-  headerTitle:  { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
-  headerSub:    { fontSize: 11, marginTop: 2 },
-  statusCard:   { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center', marginBottom: 16 },
-  statusText:   { fontSize: 16, fontWeight: '700', marginTop: 10 },
-  etaText:      { fontSize: 13, marginTop: 4 },
-  noteBox:      { borderRadius: 12, padding: 13, borderWidth: 1, marginBottom: 16 },
-  noteText:     { fontSize: 12, lineHeight: 18 },
-  map:          { height: 220, borderRadius: 16, marginBottom: 16 },
-  detailCard:   { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
-  detailRow:    { flexDirection: 'row', justifyContent: 'space-between', padding: 12, paddingHorizontal: 14, borderBottomWidth: 1, gap: 12 },
-  detailLabel:  { fontSize: 12, flexShrink: 0 },
-  detailValue:  { fontSize: 12, fontWeight: '500', textAlign: 'right', flex: 1 },
-})

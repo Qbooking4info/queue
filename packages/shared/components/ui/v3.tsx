@@ -14,7 +14,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name']
 /** The header gradient: primary -> primaryDeep in light, deep -> surface in dark. */
 export function useHeaderColors(): [string, string] {
   const { theme: t } = useTheme()
-  return t.id === 'forest' ? ['#134E4A', '#0F2326'] : ['#0F766E', '#134E4A']
+  return t.isDark ? ['#134E4A', '#0F2326'] : ['#0F766E', '#134E4A']
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -122,9 +122,9 @@ export function ServiceTile({ icon, label, sublabel, sublabelTone = 'muted', til
   tileColor?: string; onPress: () => void
 }) {
   const { theme: t } = useTheme()
-  const tone = sublabelTone === 'success' ? (t.id === 'forest' ? '#4ADE80' : '#15803D')
-    : sublabelTone === 'warning' ? (t.id === 'forest' ? '#FBBF24' : '#B45309') : t.textMuted
-  const iconOn = t.id === 'forest' ? '#081416' : '#FFFFFF'
+  const tone = sublabelTone === 'success' ? (t.isDark ? '#4ADE80' : '#15803D')
+    : sublabelTone === 'warning' ? (t.isDark ? '#FBBF24' : '#B45309') : t.textMuted
+  const iconOn = t.q.onPrimary
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => { haptics.tap(); onPress() }}
       accessibilityRole="button" accessibilityLabel={sublabel ? `${label}, ${sublabel}` : label}
@@ -245,7 +245,7 @@ export function PrimaryButton({ label, onPress, variant = 'primary', disabled, l
   disabled?: boolean; loading?: boolean; height?: number; icon?: IconName
 }) {
   const { theme: t } = useTheme()
-  const onPrimary = t.id === 'forest' ? '#081416' : '#FFFFFF'
+  const onPrimary = t.q.onPrimary
   const bg = variant === 'primary' ? t.accent : variant === 'danger' ? '#B91C1C' : 'transparent'
   const fg = variant === 'ghost' ? t.accent : variant === 'danger' ? '#FFFFFF' : onPrimary
   const off = disabled || loading

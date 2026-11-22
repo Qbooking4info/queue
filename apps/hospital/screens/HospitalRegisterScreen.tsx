@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, KeyboardAvoidingView } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
+import {
+  Screen, AppBar, Body, Field, Notice, Btn, BottomBar,
+} from '@queue/shared/components/q'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -85,69 +85,68 @@ export function HospitalRegisterScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['top','left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
+    <Screen>
+      <AppBar title="Create account" onBack={() => navigation.goBack()} />
+
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-
-          <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" style={s.back}>
-            <Ionicons name="arrow-back" size={22} color={t.textPrimary} />
-          </TouchableOpacity>
-
-          <View style={s.content}>
-            <Text style={[s.title, { color: t.textPrimary }]}>Create your account</Text>
-            <Text style={[s.sub, { color: t.textMuted }]}>
-              This account will be the primary admin for your hospital. Next, you&apos;ll fill in your hospital&apos;s
-              details, verification, location, clinics, specialties, features, hours, and plan.
+        <Body keyboardShouldPersistTaps="handled">
+          <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: t.q.ink }}>
+              Create your account
             </Text>
-
-            {error ? (
-              <View style={[s.errorBanner, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-                <Ionicons name="alert-circle-outline" size={14} color={t.danger} />
-                <Text style={s.errorText}>{error}</Text>
-              </View>
-            ) : null}
-
-            <Field icon="person-outline" placeholder="Full name" value={fullName} onChange={setFullName} t={t} />
-            <Field icon="mail-outline"   placeholder="Work email" value={email} onChange={setEmail} t={t} keyboard="email-address" />
-            <View style={{ marginBottom: 14 }}><ProfileFields value={profile} onChange={setProfile} /></View>
-            <PasswordInput value={password} onChangeText={setPassword} placeholder="Password" newPassword style={{ marginBottom: 4 }} />
-            <PasswordChecklist password={password} />
-            <Field icon="gift-outline" placeholder="Referral code (optional)" value={referral} onChange={v => setReferral(cleanReferral(v))} t={t} />
-            <TermsCheckbox checked={agreed} onChange={setAgreed} />
-
-            <Button label="Continue" onPress={handleSubmit} loading={loading} disabled={!agreed} style={{ marginTop: t.spacing.md }} />
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, marginTop: 4 }}>
+              You become the hospital admin. Next you will fill in the hospital itself — details,
+              verification, location, clinics, hours and plan. Invite your team after that.
+            </Text>
           </View>
-        </ScrollView>
+
+          {!!error && <Notice tone="red">{error}</Notice>}
+
+          <View style={{ paddingHorizontal: 16, gap: 14 }}>
+            <Field
+              label="Full name"
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Your full name"
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+            <Field
+              label="Work email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@hospital.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <ProfileFields value={profile} onChange={setProfile} />
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.q.ink70 }}>Password</Text>
+              <PasswordInput value={password} onChangeText={setPassword} newPassword />
+              <PasswordChecklist password={password} />
+            </View>
+
+            <Field
+              label="Referral code (optional)"
+              value={referral}
+              onChangeText={v => setReferral(cleanReferral(v))}
+              placeholder="If someone referred you"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+
+            <TermsCheckbox checked={agreed} onChange={setAgreed} />
+          </View>
+        </Body>
+
+        <BottomBar>
+          <Btn grow label="Continue to hospital setup" loading={loading} disabled={!agreed}
+            onPress={handleSubmit} />
+        </BottomBar>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-function Field({ icon, placeholder, value, onChange, t, keyboard }: {
-  icon: React.ComponentProps<typeof Ionicons>['name']; placeholder: string; value: string
-  onChange: (v: string) => void; t: any; keyboard?: any
-}) {
-  return (
-    <View style={[s.input, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-      <Ionicons name={icon} size={16} color={t.textMuted} />
-      <TextInput
-        value={value} onChangeText={onChange} placeholder={placeholder}
-        placeholderTextColor={t.textMuted} keyboardType={keyboard ?? 'default'}
-        autoCapitalize={keyboard === 'email-address' ? 'none' : 'words'} autoCorrect={false}
-        style={[s.inputText, { color: t.textPrimary }]}
-      />
-    </View>
-  )
-}
-
-const s = StyleSheet.create({
-  safe:        { flex: 1 },
-  back:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  content:     { flex: 1, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40 },
-  title:       { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, marginBottom: 6 },
-  sub:         { fontSize: 13, lineHeight: 19, marginBottom: 20 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 14 },
-  errorText:   { fontSize: 13, color: '#B91C1C', flex: 1 },
-  input:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12 },
-  inputText:   { fontSize: 14, flex: 1 },
-})

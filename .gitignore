@@ -53,3 +53,20 @@ queue-*.apk
 
 # Supabase CLI scratch state (created when the CLI runs from a subfolder)
 **/supabase/.temp/
+
+# Tauri desktop: the Expo web build the shell wraps, and Cargo output.
+dist-web/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Session scratch from design/research tooling — screenshots, logs, research
+# notes and exported prototypes. None of it is source; some of it is large.
+.impeccable/
+.agents/
+research_notes/
+reports/
+Claude outputs/
+skills-lock.json
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/skills/impeccable/

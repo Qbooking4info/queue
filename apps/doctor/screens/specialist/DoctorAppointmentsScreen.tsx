@@ -1,21 +1,23 @@
 // Direct (hospital-less) bookings only -- hospital-referred/assigned patients
-// already show up in "Today's Queue" for whichever hospital is currently
-// active. A direct booking has no hospital at all, so it needs its own home
-// regardless of which hospital (if any) is active.
+// already show up in "My queue" for whichever hospital is currently active. A
+// direct booking has no hospital at all, so it needs its own home regardless of
+// which hospital (if any) is active.
 import { useCallback, useState } from 'react'
-import { View, TouchableOpacity, ActivityIndicator, ScrollView, KeyboardAvoidingView, RefreshControl } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
-import { fmtDate, fmt12 } from '@queue/shared/lib/format'
-import { reviewDirectAppointment } from '@queue/shared/lib/api'
-import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
-import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { Alert } from '@queue/shared/contexts/AlertContext'
+import { fmtDate } from '@queue/shared/lib/format'
+import { reviewDirectAppointment, getHospitalHours, type DayHours } from '@queue/shared/lib/api'
 import { addToGoogleCalendar } from '@queue/shared/lib/calendar'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, Btn,
+  CardActions, CardAction, Empty, Initials, Mono, Field, Pill, type PillTone,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
@@ -29,40 +31,69 @@ interface DirectAppt {
   approval_status: string | null
   reason: string | null
   home_visit_address: string | null
+  // Stamped at booking by set_appointment_fee (20261122000001), never revised
+  // afterwards -- so this is what was agreed, not the doctor's price today.
+  consultation_fee: number | null
   patient: { full_name: string; phone: string | null } | null
 }
 
 type FilterTab = 'pending' | 'upcoming' | 'past'
 
+const STATUS: Record<string, { label: string; tone: PillTone }> = {
+  pending:     { label: 'Awaiting your review', tone: 'amber' },
+  confirmed:   { label: 'Confirmed',            tone: 'green' },
+  in_progress: { label: 'In progress',          tone: 'teal' },
+  completed:   { label: 'Completed',            tone: 'neutral' },
+  cancelled:   { label: 'Cancelled',            tone: 'red' },
+}
+
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+
 export function DoctorAppointmentsScreen({ navigation }: Props) {
   const { theme: t } = useTheme()
-  const { user } = useAuth()
+  const { user, doctorProfile } = useAuth()
   const [tab, setTab] = useState<FilterTab>('pending')
   const [appts, setAppts] = useState<DirectAppt[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [hours, setHours] = useState<DayHours[] | null>(null)
+  const [clinicCount, setClinicCount] = useState<number | null>(null)
 
   const load = useCallback(async () => {
-    if (!user) return
+    // No signed-in user means there is nothing to load and never will be;
+    // returning without clearing `loading` leaves a spinner for ever.
+    if (!user) { setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('appointments')
-      .select('id, patient_id, appointment_date, start_time, type, status, approval_status, reason, home_visit_address, patient:users!appointments_patient_id_fkey(full_name, phone)')
+      .select('id, patient_id, appointment_date, start_time, type, status, approval_status, reason, home_visit_address, consultation_fee, patient:users!appointments_patient_id_fkey(full_name, phone)')
       .eq('doctor_user_id', user.id)
       .order('appointment_date', { ascending: true })
       .order('start_time', { ascending: true })
     setAppts((data as any[]) ?? [])
+
+    // The clinic line at the bottom: today's session at the active hospital,
+    // which is where the rest of this doctor's day actually happens.
+    if (doctorProfile) {
+      const [h, c] = await Promise.all([
+        getHospitalHours(doctorProfile.hospitalId).catch(() => null),
+        supabase.from('appointments').select('*', { count: 'exact', head: true })
+          .eq('doctor_id', doctorProfile.doctorId).eq('appointment_date', todayStr()).neq('status', 'cancelled'),
+      ])
+      setHours(h)
+      setClinicCount(c.count ?? 0)
+    }
     setLoading(false)
-  }, [user])
+  }, [user, doctorProfile])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  async function act(id: string, action: Parameters<typeof reviewDirectAppointment>[1], reason?: string) {
+  async function act(id: string, action: Parameters<typeof reviewDirectAppointment>[1]) {
     setBusyId(id)
     const err = await reviewDirectAppointment(id, action)
     setBusyId(null)
-    if (err) { haptics.error(); return }
+    if (err) { haptics.error(); Alert.alert('That did not work', err); return }
     haptics.success()
     load()
   }
@@ -72,166 +103,180 @@ export function DoctorAppointmentsScreen({ navigation }: Props) {
     if (tab === 'upcoming') return ['confirmed', 'in_progress'].includes(a.status)
     return ['completed', 'cancelled'].includes(a.status)
   })
-
   const pendingCount = appts.filter(a => a.status === 'pending').length
 
+  // Upcoming is grouped by day, the way the handoff reads it: Today, Tomorrow,
+  // then the date.
+  const groups: { label: string; rows: DirectAppt[] }[] = []
+  for (const a of filtered) {
+    const label = tab === 'pending' ? 'Awaiting your review' : dayLabel(a.appointment_date)
+    const g = groups.find(x => x.label === label)
+    if (g) g.rows.push(a)
+    else groups.push({ label, rows: [a] })
+  }
+
+  const today_ = hours?.find(h => h.day === new Date().getDay())
+
   return (
-      <View style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Appointments" subtitle="Direct virtual consults and home visits">
-          <SegmentedControl<FilterTab> onDark value={tab} onChange={setTab}
-            options={[
-              { value: 'pending', label: `Pending${pendingCount ? ` (${pendingCount})` : ''}` },
-              { value: 'upcoming', label: 'Upcoming' },
-              { value: 'past', label: 'Past' },
-            ]} />
-        </Header>
-        <View style={{ height: 14 }} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen>
+        <AppBar large title="Schedule" sub="Direct virtual consults and home visits" />
+
+        <Seg<FilterTab>
+          value={tab} onChange={setTab}
+          options={[
+            { key: 'pending', label: pendingCount ? `To review · ${pendingCount}` : 'To review' },
+            { key: 'upcoming', label: 'Upcoming' },
+            { key: 'past', label: 'Past' },
+          ]} />
 
         {loading ? (
-          <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
-        ) : filtered.length === 0 ? (
-          <EmptyState icon="calendar-outline" title={`No ${tab} appointments`}
-            body={tab === 'pending' ? 'New patient requests show up here for you to approve.' : undefined} />
+          <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
         ) : (
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}
-            refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.accent}
-              onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />}>
-            {filtered.map(a => (
-              <ApptCard key={a.id} appt={a} theme={t} busy={busyId === a.id}
-                onApprove={() => act(a.id, { action: 'approve' })}
-                onReject={reason => act(a.id, { action: 'reject', reason })}
-                onStart={() => act(a.id, { action: 'start' })}
-                onComplete={() => act(a.id, { action: 'complete' })}
-                onCancel={reason => act(a.id, { action: 'cancel', reason })}
-                onJoinCall={() => navigation.navigate('DoctorVideoCall', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
-                onCarePlan={() => navigation.navigate('CarePlanCompose', { patientId: a.patient_id, patientName: a.patient?.full_name })}
-              />
+          <Body refreshControl={
+            <RefreshControl refreshing={refreshing} tintColor={t.q.primary} colors={[t.q.primary]}
+              onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />
+          }>
+            {filtered.length === 0 ? (
+              <Card style={{ marginTop: 12 }}>
+                <Empty
+                  icon="calendar-outline"
+                  title={tab === 'pending' ? 'Nothing to review' : tab === 'upcoming' ? 'Nothing booked' : 'Nothing past'}
+                  body={tab === 'pending'
+                    ? 'Patients who book you directly for a video call or a home visit land here for you to accept.'
+                    : tab === 'upcoming'
+                      ? 'Accepted direct bookings show up here. Your hospital queue is under Queue.'
+                      : 'Completed and cancelled direct bookings stay here.'} />
+              </Card>
+            ) : groups.map(g => (
+              <View key={g.label}>
+                <SectionHead title={g.label} />
+                {g.rows.map(a => (
+                  <ApptCard key={a.id} appt={a} busy={busyId === a.id}
+                    onAct={action => act(a.id, action)}
+                    onJoinCall={() => navigation.navigate('DoctorVideoCall', { appointmentId: a.id, patientName: a.patient?.full_name ?? 'Patient' })}
+                    onCarePlan={() => navigation.navigate('CarePlanCompose', { patientId: a.patient_id, patientName: a.patient?.full_name })} />
+                ))}
+              </View>
             ))}
-          </ScrollView>
-          </KeyboardAvoidingView>
+
+            {/* The clinic session, so Schedule answers "what does my whole day
+                look like" and not only "what did patients book me for". */}
+            {doctorProfile && (
+              <>
+                <SectionHead title="At your hospital" />
+                <Card>
+                  <Row
+                    icon="business-outline" iconTone="teal"
+                    title={doctorProfile.linkedHospitals.find(h => h.hospitalId === doctorProfile.hospitalId)?.hospitalName ?? 'Your hospital'}
+                    sub={[
+                      today_ && !today_.closed ? `${today_.open.slice(0, 5)}–${today_.close.slice(0, 5)}` : 'Hours not set',
+                      clinicCount != null ? `${clinicCount} booked today` : null,
+                    ].filter(Boolean).join(' · ')}
+                    chevron
+                    onPress={() => navigation.navigate('Queue')} />
+                </Card>
+              </>
+            )}
+          </Body>
         )}
-      </View>
+      </Screen>
+    </KeyboardAvoidingView>
   )
 }
 
-function ApptCard({ appt, theme: t, busy, onApprove, onReject, onStart, onComplete, onCancel, onJoinCall, onCarePlan }: {
-  appt: DirectAppt; theme: any; busy: boolean
-  onApprove: () => void; onReject: (reason: string) => void; onStart: () => void
-  onComplete: () => void; onCancel: (reason: string) => void; onJoinCall: () => void
+function dayLabel(date: string): string {
+  const today = todayStr()
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  if (date === today) return 'Today'
+  if (date === tomorrow) return 'Tomorrow'
+  return fmtDate(date)
+}
+
+function ApptCard({ appt, busy, onAct, onJoinCall, onCarePlan }: {
+  appt: DirectAppt
+  busy: boolean
+  onAct: (action: Parameters<typeof reviewDirectAppointment>[1]) => void
+  onJoinCall: () => void
   onCarePlan: () => void
 }) {
+  const { theme: t } = useTheme()
   const [showReject, setShowReject] = useState(false)
   const [reason, setReason] = useState('')
-  const sc = statusBadgeColors(t)
-  const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-    pending:     { label: 'Awaiting your review', color: sc.pending.text,     bg: sc.pending.bg },
-    confirmed:   { label: 'Confirmed',            color: sc.confirmed.text,   bg: sc.confirmed.bg },
-    in_progress: { label: 'In progress',          color: sc.in_progress.text, bg: sc.in_progress.bg },
-    completed:   { label: 'Completed',            color: sc.completed.text,   bg: sc.completed.bg },
-    cancelled:   { label: 'Cancelled',            color: sc.cancelled.text,   bg: sc.cancelled.bg },
-  }
-  const meta = STATUS_META[appt.status] ?? STATUS_META.pending
+  const meta = STATUS[appt.status] ?? STATUS.pending
+  const isVirtual = appt.type === 'virtual'
+  const name = appt.patient?.full_name ?? 'Patient'
 
   return (
-    <View style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: t.cardBg, borderColor: t.cardBorder, borderWidth: 1, borderRadius: 16, padding: 16 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>{appt.patient?.full_name ?? 'Patient'}</Text>
-          <Text style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-            {fmtDate(appt.appointment_date)} · {fmt12(appt.start_time)} · {appt.type === 'virtual' ? 'Virtual consult' : 'Home visit'}
-          </Text>
+    <Card style={{ marginTop: 12 }}>
+      <Row
+        leading={<Initials name={name} size={40} />}
+        title={name}
+        sub={[
+          isVirtual ? 'Video consult' : 'Home visit',
+          dayLabel(appt.appointment_date),
+          appt.start_time?.slice(0, 5),
+        ].filter(Boolean).join(' · ')}
+        right={appt.consultation_fee != null
+          ? <Mono size={13} weight="700">₦{Number(appt.consultation_fee).toLocaleString('en-NG')}</Mono>
+          : <Mono size={12} color={t.q.ink60}>{isVirtual ? 'video' : 'home'}</Mono>} />
+      <Hair />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {!!appt.reason && <Text style={{ fontSize: 13, lineHeight: 19, color: t.q.ink }}>{appt.reason}</Text>}
+          {!isVirtual && !!appt.home_visit_address && (
+            <Text style={{ fontSize: 12.5, lineHeight: 18, color: t.q.ink60, marginTop: appt.reason ? 4 : 0 }}>
+              {appt.home_visit_address}
+            </Text>
+          )}
+          {!!appt.patient?.phone && (
+            <Text style={{ fontSize: 12.5, color: t.q.ink60, marginTop: 4 }}>{appt.patient.phone}</Text>
+          )}
         </View>
-        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: meta.bg }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: meta.color }}>{meta.label}</Text>
-        </View>
+        <Pill label={meta.label} tone={meta.tone} />
       </View>
 
-      {appt.reason && <Text style={{ fontSize: 12, color: t.textSecondary, marginBottom: 6 }}>{appt.reason}</Text>}
-      {['confirmed', 'in_progress'].includes(appt.status) && (
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add to Google Calendar"
-          onPress={() => addToGoogleCalendar({
-            title: `${appt.type === 'virtual' ? 'Video consult' : 'Home visit'}: ${appt.patient?.full_name ?? 'Patient'}`,
-            date: appt.appointment_date, time: appt.start_time,
-            location: appt.type === 'home_visit' ? (appt.home_visit_address ?? undefined) : 'Queue Doctor (video)',
-            details: appt.reason ?? undefined,
-          }).catch(() => {})}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 10, borderRadius: 99, backgroundColor: t.accentBg, marginBottom: 8 }}>
-          <Ionicons name="calendar-outline" size={14} color={t.accent} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>Add to Google Calendar</Text>
-        </TouchableOpacity>
-      )}
-      {appt.type === 'home_visit' && appt.home_visit_address && (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
-          <Ionicons name="location-outline" size={13} color={t.textMuted} style={{ marginTop: 1 }} />
-          <Text style={{ fontSize: 12, color: t.textSecondary, flex: 1 }}>{appt.home_visit_address}</Text>
-        </View>
-      )}
-      {appt.patient?.phone && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <Ionicons name="call-outline" size={13} color={t.textMuted} />
-          <Text style={{ fontSize: 12, color: t.textSecondary }}>{appt.patient.phone}</Text>
-        </View>
+      {appt.status === 'pending' && (
+        showReject ? (
+          <View style={{ padding: 14, gap: 10 }}>
+            <Field label="Why are you declining?" value={reason} onChangeText={setReason}
+              placeholder="The patient sees this" />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Btn grow label="Keep it" variant="secondary" onPress={() => { setShowReject(false); setReason('') }} />
+              <Btn grow label="Decline" variant="danger" disabled={!reason.trim() || busy}
+                onPress={() => { onAct({ action: 'reject', reason: reason.trim() }); setShowReject(false) }} />
+            </View>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: 10, padding: 14 }}>
+            <Btn grow label="Accept" loading={busy} onPress={() => onAct({ action: 'approve' })} />
+            <Btn label="Decline" variant="secondary" onPress={() => setShowReject(true)} />
+          </View>
+        )
       )}
 
-      {showReject ? (
-        <View>
-          <TextInput value={reason} onChangeText={setReason} placeholder="Reason for declining…" placeholderTextColor={t.textMuted}
-            style={{ borderWidth: 1, borderColor: t.inputBorder, backgroundColor: t.inputBg, borderRadius: 10, padding: 10, fontSize: 12, color: t.textPrimary, marginBottom: 8 }} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <ActionBtn label="Cancel" theme={t} onPress={() => setShowReject(false)} muted />
-            <ActionBtn label="Confirm Decline" theme={t} danger disabled={!reason.trim() || busy}
-              onPress={() => { onReject(reason.trim()); setShowReject(false) }} />
-          </View>
-        </View>
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-          {appt.status === 'pending' && (
-            <>
-              <ActionBtn label="Approve" theme={t} primary disabled={busy} onPress={onApprove} />
-              <ActionBtn label="Decline" theme={t} danger disabled={busy} onPress={() => setShowReject(true)} />
-            </>
-          )}
-          {appt.status === 'confirmed' && appt.type === 'virtual' && (
-            <ActionBtn label="Join Call" theme={t} primary disabled={busy} onPress={onJoinCall} />
-          )}
-          {/* A call already in progress (started here or from another device/tab,
-              or left stuck after a disconnect) has no other way back in -- without
-              this, an interrupted call could never be resumed or properly ended. */}
-          {appt.status === 'in_progress' && appt.type === 'virtual' && (
-            <ActionBtn label="Rejoin Call" theme={t} primary disabled={busy} onPress={onJoinCall} />
-          )}
-          {appt.status === 'confirmed' && appt.type === 'home_visit' && (
-            <ActionBtn label="Start Visit" theme={t} primary disabled={busy} onPress={onStart} />
+      {appt.status !== 'pending' && (
+        <CardActions>
+          {appt.status === 'confirmed' && isVirtual && <CardAction first label="Join call" onPress={onJoinCall} />}
+          {appt.status === 'in_progress' && isVirtual && <CardAction first label="Rejoin call" onPress={onJoinCall} />}
+          {appt.status === 'confirmed' && !isVirtual && <CardAction first label="Start visit" onPress={() => onAct({ action: 'start' })} />}
+          {appt.status === 'in_progress' && !isVirtual && <CardAction first label="Mark completed" onPress={() => onAct({ action: 'complete' })} />}
+          {(appt.status === 'in_progress' || appt.status === 'completed') && (
+            <CardAction first={appt.status === 'completed'} label="Care plan" onPress={onCarePlan} />
           )}
           {appt.status === 'confirmed' && (
-            <ActionBtn label="Cancel" theme={t} muted disabled={busy} onPress={() => onCancel('Cancelled by doctor')} />
+            <CardAction label="Add to calendar" onPress={() => addToGoogleCalendar({
+              title: `${isVirtual ? 'Video consult' : 'Home visit'}: ${name}`,
+              date: appt.appointment_date, time: appt.start_time,
+              location: isVirtual ? 'Queue Doctor (video)' : (appt.home_visit_address ?? undefined),
+              details: appt.reason ?? undefined,
+            }).catch(() => {})} />
           )}
-          {appt.status === 'in_progress' && appt.type === 'home_visit' && (
-            <ActionBtn label="Mark Completed" theme={t} primary disabled={busy} onPress={onComplete} />
+          {appt.status === 'confirmed' && (
+            <CardAction label="Cancel" onPress={() => onAct({ action: 'cancel', reason: 'Cancelled by the doctor' })} />
           )}
-          {/* The independent half of "a doctor seeing a patient". Offered once
-              the visit is under way or done -- there is nothing to plan for a
-              booking that has not happened yet. */}
-          {(appt.status === 'in_progress' || appt.status === 'completed') && (
-            <ActionBtn label="Care plan" theme={t} disabled={busy} onPress={onCarePlan} />
-          )}
-        </View>
+        </CardActions>
       )}
-    </View>
-  )
-}
-
-function ActionBtn({ label, theme: t, onPress, primary, danger, muted, disabled }: {
-  label: string; theme: any; onPress: () => void; primary?: boolean; danger?: boolean; muted?: boolean; disabled?: boolean
-}) {
-  const bg = primary ? t.accent : danger ? t.dangerSubtle : t.inputBg
-  const border = primary ? t.accent : danger ? t.dangerBorder : t.cardBorder
-  const color = primary ? (t.id === 'forest' ? '#061208' : '#fff') : danger ? t.danger : t.textSecondary
-  return (
-    <TouchableOpacity disabled={disabled} onPress={() => { haptics.tap(); onPress() }}
-      style={{ flex: 1, minWidth: 100, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: bg, borderWidth: 1, borderColor: border, opacity: disabled ? 0.5 : 1 }}>
-      <Text style={{ fontSize: 12, fontWeight: '700', color }}>{label}</Text>
-    </TouchableOpacity>
+    </Card>
   )
 }

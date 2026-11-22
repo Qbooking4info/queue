@@ -1,13 +1,13 @@
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { useCallback, useState } from 'react'
-import { View, TouchableOpacity, Linking, ScrollView } from 'react-native'
+import { View, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { getActiveTransport } from '@queue/shared/lib/ambulance-api'
 import { haptics } from '@queue/shared/lib/haptics'
-import { Header, Card, SectionTitle } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Btn, Mono,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any }
 
@@ -20,58 +20,85 @@ export function AmbulanceHomeScreen({ navigation }: Props) {
   }, []))
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title="Ambulance" onBack={() => navigation.goBack()}>
-          <Text style={{ color: '#CCFBF1', fontSize: 14, lineHeight: 20 }}>
-            We find you an ambulance. If we can't, we tell you straight away and give you numbers that will.
+    <Screen>
+      <AppBar title="Ambulance" onBack={() => navigation.goBack()} />
+
+      <Body>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60 }}>
+            We find you an ambulance. If we cannot, we say so straight away and give you numbers that will.
           </Text>
-        </Header>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-                <View style={{ padding: 20, gap: 12 }}>
-          {active && (
-            <Card onPress={() => navigation.navigate('AmbulanceTracking', { requestId: active.id })} accessibilityLabel="Your active ambulance request"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.accentBg, borderColor: t.accentBorder }}>
-              <Ionicons name="navigate" size={22} color={t.accent} />
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: t.textPrimary }}>You have an active request · track it</Text>
-              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-            </Card>
-          )}
-
-          <TouchableOpacity onPress={() => { haptics.heavy(); navigation.navigate('Sos') }} accessibilityRole="button" accessibilityLabel="Emergency SOS"
-            style={{ backgroundColor: '#B91C1C', borderRadius: 16, padding: 18, minHeight: 96, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 56, height: 56, borderRadius: 99, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#B91C1C', fontWeight: '800', fontSize: 15 }}>SOS</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>Emergency</Text>
-              <Text style={{ color: '#FECACA', fontSize: 13, marginTop: 2, lineHeight: 18 }}>Hold to send. We start looking for a crew straight away and ask questions while we search.</Text>
-            </View>
-          </TouchableOpacity>
-
-          <Card accessibilityLabel="Scheduled transport" style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 96, opacity: 0.75 }}>
-            <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: t.accentBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="calendar-outline" size={26} color={t.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: t.textPrimary }}>Scheduled transport</Text>
-              <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 2, lineHeight: 18 }}>Discharge, dialysis or a planned transfer — coming soon.</Text>
-            </View>
-          </Card>
-
-          <Card style={{ gap: 10 }}>
-            <SectionTitle title="Call directly" />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {[['112', '112'], ['767', 'Lagos 767']].map(([num, label]) => (
-                <TouchableOpacity key={num} onPress={() => Linking.openURL(`tel:${num}`)} accessibilityRole="button" accessibilityLabel={`Call ${label}`}
-                  style={{ flex: 1, height: 52, borderRadius: 13, borderWidth: 1.5, borderColor: t.danger, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}>
-                  <Ionicons name="call" size={18} color={t.danger} />
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: t.danger }}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Card>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        {active && (
+          <Card style={{ marginBottom: 12 }}>
+            <Row
+              icon="navigate"
+              tint
+              title="You have an active request"
+              sub="Track where the crew is now"
+              chevron
+              onPress={() => navigation.navigate('AmbulanceTracking', { requestId: active.id })}
+            />
+          </Card>
+        )}
+
+        <Card>
+          <Row
+            icon="warning-outline" iconTone="red"
+            title="Emergency ambulance"
+            sub="Send an SOS — the nearest crew is dispatched"
+            titleColor={t.q.red}
+            chevron
+            onPress={() => { haptics.heavy(); navigation.navigate('Sos') }}
+          />
+          <Hair />
+          <Row
+            icon="business-outline"
+            title="Book an emergency slot"
+            sub="Get yourself there — we hold a place at the hospital"
+            chevron
+            onPress={() => navigation.navigate('EmergencyBooking')}
+          />
+          <Hair />
+          <Row
+            icon="calendar-outline" iconTone="neutral"
+            title="Scheduled transport"
+            sub="Discharge, dialysis or a planned transfer"
+            pill="Soon" pillTone="neutral"
+          />
+        </Card>
+
+        <SectionHead title="Call directly" />
+        <Card>
+          {([
+            ['112', 'Lagos State Emergency', 'Free from any phone'],
+            ['767', 'LASAMBUS', 'Lagos ambulance service'],
+          ] as const).map(([num, name, sub], i) => (
+            <View key={num}>
+              {i > 0 && <Hair />}
+              <Row
+                icon="call-outline" iconTone="red"
+                title={name}
+                sub={sub}
+                right={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Mono size={15} weight="700">{num}</Mono>
+                    <Btn label="Call" variant="secondary" small
+                      onPress={() => Linking.openURL(`tel:${num}`).catch(() => {})} />
+                  </View>
+                }
+              />
+            </View>
+          ))}
+        </Card>
+
+        <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
+          <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+            If someone is not breathing, call 112 now as well as sending an SOS.
+          </Text>
+        </View>
+      </Body>
+    </Screen>
   )
 }

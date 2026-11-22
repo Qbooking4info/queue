@@ -1,20 +1,21 @@
 // Booking a doctor directly has no pre-generated time_slots to pick from --
-// there's no hospital-style availability calendar for an independent doctor
-// yet. The patient picks a preferred date/time, the booking is created
+// there is no hospital-style availability calendar for an independent doctor
+// yet. The patient picks a preferred date and time, the booking is created
 // 'pending' / 'pending_review', and the doctor confirms or reschedules it
-// themselves from the doctors app's Appointments screen.
+// themselves from the doctor app's Appointments screen.
 import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { Button } from '@queue/shared/components/ui/Button'
+import { EntityAvatar } from '@queue/shared/components/ui/EntityAvatar'
 import { useAuth } from '@queue/shared/contexts/AuthContext'
-import { createDirectAppointment, IndependentDoctorProfile } from '@queue/shared/lib/api'
+import { createDirectAppointment, type IndependentDoctorProfile } from '@queue/shared/lib/api'
 import { haptics } from '@queue/shared/lib/haptics'
 import { fmtLocalDate } from '@queue/shared/lib/format'
+import {
+  Screen, AppBar, Body, Card, CardLabel, Row, SectionHead, Field, Notice,
+  Btn, BottomBar, Mono, MONO,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: any }
 
@@ -30,10 +31,7 @@ const TIMES = Array.from({ length: 20 }, (_, i) => {
   const totalMins = 8 * 60 + i * 30 // 08:00 -> 17:30
   const h = Math.floor(totalMins / 60)
   const m = totalMins % 60
-  const hh = String(h).padStart(2, '0')
-  const mm = String(m).padStart(2, '0')
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  return { value: `${hh}:${mm}`, label: `${h % 12 || 12}:${mm} ${ampm}` }
+  return { value: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, label: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` }
 })
 
 const DATES = nextDays(14)
@@ -50,13 +48,14 @@ export function DirectBookingScreen({ navigation, route }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const fee = visitType === 'virtual' ? doctor.virtualFee : doctor.homeVisitFee
+  const isHome = visitType === 'home_visit'
+  const fee = isHome ? doctor.homeVisitFee : doctor.virtualFee
 
   async function handleSubmit() {
     if (!user) { setError('You must be signed in.'); return }
     if (!time) { setError('Please choose a time.'); return }
-    if (!reason.trim()) { setError(`Please describe your reason for this ${visitType === 'virtual' ? 'consultation' : 'visit'}.`); return }
-    if (visitType === 'home_visit' && !address.trim()) { setError('Please enter the address for your home visit.'); return }
+    if (!reason.trim()) { setError(`Please describe your reason for this ${isHome ? 'visit' : 'consultation'}.`); return }
+    if (isHome && !address.trim()) { setError('Please enter the address for your home visit.'); return }
 
     setSubmitting(true); setError('')
     const result = await createDirectAppointment({
@@ -64,7 +63,7 @@ export function DirectBookingScreen({ navigation, route }: Props) {
       doctorUserId: doctor.userId,
       date, startTime: time, type: visitType,
       reason: reason.trim(),
-      homeVisitAddress: visitType === 'home_visit' ? address.trim() : undefined,
+      homeVisitAddress: isHome ? address.trim() : undefined,
     })
     setSubmitting(false)
 
@@ -76,85 +75,125 @@ export function DirectBookingScreen({ navigation, route }: Props) {
       bookingRef: result.bookingRef,
       approvalStatus: 'pending_approval',
       selectedDate: date,
+      startTime: time,
       bookingType: visitType,
     })
   }
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <Header title={visitType === 'virtual' ? 'Book Virtual Consult' : 'Book Home Visit'} onBack={() => navigation.goBack()} />
+    <Screen>
+      <AppBar title={isHome ? 'Request a home visit' : 'Request a video visit'} onBack={() => navigation.goBack()} />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={[st.doctorCard, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.textPrimary }}>
-              {doctor.title ? `${doctor.title} ` : ''}{doctor.fullName}
-            </Text>
-            {doctor.specialty && <Text style={{ fontSize: 12, color: t.accent, marginTop: 2 }}>{doctor.specialty.name}</Text>}
-            {fee != null && <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>Fee: ₦{fee.toLocaleString()}</Text>}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <Body keyboardShouldPersistTaps="handled">
+          <Card>
+            <Row
+              leading={<EntityAvatar size={40} kind="doctor" uri={doctor.avatarUrl} gender={doctor.gender} label={doctor.fullName} />}
+              title={`${doctor.title ? doctor.title + ' ' : ''}${doctor.fullName}`}
+              sub={[doctor.specialty?.name, isHome ? 'Home visit' : 'Video visit'].filter(Boolean).join(' · ')}
+              right={fee != null ? <Mono size={13} weight="700">₦{fee.toLocaleString('en-NG')}</Mono> : undefined}
+            />
+          </Card>
+
+          <Notice tone="teal" icon="information-circle-outline">
+            The doctor confirms or declines within a couple of hours. You pay only once they confirm.
+          </Notice>
+
+          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8 }}>
+            <CardLabel>Preferred date</CardLabel>
           </View>
-
-          <Text style={[st.label, { color: t.textMuted }]}>PREFERRED DATE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-            {DATES.map(d => (
-              <TouchableOpacity key={d.iso} onPress={() => { haptics.tap(); setDate(d.iso) }}
-                style={[st.dateChip, { backgroundColor: date === d.iso ? t.accentBg : t.cardBg, borderColor: date === d.iso ? t.accentBorder : t.cardBorder }]}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: date === d.iso ? t.accent : t.textPrimary }}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }} style={{ flexGrow: 0 }}>
+            {DATES.map(d => {
+              const on = date === d.iso
+              return (
+                <Pressable
+                  key={d.iso}
+                  onPress={() => { haptics.tap(); setDate(d.iso) }}
+                  accessibilityRole="button" accessibilityState={{ selected: on }}
+                  style={{
+                    minHeight: 48, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 14, backgroundColor: on ? t.q.sel : t.q.surface,
+                    borderWidth: 1, borderColor: on ? t.q.primary : t.q.line,
+                  }}>
+                  <Text style={{ fontSize: 13, fontWeight: on ? '700' : '600', color: on ? t.q.primary : t.q.ink }}>
+                    {d.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
           </ScrollView>
 
-          <Text style={[st.label, { color: t.textMuted, marginTop: 16 }]}>PREFERRED TIME</Text>
-          <View style={st.timeGrid}>
-            {TIMES.map(tm => (
-              <TouchableOpacity key={tm.value} onPress={() => { haptics.tap(); setTime(tm.value) }}
-                style={[st.timeChip, { backgroundColor: time === tm.value ? t.accentBg : t.cardBg, borderColor: time === tm.value ? t.accentBorder : t.cardBorder }]}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: time === tm.value ? t.accent : t.textPrimary }}>{tm.label}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 8 }}>
+            <CardLabel>Preferred time</CardLabel>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+            {TIMES.map(tm => {
+              const on = time === tm.value
+              return (
+                <Pressable
+                  key={tm.value}
+                  onPress={() => { haptics.tap(); setTime(tm.value) }}
+                  accessibilityRole="button" accessibilityState={{ selected: on }}
+                  style={{
+                    flexGrow: 1, flexBasis: '21%', minHeight: 44,
+                    alignItems: 'center', justifyContent: 'center', borderRadius: 12,
+                    backgroundColor: on ? t.q.sel : t.q.surface,
+                    borderWidth: 1, borderColor: on ? t.q.primary : t.q.line,
+                  }}>
+                  <Text style={{ fontFamily: MONO, fontSize: 12.5, fontWeight: on ? '700' : '400', color: on ? t.q.primary : t.q.ink70 }}>
+                    {tm.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
           </View>
 
-          {visitType === 'home_visit' && (
-            <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-              <Text style={[st.label, { color: t.textMuted, paddingHorizontal: 0 }]}>YOUR ADDRESS</Text>
-              <TextInput value={address} onChangeText={setAddress} placeholder="Where should the doctor visit you?"
-                placeholderTextColor={t.textMuted} multiline
-                style={[st.textArea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
-            </View>
+          {isHome && (
+            <>
+              <SectionHead title="Your address" />
+              <View style={{ paddingHorizontal: 16 }}>
+                <Field
+                  label="Where should the doctor visit you?"
+                  value={address} onChangeText={setAddress}
+                  multiline placeholder="Street, area, landmark, flat or gate number"
+                  style={{ minHeight: 80, textAlignVertical: 'top' }}
+                />
+              </View>
+            </>
           )}
 
-          <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-            <Text style={[st.label, { color: t.textMuted, paddingHorizontal: 0 }]}>{visitType === 'virtual' ? 'REASON FOR CONSULTATION' : 'REASON FOR VISIT'}</Text>
-            <TextInput value={reason} onChangeText={setReason} placeholder="Briefly describe your symptoms or reason…"
-              placeholderTextColor={t.textMuted} multiline
-              style={[st.textArea, { backgroundColor: t.inputBg, borderColor: t.inputBorder, color: t.textPrimary }]} />
+          <SectionHead title={isHome ? 'Reason for visit' : 'Reason for consultation'} />
+          <View style={{ paddingHorizontal: 16 }}>
+            <Field
+              label="What should the doctor know?"
+              value={reason} onChangeText={setReason}
+              multiline placeholder="Briefly describe your symptoms or reason…"
+              style={{ minHeight: 88, textAlignVertical: 'top' }}
+              error={error || undefined}
+            />
           </View>
 
-          {error ? (
-            <View style={[st.errorBox, { backgroundColor: t.dangerSubtle, borderColor: t.dangerBorder }]}>
-              <Text style={{ fontSize: 12, color: t.danger }}>{error}</Text>
-            </View>
-          ) : null}
+          <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
+            <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+              This is a request. The doctor confirms your exact time, or suggests another.
+            </Text>
+          </View>
+        </Body>
 
-          <Button label="Request Appointment" onPress={handleSubmit} loading={submitting} style={{ marginHorizontal: 20, marginTop: 20 }} />
-          <Text style={{ fontSize: 11, color: t.textMuted, textAlign: 'center', marginTop: 10, paddingHorizontal: 30 }}>
-            This is a request — the doctor will confirm your exact time or suggest an alternative.
-          </Text>
-        </ScrollView>
+        <BottomBar meta={
+          fee != null ? (
+            <>
+              <Mono size={12} weight="700">₦{fee.toLocaleString('en-NG')}</Mono>
+              <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+              <Mono size={12} color={t.q.ink60}>after confirmation</Mono>
+            </>
+          ) : undefined
+        }>
+          <Btn grow label="Request appointment" loading={submitting} onPress={handleSubmit} />
+        </BottomBar>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe:         { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:        { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  doctorCard:   { marginHorizontal: 20, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  label:        { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginBottom: 8, paddingHorizontal: 20 },
-  dateChip:     { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
-  timeGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20 },
-  timeChip:     { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, minWidth: '22%', alignItems: 'center' },
-  textArea:     { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, minHeight: 80, textAlignVertical: 'top' },
-  errorBox:     { marginHorizontal: 20, marginTop: 14, padding: 12, borderRadius: 10, borderWidth: 1 },
-})

@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { View, Linking, Platform, TouchableOpacity } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, Linking, Platform } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import * as ExpoLocation from 'expo-location'
-import { Ionicons } from '@expo/vector-icons'
 import { Text } from '@queue/shared/components/ui/Typography'
-import { Header, PrimaryButton, EmptyState, HeaderIconButton } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Card, Btn, BottomBar, IconBtn, Empty, Mono, Stat, StatStrip, Hair,
+} from '@queue/shared/components/q'
 import { LiveTrackMap, type LiveTrackData } from '@queue/shared/components/map/LiveTrackMap'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
 import { Alert } from '@queue/shared/contexts/AlertContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics } from '@queue/shared/lib/haptics'
 import { getMyActiveJob, type ActiveJob } from '@queue/shared/lib/crew-api'
-import { fetchJobPatientLocation, subscribeToPatientLocation, formatEta, TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
+import { fetchJobPatientLocation, subscribeToPatientLocation, TRANSPORT_STATUS_LABEL, type TransportStatus } from '@queue/shared/lib/ambulance-api'
 import { startConversation } from '@queue/shared/lib/chat'
 
 function metres(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -84,49 +84,71 @@ export function CrewTrackScreen({ navigation }: { navigation: any }) {
 
   if (loaded && !job) {
     return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-        <Header title="Tracking" onBack={() => navigation.goBack()} />
-        <EmptyState icon="navigate-outline" title="No active job" body="When you accept a job, the patient's live position shows here." />
-      </SafeAreaView>
+      <Screen>
+        <AppBar title="Track" onBack={() => navigation.goBack()} />
+        <Card style={{ marginTop: 12 }}>
+          <Empty icon="navigate-outline" title="No active run"
+            body="When you accept a job, the patient's live position shows here."
+            action="Back to jobs" onAction={() => navigation.goBack()} />
+        </Card>
+      </Screen>
     )
   }
 
+  const etaMins = job?.eta_seconds != null ? Math.round(job.eta_seconds / 60) : null
+  const etaAt = job?.eta_updated_at
+    ? new Date(job.eta_updated_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null
+  const distance = me && target ? fmtDist(metres(me, target)) : null
+
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: t.canvasBg }}>
-      <Header title={toHospital ? 'To hospital' : 'To patient'}
-        subtitle={job ? `${TRANSPORT_STATUS_LABEL[job.status as TransportStatus] ?? job.status}${['matched', 'en_route_to_patient'].includes(job.status) ? ` · ETA ${formatEta(job.eta_seconds)}` : ''}` : 'Loading…'}
+    <Screen>
+      <AppBar
+        title={toHospital ? 'To hospital' : 'To patient'}
+        sub={job?.booking_ref}
         onBack={() => navigation.goBack()}
-        right={<HeaderIconButton icon="locate-outline" label="Recenter map" onPress={() => setRecenter(n => n + 1)} />} />
+        right={<IconBtn name="locate-outline" label="Recenter the map" onPress={() => setRecenter(n => n + 1)} />} />
+
       <LiveTrackMap data={data} recenterKey={recenter} style={{ flex: 1 }} />
-      <View style={{ padding: 16, gap: 10, backgroundColor: t.cardBg, borderTopWidth: 1, borderTopColor: t.cardBorder }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 99, backgroundColor: patient?.live ? t.danger : t.textMuted }} />
-          <Text style={{ flex: 1, fontSize: 14, color: t.textPrimary }} numberOfLines={2}>
-            {toHospital ? (dest?.name ?? job?.destination_hospital_name ?? 'Receiving hospital')
-              : patient?.live ? 'Patient is sharing live location' : 'Showing the booked pickup point'}
+
+      <Card style={{ marginHorizontal: 0, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0, borderBottomWidth: 0 }}>
+        <StatStrip>
+          <Stat label={toHospital ? 'To hospital' : 'To pickup'}
+            value={etaMins != null ? etaMins : '—'} unit={etaMins != null ? 'min' : undefined}
+            note={etaAt ? `as of ${etaAt}` : 'not computed yet'} />
+          <Stat label="Distance" value={distance ?? '—'} note={me ? 'straight line' : 'no fix yet'} />
+          <Stat label="Priority" value={job?.triage_level != null ? `P${job.triage_level}` : '—'}
+            tone={job?.triage_level != null && job.triage_level <= 2 ? 'red' : undefined}
+            note={TRANSPORT_STATUS_LABEL[job?.status as TransportStatus] ?? ''} last />
+        </StatStrip>
+        <Hair inset={0} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: patient?.live ? t.q.redFill : t.q.ink60 }} />
+          <Text numberOfLines={2} style={{ flex: 1, fontSize: 13, color: t.q.ink70 }}>
+            {toHospital
+              ? (dest?.name ?? job?.destination_hospital_name ?? 'Receiving hospital')
+              : patient?.live ? 'The patient is sharing their live position' : 'Showing the booked pickup point'}
           </Text>
-          {me && target && <Text style={{ fontSize: 16, fontWeight: '800', color: t.textPrimary }}>{fmtDist(metres(me, target))}</Text>}
         </View>
-        {!!job?.symptom_description && <Text style={{ fontSize: 13, color: t.textSecondary }} numberOfLines={2}>{job.symptom_description}</Text>}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 1.3 }}><PrimaryButton height={64} icon="navigate" label="Navigate" disabled={!target} onPress={navigate} /></View>
-          <View style={{ flex: 1 }}>
-            <PrimaryButton height={64} variant="ghost" icon="call-outline" label="Call" disabled={!job?.contact_phone}
-              onPress={() => job?.contact_phone && Linking.openURL(`tel:${job.contact_phone}`).catch(() => {})} />
-          </View>
-          {!!job?.destination_hospital_id && (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Message hospital"
-              onPress={async () => {
-                const r = await startConversation('hospital', job.destination_hospital_id!)
-                if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
-                else Alert.alert('Messages', r.error)
-              }}
-              style={{ width: 64, height: 64, borderRadius: 13, borderWidth: 1.5, borderColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="chatbubble-ellipses-outline" size={22} color={t.accent} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </SafeAreaView>
+      </Card>
+
+      <BottomBar meta={
+        <Mono size={12} weight="600" color={t.q.ink60}>
+          {job?.symptom_description ?? 'No condition details given'}
+        </Mono>
+      }>
+        <Btn grow label="Navigate" icon="navigate" disabled={!target} onPress={navigate} />
+        <Btn label="Call" variant="secondary" icon="call-outline" disabled={!job?.contact_phone}
+          onPress={() => job?.contact_phone && Linking.openURL(`tel:${job.contact_phone}`).catch(() => {})} />
+        {!!job?.destination_hospital_id && (
+          <Btn label="Message" variant="secondary" icon="chatbubble-outline"
+            onPress={async () => {
+              const r = await startConversation('hospital', job.destination_hospital_id!)
+              if (r.ok) navigation.navigate('Chat', { conversationId: r.data })
+              else Alert.alert('Messages', r.error)
+            }} />
+        )}
+      </BottomBar>
+    </Screen>
   )
 }

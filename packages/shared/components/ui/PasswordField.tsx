@@ -84,7 +84,7 @@ export function TermsCheckbox({ checked, onChange }: { checked: boolean; onChang
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         style={{ width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: checked ? t.accent : t.inputBorder,
           backgroundColor: checked ? t.accent : 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-        {checked && <Ionicons name="checkmark" size={16} color={t.id === 'forest' ? '#081416' : '#FFFFFF'} />}
+        {checked && <Ionicons name="checkmark" size={16} color={t.q.onPrimary} />}
       </TouchableOpacity>
       <Text style={{ flex: 1, fontSize: 13, lineHeight: 20, color: t.textSecondary }}>
         I agree to Queue's{' '}

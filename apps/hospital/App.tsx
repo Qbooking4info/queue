@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto'
 import { useState } from 'react'
 import React from 'react'
 import * as Sentry from '@sentry/react-native'
-import { NavigationContainer, DarkTheme } from '@react-navigation/native'
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native'
 import { navigationRef, flushPendingNavigation } from '@queue/shared/lib/navigation'
 import { OfflineBanner } from '@queue/shared/components/ui/OfflineBanner'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
@@ -12,11 +12,12 @@ import { View, ActivityIndicator, TouchableOpacity } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Ionicons } from '@expo/vector-icons'
 
-import { ThemeProvider, useTheme } from '@queue/shared/contexts/ThemeContext'
+import { ThemeProvider, useTheme, V4_PALETTES } from '@queue/shared/contexts/ThemeContext'
 import { useQueueFonts } from '@queue/shared/hooks/useQueueFonts'
 import { AlertProvider }           from '@queue/shared/contexts/AlertContext'
 import { AuthProvider, useAuth }   from '@queue/shared/contexts/AuthContext'
 import { LocationProvider }        from '@queue/shared/contexts/LocationContext'
+import { useDeviceRegistration }   from '@queue/shared/hooks/useDeviceRegistration'
 import { usePushNotifications }    from '@queue/shared/hooks/usePushNotifications'
 
 import { SplashScreen } from '@queue/shared/screens/SplashScreen'
@@ -36,6 +37,7 @@ import { StaffManagementScreen }   from './screens/staff/StaffManagementScreen'
 import { HospitalSettingsScreen }  from './screens/staff/HospitalSettingsScreen'
 import { HospitalClinicsScreen }       from './screens/staff/HospitalClinicsScreen'
 import { HospitalClinicDetailScreen }  from './screens/staff/HospitalClinicDetailScreen'
+import { LabOrdersScreen } from './screens/staff/LabOrdersScreen'
 import { HospitalServicesScreen }      from './screens/staff/HospitalServicesScreen'
 import { HospitalScheduleScreen }      from './screens/staff/HospitalScheduleScreen'
 import { PatientsScreen } from './screens/staff/PatientsScreen'
@@ -47,7 +49,9 @@ import { setStatusBarStyle } from 'expo-status-bar'
 import { NoAccessScreen } from '@queue/shared/components/NoAccessScreen'
 import { HospitalMessagesScreen } from './screens/staff/HospitalMessagesScreen'
 import { StaffShiftsScreen } from './screens/staff/StaffShiftsScreen'
+import { BedsScreen } from './screens/staff/BedsScreen'
 import { ChatScreen } from '@queue/shared/screens/ChatScreen'
+import { QTabBar } from '@queue/shared/components/q'
 
 const AuthStack   = createNativeStackNavigator()
 const StaffTab    = createBottomTabNavigator()
@@ -62,7 +66,7 @@ function HospitalAuthStack() {
   const { theme: t } = useTheme()
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      screenListeners={{ focus: () => setStatusBarStyle(t.id === 'forest' ? 'light' : 'dark', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       {/* Staff sign in through HospitalAuthScreen, which passes surface 'hospital'. The
           shared patient LoginScreen used to be registered here too, unreachable and
           pinned to the 'patient' surface -- had anything ever routed to it, it would
@@ -74,29 +78,28 @@ function HospitalAuthStack() {
 }
 
 function StaffTabs() {
-  const { theme: t } = useTheme()
-  const insets = useSafeAreaInsets()
   return (
-    <StaffTab.Navigator screenOptions={{
-      headerShown: false,
-      tabBarStyle: { backgroundColor: t.cardBg, borderTopColor: t.cardBorder, paddingTop: 8, paddingBottom: insets.bottom || 12, height: 72 + (insets.bottom || 0) },
-      tabBarActiveTintColor: t.accent, tabBarInactiveTintColor: t.textMuted,
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-    }}>
-      <StaffTab.Screen name="AdminDashboard"    component={AdminDashboardScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'grid' : 'grid-outline'} {...p} />,           tabBarLabel: 'Home' }} />
-      <StaffTab.Screen name="FrontDeskQueue"    component={FrontDeskQueueScreen}    options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'list' : 'list-outline'} {...p} />,           tabBarLabel: 'Queue' }} />
-      <StaffTab.Screen name="WalkInBooking"     component={WalkInBookingScreen}     options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'add-circle' : 'add-circle-outline'} {...p} />, tabBarLabel: 'Walk-in' }} />
-      <StaffTab.Screen name="StaffAppointments" component={StaffAppointmentsScreen} options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'calendar' : 'calendar-outline'} {...p} />,   tabBarLabel: 'Appointments' }} />
-      <StaffTab.Screen name="StaffMore"         component={StaffMoreScreen}         options={{ tabBarIcon: p => <TabIcon name={p.focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'} {...p} />, tabBarLabel: 'More' }} />
+    <StaffTab.Navigator
+      // Same custom bar as the patient app: the selected tab is marked by a
+      // rule on its own top edge, which the default bar cannot draw.
+      tabBar={props => <QTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <StaffTab.Screen name="AdminDashboard"    component={AdminDashboardScreen}    options={{ tabBarLabel: 'Home' }} />
+      <StaffTab.Screen name="FrontDeskQueue"    component={FrontDeskQueueScreen}    options={{ tabBarLabel: 'Queue' }} />
+      <StaffTab.Screen name="WalkInBooking"     component={WalkInBookingScreen}     options={{ tabBarLabel: 'Walk-in' }} />
+      <StaffTab.Screen name="StaffAppointments" component={StaffAppointmentsScreen} options={{ tabBarLabel: 'Appointments' }} />
+      <StaffTab.Screen name="StaffMore"         component={StaffMoreScreen}         options={{ tabBarLabel: 'More' }} />
     </StaffTab.Navigator>
   )
 }
 
 function StaffStack() {
+  const { theme: t } = useTheme()
   return (
     <StaffStackN.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      // v4 screens sit on the canvas, not under a teal header, so the status-bar
+      // icons follow the palette rather than being pinned light.
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <StaffStackN.Screen name="StaffTabs"          component={StaffTabs} />
       <StaffStackN.Screen name="FrontDeskProfile"   component={FrontDeskProfileScreen as any} />
       <StaffStackN.Screen name="HospitalMessages"   component={HospitalMessagesScreen as any} />
@@ -108,8 +111,10 @@ function StaffStack() {
       <StaffStackN.Screen name="HospitalClinics"       component={HospitalClinicsScreen as any} />
       <StaffStackN.Screen name="HospitalClinicDetail"  component={HospitalClinicDetailScreen as any} />
       <StaffStackN.Screen name="HospitalServices"      component={HospitalServicesScreen as any} />
+      <StaffStackN.Screen name="LabOrders"             component={LabOrdersScreen as any} />
       <StaffStackN.Screen name="HospitalSchedule"      component={HospitalScheduleScreen as any} />
       <StaffStackN.Screen name="AmbulanceRequests"     component={AmbulanceRequestsScreen as any} />
+      <StaffStackN.Screen name="Beds"                  component={BedsScreen as any} />
       <StaffStackN.Screen name="Patients"              component={PatientsScreen as any} />
       <StaffStackN.Screen name="VirtualCare"           component={VirtualCareScreen as any} />
       <StaffStackN.Screen name="AmbulanceAlerts"       component={AmbulanceAlertsScreen as any} />
@@ -123,10 +128,10 @@ function StaffStack() {
 // onboarding creates the hospital. Without this stack they land on the no-access
 // screen immediately after signing up, which is where registration used to dead-end.
 function HospitalOnboardingStack() {
+  const { theme: t } = useTheme()
   return (
     <OnboardStk.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
-      // Staff screens sit under the teal v3.1 header, so status-bar icons are light.
-      screenListeners={{ focus: () => setStatusBarStyle('light', true) }}>
+      screenListeners={{ focus: () => setStatusBarStyle(t.isDark ? 'light' : 'dark', true) }}>
       <OnboardStk.Screen name="HospitalOnboarding" component={HospitalOnboardingScreen as any} />
     </OnboardStk.Navigator>
   )
@@ -137,6 +142,7 @@ function AppNavigator() {
   const { session, loading, user, staffProfile, crewProfile, pendingHospitalOnboarding, signOut } = useAuth()
   const { theme: t } = useTheme()
   usePushNotifications(user?.id)
+  useDeviceRegistration(user?.id, 'hospital')
 
   if (loading) {
     return (
@@ -199,10 +205,15 @@ function AppNavigator() {
 // for every screen at once rather than per-screen.
 function ThemedNav({ children }: { children: React.ReactNode }) {
   const { theme: t } = useTheme()
+  // Was pinned to DarkTheme. The hospital app defaults to the LIGHT palette
+  // now, and a dark navigator theme under light screens shows as a dark flash
+  // on every push and a dark gap behind the scene.
+  const base = t.isDark ? DarkTheme : DefaultTheme
   const navTheme = {
-    ...DarkTheme,
+    ...base,
+    dark: t.isDark,
     colors: {
-      ...DarkTheme.colors,
+      ...base.colors,
       background: t.canvasBg,
       card:       t.cardBg,
       text:       t.textPrimary,
@@ -221,7 +232,7 @@ function App() {
   const fontsReady = useQueueFonts()
   if (!fontsReady) return null
   return (
-    <ThemeProvider>
+    <ThemeProvider palettes={V4_PALETTES} defaultMode="light">
       <AlertProvider>
         <AuthProvider>
           <LocationProvider>

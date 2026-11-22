@@ -66,7 +66,7 @@ export function SplashScreen({
     opacity: v,
     transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
   })
-  const onAccent = t.id === 'forest' ? '#081416' : '#FFFFFF'
+  const onAccent = t.q.onPrimary
 
   return (
     <View style={[styles.root, { backgroundColor: t.splashBg }]}>

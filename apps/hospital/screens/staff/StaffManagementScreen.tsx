@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
-import { Header, SegmentedControl } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, Seg, Btn, BottomBar, Empty, IconBtn,
+  Initials, type PillTone,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -146,127 +147,136 @@ export function StaffManagementScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Staff & doctors" onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-        right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {tab === 'staff' ? (
-          isHospitalAdmin ? (
-            // Staff logins are created per clinic (POST /api/clinic-staff needs a clinic,
-            // name and temporary password); that form lives on the clinic's page. The
-            // email-only invite that used to open here could never succeed.
-            <TouchableOpacity onPress={() => Alert.alert('Add staff from a clinic',
-              'Front desk and clinic admin logins belong to a clinic. Open the clinic and tap + Add Staff Member.',
-              [{ text: 'Cancel', style: 'cancel' }, { text: 'Open clinics', onPress: () => navigation.navigate('HospitalClinics') }])}
-              style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
-              <Ionicons name="person-add-outline" size={14} color="#0F766E" />
-              <Text style={[s.inviteBtnText, { color: '#0F766E' }]}>Invite</Text>
-            </TouchableOpacity>
-          ) : null
-        ) : (
-          canAddDoctor ? (
-            <TouchableOpacity onPress={() => setShowLinkDoctor(true)} style={[s.inviteBtn, { backgroundColor: '#FFFFFF' }]}>
-              <Ionicons name="link-outline" size={14} color="#0F766E" />
-              <Text style={[s.inviteBtnText, { color: '#0F766E' }]}>Link</Text>
-            </TouchableOpacity>
-          ) : null
-        )}
-      
-        </View>}>
-        <SegmentedControl<'staff' | 'doctors'> onDark value={tab} onChange={setTab}
-          options={[{ value: 'staff', label: `Admin & front desk (${staff.length})` }, { value: 'doctors', label: `Doctors (${doctors.length})` }]} />
-      </Header>
-      <View style={{ height: 14 }} />
+    <Screen>
+      <AppBar
+        title="Staff & doctors"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        right={tab === 'doctors' && canAddDoctor
+          ? <IconBtn name="link-outline" label="Link a doctor" onPress={() => setShowLinkDoctor(true)} />
+          : undefined}
+      />
 
+      <Seg<'staff' | 'doctors'>
+        value={tab} onChange={setTab}
+        options={[
+          { key: 'doctors', label: `Doctors · ${doctors.length}` },
+          { key: 'staff', label: `Staff · ${staff.length}` },
+        ]}
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={t.accent} />
+          <ActivityIndicator color={t.q.primary} />
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
           {tab === 'staff' && (
             staff.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="people-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No staff yet</Text>
-                <Text style={[s.emptySub, { color: t.textMuted }]}>Invite your team to get started.</Text>
-              </View>
-            ) : staff.map(member => (
-              <View key={member.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-                <View style={[s.avatar, { backgroundColor: `${t.accent}20`, borderColor: `${t.accent}40` }]}>
-                  <Text style={[s.avatarText, { color: t.accent }]}>{initials(member.full_name)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.memberName, { color: t.textPrimary }]}>{member.full_name}</Text>
-                  <Text style={[s.memberEmail, { color: t.textMuted }]}>{member.email}</Text>
-                  {member.clinic_name && <Text style={[s.memberMeta, { color: t.textMuted }]}>{member.clinic_name}</Text>}
-                </View>
-                <View style={[s.roleBadge, { backgroundColor: `${t.accent}18`, borderColor: `${t.accent}30` }]}>
-                  <Text style={[s.roleText, { color: t.accent }]}>{ROLE_LABEL[member.role] ?? member.role}</Text>
-                </View>
-              </View>
-            ))
+              <Card style={{ marginTop: 12 }}>
+                <Empty
+                  icon="people-outline"
+                  title="No staff yet"
+                  body="Front desk and clinic admin logins belong to a clinic. Open a clinic and add them there."
+                  action={isHospitalAdmin ? 'Open clinics' : undefined}
+                  onAction={() => navigation.navigate('HospitalClinics')}
+                />
+              </Card>
+            ) : (
+              <Card>
+                {staff.map((member, i) => (
+                  <View key={member.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      leading={<Initials name={member.full_name} size={40} />}
+                      title={member.full_name}
+                      sub={[member.email, member.clinic_name].filter(Boolean).join(' · ')}
+                      pill={ROLE_LABEL[member.role] ?? member.role}
+                      pillTone="neutral"
+                    />
+                  </View>
+                ))}
+              </Card>
+            )
           )}
 
           {tab === 'doctors' && (
             doctors.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="medical-outline" size={48} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-                <Text style={[s.emptyTitle, { color: t.textPrimary }]}>No doctors yet</Text>
-                <Text style={[s.emptySub, { color: t.textMuted }]}>Tap Link above and enter a doctor's ID to add them.</Text>
-              </View>
-            ) : doctors.map(doc => {
-              const avail = AVAIL_META[doc.availability_status] ?? AVAIL_META.off_duty
-              const busy = togglingId === doc.id
-              return (
-                <View key={doc.id} style={[s.card, { backgroundColor: t.cardBg, borderColor: t.cardBorder, flexDirection: 'column', alignItems: 'stretch', gap: 12, opacity: doc.is_active ? 1 : 0.55 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={[s.avatar, { backgroundColor: t.infoSubtle, borderColor: t.infoBorder }]}>
-                      <Text style={[s.avatarText, { color: t.info }]}>{initials(doc.full_name)}</Text>
+              <Card style={{ marginTop: 12 }}>
+                <Empty
+                  icon="medical-outline"
+                  title="No doctors yet"
+                  body="Every doctor has their own Queue account. Link one by their doctor ID to add them here."
+                  action={canAddDoctor ? 'Link a doctor' : undefined}
+                  onAction={() => setShowLinkDoctor(true)}
+                />
+              </Card>
+            ) : (
+              <Card>
+                {doctors.map((doc, i) => {
+                  const avail = AVAIL_META[doc.availability_status] ?? AVAIL_META.off_duty
+                  const busy = togglingId === doc.id
+                  const tone: PillTone = !doc.is_active ? 'neutral'
+                    : doc.availability_status === 'on_duty' ? 'green'
+                    : doc.availability_status === 'on_break' ? 'amber' : 'neutral'
+                  return (
+                    <View key={doc.id}>
+                      {i > 0 && <Hair />}
+                      <Row
+                        leading={<Initials name={doc.full_name} size={40} tint="#7C2D12" />}
+                        dim={!doc.is_active}
+                        title={[doc.title, doc.full_name].filter(Boolean).join(' ')}
+                        sub={[doc.specialty_name, doc.email].filter(Boolean).join(' · ')}
+                        pill={doc.is_active ? avail.label : 'Inactive'}
+                        pillTone={tone}
+                      />
+                      {canAddDoctor && (
+                        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                          <Btn
+                            label={doc.is_active ? 'Deactivate' : 'Activate'}
+                            variant="secondary" small
+                            loading={busy}
+                            onPress={() => toggleDoctorActive(doc)}
+                          />
+                        </View>
+                      )}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.memberName, { color: t.textPrimary }]}>{[doc.title, doc.full_name].filter(Boolean).join(' ')}</Text>
-                      {doc.specialty_name && <Text style={[s.memberMeta, { color: t.textMuted }]}>{doc.specialty_name}</Text>}
-                      {doc.email && <Text style={[s.memberEmail, { color: t.textMuted }]}>{doc.email}</Text>}
-                    </View>
-                    {doc.is_active ? (
-                      <View style={[s.availBadge, { backgroundColor: `${avail.color}18` }]}>
-                        <View style={[s.availDot, { backgroundColor: avail.color }]} />
-                        <Text style={[s.availText, { color: avail.color }]}>{avail.label}</Text>
-                      </View>
-                    ) : (
-                      <View style={[s.availBadge, { backgroundColor: t.dangerSubtle }]}>
-                        <Text style={[s.availText, { color: t.danger }]}>Inactive</Text>
-                      </View>
-                    )}
-                  </View>
-                  {canAddDoctor && (
-                    <TouchableOpacity
-                      onPress={() => toggleDoctorActive(doc)}
-                      disabled={busy}
-                      style={[s.docToggleBtn, { borderColor: doc.is_active ? t.cardBorder : t.accent, backgroundColor: doc.is_active ? 'transparent' : `${t.accent}18` }]}>
-                      {busy
-                        ? <ActivityIndicator size="small" color={t.textMuted} />
-                        : <Text style={{ fontSize: 12, fontWeight: '700', color: doc.is_active ? t.textMuted : t.accent }}>
-                            {doc.is_active ? 'Deactivate' : 'Activate'}
-                          </Text>}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )
-            })
+                  )
+                })}
+              </Card>
+            )
           )}
-        </ScrollView>
+
+          {tab === 'staff' && isHospitalAdmin && staff.length > 0 && (
+            <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+              <Text style={{ fontSize: 12, lineHeight: 18, color: t.q.ink60 }}>
+                Front desk and clinic admin logins are created inside a clinic, so they come with the
+                right scope. Open the clinic and add them there.
+              </Text>
+            </View>
+          )}
+        </Body>
       )}
 
+      {tab === 'doctors' && canAddDoctor && (
+        <BottomBar>
+          <Btn grow label="Link a doctor" icon="link-outline" onPress={() => setShowLinkDoctor(true)} />
+        </BottomBar>
+      )}
+      {tab === 'staff' && isHospitalAdmin && (
+        <BottomBar>
+          <Btn grow label="Add staff in a clinic" icon="person-add-outline"
+            onPress={() => navigation.navigate('HospitalClinics')} />
+        </BottomBar>
+      )}
 
-      {/* Link doctor modal */}
-      {showLinkDoctor && <LinkDoctorModal theme={t} onClose={() => setShowLinkDoctor(false)} onDone={() => { setShowLinkDoctor(false); load(true) }} />}
-    </SafeAreaView>
+      {showLinkDoctor && (
+        <LinkDoctorModal theme={t} onClose={() => setShowLinkDoctor(false)}
+          onDone={() => { setShowLinkDoctor(false); load(true) }} />
+      )}
+    </Screen>
   )
 }
 

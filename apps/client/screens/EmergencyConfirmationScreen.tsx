@@ -1,49 +1,36 @@
-import { useEffect, useState, useRef } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, Animated, Linking } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Linking } from 'react-native'
 import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { useReducedMotion } from '@queue/shared/hooks/useReducedMotion'
+import {
+  Screen, AppBar, Body, Card, Stat, StatStrip, DetailRow, SectionHead,
+  Notice, Btn, BottomBar, Mono,
+} from '@queue/shared/components/q'
 
 interface Props { navigation: any; route: any }
+
+function getMinutes(slot?: string) {
+  const m = /(\d+)\s*min/.exec(slot ?? '')
+  if (m) return Number(m[1])
+  if (/1\s*hr/.test(slot ?? '')) return 60
+  return 0
+}
 
 export function EmergencyConfirmationScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
   const {
-    urgency, urgencyLabel, urgencyColor,
-    symptom, hospital, slot, total, bookingRef, bedSpaceStatus,
+    urgencyLabel, symptom, hospital, slot, total, bookingRef, bedSpaceStatus,
   } = route.params
 
   const bedSpaceRisk = bedSpaceStatus === 'none' || bedSpaceStatus === 'very_limited'
-
-  const [show, setShow] = useState(false)
-  const [queuePos] = useState(1)           // emergency = top of queue
   const [countdown, setCountdown] = useState(slot === 'Now (walk-in)' ? 0 : getMinutes(slot))
-  const pulseAnim = useRef(new Animated.Value(1)).current
-  const reduceMotion = useReducedMotion()
 
-  useEffect(() => { setTimeout(() => setShow(true), 100) }, [])
-
-  // Pulse animation for the alert icon -- an indefinite loop, so it's gated behind the
-  // OS's reduce-motion setting (WCAG 2.2.2): the icon, color and text around it already
-  // say this is an emergency without the pulse, and this loop has no way to stop.
-  useEffect(() => {
-    if (reduceMotion) return
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.15, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 600, useNativeDriver: true }),
-      ])
-    ).start()
-  }, [reduceMotion])
-
-  // Countdown timer
   useEffect(() => {
     if (countdown <= 0) return
-    const t = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 60000)
-    return () => clearInterval(t)
+    const id = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 60_000)
+    return () => clearInterval(id)
   }, [])
 
   function callHospital() {
@@ -55,8 +42,7 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
     const lat = hospital?.latitude
     const lng = hospital?.longitude
     if (lat != null && lng != null) {
-      const label = encodeURIComponent(hospital?.name ?? '')
-      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`)
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`)
         .catch(() => Alert.alert('Error', 'Could not open Google Maps.'))
     } else if (hospital?.address) {
       const addr = encodeURIComponent(`${hospital.address}, ${hospital.city ?? ''}`)
@@ -67,194 +53,90 @@ export function EmergencyConfirmationScreen({ navigation, route }: Props) {
     }
   }
 
+  // The old screen pulsed this icon on an endless loop. The word "emergency",
+  // the red, and the instructions all say the same thing without it, and an
+  // animation with no end state is the one kind this system does not use.
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: '#0A0301' }]}>
-      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+    <Screen>
+      <AppBar title="Emergency booking confirmed" sub={bookingRef ?? undefined} />
 
-        {/* Pulsing icon */}
-        <Animated.View style={[st.iconCircle, { transform: [{ scale: pulseAnim }],
-          borderColor: urgencyColor, backgroundColor: `${urgencyColor}18`,
-          opacity: show ? 1 : 0 }]}>
-          <Ionicons name="alert-circle-outline" size={48} color={t.danger} />
-        </Animated.View>
-
-        <Text style={[st.headline, { opacity: show ? 1 : 0 }]}>
-          Emergency booking confirmed!
-        </Text>
-        <Text style={[st.sub, { color: 'rgba(255,255,255,0.5)', opacity: show ? 1 : 0 }]}>
-          You have been placed at the{' '}
-          <Text style={{ color: urgencyColor, fontWeight: '700' }}>top of the queue</Text>
-        </Text>
-
-        {/* Live queue card */}
-        <View style={[st.queueCard, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}0D`, opacity: show ? 1 : 0 }]}>
-          <View style={st.queueStat}>
-            <Text style={[st.queueNum, { color: urgencyColor }]}>#{queuePos}</Text>
-            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Position on arrival</Text>
+      <Body>
+        <View style={{ alignItems: 'center', paddingHorizontal: 24, paddingTop: 4, paddingBottom: 18, gap: 8 }}>
+          <View style={{
+            width: 64, height: 64, borderRadius: 32, backgroundColor: t.q.redBg,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="alert-circle" size={32} color={t.q.red} />
           </View>
-          <View style={[st.queueDivider, { backgroundColor: `${urgencyColor}30` }]} />
-          <View style={st.queueStat}>
-            <Text style={[st.queueNum, { color: '#fff' }]}>
-              {countdown === 0 ? 'Now' : `~${countdown} min`}
-            </Text>
-            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>
-              {slot === 'Now (walk-in)' ? 'Walk in now' : 'Time to slot'}
-            </Text>
-          </View>
-          <View style={[st.queueDivider, { backgroundColor: `${urgencyColor}30` }]} />
-          <View style={st.queueStat}>
-            <Text style={[st.queueNum, { color: '#fff' }]}>₦{total?.toLocaleString()}</Text>
-            <Text style={[st.queueLabel, { color: 'rgba(255,255,255,0.4)' }]}>Amount due</Text>
-          </View>
+          <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5, color: t.q.ink, textAlign: 'center' }}>
+            You have a place
+          </Text>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, textAlign: 'center' }}>
+            {[hospital?.name, 'emergency room'].filter(Boolean).join(' · ')}
+          </Text>
         </View>
 
-        {/* Booking details */}
-        <View style={[st.detailCard, { opacity: show ? 1 : 0 }]}>
-          <View style={st.detailHeader}>
-            <Text style={st.detailHeaderLabel}>Booking reference</Text>
-            <Text style={[st.bookingId, { color: urgencyColor }]}>{bookingRef ?? 'QUE-EMG-XXXXX'}</Text>
-          </View>
+        <StatStrip>
+          <Stat label="Position on arrival" value={1} note="emergencies first" />
+          <Stat
+            label={slot === 'Now (walk-in)' ? 'Go' : 'Time to slot'}
+            value={countdown === 0 ? 'Now' : countdown}
+            unit={countdown === 0 ? undefined : 'min'}
+          />
+          <Stat label="Amount due" value={total != null ? `₦${Number(total).toLocaleString('en-NG')}` : '—'}
+            note="pay at the desk" last />
+        </StatStrip>
 
-          {[
-            { label: 'Hospital',   value: hospital?.name ?? '—' },
-            { label: 'Doctor',     value: 'Assigned on arrival' },
-            { label: 'Arrival',    value: slot ?? '—' },
-            { label: 'Urgency',    value: urgencyLabel },
-            { label: 'Condition',  value: symptom ?? '—' },
-          ].map(row => (
-            <View key={row.label} style={st.detailRow}>
-              <Text style={st.detailLabel}>{row.label}</Text>
-              <Text style={st.detailValue} numberOfLines={2}>{row.value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Bed space reminder -- repeated here since this is what the patient actually
-            walks away with; the warning on the booking screen is easy to forget by the
-            time they're in transit. */}
         {bedSpaceRisk && (
-          <View style={[st.bedSpaceCard, {
-            borderColor: bedSpaceStatus === 'none' ? t.dangerStrong : 'rgba(255,140,66,0.4)',
-            backgroundColor: bedSpaceStatus === 'none' ? t.dangerSubtle : 'rgba(255,140,66,0.1)',
-            opacity: show ? 1 : 0,
-          }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Ionicons name="warning-outline" size={16} color={bedSpaceStatus === 'none' ? t.danger : '#FF8C42'} />
-              <Text style={[st.bedSpaceTitle, { color: bedSpaceStatus === 'none' ? t.danger : '#FF8C42' }]}>
-                {bedSpaceStatus === 'none' ? 'Reminder: no bed space confirmed' : 'Reminder: very limited bed space'}
-              </Text>
-            </View>
-            <Text style={st.bedSpaceText}>
-              This isn't guaranteed to change by the time you arrive. Emergencies who arrive first — especially
-              those triaged as more urgent — are seen first. Basic first aid may still be given as capacity allows.
-            </Text>
-          </View>
+          /* Repeated here because this is the screen the patient walks away
+             with; the warning on the booking screen is easy to forget by the
+             time they are in transit. */
+          <Notice tone="red" icon="warning-outline">
+            {bedSpaceStatus === 'none' ? 'No bed space was confirmed. ' : 'Bed space was very limited. '}
+            That is not guaranteed to change by the time you arrive. Emergencies who arrive first,
+            especially more urgent ones, are seen first. First aid may still be given as capacity allows.
+          </Notice>
         )}
 
-        {/* Instructions */}
-        <View style={[st.instructCard, { borderColor: `${urgencyColor}30`, backgroundColor: `${urgencyColor}0A`, opacity: show ? 1 : 0 }]}>
-          <Text style={[st.instructTitle, { color: urgencyColor }]}>What to do now</Text>
+        <SectionHead title="Your booking" />
+        <Card>
+          <DetailRow label="Reference" value={bookingRef ?? '—'} mono />
+          <DetailRow label="Hospital" value={hospital?.name ?? '—'} />
+          <DetailRow label="Doctor" value="Assigned on arrival" />
+          <DetailRow label="Arrival" value={slot ?? '—'} />
+          {!!urgencyLabel && <DetailRow label="Urgency" value={urgencyLabel} />}
+          <DetailRow label="Condition" value={symptom ?? '—'} last />
+        </Card>
+
+        <SectionHead title="What to do now" />
+        <Card pad>
           {[
             slot === 'Now (walk-in)'
-              ? { icon: 'walk-outline' as const, text: 'Head to the hospital immediately — show this booking at the front desk' }
-              : { icon: 'time-outline' as const, text: `Arrive at ${hospital?.name} by your selected time` },
-            { icon: 'card-outline' as const,          text: 'Bring a valid ID and this booking confirmation' },
-            { icon: 'document-text-outline' as const, text: 'You are flagged as priority — front desk has been notified' },
-            { icon: 'call-outline' as const,          text: 'Hospital contact will be shared via SMS shortly' },
-          ].map(tip => (
-            <View key={tip.text} style={[st.instructRow, { borderBottomColor: `${urgencyColor}20`, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }]}>
-              <Ionicons name={tip.icon} size={14} color="rgba(255,255,255,0.55)" style={{ marginTop: 1 }} />
-              <Text style={[st.instructText, { color: 'rgba(255,255,255,0.75)', flex: 1 }]}>{tip.text}</Text>
+              ? 'Go to the emergency room now, and show this screen at triage'
+              : `Arrive at ${hospital?.name ?? 'the hospital'} by your chosen time`,
+            'Bring a valid ID and this confirmation',
+            'You are flagged as priority — the front desk has been notified',
+            'A doctor is assigned when you arrive',
+          ].map((line, i) => (
+            <View key={line} style={{ flexDirection: 'row', gap: 12, paddingVertical: 7 }}>
+              <Mono size={13} weight="700" color={t.q.red}>{i + 1}</Mono>
+              <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 19, color: t.q.ink70 }}>{line}</Text>
             </View>
           ))}
-        </View>
+        </Card>
 
-        {/* Actions */}
-        <View style={[st.actions, { opacity: show ? 1 : 0 }]}>
-          <TouchableOpacity onPress={callHospital} style={[st.callBtn, { borderColor: `${urgencyColor}40`, backgroundColor: `${urgencyColor}18` }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="call-outline" size={16} color={urgencyColor} /><Text style={[st.callBtnText, { color: urgencyColor }]}>Call hospital</Text></View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={getDirections} style={[st.callBtn, { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="map-outline" size={16} color="rgba(255,255,255,0.6)" />
-              <Text style={[st.callBtnText, { color: 'rgba(255,255,255,0.6)' }]}>Get directions</Text>
-            </View>
-          </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 14 }}>
+          <Btn label="Call hospital" variant="secondary" small icon="call-outline" onPress={callHospital} />
+          <Btn label="Get directions" variant="secondary" small icon="map-outline" onPress={getDirections} />
         </View>
+      </Body>
 
-        <View style={[st.actionRow, { opacity: show ? 1 : 0 }]}>
-          <TouchableOpacity
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Appointments' } }] })}
-            style={[st.secondaryBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}>
-            <Text style={st.secondaryBtnText}>View bookings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Home' } }] })}
-            style={[st.doneBtn, { backgroundColor: urgencyColor }]}>
-            <Text style={st.doneBtnText}>Back to home</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </SafeAreaView>
+      <BottomBar>
+        <Btn label="View bookings" variant="secondary"
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Appointments' } }] })} />
+        <Btn grow label="Home"
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Home' } }] })} />
+      </BottomBar>
+    </Screen>
   )
 }
-
-function getMinutes(slot: string): number {
-  if (slot === '15 min') return 15
-  if (slot === '30 min') return 30
-  if (slot === '45 min') return 45
-  if (slot === '1 hr')   return 60
-  return 0
-}
-
-const st = StyleSheet.create({
-  safe:             { flex: 1 },
-  scroll:           { alignItems: 'center', padding: 24, paddingTop: 40 },
-  iconCircle:       { width: 90, height: 90, borderRadius: 28, alignItems: 'center',
-                      justifyContent: 'center', borderWidth: 2, marginBottom: 18 },
-  iconEmoji:        { fontSize: 38 },
-  headline:         { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.6,
-                      textAlign: 'center', marginBottom: 6 },
-  sub:              { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 24 },
-  // Queue card
-  queueCard:        { width: '100%', flexDirection: 'row', borderRadius: 18, borderWidth: 1,
-                      overflow: 'hidden', marginBottom: 16 },
-  queueStat:        { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  queueNum:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
-  queueLabel:       { fontSize: 10, marginTop: 3, textAlign: 'center' },
-  queueDivider:     { width: 1 },
-  // Detail card
-  detailCard:       { width: '100%', backgroundColor: 'rgba(255,255,255,0.05)',
-                      borderRadius: 18, padding: 16, marginBottom: 14,
-                      borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  detailHeader:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  detailHeaderLabel:{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: 0.7 },
-  bookingId:        { fontSize: 12, fontWeight: '700' },
-  detailRow:        { flexDirection: 'row', justifyContent: 'space-between',
-                      paddingVertical: 8, borderBottomWidth: 1,
-                      borderBottomColor: 'rgba(255,255,255,0.07)', gap: 12 },
-  detailLabel:      { fontSize: 12, color: 'rgba(255,255,255,0.4)', flexShrink: 0 },
-  detailValue:      { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '500',
-                      textAlign: 'right', flex: 1 },
-  // Bed space reminder
-  bedSpaceCard:     { width: '100%', borderRadius: 14, borderWidth: 1.5, padding: 13, marginBottom: 14 },
-  bedSpaceTitle:    { fontSize: 12.5, fontWeight: '800' },
-  bedSpaceText:     { fontSize: 11.5, lineHeight: 16, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
-  // Instructions
-  instructCard:     { width: '100%', borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 16 },
-  instructTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase',
-                      letterSpacing: 0.7, marginBottom: 10 },
-  instructRow:      { paddingVertical: 8, borderBottomWidth: 1 },
-  instructText:     { fontSize: 12, lineHeight: 18 },
-  // Actions
-  actions:          { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 12 },
-  callBtn:          { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1 },
-  callBtnText:      { fontSize: 12, fontWeight: '700' },
-  actionRow:        { flexDirection: 'row', gap: 9, width: '100%' },
-  secondaryBtn:     { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
-  secondaryBtnText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
-  doneBtn:          { flex: 1, padding: 13, borderRadius: 13, alignItems: 'center' },
-  doneBtnText:      { fontSize: 13, fontWeight: '700', color: '#fff' },
-})

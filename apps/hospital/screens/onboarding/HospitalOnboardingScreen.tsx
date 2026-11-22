@@ -2,11 +2,11 @@ import { useState, useCallback, useEffect } from 'react'
 import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native'
 import { Text, TextInput } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { Header } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Btn, BottomBar, CardLabel, MONO,
+} from '@queue/shared/components/q'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -233,35 +233,58 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
 
   if (done) {
     return (
-      <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Ionicons name="checkmark-circle" size={72} color={t.accentDark} style={{ marginBottom: 20 }} />
-          <Text style={[s.doneTitle, { color: t.textPrimary }]}>Hospital registered!</Text>
-          <Text style={[s.doneSub, { color: t.textMuted }]}>
-            {name} is now on Queue.
+      <Screen>
+        <AppBar title="Hospital registered" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 }}>
+          <View style={{
+            width: 64, height: 64, borderRadius: 32, backgroundColor: t.q.greenBg,
+            alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+          }}>
+            <Ionicons name="checkmark" size={30} color={t.q.green} />
+          </View>
+          <Text style={{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5, color: t.q.ink, textAlign: 'center' }}>
+            {name} is on Queue
           </Text>
-          <TouchableOpacity
-            onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('MainTabs')}
-            style={[s.doneBtn, { backgroundColor: t.accent }]}>
-            <Text style={s.doneBtnText}>Done</Text>
-          </TouchableOpacity>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: t.q.ink60, textAlign: 'center' }}>
+            Invite your team, add your doctors, and patients can start booking.
+          </Text>
         </View>
-      </SafeAreaView>
+        <BottomBar>
+          <Btn grow label="Open the dashboard"
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('StaffTabs')} />
+        </BottomBar>
+      </Screen>
     )
   }
 
   return (
-    <SafeAreaView edges={['left','right','bottom']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      {/* Header */}
-      <Header title="Register your hospital" subtitle={`Step ${step + 1} of ${STEPS.length} · ${STEPS[step]}`} onBack={goBack} />
+    <Screen>
+      <AppBar
+        title="Register your hospital"
+        sub={`Step ${step + 1} of ${STEPS.length}`}
+        onBack={goBack}
+      />
 
-      {/* Progress bar */}
-      <View style={[s.progressTrack, { backgroundColor: t.cardBorder }]}>
-        <View style={[s.progressFill, { backgroundColor: t.accent, width: `${((step + 1) / STEPS.length) * 100}%` }]} />
+      {/* The whole setup at a glance. Eight segments is a lot of steps to be
+          asked for up front, and seeing where you are in them is the only
+          thing that makes it bearable. */}
+      <View
+        style={{ flexDirection: 'row', gap: 4, paddingHorizontal: 16, paddingBottom: 12 }}
+        accessibilityLabel={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
+        {STEPS.map((label, i) => (
+          <View key={label} style={{ flex: 1, gap: 5 }}>
+            <View style={{ height: 3, borderRadius: 2, backgroundColor: i <= step ? t.q.primary : t.q.line }} />
+            {i === step && (
+              <Text numberOfLines={1} style={{ fontSize: 10.5, fontWeight: '700', color: t.q.ink }}>
+                {label}
+              </Text>
+            )}
+          </View>
+        ))}
       </View>
 
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <Body keyboardShouldPersistTaps="handled">
           {/* ── STEP 0: Basics ── */}
           {step === 0 && (
             <>
@@ -543,18 +566,21 @@ export function HospitalOnboardingScreen({ navigation }: Props) {
               )}
             </>
           )}
-        </ScrollView>
+        </Body>
       </KeyboardAvoidingView>
 
-      {/* Bottom nav */}
-      <View style={[s.footer, { backgroundColor: t.canvasBg, borderTopColor: t.cardBorder }]}>
-        <Button label="Back" onPress={goBack} variant="outline" icon="arrow-back" />
-        <Button
-          label={step === STEPS.length - 1 ? 'Register' : 'Continue'} onPress={goNext} loading={submitting}
-          icon="arrow-forward" iconPosition="right" style={{ flex: 1 }}
+      <BottomBar meta={
+        <Text style={{ fontSize: 12, color: t.q.ink60 }}>{STEPS[step]}</Text>
+      }>
+        <Btn label="Back" variant="secondary" onPress={goBack} />
+        <Btn
+          grow
+          label={step === STEPS.length - 1 ? 'Register hospital' : 'Continue'}
+          loading={submitting}
+          onPress={goNext}
         />
-      </View>
-    </SafeAreaView>
+      </BottomBar>
+    </Screen>
   )
 }
 
@@ -562,24 +588,39 @@ function Field({ label, value, onChange, placeholder, keyboard, multiline, theme
   label: string; value: string; onChange: (v: string) => void
   placeholder?: string; keyboard?: any; multiline?: boolean; theme: any
 }) {
+  // Sentence case, not shouting: the label is read before every answer.
   return (
-    <View style={{ marginBottom: 14 }}>
-      <Text style={[s.fieldLabel, { color: t.textMuted }]}>{label.toUpperCase()}</Text>
-      <View style={[s.fieldInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder, ...(multiline ? { height: 80, alignItems: 'flex-start', paddingTop: 12 } : {}) }]}>
-        <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.textMuted}
-          keyboardType={keyboard ?? 'default'} multiline={multiline}
-          style={[s.fieldInputText, { color: t.textPrimary }]} />
-      </View>
+    <View style={{ marginBottom: 14, gap: 6 }}>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.q.ink70 }}>{label}</Text>
+      <TextInput
+        value={value} onChangeText={onChange} placeholder={placeholder}
+        placeholderTextColor={t.q.ink60}
+        keyboardType={keyboard ?? 'default'} multiline={multiline}
+        accessibilityLabel={label}
+        style={{
+          minHeight: multiline ? 80 : 48,
+          paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14,
+          backgroundColor: t.q.field, borderWidth: 1, borderColor: t.q.line,
+          fontSize: 15, color: t.q.ink,
+          ...(multiline ? { textAlignVertical: 'top' as const } : {}),
+        }}
+      />
     </View>
   )
 }
 
 function TimeInput({ value, onChange, theme: t }: { value: string; onChange: (v: string) => void; theme: any }) {
   return (
-    <View style={[s.timeInput, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-      <TextInput value={value} onChangeText={onChange} maxLength={5} keyboardType="numbers-and-punctuation"
-        style={[s.timeInputText, { color: t.textPrimary }]} />
-    </View>
+    <TextInput
+      value={value} onChangeText={onChange} maxLength={5}
+      keyboardType="numbers-and-punctuation"
+      style={{
+        width: 64, minHeight: 40, borderRadius: 10, borderWidth: 1,
+        borderColor: t.q.line, backgroundColor: t.q.field,
+        paddingHorizontal: 8, textAlign: 'center',
+        fontFamily: MONO, fontSize: 13, color: t.q.ink,
+      }}
+    />
   )
 }
 

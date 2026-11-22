@@ -1,13 +1,15 @@
 import { useState, useCallback, useEffect, type ComponentProps } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
+import { View, RefreshControl } from 'react-native'
+import { Text } from '@queue/shared/components/ui/Typography'
 import { Alert } from '@queue/shared/contexts/AlertContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Button } from '@queue/shared/components/ui/Button'
-import { Header, SegmentedControl, EmptyState } from '@queue/shared/components/ui/v3'
+import {
+  Screen, AppBar, Body, Card, Row, Hair, SectionHead, Seg, SearchField, Notice,
+  Btn, BottomBar, Stat, StatStrip, DayBar, Empty, IconBtn, Mono, type PillTone,
+} from '@queue/shared/components/q'
+import { useIsOffline } from '@queue/shared/hooks/useIsOffline'
+import { getHospitalHours, type DayHours } from '@queue/shared/lib/api'
 import { useAuth }  from '@queue/shared/contexts/AuthContext'
 import { supabase } from '@queue/shared/lib/supabase'
 import { haptics }  from '@queue/shared/lib/haptics'
@@ -17,6 +19,7 @@ import { ringPatient } from '@queue/shared/lib/api'
 import { VitalsEntryModal } from '@queue/shared/components/frontdesk/VitalsEntryModal'
 import { MovePositionModal } from '@queue/shared/components/frontdesk/MovePositionModal'
 import { statusBadgeColors } from '@queue/shared/lib/statusColors'
+import { compareQueueEntries, queueBand } from '@queue/shared/lib/queueOrder'
 
 interface Appt {
   id:               string
@@ -29,6 +32,9 @@ interface Appt {
   reason:           string | null
   urgency:          string | null
   queue_position:   number | null
+  // Arrival time, so a checked-in patient with no doctor yet still sorts by
+  // when they walked in rather than falling to the bottom of the list.
+  checked_in_at:    string | null
   doctor_id:          string | null
   assigned_doctor_id: string | null
   check_in_date:      string | null
@@ -93,15 +99,28 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   const hospitalId = staffProfile?.hospitalId
 
   const load = useCallback(async (silent = false) => {
-    if (!hospitalId) return
+    if (!hospitalId) { setLoading(false); return }
     if (!silent) setLoading(true)
 
-    const today = todayLocalDate()
+    const offline = useIsOffline()
+
+  // Opening hours drive the day bar. Loaded once per hospital; a hospital with
+  // none set simply gets no bar rather than an invented day.
+  const [hours, setHours] = useState<DayHours[] | null>(null)
+  useEffect(() => {
+    if (!hospitalId) return
+    let cancelled = false
+    getHospitalHours(hospitalId).then(h => { if (!cancelled) setHours(h) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [hospitalId])
+  const today_ = hours?.find(h => h.day === new Date().getDay())
+
+  const today = todayLocalDate()
     let query = supabase
       .from('appointments')
       .select(`
         id, booking_ref, appointment_date, start_time, type, status, approval_status, reason, urgency,
-        queue_position, doctor_id, assigned_doctor_id, check_in_date,
+        queue_position, checked_in_at, doctor_id, assigned_doctor_id, check_in_date,
         walkin_patient_name, walkin_patient_phone, referral_reason,
         patient:users!appointments_patient_id_fkey(id, full_name, phone),
         doctor:doctors!appointments_doctor_id_fkey(full_name),
@@ -270,6 +289,19 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
     if (error) { haptics.error(); Alert.alert('Error', error) } else haptics.success()
   }
 
+  const offline = useIsOffline()
+
+  // Opening hours drive the day bar. Loaded once per hospital; a hospital with
+  // none set simply gets no bar rather than an invented day.
+  const [hours, setHours] = useState<DayHours[] | null>(null)
+  useEffect(() => {
+    if (!hospitalId) return
+    let cancelled = false
+    getHospitalHours(hospitalId).then(h => { if (!cancelled) setHours(h) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [hospitalId])
+  const today_ = hours?.find(h => h.day === new Date().getDay())
+
   const today = todayLocalDate()
 
   // Client-side search filter (no API call)
@@ -283,88 +315,152 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
   // self-delay) is actually visible here, not just on the doctor's own queue screen.
   const active = filtered
     .filter(a => !['completed', 'cancelled', 'no_show'].includes(a.status))
-    .sort((a, b) => {
-      const tier = (a.urgency === 'emergency' ? 0 : 1) - (b.urgency === 'emergency' ? 0 : 1)
-      if (tier !== 0) return tier
-      return (a.queue_position ?? Infinity) - (b.queue_position ?? Infinity)
-    })
+    .sort(compareQueueEntries)
   const done   = filtered.filter(a =>  ['completed', 'cancelled', 'no_show'].includes(a.status))
 
   // Stats from full (unfiltered) list
   const checkedInCount = appts.filter(a => a.status === 'checked_in').length
   const pendingCount   = appts.filter(a => ['pending', 'pending_approval', 'confirmed'].includes(a.status)).length
 
-  return (
-    <SafeAreaView edges={['left','right']} style={[s.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title="Live queue"
-        subtitle={loading ? 'Loading…' : `${appts.length} today · ${checkedInCount} checked in · ${pendingCount} pending`}>
-        <SegmentedControl<'today' | 'all'> onDark value={tab} onChange={setTab}
-          options={[{ value: 'today', label: 'Today' }, { value: 'all', label: 'All' }]} />
-      </Header>
+  // The handoff's three groups are exactly the three bands queueOrder already
+  // sorts by, so the headings name the ordering rule instead of inventing a
+  // second one: numbered, arrived-but-unassigned, not here yet.
+  const numbered = active.filter(a => queueBand(a) === 0)
+  const arrived = active.filter(a => queueBand(a) === 1)
+  const expected = active.filter(a => queueBand(a) === 2)
 
-      {/* Search */}
-      {!loading && appts.length > 0 && (
-        <View style={[s.searchWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-          <Ionicons name="search-outline" size={14} color={t.textMuted} style={{ marginRight: 6 }} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by patient name…"
-            placeholderTextColor={t.textMuted}
-            style={[s.searchInput, { color: t.textPrimary }]}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
+  const emergencies = active.filter(a => a.urgency === 'emergency').length
+  const longestWait = active
+    .filter(a => a.status === 'checked_in')
+    .map(a => (a.checked_in_at ? Math.round((Date.now() - Date.parse(a.checked_in_at)) / 60_000) : null))
+    .filter((n): n is number => n != null && Number.isFinite(n))
+    .reduce<number | null>((max, n) => (max == null || n > max ? n : max), null)
+
+  const groups: { title: string; items: Appt[]; note?: string }[] = [
+    { title: `Numbered · ${numbered.length}`, items: numbered },
+    { title: `Arrived · no doctor yet · ${arrived.length}`, items: arrived },
+    { title: `Not arrived · ${expected.length}`, items: expected },
+  ].filter(g => g.items.length > 0)
+
+  return (
+    <Screen>
+      <AppBar large title="Live queue" right={
+        <IconBtn name="refresh-outline" label="Refresh the queue"
+          onPress={() => { haptics.tap(); setRefreshing(true); load(true) }} />
+      } />
+
+      {today_ && !today_.closed && (
+        <DayBar opensAt={today_.open.slice(0, 5)} closesAt={today_.close.slice(0, 5)} />
       )}
 
-      {loading ? (
-        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-          {[0,1,2,3].map(i => <SkeletonCard key={i} />)}
+      <Seg<'today' | 'all'>
+        value={tab} onChange={setTab}
+        options={[{ key: 'today', label: 'Today' }, { key: 'all', label: 'All' }]}
+      />
+
+      <SearchField value={search} onChangeText={setSearch} placeholder="Search by patient name…" />
+
+      {offline && (
+        <Notice tone="amber" icon="cloud-offline-outline">
+          You are offline. This is the last queue your device received — check-ins and approvals will
+          not send until the network is back.
+        </Notice>
+      )}
+
+      {loading && appts.length === 0 ? (
+        <View style={{ paddingHorizontal: 16, gap: 12 }}>
+          {[0, 1, 2, 3].map(i => <SkeletonCard key={i} />)}
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={t.accent} />}
-        >
+        <Body refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true) }}
+            tintColor={t.q.primary} colors={[t.q.primary]} />
+        }>
+          <StatStrip>
+            <Stat label="Waiting" value={checkedInCount}
+              note={longestWait != null ? `longest ${longestWait} min` : 'nobody waiting'} />
+            <Stat label="Unassigned" value={arrived.length}
+              tone={arrived.length > 0 ? 'amber' : undefined}
+              note={arrived.length ? 'need a doctor' : 'all assigned'} />
+            <Stat label="Emergencies" value={emergencies}
+              tone={emergencies > 0 ? 'red' : undefined}
+              note={emergencies ? 'brought forward' : 'none today'} last />
+          </StatStrip>
+
           {filtered.length === 0 && (
-            <EmptyState icon="clipboard-outline" title={search ? 'No patients match your search' : 'No one in the queue yet'}
-              body={search ? `No results for "${search}". Try a different name.`
-                : tab === 'today' ? 'Bookings for today show up here. Add a walk-in from the Walk-in tab.' : 'No appointments found.'}
-              action={!search && tab === 'today' ? 'Add a walk-in' : undefined}
-              onAction={!search && tab === 'today' ? () => navigation.navigate('WalkInBooking') : undefined} />
+            <Card style={{ marginTop: 12 }}>
+              <Empty
+                icon="clipboard-outline"
+                title={search ? 'Nobody matches that' : 'No one in the queue yet'}
+                body={search
+                  ? `Nothing matches "${search}". Try a different name.`
+                  : tab === 'today'
+                    ? 'Bookings for today show up here. Add a walk-in to put someone on the queue now.'
+                    : 'No appointments found.'}
+                action={!search && tab === 'today' ? 'Add a walk-in' : undefined}
+                onAction={!search && tab === 'today' ? () => navigation.navigate('WalkInBooking') : undefined}
+              />
+            </Card>
           )}
 
-          {active.length > 0 && (
-            <>
-              <Text style={[s.groupLabel, { color: t.textPrimary }]}>Active ({active.length})</Text>
-              {active.map(a => (
-                <ApptCard
-                  key={a.id} appt={a} theme={t} actioning={actioning} today={today}
-                  vitals={vitalsMap.get(a.id) ?? null} ringing={ringing}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject}
-                  onRing={handleRing} onRecordVitals={setVitalsTarget} onMove={setMoveTarget}
-                />
-              ))}
-            </>
-          )}
+          {groups.map(g => (
+            <View key={g.title}>
+              <SectionHead title={g.title} />
+              <Card>
+                {g.items.map((a, i) => (
+                  <View key={a.id}>
+                    {i > 0 && <Hair />}
+                    <QueueRow
+                      appt={a} t={t} today={today} actioning={actioning} ringing={ringing}
+                      vitals={vitalsMap.get(a.id) ?? null}
+                      onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject}
+                      onRing={handleRing} onRecordVitals={setVitalsTarget} onMove={setMoveTarget}
+                    />
+                  </View>
+                ))}
+              </Card>
+            </View>
+          ))}
 
           {done.length > 0 && (
             <>
-              <Text style={[s.groupLabel, { color: t.textPrimary, marginTop: 16 }]}>Completed / Cancelled ({done.length})</Text>
-              {done.map(a => (
-                <ApptCard
-                  key={a.id} appt={a} theme={t} actioning={actioning} today={today}
-                  vitals={null} ringing={ringing}
-                  onCheckIn={handleCheckIn} onApprove={handleApprove} onReject={handleReject}
-                  onRing={handleRing} onRecordVitals={setVitalsTarget} onMove={setMoveTarget}
-                />
-              ))}
+              <SectionHead title={`Finished today · ${done.length}`} />
+              <Card>
+                {done.map((a, i) => (
+                  <View key={a.id}>
+                    {i > 0 && <Hair />}
+                    <Row
+                      number={a.queue_position ?? undefined}
+                      dim
+                      title={a.patient?.full_name ?? a.walkin_patient_name ?? 'Walk-in patient'}
+                      sub={`${fmt12(a.start_time)}${a.doctor ? ' · ' + a.doctor.full_name : ''}`}
+                      pill={a.status === 'completed' ? 'Seen' : a.status === 'no_show' ? 'Missed' : 'Cancelled'}
+                      pillTone="neutral"
+                    />
+                  </View>
+                ))}
+              </Card>
             </>
           )}
-        </ScrollView>
+        </Body>
       )}
+
+      <BottomBar meta={
+        <>
+          {offline && (
+            <>
+              <Mono size={12} weight="700" color={t.q.amber}>Offline</Mono>
+              <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+            </>
+          )}
+          <Mono size={12}>Waiting {checkedInCount}</Mono>
+          <Text style={{ marginHorizontal: 7, color: t.q.ink60 }}>·</Text>
+          <Mono size={12} color={arrived.length ? t.q.amber : undefined}>Unassigned {arrived.length}</Mono>
+        </>
+      }>
+        <Btn grow label="Check someone in" icon="person-add-outline"
+          onPress={() => navigation.navigate('WalkInBooking')} />
+      </BottomBar>
 
       {vitalsTarget && (
         <VitalsEntryModal
@@ -385,182 +481,120 @@ export function FrontDeskQueueScreen({ navigation }: Props) {
           onMoved={() => { setMoveTarget(null); load(true) }}
         />
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
 
-function ApptCard({ appt, theme: t, actioning, today, vitals, ringing, onCheckIn, onApprove, onReject, onRing, onRecordVitals, onMove }: {
-  appt: Appt; theme: any; actioning: string | null; today: string
-  vitals: VitalsRow | null; ringing: string | null
-  onCheckIn: (a: Appt) => void; onApprove: (a: Appt) => void; onReject: (a: Appt) => void
-  onRing: (a: Appt) => void; onRecordVitals: (a: Appt) => void; onMove: (a: Appt) => void
+/**
+ * One patient in the queue.
+ *
+ * The old card stacked a name, phone, meta line, reason, referral, two badges,
+ * a booking ref, a vitals strip and up to five buttons. At a front desk that is
+ * read dozens of times an hour, so this is one row carrying the number, who
+ * they are and one status -- with the actions that apply to THIS state, and
+ * nothing else, underneath it.
+ */
+function QueueRow({ appt, t, today, actioning, ringing, vitals, onCheckIn, onApprove, onReject, onRing, onRecordVitals, onMove }: {
+  appt: Appt
+  t: any
+  today: string
+  actioning: string | null
+  ringing: string | null
+  vitals: VitalsRow | null
+  onCheckIn: (a: Appt) => void
+  onApprove: (a: Appt) => void
+  onReject: (a: Appt) => void
+  onRing: (a: Appt) => void
+  onRecordVitals: (a: Appt) => void
+  onMove: (a: Appt) => void
 }) {
-  // `status` and `approval_status` are independent columns -- a booking awaiting manual
-  // review has status='pending', approval_status='pending_approval'; status itself never
-  // holds that string. Derive a single display status so the badge agrees with canApprove below.
+  // `status` and `approval_status` are independent columns -- a booking awaiting
+  // manual review has status='pending', approval_status='pending_approval';
+  // status itself never holds that string.
   const dispStatus = appt.approval_status === 'pending_approval' ? 'pending_approval' : appt.status
-  const statusMeta = buildStatusMeta(t)
-  const fallback  = statusBadgeColors(t).no_show
-  const meta      = statusMeta[dispStatus] ?? { label: dispStatus, color: fallback.text, bg: fallback.bg }
   const isLoading = actioning === appt.id
-  const canCheckIn = (appt.status === 'confirmed' || appt.status === 'pending') && appt.appointment_date === today
-    && appt.approval_status !== 'pending_approval'
+  const canCheckIn = (appt.status === 'confirmed' || appt.status === 'pending')
+    && appt.appointment_date === today && appt.approval_status !== 'pending_approval'
   const canApprove = appt.approval_status === 'pending_approval'
   const isEmergency = appt.urgency === 'emergency'
-  const urgencyColor = isEmergency ? t.danger : appt.urgency === 'urgent' ? t.statusBusy.text : null
   const showVitals = appt.status === 'checked_in' || appt.status === 'in_progress'
   const isRinging = ringing === appt.id
 
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => haptics.tap()}
-      style={[s.card, {
-        backgroundColor: isEmergency ? t.dangerSubtle : t.cardBg,
-        borderColor: isEmergency ? t.danger : t.cardBorder,
-        borderLeftWidth: isEmergency ? 4 : 1,
-      }]}
-    >
-      <View style={s.cardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.patientName, { color: t.textPrimary }]}>{appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in Patient'}</Text>
-          {(appt.patient?.phone ?? appt.walkin_patient_phone) && <Text style={[s.patientPhone, { color: t.textMuted }]}>{appt.patient?.phone ?? appt.walkin_patient_phone}</Text>}
-          <Text style={[s.meta, { color: t.textMuted }]}>
-            {appt.appointment_date !== today ? `${appt.appointment_date} · ` : ''}{fmt12(appt.start_time)}
-            {appt.doctor ? ` · Dr. ${appt.doctor.full_name}` : ''}
-            {' · '}<Ionicons name={appt.type === 'virtual' ? 'videocam-outline' : 'business-outline'} size={10} color={t.textMuted} />{appt.type === 'virtual' ? ' Virtual' : ' In-person'}
-          </Text>
-          {appt.reason && <Text style={[s.reason, { color: t.textMuted }]} numberOfLines={1}>{appt.reason}</Text>}
-          {appt.referred_by && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
-              <Ionicons name="arrow-redo-outline" size={10} color={t.info} />
-              <Text style={{ fontSize: 10, fontWeight: '700', color: t.info }} numberOfLines={1}>
-                {[appt.referred_by.title, appt.referred_by.full_name].filter(Boolean).join(' ')}
-                {appt.referring_clinic?.name ? ` · ${appt.referring_clinic.name}` : ''}
-                {appt.referring_hospital?.name ? ` · ${appt.referring_hospital.name}` : ''}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={{ gap: 6, alignItems: 'flex-end' }}>
-          <View style={[s.badge, { backgroundColor: meta.bg }]}>
-            <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
-          </View>
-          {isEmergency ? (
-            <View style={[s.badge, { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: t.dangerBg, borderWidth: 1, borderColor: t.danger }]}>
-              <Ionicons name="alert-circle-outline" size={10} color={t.danger} />
-              <Text style={[s.badgeText, { color: t.danger }]}>EMERGENCY</Text>
-            </View>
-          ) : urgencyColor && (
-            <View style={[s.badge, { backgroundColor: `${urgencyColor}18` }]}>
-              <Text style={[s.badgeText, { color: urgencyColor, textTransform: 'capitalize' }]}>{appt.urgency}</Text>
-            </View>
-          )}
-          {appt.booking_ref && <Text style={[s.ref, { color: t.textMuted }]}>{appt.booking_ref}</Text>}
-        </View>
-      </View>
+  const waited = appt.checked_in_at
+    ? Math.round((Date.now() - Date.parse(appt.checked_in_at)) / 60_000)
+    : null
 
-      {(canCheckIn || canApprove) && (
-        <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
+  const pill: { label: string; tone: PillTone; solid?: boolean } =
+    isEmergency ? { label: 'Emergency', tone: 'red', solid: true }
+    : dispStatus === 'in_progress' ? { label: 'Now', tone: 'teal', solid: true }
+    : dispStatus === 'checked_in' ? { label: 'Checked in', tone: 'teal' }
+    : dispStatus === 'pending_approval' ? { label: 'Awaiting', tone: 'amber', solid: true }
+    : dispStatus === 'confirmed' ? { label: 'Expected', tone: 'neutral' }
+    : { label: dispStatus.replace(/_/g, ' '), tone: 'neutral' }
+
+  const sub = [
+    appt.appointment_date !== today ? appt.appointment_date : null,
+    appt.doctor ? appt.doctor.full_name : 'No doctor yet',
+    waited != null ? `waited ${waited} min` : fmt12(appt.start_time),
+    appt.type === 'virtual' ? 'video' : null,
+  ].filter(Boolean).join(' · ')
+
+  return (
+    <>
+      <Row
+        number={appt.queue_position ?? undefined}
+        icon={appt.queue_position == null ? (appt.type === 'virtual' ? 'videocam-outline' : 'person-outline') : undefined}
+        iconTone={isEmergency ? 'red' : 'neutral'}
+        tint={isEmergency || dispStatus === 'in_progress'}
+        title={appt.patient?.full_name ?? appt.walkin_patient_name ?? 'Walk-in patient'}
+        sub={sub}
+        pill={pill.label}
+        pillTone={pill.tone}
+        pillSolid={pill.solid}
+      />
+
+      {/* Only the actions this patient's state allows. */}
+      {(canApprove || canCheckIn || showVitals) && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
           {canApprove && (
-            <Button
-              label="Approve" onPress={() => onApprove(appt)} loading={isLoading}
-              disabled={!!actioning} variant="success" icon="checkmark" size="sm"
-            />
-          )}
-          {canApprove && (
-            <Button
-              label="Reject" onPress={() => onReject(appt)} loading={isLoading}
-              disabled={!!actioning} variant="danger" icon="close" size="sm"
-            />
+            <>
+              <Btn label="Approve" small loading={isLoading} disabled={!!actioning}
+                onPress={() => onApprove(appt)} />
+              <Btn label="Decline" variant="secondary" small disabled={!!actioning}
+                onPress={() => onReject(appt)} />
+            </>
           )}
           {canCheckIn && (
-            <Button
-              label="Check In" onPress={() => onCheckIn(appt)} loading={isLoading}
-              disabled={!!actioning} variant="info" icon="arrow-forward" iconPosition="right" size="sm" style={{ flex: 1 }}
-            />
+            <Btn label="Check in" small loading={isLoading} disabled={!!actioning}
+              icon="arrow-forward" onPress={() => onCheckIn(appt)} />
           )}
-        </View>
-      )}
-
-      {/* Vitals peek -- live-ish (polled) once the patient's checked in */}
-      {showVitals && (
-        <View style={[s.vitalsRow, { borderTopColor: t.cardBorder }]}>
-          {vitals ? (
+          {showVitals && (
             <>
-              {vitals.weight_kg != null && <VitalChip icon="scale-outline" text={`${vitals.weight_kg}kg`} theme={t} />}
-              {vitals.height_cm != null && <VitalChip icon="resize-outline" text={`${vitals.height_cm}cm`} theme={t} />}
-              {(vitals.bp_systolic != null && vitals.bp_diastolic != null) &&
-                <VitalChip icon="pulse-outline" text={`${vitals.bp_systolic}/${vitals.bp_diastolic}`} theme={t} />}
-              {vitals.blood_sugar != null && <VitalChip icon="water-outline" text={`${vitals.blood_sugar}mg/dL`} theme={t} />}
+              <Btn label={vitals ? 'Vitals' : 'Add vitals'} variant="secondary" small
+                icon="fitness-outline" onPress={() => onRecordVitals(appt)} />
+              {appt.status === 'checked_in' && (
+                <Btn label="Move" variant="secondary" small icon="swap-vertical-outline"
+                  onPress={() => onMove(appt)} />
+              )}
+              <Btn label={isRinging ? 'Ringing…' : 'Ring'} variant="secondary" small
+                icon="notifications-outline" loading={isRinging} onPress={() => onRing(appt)} />
             </>
-          ) : (
-            <Text style={{ fontSize: 11, color: t.textMuted, fontStyle: 'italic' }}>No vitals recorded yet</Text>
           )}
         </View>
       )}
 
-      {showVitals && (
-        <View style={[s.actions, { borderTopColor: t.cardBorder }]}>
-          <Button label="Vitals" onPress={() => onRecordVitals(appt)} variant="info" icon="fitness-outline" size="sm" style={{ flex: 1 }} />
-          {appt.status === 'checked_in' && (
-            <TouchableOpacity onPress={() => onMove(appt)}
-              style={[s.actionBtn, { flex: 1, backgroundColor: t.statusApproval.bg, borderColor: t.statusApproval.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="swap-vertical-outline" size={13} color={t.statusApproval.text} />
-                <Text style={[s.actionText, { color: t.statusApproval.text }]}>Move</Text>
-              </View>
-            </TouchableOpacity>
+      {/* Vitals read as data, so they are set in the mono face and only shown
+          when there is something to show. */}
+      {showVitals && vitals && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 14, paddingBottom: 12 }}>
+          {vitals.bp_systolic != null && vitals.bp_diastolic != null && (
+            <Mono size={12} color={t.q.ink70}>BP {vitals.bp_systolic}/{vitals.bp_diastolic}</Mono>
           )}
-          <TouchableOpacity onPress={() => onRing(appt)} disabled={isRinging}
-            style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(239,159,39,0.12)', borderColor: 'rgba(239,159,39,0.3)' }]}>
-            {isRinging ? <ActivityIndicator size="small" color={t.statusBusy.text} />
-              : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="notifications-outline" size={13} color={t.statusBusy.text} />
-                  <Text style={[s.actionText, { color: t.statusBusy.text }]}>Ring</Text>
-                </View>}
-          </TouchableOpacity>
+          {vitals.weight_kg != null && <Mono size={12} color={t.q.ink70}>{vitals.weight_kg} kg</Mono>}
+          {vitals.height_cm != null && <Mono size={12} color={t.q.ink70}>{vitals.height_cm} cm</Mono>}
+          {vitals.blood_sugar != null && <Mono size={12} color={t.q.ink70}>{vitals.blood_sugar} mg/dL</Mono>}
         </View>
       )}
-    </TouchableOpacity>
+    </>
   )
 }
-
-function VitalChip({ icon, text, theme: t }: { icon: ComponentProps<typeof Ionicons>['name']; text: string; theme: any }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-      <Ionicons name={icon} size={11} color={t.textMuted} />
-      <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSecondary }}>{text}</Text>
-    </View>
-  )
-}
-
-const s = StyleSheet.create({
-  safe:         { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 },
-  headerTitle:  { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  tabBar:       { flexDirection: 'row', borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
-  tabBtn:       { paddingHorizontal: 14, paddingVertical: 7 },
-  tabBtnText:   { fontSize: 12, fontWeight: '700' },
-  statsBar:     { marginHorizontal: 16, marginBottom: 8, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1 },
-  statsText:    { fontSize: 12 },
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  searchInput:  { flex: 1, fontSize: 14, padding: 0 },
-  groupLabel:   { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  card:         { borderRadius: 14, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
-  cardTop:      { flexDirection: 'row', gap: 10, padding: 14 },
-  patientName:  { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
-  patientPhone: { fontSize: 11, marginTop: 2 },
-  meta:         { fontSize: 11, marginTop: 4 },
-  reason:       { fontSize: 11, marginTop: 3, fontStyle: 'italic' },
-  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  badgeText:    { fontSize: 10, fontWeight: '700' },
-  ref:          { fontSize: 9, fontWeight: '600', marginTop: 2 },
-  actions:      { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: 1 },
-  actionBtn:    { borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1 },
-  vitalsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 14, paddingTop: 10, borderTopWidth: 1 },
-  actionText:   { fontSize: 13, fontWeight: '700' },
-  empty:        { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTitle:   { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  emptySub:     { fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
-})

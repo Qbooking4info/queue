@@ -1,26 +1,26 @@
-// Doctor-first discovery -- separate from SearchScreen (which searches
-// hospitals). Shows every registered, active doctor, not just ones accepting
-// direct (no-hospital) bookings -- a doctor who hasn't opted into that still
-// shows up with their hospital affiliation(s) (see DoctorListItem), just
-// without a direct-booking CTA on their profile. The Virtual/Home Visit
-// filter chips narrow to doctors who specifically opted into that direct-
-// booking type (doctor_profiles.accepts_direct_virtual/accepts_direct_home_visit).
-// Optionally entered pre-filtered to one specialty (from SpecialtyResultsScreen's
-// toggle) via route.params.
+// Doctor-first discovery -- separate from SearchScreen, which searches
+// hospitals. Shows every registered, active doctor, not just ones accepting
+// direct (no-hospital) bookings: a doctor who has not opted into that still
+// appears with their hospital affiliation, just without a direct-booking CTA
+// on their profile. The filter chips narrow to doctors who opted into that
+// direct-booking type.
 import { useState, useEffect, useCallback } from 'react'
-import { View, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
-import { Text, TextInput } from '@queue/shared/components/ui/Typography'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { View, ActivityIndicator, ScrollView } from 'react-native'
 import { useTheme } from '@queue/shared/contexts/ThemeContext'
-import { Header } from '@queue/shared/components/ui/v3'
-import { searchIndependentDoctors, IndependentDoctor } from '@queue/shared/lib/api'
+import { searchIndependentDoctors, type IndependentDoctor } from '@queue/shared/lib/api'
 import { DoctorListItem } from '@queue/shared/components/doctor/DoctorListItem'
 import { haptics } from '@queue/shared/lib/haptics'
+import { Screen, AppBar, Body, Card, Hair, Chip, SearchField, Empty } from '@queue/shared/components/q'
 
 interface Props { navigation: any; route?: any }
 
 type VisitFilter = 'all' | 'virtual' | 'home_visit'
+
+const FILTERS: { key: VisitFilter; label: string }[] = [
+  { key: 'all', label: 'All doctors' },
+  { key: 'virtual', label: 'Sees patients online' },
+  { key: 'home_visit', label: 'Does home visits' },
+]
 
 export function DoctorSearchScreen({ navigation, route }: Props) {
   const { theme: t } = useTheme()
@@ -34,69 +34,63 @@ export function DoctorSearchScreen({ navigation, route }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const results = await searchIndependentDoctors({
+    setDoctors(await searchIndependentDoctors({
       q: q.trim() || undefined,
       visitType: filter === 'all' ? undefined : filter,
       specialtyId,
-    })
-    setDoctors(results)
+    }))
     setLoading(false)
   }, [q, filter, specialtyId])
 
   useEffect(() => {
-    const t = setTimeout(load, 300) // debounce typing
-    return () => clearTimeout(t)
+    const id = setTimeout(load, 300) // debounce typing
+    return () => clearTimeout(id)
   }, [load])
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={[st.safe, { backgroundColor: t.canvasBg }]}>
-      <Header title={specialtyName ? `${specialtyName} doctors` : 'Find a doctor'} onBack={() => navigation.goBack()} />
-      <View style={{ height: 12 }} />
+    <Screen>
+      <AppBar title={specialtyName ? `${specialtyName} doctors` : 'Find a doctor'} onBack={() => navigation.goBack()} />
+      <SearchField value={q} onChangeText={setQ} placeholder="Doctor name or specialty…" />
 
-      <View style={[st.inputWrap, { backgroundColor: t.inputBg, borderColor: t.inputBorder }]}>
-        <Ionicons name="search-outline" size={15} color={t.textMuted} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Doctor name or specialty…" placeholderTextColor={t.textMuted}
-          style={[st.input, { color: t.textPrimary }]} />
-      </View>
-
-      <View style={st.filterRow}>
-        {([['all', 'All'], ['virtual', 'Virtual'], ['home_visit', 'Home Visit']] as [VisitFilter, string][]).map(([key, label]) => (
-          <TouchableOpacity key={key} onPress={() => { haptics.tap(); setFilter(key) }}
-            style={[st.chip, { backgroundColor: filter === key ? t.accentBg : t.cardBg, borderColor: filter === key ? t.accentBorder : t.cardBorder }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: filter === key ? t.accent : t.textMuted }}>{label}</Text>
-          </TouchableOpacity>
+      <ScrollView
+        horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+        style={{ flexGrow: 0 }}>
+        {FILTERS.map(f => (
+          <Chip key={f.key} label={f.label} on={filter === f.key}
+            onPress={() => { haptics.tap(); setFilter(f.key) }} />
         ))}
-      </View>
+      </ScrollView>
 
       {loading ? (
-        <ActivityIndicator color={t.accent} style={{ marginTop: 40 }} />
-      ) : doctors.length === 0 ? (
-        <View style={st.empty}>
-          <Ionicons name="medkit-outline" size={44} color={t.textMuted} style={{ opacity: 0.3, marginBottom: 12 }} />
-          <Text style={[st.emptyTitle, { color: t.textPrimary }]}>No doctors found</Text>
-          <Text style={[st.emptySub, { color: t.textMuted }]}>Try a different search or filter.</Text>
-        </View>
+        <ActivityIndicator color={t.q.primary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          {doctors.map(d => (
-            <DoctorListItem key={d.userId} doctor={d}
-              onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
-          ))}
-        </ScrollView>
+        <Body>
+          {doctors.length === 0 ? (
+            <Card>
+              <Empty
+                icon="medkit-outline"
+                title="No doctors match that"
+                body={filter === 'all'
+                  ? 'Try a shorter search, or browse by specialty instead.'
+                  : 'Try a specialty instead, or clear the filter.'}
+                action={filter === 'all' ? 'Browse by specialty' : 'Clear the filter'}
+                onAction={() => filter === 'all' ? navigation.navigate('SpecialtyBrowse') : setFilter('all')}
+              />
+            </Card>
+          ) : (
+            <Card>
+              {doctors.map((d, i) => (
+                <View key={d.userId}>
+                  {i > 0 && <Hair />}
+                  <DoctorListItem doctor={d}
+                    onPress={() => { haptics.tap(); navigation.navigate('DoctorProfile', { userId: d.userId }) }} />
+                </View>
+              ))}
+            </Card>
+          )}
+        </Body>
       )}
-    </SafeAreaView>
+    </Screen>
   )
 }
-
-const st = StyleSheet.create({
-  safe:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  inputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12 },
-  input:       { flex: 1, fontSize: 13 },
-  filterRow:   { flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 14 },
-  chip:        { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 99, borderWidth: 1 },
-  empty:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle:  { fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  emptySub:    { fontSize: 12, textAlign: 'center' },
-})

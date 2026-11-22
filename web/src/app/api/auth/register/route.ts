@@ -116,7 +116,10 @@ async function handle(req: NextRequest) {
   }
 
   const normPhone = phone ? normaliseDestination('sms' as Channel, phone) : null
-  const { data: profile, error: profErr } = await adminDb.from('users').insert({
+  // Cast: doctor_code and patient_code are NOT NULL with no DB default -- a
+  // BEFORE INSERT trigger generates both (20260821000001, 20260827000001), so
+  // the generated types require columns the database fills in for us.
+  const { data: profile, error: profErr } = await (adminDb.from('users') as any).insert({
     auth_id: created.user.id,
     email,
     full_name: fullName,

@@ -48,7 +48,10 @@ const HOSPITAL_SELECT = 'id, name, slug, address, city, state, country, phone, w
 // registration_number/mdcn_accreditation for the caller's own device even though the
 // anon-key path already excludes them; see 20260726000004_column_privacy_doctors_hospitals_v2.sql).
 const APPOINTMENT_HOSPITAL_SELECT = 'id, name, slug, address, city, state, phone, whatsapp, ' +
-  'latitude, longitude, opd_fee, is_24_hours, emergency_hours'
+  // allow_self_check_in (20261121000009) decides whether the patient is
+  // offered a "I have arrived" button or told to see the desk. Reading it here
+  // means the screen never offers a check-in the server will refuse.
+  'latitude, longitude, opd_fee, is_24_hours, emergency_hours, allow_self_check_in'
 
 // Routed through a cached Next.js API route (60s edge cache) instead of
 // querying Supabase directly — this is the highest-volume read in the app
@@ -314,6 +317,9 @@ export interface AppointmentHospital {
   opd_fee: number | null
   is_24_hours: boolean | null
   emergency_hours: boolean | null
+  /** Optional: absent until 20261121000009 is applied, false unless the
+   *  hospital has opted in. */
+  allow_self_check_in?: boolean | null
 }
 
 export type AppointmentWithRelations = Appointment & {
@@ -712,6 +718,38 @@ export async function createReferral(payload: {
 
 // ── Cancel appointment (with refund policy) ───────────────────────────────────
 
+export type SelfCheckInResult =
+  | { ok: true; queuePosition: number | null; estimatedWait: number | null }
+  | { ok: false; error: string; code?: 'SELF_CHECK_IN_OFF' | 'NO_HOSPITAL_LOCATION' | 'TOO_FAR' }
+
+/**
+ * Join the queue on arrival, from the patient's own phone.
+ *
+ * The hospital has to have turned this on, the booking has to be for today,
+ * and the phone has to be at the hospital -- the server checks all three, and
+ * the `code` on a refusal says which one failed so the screen can explain
+ * rather than just going red.
+ */
+export async function selfCheckIn(
+  appointmentId: string,
+  coords: { lat: number; lng: number },
+): Promise<SelfCheckInResult> {
+  const headers = await authHeader()
+  if (!headers) return { ok: false, error: 'Not authenticated' }
+  try {
+    const res = await fetch(`${API_URL}/api/appointments/${appointmentId}/self-check-in`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(coords),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: body?.error ?? 'Could not check you in', code: body?.code }
+    return { ok: true, queuePosition: body?.queuePosition ?? null, estimatedWait: body?.estimatedWait ?? null }
+  } catch {
+    return { ok: false, error: 'Could not reach the hospital. Please see the front desk.' }
+  }
+}
+
 export async function cancelAppointment(
   id: string, reason: string, appointmentDatetime: string
 ): Promise<{ success: boolean; refundPct: number; error?: string }> {
@@ -964,7 +1002,16 @@ export async function moveAppointmentQueuePosition(appointmentId: string, newPos
 // A patient's own queue-position bounds -- current position and how far later
 // they're allowed to move themselves within their own urgency tier.
 export async function getQueuePositionBounds(appointmentId: string): Promise<
-  { ok: true; currentPosition: number | null; minPosition: number; maxPosition: number; queueTotal: number | null; estimatedWait: number | null; status: string }
+  {
+    ok: true; currentPosition: number | null; minPosition: number; maxPosition: number
+    queueTotal: number | null; estimatedWait: number | null; status: string
+    /** People genuinely in front of this patient, and how many of those are emergencies. */
+    aheadOfYou: number | null; emergenciesAhead: number | null
+    /** The number the doctor is with right now, or null between patients. */
+    nowServing: number | null
+    /** When the server computed these -- the card marks itself stale past that. */
+    asOf: string | null
+  }
   | { ok: false; error: string }
 > {
   const headers = await doctorAuthHeader()
@@ -976,6 +1023,9 @@ export async function getQueuePositionBounds(appointmentId: string): Promise<
     return {
       ok: true, currentPosition: body.currentPosition, minPosition: body.minPosition, maxPosition: body.maxPosition,
       queueTotal: body.queueTotal ?? null, estimatedWait: body.estimatedWait, status: body.status,
+      aheadOfYou: body.aheadOfYou ?? null, emergenciesAhead: body.emergenciesAhead ?? null,
+      nowServing: body.nowServing ?? null,
+      asOf: body.asOf ?? null,
     }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Network error' }
@@ -1470,6 +1520,29 @@ export async function reviewDirectAppointment(
 // in. Called from 3 screens (StaffAppointmentsScreen, SpecialistQueueScreen's
 // Upcoming tab, and the web dashboard's appointments page) -- shared here so
 // all three hit the exact same contract.
+/**
+ * The receiving doctor's answer to a referral addressed to them by name.
+ *
+ * approve/reject on PATCH /api/appointments/[id] are hospital-staff actions;
+ * the one exception the route makes is a referral that names this doctor and
+ * is still awaiting a decision. Anything else comes back 403, which is the
+ * correct answer rather than something to work around here.
+ */
+export async function decideReferral(
+  appointmentId: string,
+  decision: { action: 'approve' } | { action: 'reject'; note: string },
+): Promise<string | null> {
+  const headers = await authHeader()
+  if (!headers) return 'Not authenticated'
+  const res = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(decision),
+  })
+  if (!res.ok) { const body = await res.json().catch(() => ({})); return body?.error ?? 'That did not work' }
+  return null
+}
+
 export async function rescheduleHospitalAppointment(
   appointmentId: string,
   payload: { date: string; startTime: string; reason?: string },
